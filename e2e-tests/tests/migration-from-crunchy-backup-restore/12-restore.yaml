@@ -1,0 +1,73 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # No scale-down needed: the cluster is on TL3 and the stanza existed
+      # before this timeline.  When postgres promotes TL3→TL4 after the PITR,
+      # 00000004.history is pushed by the async archiver immediately (stanza
+      # exists), so pg_rewind on the two replicas can trace the ancestry and
+      # rejoin without the scale-to-1 workaround required for step 08.
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-restored,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: primary pod not found"
+        exit 1
+      fi
+
+      # Capture the PITR target NOW — after the step 11 backup has completed.
+      # This guarantees the backup start time < target < after-target rows,
+      # which is the only valid ordering for a time-based pgBackRest restore.
+      pitr_target=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -q -t -c "SELECT to_char(clock_timestamp(), 'YYYY-MM-DD HH24:MI:SS')" \
+        | xargs)
+      echo "PITR target: ${pitr_target}"
+
+      # Force a WAL switch so the LSN at pitr_target is flushed to the archive
+      # before we write the rows that must be absent after restore.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -q -c "SELECT pg_switch_wal();"
+
+      # Write rows that must be absent after the PITR restore.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -d migrationtest -c "
+          INSERT INTO migration_data VALUES
+            (8, 'after-pitr-target-one'),
+            (9, 'after-pitr-target-two');
+        "
+
+      # Resolve the latest full backup label (step 11's second-post-restore-
+      # backup).  Because that backup completed before pitr_target was
+      # captured above, --set is safe: backup-start < pitr_target.
+      backup_label=$(kubectl -n "${NAMESPACE}" exec "${primary}" -- \
+        pgbackrest info --output json --log-level-console=info --stanza=db \
+        | jq -r '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
+
+      if [ -z "${backup_label}" ] || [ "${backup_label}" = "null" ]; then
+        echo "ERROR: could not determine latest full backup label"
+        exit 1
+      fi
+      echo "Restoring from backup: ${backup_label}"
+
+      cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: second-pitr-restore
+      spec:
+        pgCluster: percona-restored
+        repoName: repo1
+        options:
+        - --set=${backup_label}
+        - --type=time
+        - --target="${pitr_target}"
+        - --target-timeline=current
+      EOF
+    timeout: 300

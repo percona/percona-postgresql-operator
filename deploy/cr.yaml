@@ -773,6 +773,8 @@ spec:
 #      pg_audit: true
 #      pgvector: false
 #      pg_repack: false
+#      pg_cron: false
+#      set_user: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

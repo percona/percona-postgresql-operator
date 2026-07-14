@@ -1100,7 +1100,7 @@ func (r *Reconciler) scaleUpInstances(
 		next := naming.GenerateInstance(cluster, set)
 		// if there are any available instance names (as determined by observing any PVCs for the
 		// instance set that are not currently associated with an instance, e.g. in the event the
-		// instance STS was deleted), then reuse them instead of generating a new name
+		// instance STS was deleted), then reuse them instead of generating a new name.
 		if len(availableInstanceNames) > 0 {
 			next.Name = availableInstanceNames[0]
 			availableInstanceNames = availableInstanceNames[1:]

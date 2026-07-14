@@ -302,6 +302,12 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
 		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
 	}
+	if cr.Spec.Extensions.BuiltIn.PGCron == nil {
+		cr.Spec.Extensions.BuiltIn.PGCron = new(false)
+	}
+	if cr.Spec.Extensions.BuiltIn.SetUser == nil {
+		cr.Spec.Extensions.BuiltIn.SetUser = new(false)
+	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = new(true)
@@ -492,6 +498,12 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
+	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
+		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.BuiltIn.PGCron
+	}
+	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
+		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.BuiltIn.SetUser
+	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 	postgresCluster.Spec.TLS = cr.Spec.TLS
@@ -544,7 +556,16 @@ type PostgresStatus struct {
 
 	// +optional
 	ImageID string `json:"imageID"`
+
+	// +optional
+	Distribution string `json:"distribution,omitempty"`
 }
+
+// PostgreSQL distribution values reported in PostgresStatus.Distribution.
+const (
+	PostgresDistributionPercona   = "percona"
+	PostgresDistributionCommunity = "community"
+)
 
 type PGBouncerStatus struct {
 	Size int32 `json:"size"`
@@ -885,6 +906,8 @@ type BuiltInExtensionsSpec struct {
 	PGAudit          *bool `json:"pg_audit,omitempty"`
 	PGVector         *bool `json:"pgvector,omitempty"`
 	PGRepack         *bool `json:"pg_repack,omitempty"`
+	PGCron           *bool `json:"pg_cron,omitempty"`
+	SetUser          *bool `json:"set_user,omitempty"`
 }
 
 type ExtensionsSpec struct {

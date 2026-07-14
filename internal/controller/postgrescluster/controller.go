@@ -46,6 +46,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
@@ -53,6 +54,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -302,6 +304,12 @@ func (r *Reconciler) Reconcile(
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.PGCron {
+		pgcron.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.SetUser {
+		setuser.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
