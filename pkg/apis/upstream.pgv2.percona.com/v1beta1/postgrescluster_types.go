@@ -233,6 +233,13 @@ type TLSSpec struct {
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 }
 
+func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
+	if s == nil || s.CertManagementPolicy == "" {
+		return CertManagementAuto
+	}
+	return s.CertManagementPolicy
+}
+
 type CertManagementPolicy string
 
 const (

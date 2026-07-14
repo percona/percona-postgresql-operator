@@ -2222,7 +2222,7 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing),
 	))
 
-	if err == nil && cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+	if err == nil && cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
 		if repoHost != nil && len(existing.Name) == 0 {
 			return errors.Errorf("user-provided pgBackRest secret %q is missing", intent.Name)
 		}

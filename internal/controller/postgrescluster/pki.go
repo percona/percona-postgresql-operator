@@ -39,13 +39,9 @@ func (r *Reconciler) reconcileTLSCertManagementPolicy(ctx context.Context, clust
 		Reason:             "TLSSecretsFound",
 		ObservedGeneration: cluster.GetGeneration(),
 	}
-	policy := v1beta1.CertManagementAuto
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertManagementPolicy != "" {
-		policy = cluster.Spec.TLS.CertManagementPolicy
-	}
 
-	if policy != v1beta1.CertManagementUserProvidedOnly {
-		cond.Message = "certManagementPolicy is " + string(policy)
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
+		cond.Message = "certManagementPolicy is " + string(cluster.Spec.TLS.GetCertManagementPolicy())
 		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
 		return nil
 	}
@@ -184,7 +180,7 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
 		if err != nil {
 			return nil, errors.Wrap(err, "get user-provided root CA secret")
 		}

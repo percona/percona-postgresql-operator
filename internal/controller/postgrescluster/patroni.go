@@ -37,10 +37,12 @@ func (r *Reconciler) deletePatroniArtifacts(
 	selector, err := naming.AsSelector(naming.ClusterPatronis(cluster))
 	if err == nil {
 		err = errors.WithStack(
-			r.Client.DeleteAllOf(ctx, &corev1.Endpoints{},
+			r.Client.DeleteAllOf(
+				ctx, &corev1.Endpoints{},
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector},
-			))
+			),
+		)
 	}
 
 	return err
@@ -158,13 +160,15 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	err := errors.WithStack(r.setControllerReference(cluster, dcsService))
 
 	dcsService.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	dcsService.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// Allocate no IP address (headless) and create no Endpoints.
 	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
@@ -225,7 +229,8 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	logging.FromContext(ctx).V(1).Info("Replacing patroni dynamic configuration")
 
 	return errors.WithStack(
-		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration))
+		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration),
+	)
 }
 
 // generatePatroniLeaderLeaseService returns a v1.Service that exposes the
@@ -237,9 +242,11 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
 	service.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	service.Labels = naming.Merge(
-		cluster.Spec.Metadata.GetLabelsOrNil())
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+	)
 
 	if spec := cluster.Spec.Service; spec != nil {
 		service.Annotations = naming.Merge(service.Annotations,
@@ -338,7 +345,8 @@ func (r *Reconciler) reconcilePatroniStatus(
 
 	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs),
+	))
 
 	if err == nil {
 		if dcs.Annotations["initialize"] != "" {
@@ -380,7 +388,7 @@ func (r *Reconciler) reconcileReplicationSecret(
 		return custom, err
 	}
 
-	if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
 		secret := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
 			return nil, errors.Wrapf(err, "get user-provided replication TLS secret %s", secret.Name)
@@ -417,7 +425,8 @@ func (r *Reconciler) reconcileInternalReplicationSecret(
 ) (*corev1.Secret, error) {
 	existing := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	))
 
 	leaf := &pki.LeafCertificate{}
 	commonName := postgres.ReplicationUser
@@ -440,14 +449,16 @@ func (r *Reconciler) reconcileInternalReplicationSecret(
 
 	// set labels and annotations
 	intent.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "replication-client-tls",
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
@@ -572,7 +583,8 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 		if len(targetInstance.Pods) != 1 {
 			// We expect that a target instance should have one associated pod.
 			return errors.Errorf(
-				"TargetInstance should have one pod. Pods (%d)", len(targetInstance.Pods))
+				"TargetInstance should have one pod. Pods (%d)", len(targetInstance.Pods),
+			)
 		}
 	} else {
 		log.V(1).Info("TargetInstance not provided")
