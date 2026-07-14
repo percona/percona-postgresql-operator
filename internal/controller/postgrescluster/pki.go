@@ -39,8 +39,13 @@ func (r *Reconciler) reconcileTLSCertManagementPolicy(ctx context.Context, clust
 		Reason:             "TLSSecretsFound",
 		ObservedGeneration: cluster.GetGeneration(),
 	}
-	if cluster.Spec.TLS.CertManagementPolicy != v1beta1.CertManagementUserProvidedOnly {
-		cond.Message = "certManagementPolicy is " + string(cluster.Spec.TLS.CertManagementPolicy)
+	policy := v1beta1.CertManagementAuto
+	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CertManagementPolicy != "" {
+		policy = cluster.Spec.TLS.CertManagementPolicy
+	}
+
+	if policy != v1beta1.CertManagementUserProvidedOnly {
+		cond.Message = "certManagementPolicy is " + string(policy)
 		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
 		return nil
 	}
@@ -116,6 +121,7 @@ func (r *Reconciler) reconcileTLSCertManagementPolicy(ctx context.Context, clust
 	meta.SetStatusCondition(&cluster.Status.Conditions, cond)
 	return nil
 }
+
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
@@ -152,14 +158,16 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	)
 	// K8SPG-555: we need to check ca certificate from old operator versions
 	// TODO: remove when 2.4.0 will become unsupported
 	if k8serrors.IsNotFound(err) {
 		nn := client.ObjectKeyFromObject(existing)
 		nn.Name = naming.RootCertSecret
 		err = errors.WithStack(
-			r.Client.Get(ctx, nn, existing))
+			r.Client.Get(ctx, nn, existing),
+		)
 		if err == nil {
 			existing.Name = naming.RootCertSecret
 		}
@@ -361,6 +369,7 @@ func (r *Reconciler) reconcileUserProvidedClusterCertificate(
 
 	return clusterCertSecretProjection(secret), nil
 }
+
 // reconcileInternalClusterCertificate creates a cluster certificate using internal PKI.
 func (r *Reconciler) reconcileInternalClusterCertificate(
 	ctx context.Context, root *pki.RootCertificateAuthority,
@@ -373,7 +382,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 
 	existing := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	))
 
 	leaf := &pki.LeafCertificate{}
 	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
@@ -411,7 +421,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "postgres-tls",
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
