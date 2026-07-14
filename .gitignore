@@ -22,3 +22,6 @@ gke_gcloud_auth_plugin_cache
 ### VisualStudioCode ###
 .vscode/*
 .history
+
+# Isolated worktrees for subagent-driven development
+.worktrees/
