@@ -219,6 +219,8 @@ type ExtensionsSpec struct {
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
+	PGCron           bool `json:"pgCron,omitempty"`
+	SetUser          bool `json:"setUser,omitempty"`
 }
 
 type TLSSpec struct {

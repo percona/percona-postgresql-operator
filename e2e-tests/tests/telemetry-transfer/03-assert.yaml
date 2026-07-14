@@ -8,6 +8,7 @@ data:
       "apply",
       "customResourceUid",
       "databaseVersion",
+      "distribution",
       "helmDeployOperator",
       "kubeVersion",
       "operatorVersion",
