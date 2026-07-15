@@ -141,7 +141,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 	}}
 
 	// Resolve to the ClusterIP for which Patroni has configured the Endpoints.
-	endpoints.Subsets = []corev1.EndpointSubset{{
+	endpoints.Subsets = []corev1.EndpointSubset{{ //nolint:staticcheck // SA1019
 		Addresses: []corev1.EndpointAddress{{IP: leader.Spec.ClusterIP}},
 	}}
 
