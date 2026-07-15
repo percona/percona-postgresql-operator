@@ -252,6 +252,7 @@ func TestApplyIssuer(t *testing.T) {
 		require.NotNil(t, issuer.Spec.CA)
 		assert.Equal(t, naming.ClusterCACertSecret(cluster, CertManagerNamespace()).Name, issuer.Spec.CA.SecretName)
 		assert.Empty(t, issuer.OwnerReferences)
+		assert.Equal(t, naming.LabelPerconaManagedByValue, issuer.Labels[naming.LabelPerconaManagedBy])
 
 		// idempotent
 		err = ctrl.ApplyIssuer(t.Context(), cluster)
@@ -343,6 +344,7 @@ func TestApplyCAIssuer(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, issuer.Spec.SelfSigned)
 		assert.Empty(t, issuer.OwnerReferences)
+		assert.Equal(t, naming.LabelPerconaManagedByValue, issuer.Labels[naming.LabelPerconaManagedBy])
 
 		// idempotent
 		err = ctrl.ApplyCAIssuer(t.Context(), cluster)
@@ -1290,17 +1292,35 @@ func TestResolveIssuerMode(t *testing.T) {
 		assert.Equal(t, IssuerModeManagedCluster, mode)
 	})
 
-	t.Run("Kind ClusterIssuer readable returns managed cluster", func(t *testing.T) {
+	t.Run("Kind ClusterIssuer readable and labeled as ours returns managed cluster", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Spec.TLS = &v1beta1.TLSSpec{
 			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
 		}
-		existing := &v1.ClusterIssuer{ObjectMeta: metav1.ObjectMeta{Name: "shared-issuer"}}
+		existing := &v1.ClusterIssuer{ObjectMeta: metav1.ObjectMeta{
+			Name:   "shared-issuer",
+			Labels: map[string]string{naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue},
+		}}
 		cl := setupFakeClient(t, cluster, existing)
 
 		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
 		require.NoError(t, err)
 		assert.Equal(t, IssuerModeManagedCluster, mode)
+	})
+
+	t.Run("Kind ClusterIssuer readable but not labeled as ours returns external", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		// A pre-existing ClusterIssuer (e.g. ACME-backed) that this operator
+		// never created — no managed-by label.
+		existing := &v1.ClusterIssuer{ObjectMeta: metav1.ObjectMeta{Name: "shared-issuer"}}
+		cl := setupFakeClient(t, cluster, existing)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeExternal, mode)
 	})
 
 	t.Run("Kind ClusterIssuer forbidden returns external", func(t *testing.T) {

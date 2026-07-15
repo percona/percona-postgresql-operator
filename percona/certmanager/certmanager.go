@@ -89,9 +89,18 @@ func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.P
 		existing := &v1.ClusterIssuer{}
 		err := cl.Get(ctx, types.NamespacedName{Name: ic.Name}, existing)
 		switch {
-		case err == nil, k8serrors.IsNotFound(err):
+		// ClusterIssuer not found, operator will create it
+		case k8serrors.IsNotFound(err):
 			return IssuerModeManagedCluster, nil
+		case err == nil:
+			// ClusterIssuer found, check if the operator created it
+			if val, ok := existing.GetLabels()[naming.LabelPerconaManagedBy]; ok && val == naming.LabelPerconaManagedByValue {
+				return IssuerModeManagedCluster, nil
+			}
+			// Operator did not create it, it is managed externally
+			return IssuerModeExternal, nil
 		case k8serrors.IsForbidden(err):
+			// Operator does not have permission, trust blindly that it exists and managed externally
 			return IssuerModeExternal, nil
 		default:
 			return IssuerModeManagedNamespaced, errors.Wrap(err, "failed to get cluster issuer")
@@ -201,7 +210,12 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 
 	if mode == IssuerModeManagedCluster {
 		caSecretName := naming.ClusterCACertSecret(cluster, CertManagerNamespace()).Name
-		meta := metav1.ObjectMeta{Name: issuerRef(cluster, mode).Name}
+		meta := metav1.ObjectMeta{
+			Name: issuerRef(cluster, mode).Name,
+			Labels: map[string]string{
+				naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue,
+			},
+		}
 
 		existing := &v1.ClusterIssuer{}
 		err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name}, existing)
@@ -301,6 +315,9 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 
 	if mode == IssuerModeManagedCluster {
 		meta := naming.ClusterCAIssuer(cluster)
+		meta.Labels = map[string]string{
+			naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue,
+		}
 
 		existing := &v1.ClusterIssuer{}
 		err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name}, existing)
