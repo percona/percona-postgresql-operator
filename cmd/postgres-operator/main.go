@@ -161,7 +161,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:              mgr.GetClient(),
 		Scheme:              mgr.GetScheme(),
 		Owner:               postgrescluster.ControllerName,
-		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName), //nolint:staticcheck
 		Tracer:              otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
 		CertManagerCtrlFunc: certmanager.NewController,
@@ -191,7 +191,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pc := &pgcluster.PGClusterReconciler{
 		Client:               mgr.GetClient(),
 		Owner:                pgcluster.PGClusterControllerName,
-		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName), //nolint:staticcheck
 		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
 		Platform:             detectPlatform(ctx, mgr.GetConfig()),
 		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
@@ -245,7 +245,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pr := &pgrestore.PGRestoreReconciler{
 		Client:   mgr.GetClient(),
 		Owner:    pgrestore.PGRestoreControllerName,
-		Recorder: mgr.GetEventRecorderFor(pgrestore.PGRestoreControllerName),
+		Recorder: mgr.GetEventRecorderFor(pgrestore.PGRestoreControllerName), //nolint:staticcheck
 		Tracer:   otel.Tracer(pgrestore.PGRestoreControllerName),
 	}
 	if err := pr.SetupWithManager(mgr); err != nil {
