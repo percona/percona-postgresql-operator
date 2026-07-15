@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cert-manager/cert-manager/pkg/apis/certmanager"
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -231,7 +233,7 @@ func TestApplyIssuer(t *testing.T) {
 
 		list := &v1.IssuerList{}
 		require.NoError(t, client.List(t.Context(), list))
-		assert.Len(t, list.Items, 0)
+		assert.Empty(t, list.Items)
 	})
 
 	t.Run("create cluster-scoped TLS issuer when Kind is ClusterIssuer", func(t *testing.T) {
@@ -323,7 +325,7 @@ func TestApplyCAIssuer(t *testing.T) {
 
 		list := &v1.IssuerList{}
 		require.NoError(t, client.List(t.Context(), list))
-		assert.Len(t, list.Items, 0)
+		assert.Empty(t, list.Items)
 	})
 
 	t.Run("create cluster-scoped CA issuer when Kind is ClusterIssuer", func(t *testing.T) {
@@ -410,7 +412,7 @@ func TestApplyCACertificate(t *testing.T) {
 
 		list := &v1.CertificateList{}
 		require.NoError(t, client.List(t.Context(), list))
-		assert.Len(t, list.Items, 0)
+		assert.Empty(t, list.Items)
 	})
 
 	t.Run("places CA certificate in cert-manager namespace when Kind is ClusterIssuer", func(t *testing.T) {
@@ -1231,7 +1233,7 @@ func (f *forbiddenGetClient) Get(ctx context.Context, key sigs.ObjectKey, obj si
 	if _, ok := obj.(*v1.ClusterIssuer); ok {
 		return k8serrors.NewForbidden(
 			schema.GroupResource{Group: "cert-manager.io", Resource: "clusterissuers"},
-			key.Name, fmt.Errorf("forbidden"))
+			key.Name, errors.New("forbidden"))
 	}
 	return f.Client.Get(ctx, key, obj, opts...)
 }
@@ -1354,7 +1356,7 @@ func TestIssuerRef(t *testing.T) {
 		ref := issuerRef(cluster, IssuerModeManagedNamespaced)
 		assert.Equal(t, naming.TLSIssuer(cluster).Name, ref.Name)
 		assert.Equal(t, v1.IssuerKind, ref.Kind)
-		assert.Equal(t, "", ref.Group)
+		assert.Equal(t, certmanager.GroupName, ref.Group)
 	})
 
 	t.Run("managed namespaced with issuerConf name override", func(t *testing.T) {
