@@ -57,7 +57,7 @@ type ServiceSpec struct {
 	//
 	// +optional
 	// +kubebuilder:validation:Enum={Cluster,Local}
-	InternalTrafficPolicy *corev1.ServiceExternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
+	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
 
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#traffic-policies
 	//
