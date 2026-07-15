@@ -958,7 +958,7 @@ func TestIssuerModeAwareness(t *testing.T) {
 		primaryService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "external-cluster-cert-primary"}}
 		replicaService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "external-cluster-cert-replicas"}}
 
-		_, err := r.reconcileCertManagerClusterCertificate(ctx, nil, cluster, primaryService, replicaService)
+		_, err := r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
 		assert.NilError(t, err)
 		assert.Equal(t, recovery.applyIssuerCalls, 0)
 	})

@@ -413,14 +413,12 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 
 	clusterScoped := mode == IssuerModeManagedCluster
 
-	var secretMeta metav1.ObjectMeta
-	var issuerRefValue cmmeta.IssuerReference
+	secretMeta := naming.PostgresRootCASecret(cluster)
+	issuerRefValue := cmmeta.IssuerReference{Name: naming.CAIssuer(cluster).Name, Kind: v1.IssuerKind}
+
 	if clusterScoped {
 		secretMeta = naming.ClusterCACertSecret(cluster, CertManagerNamespace())
 		issuerRefValue = cmmeta.IssuerReference{Name: naming.ClusterCAIssuer(cluster).Name, Kind: v1.ClusterIssuerKind}
-	} else {
-		secretMeta = naming.PostgresRootCASecret(cluster)
-		issuerRefValue = cmmeta.IssuerReference{Name: naming.CAIssuer(cluster).Name, Kind: v1.IssuerKind}
 	}
 	certName := secretMeta.Name
 	certNamespace := secretMeta.Namespace

@@ -77,17 +77,6 @@ func (r *Reconciler) reconcileRootCertificate(
 
 	err = errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
-	// K8SPG-555: we need to check ca certificate from old operator versions
-	// TODO: remove when 2.4.0 will become unsupported
-	if k8serrors.IsNotFound(err) && mode == certmanager.IssuerModeManagedNamespaced {
-		nn := client.ObjectKeyFromObject(existing)
-		nn.Name = naming.RootCertSecret
-		err = errors.WithStack(
-			r.Client.Get(ctx, nn, existing))
-		if err == nil {
-			existing.Name = naming.RootCertSecret
-		}
-	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
 
@@ -252,14 +241,14 @@ func (r *Reconciler) reconcileClusterCertificate(
 	}
 
 	if certManagerManaged {
-		return r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		return r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
 	}
 
 	// cluster certificates are not managed by cert-manager
 	// but Certificate object exists due to the bug described in K8SPG-1017
 	// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
 	if cert := certmanager.ClusterCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
-		_, err := r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		_, err := r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
 		if err != nil {
 			logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
 		}
@@ -353,8 +342,9 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 // reconcileCertManagerClusterCertificate creates a cluster certificate using cert-manager.
 // It first ensures the TLS issuer exists, then creates the cluster Certificate CR.
 func (r *Reconciler) reconcileCertManagerClusterCertificate(
-	ctx context.Context, root *pki.RootCertificateAuthority,
-	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	primaryService *corev1.Service,
 	replicaService *corev1.Service,
 ) (
 	*corev1.SecretProjection, error,
