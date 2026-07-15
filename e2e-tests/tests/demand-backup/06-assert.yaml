@@ -34,6 +34,6 @@ apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
-  generation: 3
+  generation: 5
 status:
-  observedGeneration: 3
+  observedGeneration: 5
