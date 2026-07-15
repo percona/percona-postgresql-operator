@@ -324,7 +324,7 @@ func (r *Reconciler) reconcileClusterCertificate(
 		return cluster.Spec.CustomTLSSecret, nil
 	}
 
-	if cluster.Spec.TLS.CertManagementPolicy == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
 		return r.reconcileUserProvidedClusterCertificate(ctx, cluster)
 	}
 	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)

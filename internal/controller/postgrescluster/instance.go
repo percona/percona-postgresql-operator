@@ -1491,7 +1491,12 @@ func (r *Reconciler) reconcileInstanceCertificates(
 	if cluster.Spec.CustomTLSSecret == nil {
 		if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
 			existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
-			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing); err != nil {
+			// Allow the StatefulSet to be created so its generated name is visible
+			// to the user. The next reconciliation checks its certificate Secret
+			// and pauses until the user provides it.
+			if err := client.IgnoreNotFound(
+				r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+			); err != nil {
 				return nil, errors.Wrapf(err, "get user-provided instance TLS secret %s", existing.Name)
 			}
 			return existing, nil
