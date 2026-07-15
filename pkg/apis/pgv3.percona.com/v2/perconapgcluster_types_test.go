@@ -65,6 +65,25 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 	})
 }
 
+func TestPerconaPGCluster_Version(t *testing.T) {
+	t.Run("empty CRVersion does not crash", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		// cr.Version() should not panic when CRVersion is empty
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		// Should return the default operator version
+		assert.Equal(t, version.Version(), ver.String())
+	})
+
+	t.Run("valid CRVersion is parsed correctly", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "2.5.0"
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		assert.Equal(t, "2.5.0", ver.String())
+	})
+}
+
 func TestPerconaPGCluster_Proxy(t *testing.T) {
 	t.Run("Proxy is nil, CRVersion < 2.9.0", func(t *testing.T) {
 		cr := new(PerconaPGCluster)
