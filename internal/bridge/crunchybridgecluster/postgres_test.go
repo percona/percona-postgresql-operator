@@ -36,7 +36,7 @@ func TestGeneratePostgresRoleSecret(t *testing.T) {
 		Name:       "application",
 		SecretName: "application-role-secret",
 	}
-	role := &bridge.ClusterRoleApiResource{
+	role := &bridge.ClusterRoleApiResource{ //nolint:gosec //test data
 		Name:     "application",
 		Password: "password",
 		URI:      "postgres://application:password@example.com:5432/postgres",
@@ -149,7 +149,7 @@ func TestReconcilePostgresRoleSecrets(t *testing.T) {
 			Name:       "application",
 			SecretName: "application-role-secret",
 		}
-		postgresSpec := &v1beta1.CrunchyBridgeClusterRoleSpec{
+		postgresSpec := &v1beta1.CrunchyBridgeClusterRoleSpec{ //nolint:gosec //test data
 			Name:       "postgres",
 			SecretName: "postgres-role-secret",
 		}

@@ -1215,6 +1215,10 @@ func (r *Reconciler) reconcileInstance(
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
 			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
+		if err != nil {
+			return errors.Wrap(err, "failed to populate pod")
+		}
+
 	}
 
 	// Add pgMonitor resources to the instance Pod spec

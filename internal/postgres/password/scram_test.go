@@ -190,7 +190,7 @@ func TestSCRAMSASLPrep(t *testing.T) {
 	tests := []stringStruct{
 		{password: "hippo", expected: "hippo"},
 		{password: "híppo", expected: "híppo"},
-		{password: "こんにちは", expected: "こんにちは"},
+		{password: "こんにちは", expected: "こんにちは"}, //nolint:gosec // test data
 		{password: "hippo\u1680lake", expected: "hippo lake"},
 		{password: "hipp\ufe01o", expected: "hippo"},
 		{password: "hipp\u206ao", expected: "hipp\u206ao"},

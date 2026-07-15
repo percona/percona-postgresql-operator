@@ -521,7 +521,7 @@ func instanceYAML(
 		},
 	}
 
-	postgresql := map[string]any{
+	postgresql := map[string]any{ //nolint:gosec //TODO: investigate the security concern
 		// TODO(cbandy): "bin_dir"
 
 		// Missing here is "connect_address" which cannot be known until the

@@ -142,6 +142,10 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 		}, ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(k.Config, "POST", request.URL())
+	if err != nil {
+		log.Error(err)
+		return err
+	}
 
 	stdoutReader, stdoutWriter := io.Pipe()
 	defer func() {

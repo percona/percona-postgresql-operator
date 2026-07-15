@@ -135,7 +135,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": service "cert-manager-webhook" not found`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": service "cert-manager-webhook" not found`),
 			}, nil
 		}
 
@@ -148,7 +148,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": dial tcp 10.96.38.90:443: connect: connection refused`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": dial tcp 10.96.38.90:443: connect: connection refused`),
 			}, nil
 		}
 
@@ -161,7 +161,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": x509: certificate signed by unknown authority`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": x509: certificate signed by unknown authority`),
 			}, nil
 		}
 

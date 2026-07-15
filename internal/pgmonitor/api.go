@@ -52,7 +52,7 @@ func (exec Executor) GetExporterSetupSQL(ctx context.Context, version int) (stri
 			"/opt/crunchy/bin/postgres/pgbackrest_info.sh")
 	}
 
-	log.V(1).Info("updated pgMonitor default configration", "sql", sql)
+	log.V(1).Info("updated pgMonitor default configuration", "sql", sql)
 
 	return sql, stderr.String(), err
 }

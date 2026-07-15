@@ -255,6 +255,9 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 	existing := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+	if err != nil {
+		return nil, errors.Wrap(err, "get secret")
+	}
 
 	leaf := &pki.LeafCertificate{}
 	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
