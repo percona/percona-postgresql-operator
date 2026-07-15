@@ -19,5 +19,11 @@ commands:
       remove_all_finalizers
       check_operator_panic
       destroy_operator
+
+      # Cluster-scoped, so not owned by (and not garbage-collected with) the
+      # namespaced PostgresCluster/PerconaPGCluster deleted above.
+      issuer_name="${NAMESPACE}-shared-issuer"
+      kubectl delete clusterissuer "$issuer_name" "${issuer_name}-ca-issuer" --ignore-not-found=true
+
       destroy_cert_manager
     timeout: 60
