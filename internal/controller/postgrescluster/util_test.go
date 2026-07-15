@@ -229,15 +229,14 @@ func TestAddNSSWrapper(t *testing.T) {
 				// Each container that requires the nss_wrapper envs should be updated
 				var actualUpdatedContainerCount int
 				for i, c := range template.Spec.Containers {
-					if c.Name == naming.ContainerDatabase ||
-						c.Name == naming.PGBackRestRepoContainerName ||
-						c.Name == naming.PGBackRestRestoreContainerName {
+					switch c.Name {
+					case naming.ContainerDatabase, naming.PGBackRestRepoContainerName, naming.PGBackRestRestoreContainerName:
 						assert.DeepEqual(t, expectedEnv, c.Env)
 						actualUpdatedContainerCount++
-					} else if c.Name == "pgadmin" {
+					case "pgadmin":
 						assert.DeepEqual(t, expectedPGAdminEnv, c.Env)
 						actualUpdatedContainerCount++
-					} else {
+					default:
 						assert.DeepEqual(t, beforeAddNSS[i], c)
 					}
 				}

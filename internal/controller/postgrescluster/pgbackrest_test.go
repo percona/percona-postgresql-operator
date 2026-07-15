@@ -3687,15 +3687,15 @@ func TestObserveRestoreEnv(t *testing.T) {
 		}{{
 			desc: "restore job and all patroni endpoints exist",
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
-				fakeLeaderEP := &corev1.Endpoints{}
+				fakeLeaderEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
 				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
-				fakeDCSEP := &corev1.Endpoints{}
+				fakeDCSEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
 				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
-				fakeFailoverEP := &corev1.Endpoints{}
+				fakeFailoverEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
 				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
@@ -3711,15 +3711,15 @@ func TestObserveRestoreEnv(t *testing.T) {
 		}, {
 			desc: "patroni endpoints only exist",
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
-				fakeLeaderEP := &corev1.Endpoints{}
+				fakeLeaderEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
 				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
-				fakeDCSEP := &corev1.Endpoints{}
+				fakeDCSEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
 				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
-				fakeFailoverEP := &corev1.Endpoints{}
+				fakeFailoverEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
 				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
@@ -3892,19 +3892,19 @@ func TestPrepareForRestore(t *testing.T) {
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
 			) (*batchv1.Job, []corev1.Endpoints) {
-				fakeLeaderEP := corev1.Endpoints{}
+				fakeLeaderEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
 				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeLeaderEP))
-				fakeDCSEP := corev1.Endpoints{}
+				fakeDCSEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
 				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeDCSEP))
-				fakeFailoverEP := corev1.Endpoints{}
+				fakeFailoverEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
 				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeFailoverEP))
-				return nil, []corev1.Endpoints{fakeLeaderEP, fakeDCSEP, fakeFailoverEP}
+				return nil, []corev1.Endpoints{fakeLeaderEP, fakeDCSEP, fakeFailoverEP} //nolint:staticcheck // SA1019
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -3921,7 +3921,7 @@ func TestPrepareForRestore(t *testing.T) {
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
 			) (*batchv1.Job, []corev1.Endpoints) {
-				return nil, []corev1.Endpoints{}
+				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -3949,7 +3949,7 @@ func TestPrepareForRestore(t *testing.T) {
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
 			) (*batchv1.Job, []corev1.Endpoints) {
-				return nil, []corev1.Endpoints{}
+				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -4011,8 +4011,8 @@ func TestPrepareForRestore(t *testing.T) {
 						naming.GenerateStartupInstance(cluster, &cluster.Spec.InstanceSets[0]).Name)
 				}
 
-				leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{}
-				currentEndpoints := []corev1.Endpoints{}
+				leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
+				currentEndpoints := []corev1.Endpoints{}                                                  //nolint:staticcheck // SA1019
 				if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniLeaderEndpoints(cluster)),
 					&leaderEP); err != nil {
 					assert.NilError(t, client.IgnoreNotFound(err))
