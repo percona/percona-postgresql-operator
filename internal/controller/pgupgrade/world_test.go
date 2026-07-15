@@ -57,7 +57,7 @@ func TestPopulateCluster(t *testing.T) {
 }
 
 func TestPopulatePatroniEndpoint(t *testing.T) {
-	endpoints := []corev1.Endpoints{
+	endpoints := []corev1.Endpoints{ //nolint:staticcheck // SA1019
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -85,7 +85,7 @@ func TestPopulatePatroniEndpoint(t *testing.T) {
 	world.populatePatroniEndpoints(endpoints)
 
 	// The first two have the correct labels.
-	assert.DeepEqual(t, world.PatroniEndpoints, []*corev1.Endpoints{
+	assert.DeepEqual(t, world.PatroniEndpoints, []*corev1.Endpoints{ //nolint:staticcheck // SA1019
 		&endpoints[0],
 		&endpoints[1],
 	})

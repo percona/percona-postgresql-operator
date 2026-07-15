@@ -97,7 +97,7 @@ func (w *World) populateCluster(cluster *v1beta1.PostgresCluster, err error) err
 	return err
 }
 
-func (w *World) populatePatroniEndpoints(endpoints []corev1.Endpoints) {
+func (w *World) populatePatroniEndpoints(endpoints []corev1.Endpoints) { //nolint:staticcheck // SA1019
 	for index, endpoint := range endpoints {
 		if endpoint.Labels[LabelPatroni] != "" {
 			w.PatroniEndpoints = append(w.PatroniEndpoints, &endpoints[index])
@@ -164,7 +164,7 @@ type World struct {
 	ClusterShutdown  bool
 	ReplicasExpected int
 
-	PatroniEndpoints []*corev1.Endpoints
+	PatroniEndpoints []*corev1.Endpoints //nolint:staticcheck // SA1019
 	Jobs             map[string]*batchv1.Job
 }
 

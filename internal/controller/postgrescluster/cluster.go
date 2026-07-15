@@ -92,7 +92,7 @@ func (r *Reconciler) reconcileClusterPodService(
 // resolve to the PostgreSQL primary instance.
 func (r *Reconciler) generateClusterPrimaryService(
 	cluster *v1beta1.PostgresCluster, leader *corev1.Service,
-) (*corev1.Service, *corev1.Endpoints, error) {
+) (*corev1.Service, *corev1.Endpoints, error) { //nolint:staticcheck // SA1019
 	// We want to name and label our primary Service consistently. When Patroni is
 	// using Endpoints for its DCS, however, they and any Service that uses them
 	// must use the same name as the Patroni "scope" which has its own constraints.
@@ -118,7 +118,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	// Endpoints for a Service have the same name as the Service. Copy labels,
 	// annotations, and ownership, too.
-	endpoints := &corev1.Endpoints{}
+	endpoints := &corev1.Endpoints{} //nolint:staticcheck // SA1019
 	service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
 	endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
 

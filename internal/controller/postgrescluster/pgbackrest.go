@@ -1004,10 +1004,10 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 // restore Jobs and then updating pgBackRest restore status accordingly.
 func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 	cluster *v1beta1.PostgresCluster,
-) ([]corev1.Endpoints, *batchv1.Job, error) {
+) ([]corev1.Endpoints, *batchv1.Job, error) { //nolint:staticcheck // SA1019
 	// lookup the various patroni endpoints
-	leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{}
-	currentEndpoints := []corev1.Endpoints{}
+	leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{} //nolint:staticcheck // SA1019
+	currentEndpoints := []corev1.Endpoints{}                                                  //nolint:staticcheck // SA1019
 	if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniLeaderEndpoints(cluster)),
 		&leaderEP); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -1130,7 +1130,7 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 // cluster to re-bootstrap using a restored data directory.
 func (r *Reconciler) prepareForRestore(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
-	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string,
+	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string, //nolint:staticcheck // SA1019
 ) error {
 	setPreparingClusterCondition := func(resource string) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{

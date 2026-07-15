@@ -587,7 +587,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	bldr := builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
-		Owns(&corev1.Endpoints{}).
+		Owns(&corev1.Endpoints{}).                     //nolint:staticcheck // SA1019: matches production code
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).

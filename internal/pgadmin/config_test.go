@@ -94,7 +94,7 @@ func TestStartupCommand(t *testing.T) {
 		// Expect flake8 to be happy. Ignore "E401 multiple imports on one line"
 		// in addition to the defaults. The file contents appear in PodSpec, so
 		// allow lines longer than the default to save some vertical space.
-		cmd := exec.Command(flake8, "--extend-ignore=E401", "--max-line-length=99", file)
+		cmd := exec.CommandContext(context.Background(), flake8, "--extend-ignore=E401", "--max-line-length=99", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	})

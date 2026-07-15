@@ -3865,14 +3865,14 @@ func TestPrepareForRestore(t *testing.T) {
 	for _, dedicated := range []bool{true, false} {
 		testCases := []struct {
 			desc            string
-			createResources func(t *testing.T, cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints)
+			createResources func(t *testing.T, cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) //nolint:staticcheck // SA1019: matches production code
 			fakeObserved    *observedInstances
 			result          testResult
 		}{{
 			desc: "remove restore jobs",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
 				job := generateJob(cluster.Name)
 				assert.NilError(t, r.Client.Create(ctx, job))
 				return job, nil
@@ -3891,7 +3891,7 @@ func TestPrepareForRestore(t *testing.T) {
 			desc: "remove patroni endpoints",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
 				fakeLeaderEP.Namespace = namespace
@@ -3920,7 +3920,7 @@ func TestPrepareForRestore(t *testing.T) {
 			desc: "cluster fully prepared",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
 				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{
@@ -3948,7 +3948,7 @@ func TestPrepareForRestore(t *testing.T) {
 			}},
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
 				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{

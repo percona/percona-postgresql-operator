@@ -37,7 +37,7 @@ func (r *Reconciler) deletePatroniArtifacts(
 	selector, err := naming.AsSelector(naming.ClusterPatronis(cluster))
 	if err == nil {
 		err = errors.WithStack(
-			r.Client.DeleteAllOf(ctx, &corev1.Endpoints{},
+			r.Client.DeleteAllOf(ctx, &corev1.Endpoints{}, //nolint:staticcheck // SA1019
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector},
 			))
@@ -336,7 +336,7 @@ func (r *Reconciler) reconcilePatroniStatus(
 		}
 	}
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
+	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)} //nolint:staticcheck // SA1019
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
 

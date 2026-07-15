@@ -185,7 +185,7 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 	}
 	objs = append(objs, postgresCluster)
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster)}
+	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster)} //nolint:staticcheck // SA1019: matches production code
 	dcs.Annotations = map[string]string{
 		"initialize": "system-identifier",
 	}

@@ -477,7 +477,7 @@ func TestReconcilePatroniStatus(t *testing.T) {
 			},
 		}
 
-		endpoints := &corev1.Endpoints{
+		endpoints := &corev1.Endpoints{ //nolint:staticcheck // SA1019: matches production code
 			ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster),
 		}
 		if writeAnnotation {

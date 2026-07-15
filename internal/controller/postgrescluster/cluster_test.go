@@ -596,7 +596,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	_, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
 	assert.ErrorContains(t, err, "not implemented")
 
-	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) {
+	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) { //nolint:staticcheck // SA1019
 		assert.Assert(t, cmp.MarshalMatches(service.TypeMeta, `
 apiVersion: v1
 kind: Service

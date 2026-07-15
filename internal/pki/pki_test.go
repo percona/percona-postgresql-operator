@@ -487,7 +487,7 @@ func strictOpenSSLVerify(t *testing.T, openssl string, root, leaf Certificate) {
 	verify := func(t testing.TB, args ...string) {
 		t.Helper()
 		// #nosec G204 -- args from this test
-		cmd := exec.Command(openssl, append([]string{"verify",
+		cmd := exec.CommandContext(context.Background(), openssl, append([]string{"verify",
 			// Do not use the default trusted CAs.
 			"-no-CAfile", "-no-CApath",
 			// Disable "non-compliant workarounds for broken certificates".
