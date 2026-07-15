@@ -27,7 +27,7 @@ func (r *CrunchyBridgeClusterReconciler) handleDelete(
 	log := ctrl.LoggerFrom(ctx)
 
 	// If the CrunchyBridgeCluster isn't being deleted, add the finalizer
-	if crunchybridgecluster.ObjectMeta.DeletionTimestamp.IsZero() {
+	if crunchybridgecluster.ObjectMeta.DeletionTimestamp.IsZero() { //nolint:staticcheck //test data
 		if !controllerutil.ContainsFinalizer(crunchybridgecluster, finalizer) {
 			controllerutil.AddFinalizer(crunchybridgecluster, finalizer)
 			if err := r.Update(ctx, crunchybridgecluster); err != nil {

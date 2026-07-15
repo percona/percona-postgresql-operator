@@ -23,19 +23,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
 )
 
-func compareMaps(x map[string]string, y map[string]string) bool {
-	if len(x) != len(y) {
-		return false
-	}
-
-	for k, v := range x {
-		if y[k] != v {
-			return false
-		}
-	}
-	return true
-}
-
 func TestBackupOwnerReference(t *testing.T) {
 	// The test is disabled, because there are problems with the fake client
 	//

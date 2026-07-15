@@ -483,7 +483,7 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 })
 
 // tracerWithCounter is a tracer that counts the number of times the Reconcile is called. It should be used for crunchy reconciler.
-type tracerWithCounter struct {
+type tracerWithCounter struct { //nolint:unused
 	noop.Tracer
 	counter int
 	t       trace.Tracer

@@ -183,7 +183,7 @@ cd $PGADMIN_DIR
 		// Get password from secret
 		userPasswordSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
 			Namespace: pgadmin.Namespace,
-			Name:      user.PasswordRef.LocalObjectReference.Name,
+			Name:      user.PasswordRef.Name,
 		}}
 		err := errors.WithStack(
 			r.Client.Get(ctx, client.ObjectKeyFromObject(userPasswordSecret), userPasswordSecret))

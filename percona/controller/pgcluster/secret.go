@@ -32,7 +32,7 @@ func getSecretHash(secrets ...corev1.Secret) string {
 	var data strings.Builder
 
 	for _, secret := range secrets {
-		data.WriteString(fmt.Sprintln(secret.Data))
+		fmt.Fprintln(&data, secret.Data)
 	}
 
 	return fmt.Sprintf("%x", md5.Sum([]byte(data.String()))) //nolint:gosec

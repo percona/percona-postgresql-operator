@@ -47,8 +47,8 @@ func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName,
 func (f *fakeClientWithError) Patch(ctx context.Context, obj crclient.Object,
 	patch crclient.Patch, opts ...crclient.PatchOption,
 ) error {
-	switch {
-	case f.errorType == "patch error":
+	switch f.errorType {
+	case "patch error":
 		return errors.New("patch error")
 	default:
 		return f.Client.Patch(ctx, obj, patch, opts...)

@@ -783,7 +783,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresCluster,
 	spec corev1.PersistentVolumeClaimSpec, repoName string,
 	repoResources *RepoResources,
-) (*corev1.PersistentVolumeClaim, error) {
+) (*corev1.PersistentVolumeClaim, error) { //nolint:unparam
 	annotations := naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil())

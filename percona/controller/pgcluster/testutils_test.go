@@ -150,23 +150,6 @@ func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
 	return cr, nil
 }
 
-func readDefaultBackup(name, namespace string) (*v2.PerconaPGBackup, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "backup.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	bcp := &v2.PerconaPGBackup{}
-
-	if err := yaml.Unmarshal(data, bcp); err != nil {
-		return nil, err
-	}
-
-	bcp.Name = name
-	bcp.Namespace = namespace
-	return bcp, nil
-}
-
 type fakeClient struct {
 	client.Client
 }

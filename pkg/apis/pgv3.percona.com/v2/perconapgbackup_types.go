@@ -140,7 +140,7 @@ type SnapshotStatus struct {
 }
 
 // +kubebuilder:validation:Type=string
-type PITRestoreDateTime struct {
+type PITRestoreDateTime struct { //nolint:recvcheck
 	*metav1.Time `json:",inline"`
 }
 
@@ -184,7 +184,7 @@ func (t PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.Time.Format("2006-01-02 15:04:05.000000-0700"))
+	return json.Marshal(t.Format("2006-01-02 15:04:05.000000-0700"))
 }
 
 type PGBackupStorageType string

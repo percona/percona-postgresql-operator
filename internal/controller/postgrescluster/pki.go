@@ -330,7 +330,7 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 // reconcileCertManagerClusterCertificate creates a cluster certificate using cert-manager.
 // It first ensures the TLS issuer exists, then creates the cluster Certificate CR.
 func (r *Reconciler) reconcileCertManagerClusterCertificate(
-	ctx context.Context, root *pki.RootCertificateAuthority,
+	ctx context.Context, _ *pki.RootCertificateAuthority,
 	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
 	replicaService *corev1.Service,
 ) (

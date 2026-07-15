@@ -20,8 +20,6 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
 )
 
-type finalizerFunc func(context.Context, *v2.PerconaPGCluster) error
-
 func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 

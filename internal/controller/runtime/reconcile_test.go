@@ -38,20 +38,17 @@ func TestErrorWithoutBackoff(t *testing.T) {
 
 func TestRequeueWithBackoff(t *testing.T) {
 	result := RequeueWithBackoff()
-	assert.Assert(t, result.Requeue)
+	assert.Assert(t, !result.IsZero())
 	assert.Assert(t, result.RequeueAfter == 0)
 }
 
 func TestRequeueWithoutBackoff(t *testing.T) {
 	result := RequeueWithoutBackoff(0)
-	assert.Assert(t, result.Requeue)
 	assert.Assert(t, result.RequeueAfter > 0)
 
 	result = RequeueWithoutBackoff(-1)
-	assert.Assert(t, result.Requeue)
 	assert.Assert(t, result.RequeueAfter > 0)
 
 	result = RequeueWithoutBackoff(time.Minute)
-	assert.Assert(t, result.Requeue)
 	assert.Equal(t, result.RequeueAfter, time.Minute)
 }

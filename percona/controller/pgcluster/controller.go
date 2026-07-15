@@ -401,9 +401,6 @@ func (r *PGClusterReconciler) reconcileTLS(ctx context.Context, cr *v2.PerconaPG
 	if err := r.validateTLS(ctx, cr); err != nil {
 		return errors.Wrap(err, "validate TLS")
 	}
-	if err := r.reconcileOldCACert(ctx, cr); err != nil {
-		return errors.Wrap(err, "reconcile old CA")
-	}
 	return nil
 }
 
@@ -455,81 +452,6 @@ func (r *PGClusterReconciler) validateTLS(ctx context.Context, cr *v2.PerconaPGC
 	}
 	if err := validateSecretProjection(cr.Spec.Secrets.CustomReplicationClientTLSSecret, certPaths...); err != nil {
 		return errors.Wrap(err, "failed to validate .spec.customReplicationTLSSecret")
-	}
-	return nil
-}
-
-func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.Secrets.CustomRootCATLSSecret != nil {
-		return nil
-	}
-
-	oldCASecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.RootCertSecret,
-			Namespace: cr.Namespace,
-		},
-	}
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(oldCASecret), oldCASecret)
-	if client.IgnoreNotFound(err) != nil {
-		return errors.Wrap(err, "failed to get old ca secret")
-	}
-
-	if cr.CompareVersion("2.5.0") < 0 {
-		if k8serrors.IsNotFound(err) {
-			// K8SPG-555: We should create an empty secret with old name, so that crunchy part can populate it
-			// instead of creating secrets unique to the cluster
-			// TODO: remove when 2.4.0 will become unsupported
-
-			if err := r.Client.Create(ctx, oldCASecret); err != nil {
-				return errors.Wrap(err, "failed to create ca secret")
-			}
-		}
-		return nil
-	}
-	if k8serrors.IsNotFound(err) {
-		return nil
-	}
-
-	// K8SPG-555: Previously we used a single CA secret for all clusters in a namespace.
-	// We should copy the contents of the old CA secret, if it exists, to the new one, which is unique for each cluster.
-	// TODO: remove when 2.4.0 will become unsupported
-	newCASecret := &corev1.Secret{
-		ObjectMeta: naming.PostgresRootCASecret(
-			&v1beta1.PostgresCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cr.Name,
-					Namespace: cr.Namespace,
-				},
-			}),
-	}
-	err = r.Client.Get(ctx, client.ObjectKeyFromObject(newCASecret), new(corev1.Secret))
-	if client.IgnoreNotFound(err) != nil {
-		return errors.Wrap(err, "failed to get new ca secret")
-	}
-
-	if k8serrors.IsNotFound(err) {
-		err := r.Client.Get(ctx, types.NamespacedName{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
-		}, new(v1beta1.PostgresCluster))
-		if client.IgnoreNotFound(err) != nil {
-			return errors.Wrap(err, "failed to get crunchy cluster")
-		}
-		// If the cluster is new, we should not copy the old CA secret.
-		// We should create an empty secret instead, so that crunchy part can populate it.
-		if !k8serrors.IsNotFound(err) {
-			newCASecret.Data = oldCASecret.Data
-		}
-
-		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
-			newCASecret.Annotations = cr.Spec.Metadata.Annotations
-			newCASecret.Labels = cr.Spec.Metadata.Labels
-		}
-
-		if err := r.Client.Create(ctx, newCASecret); err != nil {
-			return errors.Wrap(err, "failed to create updated CA secret")
-		}
 	}
 	return nil
 }

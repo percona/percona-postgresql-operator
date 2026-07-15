@@ -43,7 +43,7 @@ func init() {
 // +operator-sdk:csv:customresourcedefinitions:resources={{ConfigMap,v1},{Secret,v1},{Service,v1},{CronJob,v1beta1},{Deployment,v1},{Job,v1},{StatefulSet,v1},{PersistentVolumeClaim,v1}}
 //
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
-type PerconaPGCluster struct {
+type PerconaPGCluster struct { //nolint:recvcheck
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
@@ -636,7 +636,7 @@ type Patroni struct {
 
 // Backups struct.
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
-type Backups struct {
+type Backups struct { //nolint:recvcheck
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// pgBackRest archive configuration
@@ -963,7 +963,7 @@ func (p PGInstanceSets) ToCrunchy() []crunchyv1beta1.PostgresInstanceSetSpec {
 	return set
 }
 
-type PGInstanceSetSpec struct {
+type PGInstanceSetSpec struct { //nolint:recvcheck
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 
