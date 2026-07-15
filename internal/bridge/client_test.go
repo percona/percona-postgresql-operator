@@ -188,8 +188,8 @@ func TestClientDoWithBackoff(t *testing.T) {
 
 		// Client with lots of brief backoff.
 		client := NewClient(server.URL, "")
-		client.Backoff.Duration = time.Millisecond
-		client.Backoff.Steps = 100
+		client.Duration = time.Millisecond
+		client.Steps = 100
 		assert.Equal(t, client.BaseURL.String(), server.URL)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
