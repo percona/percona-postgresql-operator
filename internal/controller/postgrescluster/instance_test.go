@@ -1364,7 +1364,7 @@ func TestDeleteInstance(t *testing.T) {
 		NamespacedName: client.ObjectKeyFromObject(cluster),
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, result.Requeue == false)
+	assert.Assert(t, result.RequeueAfter == 0)
 
 	stsList := &appsv1.StatefulSetList{}
 	assert.NilError(t, reconciler.Client.List(ctx, stsList,

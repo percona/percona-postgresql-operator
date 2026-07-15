@@ -101,7 +101,7 @@ func TestCustomLabels(t *testing.T) {
 			NamespacedName: client.ObjectKeyFromObject(cluster),
 		})
 		assert.NilError(t, err)
-		assert.Assert(t, result.Requeue == false)
+		assert.Assert(t, result.RequeueAfter == 0)
 	}
 
 	getUnstructuredLabels := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
@@ -351,7 +351,7 @@ func TestCustomAnnotations(t *testing.T) {
 			NamespacedName: client.ObjectKeyFromObject(cluster),
 		})
 		assert.NilError(t, err)
-		assert.Assert(t, result.Requeue == false)
+		assert.Assert(t, result.RequeueAfter == 0)
 	}
 
 	getUnstructuredAnnotations := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
