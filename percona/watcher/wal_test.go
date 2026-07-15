@@ -16,7 +16,7 @@ import (
 	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
 )
 
-func mustParseTime(layout string, value string) time.Time {
+func mustParseTime(layout string, value string) time.Time { //nolint:unparam
 	time, err := time.Parse(layout, value)
 	if err != nil {
 		panic(err)

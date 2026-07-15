@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:staticcheck // SA1019: uses deprecated APIs that match production code
 package postgrescluster
 
 import (

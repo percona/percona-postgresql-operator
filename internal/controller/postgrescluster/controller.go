@@ -438,9 +438,8 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		var next reconcile.Result
 		if next, err = r.reconcilePGBackRest(ctx, cluster,
-			instances, rootCA, backupsSpecFound); err == nil && !next.IsZero() {
-			result.Requeue = result.Requeue || next.Requeue
-			if next.RequeueAfter > 0 {
+			instances, rootCA, backupsSpecFound); err == nil && next.RequeueAfter > 0 {
+			if result.RequeueAfter == 0 || next.RequeueAfter < result.RequeueAfter {
 				result.RequeueAfter = next.RequeueAfter
 			}
 		}

@@ -77,7 +77,7 @@ func setupDeploymentID(t *testing.T) string {
 // setupFakeClientWithPGOScheme returns a fake client with the PGO scheme added;
 // if `includeCluster` is true, also adds some empty PostgresCluster and CrunchyBridgeCluster
 // items to the client
-func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client {
+func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client { //nolint:unparam
 	t.Helper()
 	if includeCluster {
 		pc := &v1beta1.PostgresClusterList{
