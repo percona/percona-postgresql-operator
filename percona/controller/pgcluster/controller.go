@@ -2,7 +2,7 @@ package pgcluster
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"io"
 	"reflect"
