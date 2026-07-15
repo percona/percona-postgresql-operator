@@ -271,7 +271,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pgAdminReconciler := &standalone_pgadmin.PGAdminReconciler{
 		Client:      mgr.GetClient(),
 		Owner:       "pgadmin-controller",
-		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
+		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin), //nolint:staticcheck
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
 
