@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,9 +338,12 @@ func TestClusterCAIssuer(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "postgres-operator"
 	cluster.Name = "hippo"
+	cluster.Spec.TLS = &v1beta1.TLSSpec{
+		IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer"},
+	}
 
 	meta := ClusterCAIssuer(cluster)
-	assert.Equal(t, meta.Name, "hippo-postgres-operator-ca-issuer")
+	assert.Equal(t, meta.Name, "shared-tls-issuer-ca-issuer")
 	assert.Equal(t, meta.Namespace, "")
 }
 
@@ -347,8 +351,11 @@ func TestClusterCACertSecret(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "postgres-operator"
 	cluster.Name = "hippo"
+	cluster.Spec.TLS = &v1beta1.TLSSpec{
+		IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer"},
+	}
 
 	meta := ClusterCACertSecret(cluster, "cert-manager")
-	assert.Equal(t, meta.Name, "hippo-postgres-operator-cluster-ca-cert")
+	assert.Equal(t, meta.Name, "shared-tls-issuer-ca-cert")
 	assert.Equal(t, meta.Namespace, "cert-manager")
 }

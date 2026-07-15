@@ -657,26 +657,19 @@ func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
-// ClusterCAIssuer returns the ObjectMeta for the cluster-scoped self-signed
-// CA ClusterIssuer used by cert-manager when spec.tls.issuerConf.kind is
-// "ClusterIssuer" (K8SPG-951). The name is qualified by cluster name and
-// namespace so multiple PostgresClusters sharing this mode don't collide;
-// ClusterIssuers have no namespace of their own.
+// K8SPG-951
+// ClusterCAIssuer returns the ObjectMeta for the cluster-scoped CA ClusterIssuer used by cert-manager.
 func ClusterCAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name: cluster.Name + "-" + cluster.Namespace + "-ca-issuer",
+		Name: cluster.Spec.TLS.IssuerConf.Name + "-ca-issuer",
 	}
 }
 
-// ClusterCACertSecret returns the ObjectMeta for the CA certificate Secret
-// backing a cluster-scoped self-signed CA ClusterIssuer (K8SPG-951).
-// certManagerNamespace is cert-manager's shared "cluster resource namespace"
-// (see percona/certmanager.CertManagerNamespace) — a ClusterIssuer's
-// spec.ca.secretName is resolved there, not in the PostgresCluster's own
-// namespace.
+// K8SPG-951
+// ClusterTLSIssuer returns the ObjectMeta for the cluster-scoped TLS ClusterIssuer used by cert-manager.
 func ClusterCACertSecret(cluster *v1beta1.PostgresCluster, certManagerNamespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: certManagerNamespace,
-		Name:      cluster.Name + "-" + cluster.Namespace + "-cluster-ca-cert",
+		Name:      cluster.Spec.TLS.IssuerConf.Name + "-ca-cert",
 	}
 }
