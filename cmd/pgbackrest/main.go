@@ -388,7 +388,7 @@ else
 fi
 `
 
-	localHashCmd := exec.Command("bash", "-ceu", "--", localScript)
+	localHashCmd := exec.CommandContext(ctx, "bash", "-ceu", "--", localScript)
 	hashOutput, err := localHashCmd.Output()
 	if err != nil {
 		log.Fatalf("unable to calculate hash for pgBackRest config: %v", err)

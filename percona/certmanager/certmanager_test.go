@@ -2,7 +2,6 @@ package certmanager
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -174,7 +173,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf("some unexpected error"),
+				err: errors.Errorf("some unexpected error"),
 			}, nil
 		}
 

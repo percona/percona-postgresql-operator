@@ -293,7 +293,7 @@ cd $PGADMIN_DIR
 	// to add a user, that user will not be in intentUsers. If errors occurred when attempting to
 	// update a user, the user will be in intentUsers as it existed before. We now want to marshal the
 	// intentUsers to json and write the users.json file to the secret.
-	intentUserSecret.Data["users.json"], _ = json.Marshal(intentUsers)
+	intentUserSecret.Data["users.json"], _ = json.Marshal(intentUsers) //nolint:gosec //TODO:investigate the security concern
 
 	err = errors.WithStack(r.setControllerReference(pgadmin, intentUserSecret))
 	if err == nil {

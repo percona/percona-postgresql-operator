@@ -38,7 +38,7 @@ func executable(name string, args ...string) func(testing.TB) string {
 		t.Helper()
 		once.Do(func() {
 			path, err := exec.LookPath(name)
-			cmd := exec.Command(path, args...) // #nosec G204 -- args from init()
+			cmd := exec.Command(path, args...) //nolint:noctx // #nosec G204 -- args from init()
 
 			if err != nil {
 				result = func(t testing.TB) string {

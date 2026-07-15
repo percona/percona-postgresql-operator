@@ -489,7 +489,7 @@ type tracerWithCounter struct { //nolint:unused
 	t       trace.Tracer
 }
 
-func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) { //nolint:unused
 	ctx, span := t.t.Start(ctx, spanName, opts...)
 	if spanName == "Reconcile" {
 		t.counter++

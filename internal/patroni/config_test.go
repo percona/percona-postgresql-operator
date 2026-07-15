@@ -1285,7 +1285,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "command.sh")
 		assert.NilError(t, os.WriteFile(file, []byte(command), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", "--shell=sh", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", "--shell=sh", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}
@@ -1307,7 +1307,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "script.bash")
 		assert.NilError(t, os.WriteFile(file, []byte(script), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}
