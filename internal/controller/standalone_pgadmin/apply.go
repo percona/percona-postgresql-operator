@@ -8,6 +8,7 @@ import (
 	"context"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,7 +37,7 @@ func (r *PGAdminReconciler) apply(ctx context.Context, object client.Object) err
 	// Generate an apply-patch by comparing the object to its zero value.
 	zero := reflect.New(reflect.TypeOf(object).Elem()).Interface()
 	data, err := client.MergeFrom(zero.(client.Object)).Data(object)
-	apply := client.RawPatch(client.Apply.Type(), data)
+	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// Send the apply-patch with force=true.
 	if err == nil {

@@ -13,6 +13,7 @@ import (
 	googleuuid "github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -150,7 +151,7 @@ func applyConfigMap(ctx context.Context, crClient crclient.Client,
 	data, err := crclient.MergeFrom(zero).Data(object)
 
 	if err == nil {
-		apply := crclient.RawPatch(crclient.Apply.Type(), data)
+		apply := crclient.RawPatch(types.ApplyPatchType, data)
 		err = crClient.Patch(ctx, object, apply,
 			[]crclient.PatchOption{crclient.ForceOwnership, crclient.FieldOwner(owner)}...)
 	}
