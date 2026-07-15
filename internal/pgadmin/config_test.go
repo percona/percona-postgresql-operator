@@ -5,6 +5,7 @@
 package pgadmin
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"

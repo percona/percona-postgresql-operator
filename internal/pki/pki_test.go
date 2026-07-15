@@ -5,6 +5,7 @@
 package pki
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"os"
