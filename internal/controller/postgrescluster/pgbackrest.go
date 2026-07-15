@@ -2460,7 +2460,7 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 
 	if isCreate {
 		r.Recorder.Eventf(postgresCluster, corev1.EventTypeNormal, EventRepoHostCreated,
-			"created pgBackRest repository host %s/%s", repoHost.TypeMeta.Kind, repoHostName)
+			"created pgBackRest repository host %s/%s", repoHost.Kind, repoHostName)
 	}
 
 	return repoHost, nil
@@ -2664,7 +2664,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if currentBackupJob != nil {
-		backupJob.ObjectMeta.Name = currentBackupJob.ObjectMeta.Name
+		backupJob.Name = currentBackupJob.ObjectMeta.Name
 	}
 
 	var labels, annotations map[string]string
@@ -2678,8 +2678,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		map[string]string{
 			naming.PGBackRestBackup: manualAnnotation,
 		})
-	backupJob.ObjectMeta.Labels = labels
-	backupJob.ObjectMeta.Annotations = annotations
+	backupJob.Labels = labels
+	backupJob.Annotations = annotations
 	// K8SPG-703
 	backupJob.Finalizers = []string{pNaming.FinalizerKeepJob}
 

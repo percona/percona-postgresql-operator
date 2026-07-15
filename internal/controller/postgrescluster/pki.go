@@ -7,12 +7,10 @@ package postgrescluster
 import (
 	"context"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
@@ -66,17 +64,6 @@ func (r *Reconciler) reconcileRootCertificate(
 
 	err := errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
-	// K8SPG-555: we need to check ca certificate from old operator versions
-	// TODO: remove when 2.4.0 will become unsupported
-	if k8serrors.IsNotFound(err) {
-		nn := client.ObjectKeyFromObject(existing)
-		nn.Name = naming.RootCertSecret
-		err = errors.WithStack(
-			r.Client.Get(ctx, nn, existing))
-		if err == nil {
-			existing.Name = naming.RootCertSecret
-		}
-	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
 
@@ -126,20 +113,14 @@ func (r *Reconciler) reconcileRootCertificate(
 
 	// K8SPG-555
 	intent := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      existing.Name,
-			Namespace: existing.Namespace,
-		},
+		ObjectMeta: naming.PostgresRootCASecret(cluster),
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
 
-	if cluster.Labels != nil {
-		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
-		if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.6.0"))) && cluster.Spec.Metadata != nil {
-			intent.Labels = cluster.Spec.Metadata.Labels
-			intent.Annotations = cluster.Spec.Metadata.Annotations
-		}
+	if cluster.Spec.Metadata != nil {
+		intent.Labels = cluster.Spec.Metadata.Labels
+		intent.Annotations = cluster.Spec.Metadata.Annotations
 	}
 
 	if err == nil {

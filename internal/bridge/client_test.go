@@ -111,8 +111,8 @@ func TestClientDoWithBackoff(t *testing.T) {
 
 		// Client with brief backoff.
 		client := NewClient(server.URL, "")
-		client.Backoff.Duration = time.Millisecond
-		client.Backoff.Steps = 5
+		client.Duration = time.Millisecond
+		client.Steps = 5
 		assert.Equal(t, client.BaseURL.String(), server.URL)
 
 		ctx := context.Background()
@@ -168,8 +168,8 @@ func TestClientDoWithBackoff(t *testing.T) {
 
 		// Client with brief backoff.
 		client := NewClient(server.URL, "")
-		client.Backoff.Duration = time.Millisecond
-		client.Backoff.Steps = 5
+		client.Duration = time.Millisecond
+		client.Steps = 5
 		assert.Equal(t, client.BaseURL.String(), server.URL)
 
 		ctx := context.Background()

@@ -227,7 +227,7 @@ func (vs *fakeVS) Start(t *testing.T) error {
 		Handler:           gwmux,
 		ReadHeaderTimeout: time.Second * 10,
 	}
-	gwLis, err := net.Listen("tcp", gwServer.Addr)
+	gwLis, err := new(net.ListenConfig).Listen(context.Background(), "tcp", gwServer.Addr)
 	if err != nil {
 		return errors.Wrap(err, "failed to listen gateway")
 	}

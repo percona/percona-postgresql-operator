@@ -479,9 +479,10 @@ topologySpreadConstraints:
 			var instanceConfFound, dedicatedRepoConfFound bool
 			for k, v := range config.Data {
 				if v != "" {
-					if k == pgbackrest.CMInstanceKey {
+					switch k {
+					case pgbackrest.CMInstanceKey:
 						instanceConfFound = true
-					} else if k == pgbackrest.CMRepoKey {
+					case pgbackrest.CMRepoKey:
 						dedicatedRepoConfFound = true
 					}
 				}
