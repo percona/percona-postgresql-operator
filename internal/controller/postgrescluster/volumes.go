@@ -128,6 +128,13 @@ func (r *Reconciler) observePersistentVolumeClaims(
 				// - https://git.k8s.io/enhancements/keps/sig-storage/3751-volume-attributes-class
 				corev1.PersistentVolumeClaimVolumeModifyingVolume,
 				corev1.PersistentVolumeClaimVolumeModifyVolumeError:
+
+			case
+				// These conditions are informational and do not require action
+				// from the operator.
+				corev1.PersistentVolumeClaimControllerResizeError,
+				corev1.PersistentVolumeClaimNodeResizeError,
+				corev1.PersistentVolumeClaimUnused:
 			}
 		}
 	}

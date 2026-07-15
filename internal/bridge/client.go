@@ -723,7 +723,7 @@ func (c *Client) UpdateCluster(
 ) (*ClusterApiResource, error) {
 	result := &ClusterApiResource{}
 
-	clusterbyte, err := json.Marshal(clusterRequestPayload)
+	clusterbyte, err := json.Marshal(clusterRequestPayload) //nolint:errchkjson //in case the struct changes, we would need to check the error anyway
 	if err != nil {
 		return result, err
 	}

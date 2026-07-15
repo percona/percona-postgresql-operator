@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -95,7 +96,7 @@ func TestCheck(t *testing.T) {
 		cl := setupFakeClient(t)
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
-			return nil, fmt.Errorf("failed to create checker")
+			return nil, errors.Errorf("failed to create checker")
 		}
 
 		err := ctrl.Check(t.Context(), &rest.Config{}, "default")
@@ -108,7 +109,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`no matches for kind "CertificateRequest" in group "cert-manager.io"`),
+				err: errors.Errorf(`no matches for kind "CertificateRequest" in group "cert-manager.io"`),
 			}, nil
 		}
 
@@ -121,7 +122,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf("error finding the scope of the object: failed to get restmapping: unable to retrieve the complete list of server APIs: cert-manager.io/v1: no matches for cert-manager.io/v1, Resource="),
+				err: errors.Errorf("error finding the scope of the object: failed to get restmapping: unable to retrieve the complete list of server APIs: cert-manager.io/v1: no matches for cert-manager.io/v1, Resource="),
 			}, nil
 		}
 

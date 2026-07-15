@@ -77,7 +77,7 @@ func initStorage(storageType extensions.StorageType, endpoint, bucket, region st
 	case extensions.StorageTypeS3:
 		return extensions.NewS3(endpoint, region, bucket, s3ForcePathStyle, disableSSL)
 	default:
-		log.Fatalf("unknown storage type: %s", os.Getenv("STORAGE_TYPE"))
+		log.Fatalf("unknown storage type: %s", string(storageType))
 	}
 
 	return nil

@@ -1227,7 +1227,7 @@ func TestGetClusterRole(t *testing.T) {
 	}
 
 	t.Run("WeSendCorrectData", func(t *testing.T) {
-		responsePayloadJson, err := json.Marshal(clusterRoleApiResource)
+		responsePayloadJson, err := json.Marshal(clusterRoleApiResource) //nolint:gosec // test data, not a real secret
 		assert.NilError(t, err)
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1249,7 +1249,7 @@ func TestGetClusterRole(t *testing.T) {
 	})
 
 	t.Run("OkResponse", func(t *testing.T) {
-		responsePayloadJson, err := json.Marshal(clusterRoleApiResource)
+		responsePayloadJson, err := json.Marshal(clusterRoleApiResource) //nolint:gosec // test data, not a real secret
 		assert.NilError(t, err)
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1267,7 +1267,7 @@ func TestGetClusterRole(t *testing.T) {
 	})
 
 	t.Run("ErrorResponse", func(t *testing.T) {
-		responsePayloadJson, err := json.Marshal(clusterRoleApiResource)
+		responsePayloadJson, err := json.Marshal(clusterRoleApiResource) //nolint:gosec // test data, not a real secret
 		assert.NilError(t, err)
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
