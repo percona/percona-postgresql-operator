@@ -157,14 +157,14 @@ type fakeClient struct {
 var _ = client.Client(new(fakeClient))
 
 func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, options ...client.PatchOption) error {
-	err := f.Client.Patch(ctx, obj, patch, options...)
+	err := f.Patch(ctx, obj, patch, options...)
 	if !k8serrors.IsNotFound(err) {
 		return err
 	}
-	if err := f.Client.Create(ctx, obj); err != nil {
+	if err := f.Create(ctx, obj); err != nil {
 		return err
 	}
-	return f.Client.Patch(ctx, obj, patch, options...)
+	return f.Patch(ctx, obj, patch, options...)
 }
 
 func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...client.Object) (client.Client, error) {

@@ -2834,7 +2834,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if job != nil {
-		backupJob.ObjectMeta.Name = job.ObjectMeta.Name
+		backupJob.Name = job.ObjectMeta.Name
 	}
 
 	var labels, annotations map[string]string
@@ -2852,8 +2852,8 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 		map[string]string{
 			naming.PGBackRestConfigHash: configHash,
 		})
-	backupJob.ObjectMeta.Labels = labels
-	backupJob.ObjectMeta.Annotations = annotations
+	backupJob.Labels = labels
+	backupJob.Annotations = annotations
 
 	// K8SPG-613
 	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)

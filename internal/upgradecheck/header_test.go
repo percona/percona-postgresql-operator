@@ -522,7 +522,7 @@ func TestGetManagedClusters(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success", func(t *testing.T) {
-		fakeClient := setupFakeClientWithPGOScheme(t, true)
+		fakeClient := setupFakeClientWithPGOScheme(t)
 		ctx, calls := setupLogCapture(ctx)
 		count := getManagedClusters(ctx, fakeClient)
 		assert.Equal(t, len(*calls), 0)
@@ -531,7 +531,7 @@ func TestGetManagedClusters(t *testing.T) {
 
 	t.Run("list throw error", func(t *testing.T) {
 		fakeClientWithOptionalError := &fakeClientWithError{
-			setupFakeClientWithPGOScheme(t, true), "list error",
+			setupFakeClientWithPGOScheme(t), "list error",
 		}
 		ctx, calls := setupLogCapture(ctx)
 		count := getManagedClusters(ctx, fakeClientWithOptionalError)
@@ -545,7 +545,7 @@ func TestGetBridgeClusters(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success", func(t *testing.T) {
-		fakeClient := setupFakeClientWithPGOScheme(t, true)
+		fakeClient := setupFakeClientWithPGOScheme(t)
 		ctx, calls := setupLogCapture(ctx)
 		count := getBridgeClusters(ctx, fakeClient)
 		assert.Equal(t, len(*calls), 0)
@@ -554,7 +554,7 @@ func TestGetBridgeClusters(t *testing.T) {
 
 	t.Run("list throw error", func(t *testing.T) {
 		fakeClientWithOptionalError := &fakeClientWithError{
-			setupFakeClientWithPGOScheme(t, true), "list error",
+			setupFakeClientWithPGOScheme(t), "list error",
 		}
 		ctx, calls := setupLogCapture(ctx)
 		count := getBridgeClusters(ctx, fakeClientWithOptionalError)

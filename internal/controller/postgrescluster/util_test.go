@@ -81,7 +81,7 @@ func TestAddDevSHM(t *testing.T) {
 
 			// check there is an empty dir mounted under the dshm volume
 			for _, v := range template.Spec.Volumes {
-				if v.Name == "dshm" && v.VolumeSource.EmptyDir != nil && v.VolumeSource.EmptyDir.Medium == corev1.StorageMediumMemory {
+				if v.Name == "dshm" && v.EmptyDir != nil && v.VolumeSource.EmptyDir.Medium == corev1.StorageMediumMemory {
 					found = true
 					break
 				}

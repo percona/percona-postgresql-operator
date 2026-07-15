@@ -47,7 +47,7 @@ func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestCheckForUpgrades(t *testing.T) {
-	fakeClient := setupFakeClientWithPGOScheme(t, true)
+	fakeClient := setupFakeClientWithPGOScheme(t)
 	cfg := &rest.Config{}
 
 	ctx := logging.NewContext(context.Background(), logging.Discard())
@@ -157,7 +157,7 @@ func TestCheckForUpgrades(t *testing.T) {
 // TODO(benjaminjb): Replace `fake` with envtest
 func TestCheckForUpgradesScheduler(t *testing.T) {
 	t.Skip("This test fails when run with 'go test ./...', but passes when run on its own.") // TODO: remove
-	fakeClient := setupFakeClientWithPGOScheme(t, false)
+	fakeClient := setupFakeClientWithPGOScheme(t)
 	_, server := setupVersionServer(t, true)
 	defer server.Close()
 	cfg := &rest.Config{Host: server.URL}
