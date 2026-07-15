@@ -666,7 +666,7 @@ func ClusterCAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 }
 
 // K8SPG-951
-// ClusterTLSIssuer returns the ObjectMeta for the cluster-scoped TLS ClusterIssuer used by cert-manager.
+// ClusterCACertSecret returns the ObjectMeta for the cluster-scoped CA Secret in cert-manager's namespace.
 func ClusterCACertSecret(cluster *v1beta1.PostgresCluster, certManagerNamespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: certManagerNamespace,
