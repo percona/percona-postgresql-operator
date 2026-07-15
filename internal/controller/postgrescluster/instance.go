@@ -1602,11 +1602,6 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	return instanceCerts, nil
 }
 
-// instanceCACert returns the CA certificate to embed alongside an instance's
-// leaf certificate. When rootCertificateAuth is set (the operator manages
-// the CA itself), it's the source of truth. When it's nil (external issuer —
-// see K8SPG-951), this reads the ca.crt cert-manager wrote into the
-// instance's own just-issued secret.
 func instanceCACert(rootCertificateAuth *pki.RootCertificateAuthority, issuedSecret *corev1.Secret) (pki.Certificate, error) {
 	if rootCertificateAuth != nil {
 		return rootCertificateAuth.Certificate, nil

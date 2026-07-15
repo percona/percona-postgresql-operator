@@ -21,13 +21,6 @@ const refreshInterval time.Duration = 60 * time.Minute
 
 const ElectionID string = "08db3feb.percona.com"
 
-// ClientCacheOptions returns the client.CacheOptions CreateRuntimeManager
-// applies to every manager it builds. The operator does not request
-// cluster-wide list/watch RBAC for clusterissuers.cert-manager.io by
-// default (K8SPG-951's managed ClusterIssuer mode), so Get calls for
-// ClusterIssuer must bypass the informer cache entirely and hit the API
-// server directly, which only needs "get" on the one named object.
-// Exported so it's directly unit-testable without constructing a manager.
 func ClientCacheOptions() *client.CacheOptions {
 	return &client.CacheOptions{
 		DisableFor: []client.Object{&cmv1.ClusterIssuer{}},

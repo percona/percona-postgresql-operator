@@ -2335,13 +2335,6 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	return nil
 }
 
-// pgBackRestCACert returns the CA certificate bytes to trust for pgBackRest's
-// client/repo TLS. When rootCA is set (the operator manages the CA itself),
-// it's the source of truth. When rootCA is nil (external issuer — see
-// K8SPG-951), there is no operator-tracked CA; instead this reads the ca.crt
-// cert-manager wrote into one of the just-issued leaf secrets, which is
-// present as long as the external issuer returns CA data in its response
-// (true for CA-backed issuers; not guaranteed for e.g. some ACME issuers).
 func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
 	if rootCA != nil {
 		caCert, err := rootCA.Certificate.MarshalText()
