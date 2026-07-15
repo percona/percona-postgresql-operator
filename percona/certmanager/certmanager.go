@@ -49,33 +49,18 @@ const (
 	DefaultRenewBefore = 30 * 24 * time.Hour
 )
 
-// IssuerMode describes how the operator should treat
-// cluster.Spec.TLS.IssuerConf (K8SPG-951).
 type IssuerMode int
 
 const (
-	// IssuerModeManagedNamespaced: issuerConf is unset, or its Kind is "" or
-	// "Issuer" — the operator owns a namespaced self-signed CA issuer, CA
-	// certificate, and CA-backed TLS issuer (the long-standing behavior).
+	// IssuerModeManagedNamespaced: operator owns and manages a namespaced self-signed Issuer
 	IssuerModeManagedNamespaced IssuerMode = iota
-	// IssuerModeManagedCluster: issuerConf.Kind is "ClusterIssuer" and the
-	// operator can read the named ClusterIssuer (or it doesn't exist yet) —
-	// the operator owns a cluster-scoped self-signed CA ClusterIssuer, a CA
-	// certificate in cert-manager's shared namespace, and a CA-backed TLS
-	// ClusterIssuer.
+	// IssuerModeManagedCluster: operator owns and manages a cluster-scoped self-signed ClusterIssuer
 	IssuerModeManagedCluster
-	// IssuerModeExternal: issuerConf.Kind is a third-party kind, or is
-	// "ClusterIssuer" but the operator is Forbidden from reading it — every
-	// leaf Certificate references issuerConf directly and the operator
-	// creates nothing issuer-related.
+	// IssuerModeExternal: operator does nothing for issuer, simply trusts that it exists and uses it to sign certificates
 	IssuerModeExternal
 )
 
-// CertManagerNamespace returns cert-manager's shared "cluster resource
-// namespace" — where a ClusterIssuer's spec.ca.secretName is resolved from,
-// as opposed to the namespace of whatever references the ClusterIssuer.
-// Configurable via the CERTMANAGER_NAMESPACE environment variable; defaults
-// to "cert-manager".
+// CertManagerNamespace returns the namespace where cert-manager is installed.
 func CertManagerNamespace() string {
 	if ns := os.Getenv("CERTMANAGER_NAMESPACE"); ns != "" {
 		return ns
@@ -83,8 +68,6 @@ func CertManagerNamespace() string {
 	return "cert-manager"
 }
 
-// issuerConf returns cluster.Spec.TLS.IssuerConf, or nil if TLS or
-// IssuerConf is unset.
 func issuerConf(cluster *v1beta1.PostgresCluster) *cmmeta.IssuerReference {
 	if cluster.Spec.TLS == nil {
 		return nil
@@ -92,13 +75,7 @@ func issuerConf(cluster *v1beta1.PostgresCluster) *cmmeta.IssuerReference {
 	return cluster.Spec.TLS.IssuerConf
 }
 
-// ResolveIssuerMode determines how the operator should handle
-// cluster.Spec.TLS.IssuerConf. For Kind == "ClusterIssuer" it performs a
-// live Get to check whether the operator can read the named ClusterIssuer:
-// Forbidden (no RBAC for clusterissuers.cert-manager.io — the default,
-// since none is shipped) downgrades to IssuerModeExternal so the operator
-// doesn't try to own something it can't inspect. NotFound is not an error
-// here — the operator will create it as part of managing it.
+// ResolveIssuerMode determines how the operator should handle cluster.Spec.TLS.IssuerConf.
 func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (IssuerMode, error) {
 	ic := issuerConf(cluster)
 	if ic == nil {
@@ -124,15 +101,6 @@ func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.P
 	}
 }
 
-// issuerRef resolves what a leaf Certificate's spec.issuerRef should be for
-// the given mode:
-//   - IssuerModeExternal: issuerConf's Name/Kind/Group verbatim (Group
-//     defaults to "cert-manager.io" when empty — matches cert-manager's own
-//     IssuerReference default).
-//   - IssuerModeManagedCluster: the cluster-scoped TLS ClusterIssuer named
-//     by issuerConf.Name (required by the CRD whenever issuerConf is set).
-//   - IssuerModeManagedNamespaced: the namespaced TLS Issuer, named by
-//     issuerConf.Name when set, otherwise the auto-generated name.
 func issuerRef(cluster *v1beta1.PostgresCluster, mode IssuerMode) cmmeta.IssuerReference {
 	switch mode {
 	case IssuerModeExternal:
