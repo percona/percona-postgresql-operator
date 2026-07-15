@@ -120,13 +120,13 @@ func issuerRef(cluster *v1beta1.PostgresCluster, mode IssuerMode) cmmeta.IssuerR
 		}
 		return cmmeta.IssuerReference{Name: ic.Name, Kind: ic.Kind, Group: group}
 	case IssuerModeManagedCluster:
-		return cmmeta.IssuerReference{Name: issuerConf(cluster).Name, Kind: v1.ClusterIssuerKind}
+		return cmmeta.IssuerReference{Name: issuerConf(cluster).Name, Kind: v1.ClusterIssuerKind, Group: certmanager.GroupName}
 	default:
 		name := naming.TLSIssuer(cluster).Name
 		if ic := issuerConf(cluster); ic != nil && ic.Name != "" {
 			name = ic.Name
 		}
-		return cmmeta.IssuerReference{Name: name, Kind: v1.IssuerKind}
+		return cmmeta.IssuerReference{Name: name, Kind: v1.IssuerKind, Group: certmanager.GroupName}
 	}
 }
 
