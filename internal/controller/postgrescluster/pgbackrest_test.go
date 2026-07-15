@@ -3220,11 +3220,11 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		t.Run(fmt.Sprintf("openshift-%v", openshift), func(t *testing.T) {
 			t.Run("ObjectMeta", func(t *testing.T) {
 				t.Run("Name", func(t *testing.T) {
-					assert.Equal(t, job.ObjectMeta.Name,
+					assert.Equal(t, job.Name,
 						naming.PGBackRestRestoreJob(cluster).Name)
 				})
 				t.Run("Namespace", func(t *testing.T) {
-					assert.Equal(t, job.ObjectMeta.Namespace,
+					assert.Equal(t, job.Namespace,
 						naming.PGBackRestRestoreJob(cluster).Namespace)
 				})
 				t.Run("Annotations", func(t *testing.T) {
@@ -3689,15 +3689,15 @@ func TestObserveRestoreEnv(t *testing.T) {
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
 				fakeLeaderEP := &corev1.Endpoints{}
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
 				fakeDCSEP := &corev1.Endpoints{}
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
 				fakeFailoverEP := &corev1.Endpoints{}
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
 
 				job := generateJob(cluster.Name, new(false), new(false))
@@ -3713,15 +3713,15 @@ func TestObserveRestoreEnv(t *testing.T) {
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
 				fakeLeaderEP := &corev1.Endpoints{}
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
 				fakeDCSEP := &corev1.Endpoints{}
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
 				fakeFailoverEP := &corev1.Endpoints{}
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
 			},
 			result: testResult{
@@ -3894,15 +3894,15 @@ func TestPrepareForRestore(t *testing.T) {
 			) (*batchv1.Job, []corev1.Endpoints) {
 				fakeLeaderEP := corev1.Endpoints{}
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeLeaderEP))
 				fakeDCSEP := corev1.Endpoints{}
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeDCSEP))
 				fakeFailoverEP := corev1.Endpoints{}
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeFailoverEP))
 				return nil, []corev1.Endpoints{fakeLeaderEP, fakeDCSEP, fakeFailoverEP}
 			},

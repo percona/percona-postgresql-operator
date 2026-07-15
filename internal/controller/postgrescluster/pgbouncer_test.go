@@ -111,12 +111,12 @@ ownerReferences:
 		assert.Assert(t, specified)
 
 		// Annotations present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
+		assert.DeepEqual(t, service.Annotations, map[string]string{
 			"a": "v1",
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",
@@ -142,13 +142,13 @@ ownerReferences:
 		assert.Assert(t, specified)
 
 		// Annotations present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
+		assert.DeepEqual(t, service.Annotations, map[string]string{
 			"a": "v1",
 			"c": "v3",
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg7",
@@ -429,12 +429,12 @@ namespace: ns3
 		assert.Assert(t, specified)
 
 		// Annotations present in the metadata.
-		assert.DeepEqual(t, deploy.ObjectMeta.Annotations, map[string]string{
+		assert.DeepEqual(t, deploy.Annotations, map[string]string{
 			"a": "v1",
 		})
 
 		// Labels present in the metadata.
-		assert.DeepEqual(t, deploy.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, deploy.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "test-cluster",
 			"postgres-operator.crunchydata.com/role":    "pgbouncer",

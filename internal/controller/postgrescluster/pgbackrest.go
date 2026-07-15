@@ -2664,7 +2664,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if currentBackupJob != nil {
-		backupJob.Name = currentBackupJob.ObjectMeta.Name
+		backupJob.Name = currentBackupJob.Name
 	}
 
 	var labels, annotations map[string]string
@@ -2834,7 +2834,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if job != nil {
-		backupJob.Name = job.ObjectMeta.Name
+		backupJob.Name = job.Name
 	}
 
 	var labels, annotations map[string]string

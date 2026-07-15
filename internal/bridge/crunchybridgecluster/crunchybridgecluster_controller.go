@@ -79,7 +79,7 @@ func (r *CrunchyBridgeClusterReconciler) SetupWithManager(
 func (r *CrunchyBridgeClusterReconciler) setControllerReference(
 	owner *v1beta1.CrunchyBridgeCluster, controlled client.Object,
 ) error {
-	return controllerutil.SetControllerReference(owner, controlled, r.Client.Scheme())
+	return controllerutil.SetControllerReference(owner, controlled, r.Scheme())
 }
 
 //+kubebuilder:rbac:groups="upstream.pgv3.percona.com",resources="crunchybridgeclusters",verbs={get,patch,update}
@@ -669,7 +669,7 @@ func (r *CrunchyBridgeClusterReconciler) GetSecretKeys(
 	}}
 
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Get(ctx, client.ObjectKeyFromObject(existing), existing))
 
 	if err == nil {
 		if existing.Data["key"] != nil && existing.Data["team"] != nil {
@@ -692,7 +692,7 @@ func (r *CrunchyBridgeClusterReconciler) deleteControlled(
 		version := object.GetResourceVersion()
 		exactly := client.Preconditions{UID: &uid, ResourceVersion: &version}
 
-		return r.Client.Delete(ctx, object, exactly)
+		return r.Delete(ctx, object, exactly)
 	}
 
 	return nil

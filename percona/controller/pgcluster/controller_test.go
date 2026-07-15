@@ -269,7 +269,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 			It("should have PMM secret hash", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
+				Expect(sts.Spec.Template.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
 			})
 
 			It("should label PMM secret", func() {
@@ -313,7 +313,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 			It("should have PMM secret hash", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
+				Expect(sts.Spec.Template.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
 			})
 
 			It("should label PMM secret", func() {
