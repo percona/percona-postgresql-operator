@@ -507,12 +507,12 @@ func (r *Reconciler) deleteInstances(
 	// There are multiple instances; stop the replicas. When none are found,
 	// requeue to try again.
 
-	result.Requeue = true
+	result.RequeueAfter = 1 * time.Second
 	for i := range pods.Items {
 		role := pods.Items[i].Labels[naming.LabelRole]
 		if err == nil && role == naming.RolePatroniReplica {
 			err = stop(&pods.Items[i])
-			result.Requeue = false
+			result.RequeueAfter = 0
 		}
 
 		// An instance without a role label is not participating in the Patroni
@@ -520,7 +520,7 @@ func (r *Reconciler) deleteInstances(
 		// stop these as well.
 		if err == nil && len(role) == 0 {
 			err = stop(&pods.Items[i])
-			result.Requeue = false
+			result.RequeueAfter = 0
 		}
 	}
 
