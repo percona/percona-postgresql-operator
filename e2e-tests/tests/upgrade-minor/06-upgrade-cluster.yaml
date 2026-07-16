@@ -20,12 +20,23 @@ commands:
       cr_ver=$(yq '.spec.crVersion' $DEPLOY_DIR/cr.yaml)
 
       yq -i eval '
+          .apiVersion = "pgv3.percona.com/v2" |
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
           .spec.crVersion = "'${cr_ver}'" |
           .spec.image = "'${target_image_postgresql}'" |
           .spec.proxy.pgBouncer.image = "'${target_image_pgbouncer}'" |
           .spec.backups.pgbackrest.image = "'${target_image_backrest}'"' "${TEMP_DIR}/cr_lower.yaml"
+
+      # Migrate from pgv2 to pgv3: orphan-delete old CRs so child resources (StatefulSets, etc.) are preserved
+      # Remove finalizer from pgv2 PostgresCluster (no controller watches pgv2 anymore)
+      kubectl -n "${NAMESPACE}" patch postgrescluster.upstream.pgv2.percona.com "${test_name}" \
+        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' --ignore-not-found || true
+      kubectl -n "${NAMESPACE}" delete postgrescluster.upstream.pgv2.percona.com "${test_name}" \
+        --cascade=orphan --ignore-not-found
+      kubectl -n "${NAMESPACE}" delete perconapgcluster.pgv2.percona.com "${test_name}" \
+        --cascade=orphan --ignore-not-found
+
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
       sleep 7 # wait for reconcile loop
 
