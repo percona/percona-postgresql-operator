@@ -46,6 +46,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
@@ -53,6 +54,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -281,6 +283,12 @@ func (r *Reconciler) Reconcile(
 	}
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.PGCron {
+		pgcron.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.SetUser {
+		setuser.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
@@ -563,6 +571,15 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 
 	r.Cache = mgr.GetCache()
 
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v1beta1.PostgresCluster{},
+		v1beta1.IndexFieldPGBouncerUserSecrets,
+		v1beta1.PGBouncerUserSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -592,6 +609,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Watches(&corev1.Pod{}, r.watchPods()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()) // watch all StatefulSets
 

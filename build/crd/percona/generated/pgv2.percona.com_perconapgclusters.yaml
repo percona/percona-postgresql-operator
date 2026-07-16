@@ -10288,6 +10288,9 @@ spec:
                   upgrade to apply changes to Kubernetes objects. Default is the latest
                   version.
                 type: string
+                x-kubernetes-validations:
+                - message: CRVersion must be a valid semantic version
+                  rule: self == "" || self.matches('^[0-9]+\\.[0-9]+\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
                   cluster.
@@ -13693,6 +13696,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_cron:
+                        type: boolean
                       pg_repack:
                         type: boolean
                       pg_stat_monitor:
@@ -13700,6 +13705,8 @@ spec:
                       pg_stat_statements:
                         type: boolean
                       pgvector:
+                        type: boolean
+                      set_user:
                         type: boolean
                     type: object
                   custom:
@@ -28448,6 +28455,22 @@ spec:
                           - whenUnsatisfiable
                           type: object
                         type: array
+                      usersSecret:
+                        description: |-
+                          Secret with users to add to PgBouncer's authentication file. Each key is
+                          a PgBouncer user name and its value is the password or verifier.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                 required:
                 - pgBouncer
@@ -29082,6 +29105,8 @@ spec:
                 type: object
               postgres:
                 properties:
+                  distribution:
+                    type: string
                   imageID:
                     type: string
                   instances:

@@ -82,6 +82,7 @@ func PostgreSQL(
 	if inCluster.CompareVersion("2.9.0") >= 0 {
 		restore = "/opt/crunchy/bin/restore-command-wrapper.sh " + restore
 	}
+	restoreOverridden := false
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
 		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
 		if ok {
@@ -90,11 +91,22 @@ func PostgreSQL(
 				restore_command, ok := params["restore_command"].(string)
 				if ok {
 					restore = restore_command
+					restoreOverridden = true
 				}
 			}
 		}
 	}
-	outParameters.Mandatory.Add("restore_command", restore)
+
+	// If backups are disabled, there is no pgBackRest repository to restore WAL
+	// from. Unlike archive_command, restore_command can't be replaced with a
+	// no-op placeholder: Postgres treats a zero exit status as "the file was
+	// placed", so a placeholder would make it think recovery succeeded when it
+	// didn't. Leave restore_command unset so Postgres relies on streaming
+	// replication and local WAL only -- unless the user explicitly configured
+	// their own restore_command.
+	if backupsEnabled || restoreOverridden {
+		outParameters.Mandatory.Add("restore_command", restore)
+	}
 
 	if inCluster.Spec.Standby != nil && inCluster.Spec.Standby.Enabled && inCluster.Spec.Standby.RepoName != "" {
 
