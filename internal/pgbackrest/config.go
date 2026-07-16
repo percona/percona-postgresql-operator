@@ -568,11 +568,12 @@ TOKEN=$(<"${SERVICEACCOUNT}/token")
 CACERT="${SERVICEACCOUNT}/ca.crt"
 
 monitor_volume() {
-  local path="$1" annotation="$2" size use size_int use_int new_size patch
-  size=$(df --human-readable --block-size=M "${path}" | awk 'FNR == 2 {print $2}')
-  use=$(df --human-readable "${path}" | awk 'FNR == 2 {print $5}')
+  local path="$1" annotation="$2" df_output size use size_int use_int new_size patch
+  df_output=$(df --human-readable --block-size=M "${path}")
+  size=$(awk 'FNR == 2 {print $2}' <<<"${df_output}")
+  use=$(awk 'FNR == 2 {print $5}' <<<"${df_output}")
   size_int="${size//M/}"
-  use_int=$(sed 's/[[:punct:]]//g' <<<"${use}")
+  use_int="${use//[[:punct:]]/}"
   if ((use_int > 75)); then
     new_size="$((size_int + size_int / 2))Mi"
     patch='{"metadata":{"annotations":{"'"${annotation}"'":"'"${new_size}"'"}}}'
