@@ -374,6 +374,8 @@ spec:
 #      - secretRef:
 #          name: pgbouncer-env-secret
 #      exposeSuperusers: false
+#      usersSecret:
+#        name: pgbouncer-users
 #      resources:
 #        limits:
 #          cpu: 200m
