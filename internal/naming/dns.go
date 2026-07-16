@@ -6,13 +6,61 @@ package naming
 
 import (
 	"context"
+	"fmt"
+	"hash/fnv"
 	"net"
 	"strings"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
+
+// maxDNSSafeLength is the maximum length for a Kubernetes DNS-1123 label (63 characters).
+// This is the universal limit for resource names that get used in DNS.
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+const maxDNSSafeLength = 63
+
+// SafeDNSName truncates a name to fit within the Kubernetes DNS-1123 label limit of 63 characters.
+// It also ensures the name doesn't end with a hyphen, which is invalid for DNS labels.
+// This should be used for any resource name that may be used in DNS (Pods, Services, Jobs, etc.).
+func SafeDNSName(name string) string {
+	// Strip trailing hyphens which are invalid in DNS labels
+	name = strings.TrimRight(name, "-")
+	if len(name) <= maxDNSSafeLength {
+		return name
+	}
+	name = name[:maxDNSSafeLength]
+	// Strip any trailing hyphens created by truncation
+	return strings.TrimRight(name, "-")
+}
+
+// SafeDNSUniqueName ensures the name fits within the 63-character DNS-1123 label limit.
+// If the name exceeds the limit, it truncates to 58 characters and appends a 4-character
+// deterministic suffix based on the input name to maintain consistency across reconciles.
+// It also ensures the name doesn't end with a hyphen, which is invalid for DNS labels.
+// This is useful for resources that need unique names like Jobs or Pods.
+func SafeDNSUniqueName(name string) string {
+	// Strip trailing hyphens which are invalid in DNS labels
+	name = strings.TrimRight(name, "-")
+	if len(name) <= maxDNSSafeLength {
+		return name
+	}
+
+	// Reserve 5 characters for the dash + 4 char suffix
+	prefix := name[:maxDNSSafeLength-5]
+	// Strip trailing hyphens from the truncated prefix
+	prefix = strings.TrimRight(prefix, "-")
+
+	// Use a deterministic suffix based on the cleaned name (not random!)
+	// This ensures the same name always produces the same output across reconciles
+	hash := fnv.New32a()
+	hash.Write([]byte(name))
+	suffix := rand.SafeEncodeString(fmt.Sprint(hash.Sum32()))[:4]
+
+	return prefix + "-" + suffix
+}
 
 // InstancePodDNSNames returns the possible DNS names for instance. The first
 // name is the fully qualified domain name (FQDN).
