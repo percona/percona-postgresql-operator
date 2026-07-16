@@ -368,7 +368,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			SecretName: certName,
 			CommonName: cluster.Name + "-postgres",
 			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.IssuerReference{
 				Name: naming.TLSIssuer(cluster).Name,
 				Kind: v1.IssuerKind,
 			},
