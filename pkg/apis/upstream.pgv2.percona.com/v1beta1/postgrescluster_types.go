@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 )
@@ -206,6 +207,26 @@ type PostgresClusterSpec struct {
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
+func (cluster *PostgresCluster) PGBouncerUserSecrets() []string {
+	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+		return nil
+	}
+	if cluster.Spec.Proxy.PGBouncer.UsersSecret == nil || cluster.Spec.Proxy.PGBouncer.UsersSecret.Name == "" {
+		return nil
+	}
+	return []string{cluster.Spec.Proxy.PGBouncer.UsersSecret.Name}
+}
+
+const IndexFieldPGBouncerUserSecrets = "postgresCluster.pgBouncerUserSecrets" //nolint:gosec
+
+var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cluster, ok := obj.(*PostgresCluster)
+	if !ok {
+		return nil
+	}
+	return cluster.PGBouncerUserSecrets()
+}
+
 type InitContainerSpec struct {
 	// +kubebuilder:validation:Required
 	Image                    string                       `json:"image,omitempty"`
@@ -219,6 +240,8 @@ type ExtensionsSpec struct {
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
+	PGCron           bool `json:"pgCron,omitempty"`
+	SetUser          bool `json:"setUser,omitempty"`
 }
 
 type TLSSpec struct {

@@ -657,6 +657,8 @@ func (r *Reconciler) reconcileInstanceSets(
 		return err
 	}
 
+	ctx = logging.NewContext(ctx, logging.FromContext(ctx).WithName("SmartUpdate"))
+
 	// Rollout changes to instances by calling rolloutInstance.
 	err = r.rolloutInstances(ctx, cluster, instances,
 		func(ctx context.Context, instance *Instance) error {
@@ -789,8 +791,14 @@ func (r *Reconciler) rolloutInstance(
 		return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
+	log := logging.FromContext(ctx)
+
 	primary, known := instance.IsPrimary()
 	primary = primary && known
+
+	if primary {
+		log.Info("Instance is primary", "instance", instance.Name)
+	}
 
 	// When the cluster has more than one instance participating in failover,
 	// perform a controlled switchover to one of those instances. Patroni will
@@ -821,7 +829,6 @@ func (r *Reconciler) rolloutInstance(
 		span.RecordError(err)
 		return err
 	}
-
 	// When the cluster has only one instance for failover, perform a series of
 	// immediate checkpoints to increase the likelihood that a "fast" shutdown
 	// will complete before the SIGKILL near TerminationGracePeriodSeconds.
@@ -848,7 +855,7 @@ func (r *Reconciler) rolloutInstance(
 			err = errors.WithStack(err)
 			elapsed := time.Since(start)
 
-			logging.FromContext(ctx).V(1).Info("attempted checkpoint",
+			log.Info("attempted checkpoint",
 				"duration", elapsed, "stdout", stdout, "stderr", stderr)
 
 			span.RecordError(err)
@@ -867,13 +874,17 @@ func (r *Reconciler) rolloutInstance(
 
 		// Communicate the lack or slowness of CHECKPOINT and shutdown anyway.
 		if err != nil {
+			log.Error(err, "Unable to checkpoint primary before shutdown")
 			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "NoCheckpoint",
 				"Unable to checkpoint primary before shutdown: %v", err)
 		} else if duration > threshold {
+			log.Info(fmt.Sprintf("Shutting down primary despite checkpoint taking over %v (threshold: %v)", duration, threshold))
 			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "SlowCheckpoint",
 				"Shutting down primary despite checkpoint taking over %v", duration)
 		}
 	}
+
+	log.Info("Rolling out instance", "pod", pod.Name)
 
 	// Delete the Pod so its controlling StatefulSet will recreate it. Patroni
 	// will receive a SIGTERM and use "pg_ctl" to perform a "fast" shutdown of
@@ -1100,7 +1111,7 @@ func (r *Reconciler) scaleUpInstances(
 		next := naming.GenerateInstance(cluster, set)
 		// if there are any available instance names (as determined by observing any PVCs for the
 		// instance set that are not currently associated with an instance, e.g. in the event the
-		// instance STS was deleted), then reuse them instead of generating a new name
+		// instance STS was deleted), then reuse them instead of generating a new name.
 		if len(availableInstanceNames) > 0 {
 			next.Name = availableInstanceNames[0]
 			availableInstanceNames = availableInstanceNames[1:]

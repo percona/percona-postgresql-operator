@@ -8,5 +8,5 @@ commands:
       source ../../functions
 
       get_cr "some-name" ${RANDOM} \
-        | yq '.spec.backups.enabled=false' \
+        | yq '.spec.backups.enabled=false | del(.spec.backups.pgbackrest)' \
         | kubectl -n "${NAMESPACE}" apply -f -
