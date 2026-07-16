@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      check_pgbouncer_user() {
+        kubectl -n "${NAMESPACE}" get perconapgcluster/${test_name} -o json \
+          | jq -e --arg secret "${test_name}-pgbouncer-users" \
+              '.spec.proxy.pgBouncer.usersSecret.name == $secret'
+
+        kubectl -n "${NAMESPACE}" get secret "${test_name}-pgbouncer" \
+          --template='{{index .data "pgbouncer-users.txt" | base64decode}}' \
+          | grep -F '"stats_user" "stats-password"'
+      }
+
+      retry 12 5 check_pgbouncer_user
