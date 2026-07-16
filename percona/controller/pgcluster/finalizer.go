@@ -225,6 +225,9 @@ type finalizerEntry struct {
 	fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
 }
 
+// prePostgresClusterDeletionFinalizers returns finalizers that must run while the
+// PostgresCluster still exists (e.g. operations that require running pods or
+// cluster resources such as stopping watchers and deleting backups from repos).
 func (r *PGClusterReconciler) prePostgresClusterDeletionFinalizers() []finalizerEntry {
 	return []finalizerEntry{
 		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
