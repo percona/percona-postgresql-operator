@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -992,6 +993,30 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 	return jobSpec
 }
 
+// findSingleJob returns the one Job matching selector in cluster's namespace, or nil
+// if none exists. Returns an error if more than one is found.
+func (r *Reconciler) findSingleJob(
+	ctx context.Context, cluster *v1beta1.PostgresCluster, selector labels.Selector, what string,
+) (*batchv1.Job, error) {
+	jobs := &batchv1.JobList{}
+	if err := r.Client.List(ctx, jobs, &client.ListOptions{
+		Namespace:     cluster.Namespace,
+		LabelSelector: selector,
+	}); err != nil {
+		return nil, errors.WithStack(err)
+	}
+	switch len(jobs.Items) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &jobs.Items[0], nil
+	default:
+		return nil, errors.WithStack(
+			errors.New("invalid number of " + what + " found when attempting to reconcile a " +
+				"pgBackRest data source"))
+	}
+}
+
 // +kubebuilder:rbac:groups="",resources="configmaps",verbs={delete,list}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={list,delete}
 // +kubebuilder:rbac:groups="",resources="endpoints",verbs={get}
@@ -1004,14 +1029,14 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 // restore Jobs and then updating pgBackRest restore status accordingly.
 func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 	cluster *v1beta1.PostgresCluster,
-) ([]corev1.Endpoints, *batchv1.Job, error) {
+) ([]corev1.Endpoints, *batchv1.Job, *batchv1.Job, error) {
 	// lookup the various patroni endpoints
 	leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{}
 	currentEndpoints := []corev1.Endpoints{}
 	if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniLeaderEndpoints(cluster)),
 		&leaderEP); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, nil, errors.WithStack(err)
+			return nil, nil, nil, errors.WithStack(err)
 		}
 	} else {
 		currentEndpoints = append(currentEndpoints, leaderEP)
@@ -1019,7 +1044,7 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 	if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniDistributedConfiguration(cluster)),
 		&dcsEP); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, nil, errors.WithStack(err)
+			return nil, nil, nil, errors.WithStack(err)
 		}
 	} else {
 		currentEndpoints = append(currentEndpoints, dcsEP)
@@ -1027,26 +1052,29 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 	if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniTrigger(cluster)),
 		&failoverEP); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, nil, errors.WithStack(err)
+			return nil, nil, nil, errors.WithStack(err)
 		}
 	} else {
 		currentEndpoints = append(currentEndpoints, failoverEP)
 	}
 
-	restoreJobs := &batchv1.JobList{}
-	if err := r.Client.List(ctx, restoreJobs, &client.ListOptions{
-		Namespace:     cluster.Namespace,
-		LabelSelector: naming.PGBackRestRestoreJobSelector(cluster.GetName()),
-	}); err != nil {
-		return nil, nil, errors.WithStack(err)
+	restoreJob, err := r.findSingleJob(ctx, cluster,
+		naming.PGBackRestRestoreJobSelector(cluster.GetName()), "restore Jobs")
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	var restoreJob *batchv1.Job
-	if len(restoreJobs.Items) > 1 {
-		return nil, nil, errors.WithStack(
-			errors.New("invalid number of restore Jobs found when attempting to reconcile a " +
-				"pgBackRest data source"))
-	} else if len(restoreJobs.Items) == 1 {
-		restoreJob = &restoreJobs.Items[0]
+
+	// Under an external DCS backend (e.g. etcd), Patroni never creates the Kubernetes
+	// Endpoints objects looked up above, so "currentEndpoints" can never signal that
+	// Patroni's DCS state is clean. Look up the Job that runs "patronictl remove"
+	// against the external DCS instead.
+	var dcsCleanupJob *batchv1.Job
+	if cluster.UsesExternalDCS() {
+		dcsCleanupJob, err = r.findSingleJob(ctx, cluster,
+			naming.PatroniDCSCleanupJobSelector(cluster.GetName()), "Patroni DCS cleanup Jobs")
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	if restoreJob != nil {
@@ -1086,11 +1114,11 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 				Namespace:     cluster.Namespace,
 				LabelSelector: selector,
 			}); err != nil {
-				return nil, nil, errors.WithStack(err)
+				return nil, nil, nil, errors.WithStack(err)
 			}
 			for i := range restoreConfigMaps.Items {
 				if err := r.Client.Delete(ctx, &restoreConfigMaps.Items[i]); err != nil {
-					return nil, nil, errors.WithStack(err)
+					return nil, nil, nil, errors.WithStack(err)
 				}
 			}
 			restoreSecrets := &corev1.SecretList{}
@@ -1098,11 +1126,11 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 				Namespace:     cluster.Namespace,
 				LabelSelector: selector,
 			}); err != nil {
-				return nil, nil, errors.WithStack(err)
+				return nil, nil, nil, errors.WithStack(err)
 			}
 			for i := range restoreSecrets.Items {
 				if err := r.Client.Delete(ctx, &restoreSecrets.Items[i]); err != nil {
-					return nil, nil, errors.WithStack(err)
+					return nil, nil, nil, errors.WithStack(err)
 				}
 			}
 		} else if failed {
@@ -1116,7 +1144,7 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 		}
 	}
 
-	return currentEndpoints, restoreJob, nil
+	return currentEndpoints, restoreJob, dcsCleanupJob, nil
 }
 
 // +kubebuilder:rbac:groups="",resources="endpoints",verbs={delete}
@@ -1130,7 +1158,7 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 // cluster to re-bootstrap using a restored data directory.
 func (r *Reconciler) prepareForRestore(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
-	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string,
+	currentEndpoints []corev1.Endpoints, restoreJob, dcsCleanupJob *batchv1.Job, restoreID string,
 ) error {
 	setPreparingClusterCondition := func(resource string) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -1211,33 +1239,61 @@ func (r *Reconciler) prepareForRestore(ctx context.Context,
 		return nil
 	}
 
-	// if everything is gone, proceed with re-bootstrapping the cluster via an in-place restore
-	if len(currentEndpoints) == 0 {
-		meta.RemoveStatusCondition(&cluster.Status.Conditions, ConditionPostgresDataInitialized)
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			ObservedGeneration: cluster.GetGeneration(),
-			Type:               ConditionPGBackRestRestoreProgressing,
-			Status:             metav1.ConditionTrue,
-			Reason:             ReasonReadyForRestore,
-			Message:            "Restoring cluster in-place",
-		})
-		// the cluster is no longer bootstrapped
-		cluster.Status.Patroni.SystemIdentifier = ""
-		// the restore will change the contents of the database, so the pgbouncer and exporter hashes
-		// are no longer valid
-		cluster.Status.Proxy.PGBouncer.PostgreSQLRevision = ""
-		cluster.Status.Monitoring.ExporterConfiguration = ""
+	// Confirm Patroni's DCS state has actually been cleared before proceeding to
+	// re-bootstrap. Under Kubernetes DCS this means the Endpoints Patroni created are
+	// gone; under an external DCS backend (e.g. etcd), Patroni never creates those
+	// Endpoints, so a Job running "patronictl remove" is used instead to clear the
+	// leader lock, members, and the "initialize" key from the external DCS (run only
+	// now, after Patroni is confirmed stopped, so there's no live Patroni process left
+	// to re-register itself into DCS).
+	if cluster.UsesExternalDCS() {
+		switch {
+		case dcsCleanupJob == nil:
+			setPreparingClusterCondition("removing DCS")
+			if err := r.reconcileDCSCleanupJob(ctx, cluster); err != nil {
+				return errors.WithStack(err)
+			}
+			return nil
+		case jobFailed(dcsCleanupJob):
+			setPreparingClusterCondition("removing DCS")
+			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "PatroniDCSCleanupFailed",
+				"patronictl remove failed; retrying")
+			if err := r.Client.Delete(ctx, dcsCleanupJob,
+				client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return errors.WithStack(err)
+			}
+			return nil
+		case !jobCompleted(dcsCleanupJob):
+			// still running; wait for the next reconcile
+			return nil
+		}
+		// dcsCleanupJob completed successfully -- fall through to re-bootstrap below.
+	} else if len(currentEndpoints) > 0 {
+		setPreparingClusterCondition("removing DCS")
+		// delete any Endpoints
+		for i := range currentEndpoints {
+			if err := r.Client.Delete(ctx, &currentEndpoints[i]); client.IgnoreNotFound(err) != nil {
+				return errors.WithStack(err)
+			}
+		}
 		return nil
 	}
 
-	setPreparingClusterCondition("removing DCS")
-	// delete any Endpoints
-	for i := range currentEndpoints {
-		if err := r.Client.Delete(ctx, &currentEndpoints[i]); client.IgnoreNotFound(err) != nil {
-			return errors.WithStack(err)
-		}
-	}
-
+	// everything is gone, proceed with re-bootstrapping the cluster via an in-place restore
+	meta.RemoveStatusCondition(&cluster.Status.Conditions, ConditionPostgresDataInitialized)
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		ObservedGeneration: cluster.GetGeneration(),
+		Type:               ConditionPGBackRestRestoreProgressing,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonReadyForRestore,
+		Message:            "Restoring cluster in-place",
+	})
+	// the cluster is no longer bootstrapped
+	cluster.Status.Patroni.SystemIdentifier = ""
+	// the restore will change the contents of the database, so the pgbouncer and exporter hashes
+	// are no longer valid
+	cluster.Status.Proxy.PGBouncer.PostgreSQLRevision = ""
+	cluster.Status.Monitoring.ExporterConfiguration = ""
 	return nil
 }
 
@@ -1516,6 +1572,86 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	}
 
 	return nil
+}
+
+// reconcileDCSCleanupJob reconciles the Job that runs "patronictl remove" to clear
+// cluster's Patroni state from its external DCS before an in-place restore
+// re-bootstraps the cluster. Only used when cluster.UsesExternalDCS() (e.g. etcd).
+func (r *Reconciler) reconcileDCSCleanupJob(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	clusterConfigMap := &corev1.ConfigMap{}
+	if err := r.Client.Get(ctx,
+		naming.AsObjectKey(naming.ClusterConfigMap(cluster)), clusterConfigMap); err != nil {
+		return errors.WithStack(err)
+	}
+
+	startupInstance := metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Status.StartupInstance,
+	}
+	instanceConfigMap := &corev1.ConfigMap{}
+	if err := r.Client.Get(ctx,
+		naming.AsObjectKey(naming.InstanceConfigMap(&startupInstance)), instanceConfigMap); err != nil {
+		return errors.WithStack(err)
+	}
+	instanceCertificates := &corev1.Secret{}
+	if err := r.Client.Get(ctx,
+		naming.AsObjectKey(naming.InstanceCertificates(&startupInstance)), instanceCertificates); err != nil {
+		return errors.WithStack(err)
+	}
+
+	job := &batchv1.Job{}
+	if err := r.generateDCSCleanupJobIntent(cluster,
+		clusterConfigMap, instanceConfigMap, instanceCertificates, job); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return errors.WithStack(r.apply(ctx, job))
+}
+
+// generateDCSCleanupJobIntent generates the Job that runs "patronictl remove".
+func (r *Reconciler) generateDCSCleanupJobIntent(
+	cluster *v1beta1.PostgresCluster,
+	clusterConfigMap, instanceConfigMap *corev1.ConfigMap, instanceCertificates *corev1.Secret,
+	job *batchv1.Job,
+) error {
+	meta := naming.PatroniDCSCleanupJob(cluster)
+	labels := naming.Merge(
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+		naming.WithPerconaLabels(
+			naming.PatroniDCSCleanupJobLabels(cluster.Name),
+			cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
+	meta.Labels = labels
+
+	job.ObjectMeta = meta
+	job.Spec = batchv1.JobSpec{
+		// one attempt; prepareForRestore deletes and recreates the Job on failure
+		BackoffLimit: ptr.To(int32(0)),
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:            naming.ContainerDatabase,
+					Image:           config.PostgresContainerImage(cluster),
+					ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+					SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
+				}},
+				RestartPolicy:                corev1.RestartPolicyNever,
+				AutomountServiceAccountToken: new(false),
+				EnableServiceLinks:           new(false),
+				ImagePullSecrets:             cluster.Spec.ImagePullSecrets,
+				SecurityContext:              postgres.PodSecurityContext(cluster),
+			},
+		},
+	}
+
+	patroni.DCSCleanupJob(cluster, clusterConfigMap, instanceConfigMap, instanceCertificates,
+		&job.Spec.Template)
+
+	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
+	return errors.WithStack(r.setControllerReference(cluster, job))
 }
 
 // reconcilePGBackRest is responsible for reconciling any/all pgBackRest resources owned by a

@@ -534,6 +534,199 @@ func TestReconcilePatroniStatus(t *testing.T) {
 	}
 }
 
+func TestReconcilePatroniStatusEtcd(t *testing.T) {
+	ctx := context.Background()
+
+	newCluster := func() *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "etcd-status", Namespace: "postgres-operator"},
+			Spec: v1beta1.PostgresClusterSpec{
+				Patroni: &v1beta1.PatroniSpec{
+					DCS: &v1beta1.PatroniDCS{Type: v1beta1.PatroniDCSTypeEtcd},
+				},
+			},
+		}
+		// SyncPeriodSeconds is normally set by cluster.Default(), called
+		// earlier in Reconcile.
+		cluster.Spec.Patroni.Default()
+		return cluster
+	}
+
+	runningInstance := func() *observedInstances {
+		instance := &Instance{
+			Name: "instance",
+			Pods: []*corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "instance-0", Namespace: "postgres-operator"},
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{{
+						Type: corev1.PodReady, Status: corev1.ConditionTrue,
+					}},
+					ContainerStatuses: []corev1.ContainerStatus{{
+						Name:  naming.ContainerDatabase,
+						State: corev1.ContainerState{Running: new(corev1.ContainerStateRunning)},
+					}},
+				},
+			}},
+		}
+		return &observedInstances{forCluster: []*Instance{instance}}
+	}
+
+	t.Run("SetsSystemIdentifierAndPolls", func(t *testing.T) {
+		cluster := newCluster()
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				_, _ = stdout.Write([]byte(
+					`{"state": "running", "database_system_identifier": "6952526174828511264"}`))
+				return nil
+			},
+		}
+
+		requeue, err := r.reconcilePatroniStatus(ctx, cluster, runningInstance())
+		assert.NilError(t, err)
+		assert.Equal(t, cluster.Status.Patroni.SystemIdentifier, "6952526174828511264")
+		// Once bootstrapped, expect polling at the (default) sync period,
+		// since the pod-annotation watch never fires under non-Kubernetes DCS.
+		assert.Equal(t, requeue, 10*time.Second)
+	})
+
+	t.Run("RetriesWhenNotYetAvailable", func(t *testing.T) {
+		cluster := newCluster()
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				return errors.New("connection refused")
+			},
+		}
+
+		requeue, err := r.reconcilePatroniStatus(ctx, cluster, runningInstance())
+		assert.NilError(t, err)
+		assert.Equal(t, cluster.Status.Patroni.SystemIdentifier, "")
+		assert.Equal(t, requeue, time.Second)
+	})
+
+	t.Run("SkipsExecOnceKnown", func(t *testing.T) {
+		cluster := newCluster()
+		cluster.Status.Patroni.SystemIdentifier = "already-known"
+		called := false
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				called = true
+				return errors.New("should not be called")
+			},
+		}
+
+		requeue, err := r.reconcilePatroniStatus(ctx, cluster, runningInstance())
+		assert.NilError(t, err)
+		assert.Assert(t, !called, "should not exec once SystemIdentifier is already known")
+		assert.Equal(t, cluster.Status.Patroni.SystemIdentifier, "already-known")
+		assert.Equal(t, requeue, 10*time.Second)
+	})
+
+	t.Run("NoRunningInstance", func(t *testing.T) {
+		cluster := newCluster()
+		r := &Reconciler{}
+
+		requeue, err := r.reconcilePatroniStatus(ctx, cluster, &observedInstances{})
+		assert.NilError(t, err)
+		assert.Equal(t, cluster.Status.Patroni.SystemIdentifier, "")
+		assert.Equal(t, requeue, time.Duration(0))
+	})
+}
+
+func TestHandlePatroniRestarts(t *testing.T) {
+	ctx := context.Background()
+
+	newInstance := func(annotations map[string]string) *observedInstances {
+		instance := &Instance{
+			Name: "instance",
+			Pods: []*corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "instance-0", Namespace: "postgres-operator",
+					Annotations: annotations,
+				},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{{
+						Name:  naming.ContainerDatabase,
+						State: corev1.ContainerState{Running: new(corev1.ContainerStateRunning)},
+					}},
+				},
+			}},
+		}
+		return &observedInstances{forCluster: []*Instance{instance}}
+	}
+
+	t.Run("KubernetesDCSUsesAnnotation", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{Name: "k8s-restart"}}
+		observed := newInstance(map[string]string{"status": `{"role":"replica","pending_restart":true}`})
+
+		var restarted bool
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				assert.DeepEqual(t, command, strings.Fields(
+					`patronictl restart --pending --force --role=replica `+naming.PatroniScope(cluster)))
+				restarted = true
+				return nil
+			},
+		}
+
+		assert.NilError(t, r.handlePatroniRestarts(ctx, cluster, observed))
+		assert.Assert(t, restarted, "should restart via patronictl once annotation indicates pending_restart")
+	})
+
+	t.Run("EtcdDCSUsesRestAPI", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "etcd-restart"},
+			Spec: v1beta1.PostgresClusterSpec{
+				Patroni: &v1beta1.PatroniSpec{DCS: &v1beta1.PatroniDCS{Type: v1beta1.PatroniDCSTypeEtcd}},
+			},
+		}
+		// No "status" annotation at all: Patroni never writes it under etcd DCS.
+		observed := newInstance(nil)
+
+		var restarted bool
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				if command[0] == "curl" {
+					_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": true}`))
+					return nil
+				}
+				assert.DeepEqual(t, command, strings.Fields(
+					`patronictl restart --pending --force --role=replica `+naming.PatroniScope(cluster)))
+				restarted = true
+				return nil
+			},
+		}
+
+		assert.NilError(t, r.handlePatroniRestarts(ctx, cluster, observed))
+		assert.Assert(t, restarted, "should restart once Patroni's REST API reports pending_restart")
+	})
+
+	t.Run("EtcdDCSNoRestartNeeded", func(t *testing.T) {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "etcd-no-restart"},
+			Spec: v1beta1.PostgresClusterSpec{
+				Patroni: &v1beta1.PatroniSpec{DCS: &v1beta1.PatroniDCS{Type: v1beta1.PatroniDCSTypeEtcd}},
+			},
+		}
+		observed := newInstance(nil)
+
+		r := &Reconciler{
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+				assert.Equal(t, command[0], "curl", "should only check status, never attempt a restart")
+				_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": false}`))
+				return nil
+			},
+		}
+
+		assert.NilError(t, r.handlePatroniRestarts(ctx, cluster, observed))
+	})
+}
+
 func TestReconcilePatroniSwitchover(t *testing.T) {
 	_, client := setupKubernetes(t)
 	require.ParallelCapacity(t, 0)

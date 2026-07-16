@@ -766,3 +766,4 @@ func TestShouldCheckStandbyLag(t *testing.T) {
 		})
 	}
 }
+

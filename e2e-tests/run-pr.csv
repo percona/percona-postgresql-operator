@@ -33,6 +33,7 @@ telemetry-transfer
 upgrade-consistency
 upgrade-minor
 users
+etcd-dcs
 migration-from-crunchy-standby
 migration-from-crunchy-pv
 migration-from-crunchy-backup-restore

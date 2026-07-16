@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      patroni_yaml=$(kubectl -n "${NAMESPACE}" get configmap etcd-dcs-config \
+        -o jsonpath='{.data.patroni\.yaml}')
+
+      echo "${patroni_yaml}" | grep -q "etcd3:"
+      echo "${patroni_yaml}" | grep -q "protocol: http"
+      echo "${patroni_yaml}" | grep -q "callbacks:"
+      echo "${patroni_yaml}" | grep -q "on_start: /opt/crunchy/bin/patroni-role-change.sh"
+      echo "${patroni_yaml}" | grep -q "on_role_change: /opt/crunchy/bin/patroni-role-change.sh"
+
+      if echo "${patroni_yaml}" | grep -q "kubernetes:"; then
+        echo "ERROR: patroni.yaml must not contain kubernetes: section when etcd DCS is configured"
+        exit 1
+      fi

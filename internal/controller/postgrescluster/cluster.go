@@ -122,6 +122,24 @@ func (r *Reconciler) generateClusterPrimaryService(
 	service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
 	endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
 
+	// With external DCS, Patroni does not manage k8s Endpoints for leader election.
+	// Use a label-selector service instead: pods labeled role=primary by the
+	// on_role_change/on_start callback receive primary traffic directly.
+	if cluster.UsesExternalDCS() {
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		service.Spec.Selector = map[string]string{
+			naming.LabelCluster: cluster.Name,
+			naming.LabelRole:    naming.RolePatroniLeader,
+		}
+		service.Spec.Ports = []corev1.ServicePort{{
+			Name:       naming.PortPostgreSQL,
+			Port:       *cluster.Spec.Port,
+			Protocol:   corev1.ProtocolTCP,
+			TargetPort: intstr.FromString(naming.PortPostgreSQL),
+		}}
+		return service, nil, err
+	}
+
 	if leader == nil {
 		// TODO(cbandy): We need to build a different kind of Service here.
 		return nil, nil, errors.New("Patroni DCS other than Kubernetes Endpoints is not implemented")
@@ -176,7 +194,7 @@ func (r *Reconciler) reconcileClusterPrimaryService(
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
-	if err == nil {
+	if err == nil && endpoints != nil {
 		err = errors.WithStack(r.apply(ctx, endpoints))
 	}
 	return service, err
@@ -298,7 +316,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 
 	// observe all resources currently relevant to reconciling data sources, and update status
 	// accordingly
-	endpoints, restoreJob, err := r.observeRestoreEnv(ctx, cluster)
+	endpoints, restoreJob, dcsCleanupJob, err := r.observeRestoreEnv(ctx, cluster)
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
@@ -389,7 +407,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 	//   annotation, indicating they want a new in-place restore)
 	if (restoringInPlace && (!readyForRestore || configChanged)) || restoreIDChanged {
 		if err := r.prepareForRestore(ctx, cluster, observed, endpoints,
-			restoreJob, restoreID); err != nil {
+			restoreJob, dcsCleanupJob, restoreID); err != nil {
 			return true, err
 		}
 		// return early and don't restore (i.e. populate the data dir) until the cluster is

@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"path"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -174,6 +176,52 @@ func (exec Executor) RestartPendingMembers(ctx context.Context, role, scope stri
 	)
 
 	return err
+}
+
+// MemberStatus mirrors the fields PGO needs from Patroni's monitoring
+// endpoint (GET /patroni), available on every Patroni instance regardless
+// of DCS backend.
+// - https://github.com/patroni/patroni/blob/v4.1.4/docs/rest_api.rst#monitoring-endpoint
+type MemberStatus struct {
+	DatabaseSystemIdentifier string `json:"database_system_identifier"`
+	PendingRestart           bool   `json:"pending_restart"`
+}
+
+// GetMemberStatus curls Patroni's own monitoring REST endpoint inside the
+// pod and returns the parsed response. Unlike reading Kubernetes annotations,
+// this works identically regardless of DCS backend, since it's
+// PostgreSQL/Patroni introspection rather than a DCS read.
+//
+// host must match a DNS SAN on Patroni's REST API certificate (i.e. the
+// pod's own stable DNS name) since Patroni does not certify "localhost".
+func (exec Executor) GetMemberStatus(ctx context.Context, host string, port int32) (MemberStatus, error) {
+	var stdout, stderr bytes.Buffer
+	var status MemberStatus
+
+	err := exec(ctx, nil, &stdout, &stderr,
+		"curl", "--silent", "--fail",
+		"--cacert", path.Join(configDirectory, certAuthorityConfigPath),
+		fmt.Sprintf("https://%s:%d/patroni", host, port))
+	if err != nil {
+		return status, err
+	}
+
+	if stderr.String() != "" {
+		return status, errors.New(stderr.String())
+	}
+
+	err = json.Unmarshal(stdout.Bytes(), &status)
+	return status, err
+}
+
+// PodRequiresRestart returns whether or not PostgreSQL inside the pod has
+// (pending) parameter changes that require a PostgreSQL restart, by asking
+// Patroni's own monitoring REST API directly. Unlike the package-level
+// PodRequiresRestart function, this works under any DCS backend, since it
+// doesn't depend on Patroni having written a Kubernetes annotation.
+func (exec Executor) PodRequiresRestart(ctx context.Context, host string, port int32) (bool, error) {
+	status, err := exec.GetMemberStatus(ctx, host, port)
+	return status.PendingRestart, err
 }
 
 // GetTimeline gets the patronictl status and returns the timeline,

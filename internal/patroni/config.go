@@ -7,6 +7,7 @@ package patroni
 import (
 	"fmt"
 	"maps"
+	"net/url"
 	"path"
 	"strings"
 
@@ -36,6 +37,33 @@ const (
 		"# If you want to override the config, annotate this ConfigMap with " + naming.OverrideConfigAnnotation + "=true\n"
 )
 
+// etcdHosts strips the URL scheme from each endpoint and returns bare host:port strings.
+func etcdHosts(endpoints []string) []string {
+	hosts := make([]string, 0, len(endpoints))
+	for _, ep := range endpoints {
+		u, err := url.Parse(ep)
+		if err != nil || u.Host == "" {
+			hosts = append(hosts, ep)
+			continue
+		}
+		hosts = append(hosts, u.Host)
+	}
+	return hosts
+}
+
+// etcdProtocol returns the URL scheme of the first endpoint ("http" or "https").
+// Defaults to "http" when the scheme cannot be determined.
+func etcdProtocol(endpoints []string) string {
+	if len(endpoints) == 0 {
+		return "http"
+	}
+	u, err := url.Parse(endpoints[0])
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "http"
+	}
+	return u.Scheme
+}
+
 // quoteShellWord ensures that s is interpreted by a shell as single word.
 func quoteShellWord(s string) string {
 	// https://www.gnu.org/software/bash/manual/html_node/Quoting.html
@@ -48,32 +76,10 @@ func clusterYAML(
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
 ) (string, error) {
 
-	labels := map[string]string{naming.LabelCluster: cluster.Name}
-	if cluster.CompareVersion("2.9.0") >= 0 {
-		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
-	}
-
 	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
 		"scope": naming.PatroniScope(cluster),
-
-		// Use Kubernetes Endpoints for the distributed configuration store (DCS).
-		// These values cannot change during the cluster's lifetime.
-		//
-		// NOTE(cbandy): It *might* be possible to *carefully* change the role and
-		// scope labels, but there is no way to reconfigure all instances at once.
-		"kubernetes": map[string]any{
-			"namespace":     cluster.Namespace,
-			"role_label":    naming.LabelRole,
-			"scope_label":   naming.LabelPatroni,
-			"use_endpoints": true,
-
-			// In addition to "scope_label" above, Patroni will add the following to
-			// every object it creates. It will also use these as filters when doing
-			// any lookups.
-			"labels": labels,
-		},
 
 		"postgresql": map[string]any{
 			// TODO(cbandy): "callbacks"
@@ -156,6 +162,52 @@ func clusterYAML(
 			// flexible approximation.
 			"mode": "off",
 		},
+	}
+
+	// DCS configuration — either external etcd or the Kubernetes-native Endpoints backend.
+	// These values cannot change during the cluster's lifetime.
+	if cluster.DCSType() == v1beta1.PatroniDCSTypeEtcd {
+		if dcs := cluster.GetDCS(); dcs.Etcd != nil {
+			etcd3 := map[string]any{
+				"hosts":    etcdHosts(dcs.Etcd.Endpoints),
+				"protocol": etcdProtocol(dcs.Etcd.Endpoints),
+			}
+			if dcs.Etcd.TLSSecret != "" {
+				etcd3["cacert"] = path.Join(configDirectory, "etcd-tls", "ca.crt")
+				etcd3["cert"] = path.Join(configDirectory, "etcd-tls", "tls.crt")
+				etcd3["key"] = path.Join(configDirectory, "etcd-tls", "tls.key")
+			}
+			root["etcd3"] = etcd3
+
+			// With etcd DCS, Patroni does not update pod labels. Use callbacks to
+			// patch the role label on start and on each role change so Service
+			// selectors keep working. on_start covers pod restarts where the role
+			// does not change; on_role_change covers failovers.
+			root["postgresql"].(map[string]any)["callbacks"] = map[string]any{
+				"on_start":       "/opt/crunchy/bin/patroni-role-change.sh",
+				"on_role_change": "/opt/crunchy/bin/patroni-role-change.sh",
+			}
+		}
+	} else {
+		// Use Kubernetes Endpoints for the distributed configuration store (DCS).
+		//
+		// NOTE(cbandy): It *might* be possible to *carefully* change the role and
+		// scope labels, but there is no way to reconfigure all instances at once.
+		labels := map[string]string{naming.LabelCluster: cluster.Name}
+		if cluster.CompareVersion("2.9.0") >= 0 {
+			labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
+		}
+		root["kubernetes"] = map[string]any{
+			"namespace":     cluster.Namespace,
+			"role_label":    naming.LabelRole,
+			"scope_label":   naming.LabelPatroni,
+			"use_endpoints": true,
+
+			// In addition to "scope_label" above, Patroni will add the following to
+			// every object it creates. It will also use these as filters when doing
+			// any lookups.
+			"labels": labels,
+		}
 	}
 
 	if !ClusterBootstrapped(cluster) {
@@ -348,17 +400,20 @@ func instanceEnvironment(
 	)
 
 	// Gather Endpoint ports for any Container ports that match the leader
-	// Service definition.
+	// Service definition. leaderService is nil when using etcd DCS (no k8s
+	// leader Endpoints), in which case the ports list stays empty.
 	ports := []corev1.EndpointPort{}
-	for _, sp := range leaderService.Spec.Ports {
-		for i := range podContainers {
-			for _, cp := range podContainers[i].Ports {
-				if sp.TargetPort.StrVal == cp.Name {
-					ports = append(ports, corev1.EndpointPort{
-						Name:     sp.Name,
-						Port:     cp.ContainerPort,
-						Protocol: cp.Protocol,
-					})
+	if leaderService != nil {
+		for _, sp := range leaderService.Spec.Ports {
+			for i := range podContainers {
+				for _, cp := range podContainers[i].Ports {
+					if sp.TargetPort.StrVal == cp.Name {
+						ports = append(ports, corev1.EndpointPort{
+							Name:     sp.Name,
+							Port:     cp.ContainerPort,
+							Protocol: cp.Protocol,
+						})
+					}
 				}
 			}
 		}
@@ -371,7 +426,7 @@ func instanceEnvironment(
 	// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/postgresql/postmaster.py#L215-L216
 
 	variables := []corev1.EnvVar{
-		// Set "name" to the v1.Pod's name. Required when using Kubernetes for DCS.
+		// Set "name" to the v1.Pod's name. Required by Patroni for node identity.
 		// Patroni must be restarted when changing this value.
 		{
 			Name: "PATRONI_NAME",
@@ -380,31 +435,38 @@ func instanceEnvironment(
 				FieldPath:  "metadata.name",
 			}},
 		},
+	}
 
-		// Set "kubernetes.pod_ip" to the v1.Pod's primary IP address.
-		// Patroni must be restarted when changing this value.
-		{
-			Name: "PATRONI_KUBERNETES_POD_IP",
-			ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "status.podIP",
-			}},
-		},
+	// The PATRONI_KUBERNETES_* variables are only needed for the Kubernetes DCS backend.
+	if !cluster.UsesExternalDCS() {
+		variables = append(variables,
+			// Set "kubernetes.pod_ip" to the v1.Pod's primary IP address.
+			// Patroni must be restarted when changing this value.
+			corev1.EnvVar{
+				Name: "PATRONI_KUBERNETES_POD_IP",
+				ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "status.podIP",
+				}},
+			},
 
-		// When using Endpoints for DCS, Patroni needs to replicate the leader
-		// ServicePort definitions. Set "kubernetes.ports" to the YAML of this
-		// Pod's equivalent EndpointPort definitions.
-		//
-		// This is connascent with PATRONI_POSTGRESQL_CONNECT_ADDRESS below.
-		// Patroni must be restarted when changing this value.
-		{
-			Name:  "PATRONI_KUBERNETES_PORTS",
-			Value: string(portsYAML),
-		},
+			// When using Endpoints for DCS, Patroni needs to replicate the leader
+			// ServicePort definitions. Set "kubernetes.ports" to the YAML of this
+			// Pod's equivalent EndpointPort definitions.
+			//
+			// This is connascent with PATRONI_POSTGRESQL_CONNECT_ADDRESS below.
+			// Patroni must be restarted when changing this value.
+			corev1.EnvVar{
+				Name:  "PATRONI_KUBERNETES_PORTS",
+				Value: string(portsYAML),
+			},
+		)
+	}
 
+	variables = append(variables,
 		// Set "postgresql.connect_address" using the Pod's stable DNS name.
 		// PostgreSQL must be restarted when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_POSTGRESQL_CONNECT_ADDRESS",
 			Value: fmt.Sprintf("%s.%s:%d", "$(PATRONI_NAME)", podSubdomain, postgresPort),
 		},
@@ -414,28 +476,28 @@ func instanceEnvironment(
 		//
 		// This is connascent with PATRONI_POSTGRESQL_CONNECT_ADDRESS above.
 		// PostgreSQL must be restarted when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_POSTGRESQL_LISTEN",
 			Value: fmt.Sprintf("*:%d", postgresPort),
 		},
 
 		// Set "postgresql.config_dir" to PostgreSQL's $PGDATA directory.
 		// Patroni must be restarted when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_POSTGRESQL_CONFIG_DIR",
 			Value: postgres.ConfigDirectory(cluster),
 		},
 
 		// Set "postgresql.data_dir" to PostgreSQL's "data_directory".
 		// Patroni must be restarted when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_POSTGRESQL_DATA_DIR",
 			Value: postgres.DataDirectory(cluster),
 		},
 
 		// Set "restapi.connect_address" using the Pod's stable DNS name.
 		// Patroni must be reloaded when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_RESTAPI_CONNECT_ADDRESS",
 			Value: fmt.Sprintf("%s.%s:%d", "$(PATRONI_NAME)", podSubdomain, patroniPort),
 		},
@@ -443,17 +505,17 @@ func instanceEnvironment(
 		// Set "restapi.listen" using the special address "*" to mean all TCP interfaces.
 		// This is connascent with PATRONI_RESTAPI_CONNECT_ADDRESS above.
 		// Patroni must be reloaded when changing this value.
-		{
+		corev1.EnvVar{
 			Name:  "PATRONI_RESTAPI_LISTEN",
 			Value: fmt.Sprintf("*:%d", patroniPort),
 		},
 
 		// The Patroni client `patronictl` looks here for its configuration file(s).
-		{
+		corev1.EnvVar{
 			Name:  "PATRONICTL_CONFIG_FILE",
 			Value: configDirectory,
 		},
-	}
+	)
 
 	return variables
 }
@@ -497,15 +559,6 @@ func instanceYAML(
 		// created. That value should be injected using the downward API and the
 		// PATRONI_NAME environment variable.
 
-		"kubernetes": map[string]any{
-			// Missing here is "pod_ip" which cannot be known until the instance Pod is
-			// created. That value should be injected using the downward API and the
-			// PATRONI_KUBERNETES_POD_IP environment variable.
-
-			// Missing here is "ports" which is is connascent with "postgresql.connect_address".
-			// See the PATRONI_KUBERNETES_PORTS env variable.
-		},
-
 		"restapi": map[string]any{
 			// Missing here is "connect_address" which cannot be known until the
 			// instance Pod is created. That value should be injected using the downward
@@ -519,6 +572,19 @@ func instanceYAML(
 			// TODO(cbandy): "nofailover"
 			// TODO(cbandy): "nosync"
 		},
+	}
+
+	// For the Kubernetes DCS backend, include an empty kubernetes section that
+	// receives pod_ip and ports from the PATRONI_KUBERNETES_* environment variables.
+	if !cluster.UsesExternalDCS() {
+		root["kubernetes"] = map[string]any{
+			// Missing here is "pod_ip" which cannot be known until the instance Pod is
+			// created. That value should be injected using the downward API and the
+			// PATRONI_KUBERNETES_POD_IP environment variable.
+
+			// Missing here is "ports" which is connascent with "postgresql.connect_address".
+			// See the PATRONI_KUBERNETES_PORTS env variable.
+		}
 	}
 
 	postgresql := map[string]any{

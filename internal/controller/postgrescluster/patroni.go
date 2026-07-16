@@ -6,6 +6,7 @@ package postgrescluster
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -46,32 +47,60 @@ func (r *Reconciler) deletePatroniArtifacts(
 	return err
 }
 
+// patroniPodHost returns pod's own stable DNS name, matching the DNS SAN on
+// its Patroni REST API certificate. Patroni's REST API does not certify
+// "localhost", so calls made inside the pod must target this name instead.
+func patroniPodHost(pod *corev1.Pod) string {
+	return fmt.Sprintf("%s.%s.%s.svc", pod.Spec.Hostname, pod.Spec.Subdomain, pod.Namespace)
+}
+
 func (r *Reconciler) handlePatroniRestarts(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
 ) error {
 	const container = naming.ContainerDatabase
 	var primaryNeedsRestart, replicaNeedsRestart *Instance
 
+	// Only Kubernetes DCS has Patroni write the "status" pod annotation that
+	// PodRequiresRestart reads. Every external DCS backend (currently just etcd,
+	// but this isn't etcd-specific) needs a live check via Patroni's own
+	// monitoring REST API instead.
+	requiresRestart := func(pod *corev1.Pod) bool {
+		if !cluster.UsesExternalDCS() {
+			return patroni.PodRequiresRestart(pod)
+		}
+		exec := patroni.Executor(func(
+			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+		})
+		restart, err := exec.PodRequiresRestart(ctx, patroniPodHost(pod), cluster.Spec.Patroni.GetPort())
+		return err == nil && restart
+	}
+
 	// Look for one primary and one replica that need to restart. Ignore
 	// containers that are terminating or not running; Kubernetes will start
 	// them again, and calls to their Patroni API will likely be interrupted anyway.
 	for _, instance := range instances.forCluster {
-		if len(instance.Pods) > 0 && patroni.PodRequiresRestart(instance.Pods[0]) {
-			if terminating, known := instance.IsTerminating(); terminating || !known {
-				continue
-			}
-			if running, known := instance.IsRunning(container); !running || !known {
-				continue
-			}
+		if len(instance.Pods) == 0 {
+			continue
+		}
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			continue
+		}
+		if running, known := instance.IsRunning(container); !running || !known {
+			continue
+		}
+		if !requiresRestart(instance.Pods[0]) {
+			continue
+		}
 
-			if primary, _ := instance.IsPrimary(); primary {
-				primaryNeedsRestart = instance
-			} else {
-				replicaNeedsRestart = instance
-			}
-			if primaryNeedsRestart != nil && replicaNeedsRestart != nil {
-				break
-			}
+		if primary, _ := instance.IsPrimary(); primary {
+			primaryNeedsRestart = instance
+		} else {
+			replicaNeedsRestart = instance
+		}
+		if primaryNeedsRestart != nil && replicaNeedsRestart != nil {
+			break
 		}
 	}
 
@@ -145,6 +174,12 @@ func (r *Reconciler) handlePatroniRestarts(
 func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
+	// With an external DCS backend, Patroni stores distributed configuration there
+	// instead of in k8s Endpoints.
+	if cluster.UsesExternalDCS() {
+		return nil
+	}
+
 	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
 	// Endpoints object is not removed by Kubernetes at startup. Patroni will
 	// create this object if it has permission to do so, but it won't set any
@@ -308,6 +343,11 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 func (r *Reconciler) reconcilePatroniLeaderLease(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Service, error) {
+	// With an external DCS backend, Patroni does not use k8s Endpoints for leader elections.
+	if cluster.UsesExternalDCS() {
+		return nil, nil
+	}
+
 	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
 	// Endpoints object is not removed by Kubernetes at startup.
 	// - https://releases.k8s.io/v1.16.0/pkg/controller/endpoint/endpoints_controller.go#L547
@@ -336,28 +376,80 @@ func (r *Reconciler) reconcilePatroniStatus(
 		}
 	}
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
-	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
+	// Only Kubernetes DCS has Patroni write the "initialize" value to a
+	// Kubernetes Endpoints object.
+	if !cluster.UsesExternalDCS() {
+		dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
+		err := errors.WithStack(client.IgnoreNotFound(
+			r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
 
-	if err == nil {
-		if dcs.Annotations["initialize"] != "" {
-			// After bootstrap, Patroni writes the cluster system identifier to DCS.
-			cluster.Status.Patroni.SystemIdentifier = dcs.Annotations["initialize"]
-		} else if readyInstance {
-			// While we typically expect a value for the initialize key to be present in the
-			// Endpoints above by the time the StatefulSet for any instance indicates "ready"
-			// (since Patroni writes this value after successful cluster bootstrap, at which time
-			// the initial primary should transition to "ready"), sometimes this is not the case
-			// and the "initialize" key is not yet present.  Therefore, if a "ready" instance
-			// is detected in the cluster we assume this is the case, and simply log a message and
-			// requeue in order to try again until the expected value is found.
-			log.Info("detected ready instance but no initialize value")
-			requeue = time.Second
+		if err == nil {
+			if dcs.Annotations["initialize"] != "" {
+				// After bootstrap, Patroni writes the cluster system identifier to DCS.
+				cluster.Status.Patroni.SystemIdentifier = dcs.Annotations["initialize"]
+			} else if readyInstance {
+				// While we typically expect a value for the initialize key to be present in the
+				// Endpoints above by the time the StatefulSet for any instance indicates "ready"
+				// (since Patroni writes this value after successful cluster bootstrap, at which time
+				// the initial primary should transition to "ready"), sometimes this is not the case
+				// and the "initialize" key is not yet present.  Therefore, if a "ready" instance
+				// is detected in the cluster we assume this is the case, and simply log a message and
+				// requeue in order to try again until the expected value is found.
+				log.Info("detected ready instance but no initialize value")
+				requeue = time.Second
+			}
 		}
-	}
 
-	return requeue, err
+		return requeue, err
+	} else {
+		// Every other DCS backend (currently just etcd, but this isn't
+		// etcd-specific) has no Kubernetes object to read "initialize" from.
+		// Ask a running instance directly via Patroni's own monitoring REST
+		// API instead, which reports the same value regardless of DCS backend.
+		if cluster.Status.Patroni.SystemIdentifier == "" {
+			var pod *corev1.Pod
+			for _, instance := range observedInstances.forCluster {
+				if terminating, known := instance.IsTerminating(); !terminating && known {
+					if running, known := instance.IsRunning(naming.ContainerDatabase); running && known && len(instance.Pods) > 0 {
+						pod = instance.Pods[0]
+						break
+					}
+				}
+			}
+
+			if pod == nil {
+				if readyInstance {
+					requeue = time.Second
+				}
+			} else {
+				exec := patroni.Executor(func(
+					ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+				) error {
+					return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
+				})
+
+				status, err := exec.GetMemberStatus(ctx, patroniPodHost(pod), cluster.Spec.Patroni.GetPort())
+				if err == nil && status.DatabaseSystemIdentifier != "" {
+					cluster.Status.Patroni.SystemIdentifier = status.DatabaseSystemIdentifier
+				} else if readyInstance {
+					log.Info("detected ready instance but no system identifier yet")
+					requeue = time.Second
+				}
+			}
+		}
+
+		if patroni.ClusterBootstrapped(cluster) {
+			// The pod-annotation watch that normally triggers reconciles for
+			// pending restarts never fires under non-Kubernetes DCS (Patroni
+			// doesn't write that annotation), so poll at roughly Patroni's
+			// own loop_wait cadence instead. See handlePatroniRestarts.
+			// cluster.Default() (called earlier in Reconcile) guarantees
+			// SyncPeriodSeconds is set.
+			requeue = time.Duration(*cluster.Spec.Patroni.SyncPeriodSeconds) * time.Second
+		}
+
+		return requeue, nil
+	}
 }
 
 // reconcileReplicationSecret creates a secret containing the TLS

@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      keys=$(kubectl -n "${NAMESPACE}" exec etcd-0 -- \
+        /usr/local/bin/etcdctl --endpoints=http://localhost:2379 \
+        get / --prefix --keys-only)
+
+      echo "${keys}"
+      echo "${keys}" | grep -q "etcd-dcs-ha"

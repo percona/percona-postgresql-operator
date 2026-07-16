@@ -287,3 +287,99 @@ func TestExecutorGetTimeline(t *testing.T) {
 		assert.Equal(t, tl, int64(4))
 	})
 }
+
+func TestExecutorGetMemberStatus(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		expected := errors.New("bang")
+		status, actual := Executor(func(
+			context.Context, io.Reader, io.Writer, io.Writer, ...string,
+		) error {
+			return expected
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
+
+		assert.Equal(t, expected, actual)
+		assert.DeepEqual(t, status, MemberStatus{})
+	})
+
+	t.Run("Stderr", func(t *testing.T) {
+		status, actual := Executor(func(
+			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			_, _ = stderr.Write([]byte(`no luck`))
+			return nil
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
+
+		assert.Error(t, actual, "no luck")
+		assert.DeepEqual(t, status, MemberStatus{})
+	})
+
+	t.Run("BadJSON", func(t *testing.T) {
+		status, actual := Executor(func(
+			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			_, _ = stdout.Write([]byte(`no luck`))
+			return nil
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
+
+		assert.ErrorContains(t, actual, "invalid character")
+		assert.DeepEqual(t, status, MemberStatus{})
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		status, actual := Executor(func(
+			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			assert.DeepEqual(t, command, strings.Fields(
+				`curl --silent --fail --cacert /etc/patroni/~postgres-operator/patroni.ca-roots https://some-host:8008/patroni`,
+			))
+			assert.Assert(t, stdin == nil, "expected no stdin, got %T", stdin)
+
+			_, _ = stdout.Write([]byte(
+				`{"state": "running", "role": "primary", "database_system_identifier": "6287881213849985952", "pending_restart": true}`,
+			))
+			return nil
+		}).GetMemberStatus(context.Background(), "some-host", 8008)
+
+		assert.NilError(t, actual)
+		assert.Equal(t, status.DatabaseSystemIdentifier, "6287881213849985952")
+		assert.Equal(t, status.PendingRestart, true)
+	})
+}
+
+func TestExecutorPodRequiresRestart(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		expected := errors.New("bang")
+		restart, actual := Executor(func(
+			context.Context, io.Reader, io.Writer, io.Writer, ...string,
+		) error {
+			return expected
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
+
+		assert.Equal(t, expected, actual)
+		assert.Equal(t, restart, false)
+	})
+
+	t.Run("False", func(t *testing.T) {
+		restart, actual := Executor(func(
+			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": false}`))
+			return nil
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
+
+		assert.NilError(t, actual)
+		assert.Equal(t, restart, false)
+	})
+
+	t.Run("True", func(t *testing.T) {
+		restart, actual := Executor(func(
+			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			_, _ = stdout.Write([]byte(`{"state": "running", "pending_restart": true}`))
+			return nil
+		}).PodRequiresRestart(context.Background(), "some-host", 8008)
+
+		assert.NilError(t, actual)
+		assert.Equal(t, restart, true)
+	})
+}
