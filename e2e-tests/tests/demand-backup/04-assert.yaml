@@ -1,6 +1,22 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 660
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      kubectl wait --for=jsonpath='{.status.state}'=Succeeded --timeout=560s -n "${NAMESPACE}" pg-backup/demand-backup-full-repo1
+      kubectl wait --for=jsonpath='{.status.backupType}'=full --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-full-repo1
+      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-full-repo1 -o json | jq -e '.status.size != null' >/dev/null
+
+      kubectl wait --for=jsonpath='{.status.state}'=Succeeded --timeout=560s -n "${NAMESPACE}" pg-backup/demand-backup-differential-repo1
+      kubectl wait --for=jsonpath='{.status.backupType}'=diff --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-differential-repo1
+      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-differential-repo1 -o json | jq -e '.status.size != null' >/dev/null
+
+      kubectl wait --for=jsonpath='{.status.state}'=Succeeded --timeout=560s -n "${NAMESPACE}" pg-backup/demand-backup-incremental-repo1
+      kubectl wait --for=jsonpath='{.status.backupType}'=incr --timeout=120s -n "${NAMESPACE}" pg-backup/demand-backup-incremental-repo1
+      kubectl -n "${NAMESPACE}" get pg-backup demand-backup-incremental-repo1 -o json | jq -e '.status.size != null' >/dev/null
 ---
 kind: Job
 apiVersion: batch/v1
@@ -102,6 +118,7 @@ apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: demand-backup
-  generation: 2
+  generation: 4
 status:
-  observedGeneration: 2
+  observedGeneration: 4
+
