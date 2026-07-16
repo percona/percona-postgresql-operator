@@ -25,15 +25,6 @@ import (
 
 // Upgrade job
 
-// pgUpgradeJob returns the ObjectMeta for the pg_upgrade Job utilized to
-// upgrade from one major PostgreSQL version to another
-func pgUpgradeJob(upgrade *v1beta1.PGUpgrade) metav1.ObjectMeta {
-	return metav1.ObjectMeta{
-		Namespace: upgrade.Namespace,
-		Name:      upgrade.Name + "-pgdata",
-	}
-}
-
 // upgradeCommand returns an entrypoint that prepares the filesystem for
 // and performs a PostgreSQL major version upgrade using pg_upgrade.
 func upgradeCommand(oldVersion, newVersion int, fetchKeyCommand string, availableCPUs int) []string {
@@ -142,7 +133,7 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
 
 	job.Namespace = upgrade.Namespace
-	job.Name = pgUpgradeJob(upgrade).Name
+	job.Name = naming.SafeDNSUniqueName(upgrade.Name + "-pgdata")
 
 	job.Labels = Merge(upgrade.Spec.Metadata.GetLabelsOrNil(),
 		commonLabels(pgUpgrade, upgrade), //FIXME role pgupgrade
@@ -302,7 +293,7 @@ func (r *PGUpgradeReconciler) generateRemoveDataJob(
 	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
 
 	job.Namespace = upgrade.Namespace
-	job.Name = upgrade.Name + "-" + sts.Name
+	job.Name = naming.SafeDNSUniqueName(upgrade.Name + "-" + sts.Name)
 
 	job.Labels = labels.Merge(upgrade.Spec.Metadata.GetLabelsOrNil(),
 		commonLabels(removeData, upgrade)) //FIXME role removedata

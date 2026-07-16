@@ -51,10 +51,41 @@ func TestCertificateTextMarshaling(t *testing.T) {
 
 		bundle := bytes.Join([][]byte{txt, otherText}, nil)
 
-		// Only the first certificate of a bundle is parsed.
+		// Only the first certificate of a bundle is parsed for
+		// cryptographic use (e.g. signing, CommonName, DNSNames), but every
+		// certificate in the bundle is kept so the full chain — such as an
+		// intermediate CA followed by its root — round-trips through
+		// MarshalText. Otherwise a custom root CA bundle silently loses
+		// every certificate after the first when it is copied into
+		// per-instance trust stores.
 		var sink Certificate
 		assert.NilError(t, sink.UnmarshalText(bundle))
 		assert.DeepEqual(t, cert, sink)
+
+		sinkText, err := sink.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, sinkText, bundle)
+	})
+
+	t.Run("BundleIgnoresNonCertificateBlocks", func(t *testing.T) {
+		// A non-certificate PEM block (e.g. a private key) appended after
+		// the first certificate must never be forwarded into a trust store,
+		// even though certificates that follow are kept.
+		keyText, err := root.PrivateKey.MarshalText()
+		assert.NilError(t, err)
+
+		other, _ := NewRootCertificateAuthority()
+		otherText, err := other.Certificate.MarshalText()
+		assert.NilError(t, err)
+
+		bundle := bytes.Join([][]byte{txt, keyText, otherText}, nil)
+
+		var sink Certificate
+		assert.NilError(t, sink.UnmarshalText(bundle))
+
+		sinkText, err := sink.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, sinkText, bytes.Join([][]byte{txt, otherText}, nil))
 	})
 
 	t.Run("EncodedEmpty", func(t *testing.T) {
