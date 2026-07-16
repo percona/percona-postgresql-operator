@@ -31,7 +31,8 @@ commands:
 
       kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_backrest sts/upgrade-minor-repo-host
       kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_pgbouncer deployment/upgrade-minor-pgbouncer
-      for s in $(kubectl get sts --no-headers -l postgres-operator.crunchydata.com/instance-set=instance1 --output=custom-columns='NAME:.metadata.name'); do
+      for s in $(kubectl get sts -n $NAMESPACE --no-headers -l postgres-operator.crunchydata.com/instance-set=instance1 --output=custom-columns='NAME:.metadata.name'); do
           kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_postgresql sts/${s}
       done
     timeout: 180
+
