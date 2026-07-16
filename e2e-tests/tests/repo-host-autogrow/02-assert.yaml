@@ -1,0 +1,42 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o nounset
+      set -o pipefail
+      set -o xtrace
+
+      cluster=repo-host-autogrow
+      selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-dedicated"
+
+      repo_pod=$(kubectl -n "${NAMESPACE}" get pods -l "${selector}" -o jsonpath='{.items[0].metadata.name}')
+
+      suggested_size=
+      for _ in $(seq 1 60); do
+        suggested_size=$(kubectl -n "${NAMESPACE}" get pod "${repo_pod}" \
+          -o jsonpath='{.metadata.annotations.suggested-pgbackrest-repo1-pvc-size}')
+        if [[ -n "${suggested_size}" ]]; then
+          break
+        fi
+        sleep 5
+      done
+
+      if [[ -z "${suggested_size}" ]]; then
+        echo "Expected repo1 PVC size suggestion"
+        exit 1
+      fi
+      if [[ "${suggested_size}" != *Mi ]]; then
+        echo "Expected repo1 PVC size suggestion in Mi, got ${suggested_size}"
+        exit 1
+      fi
+
+      suggested_mebibytes=${suggested_size%Mi}
+      if ((suggested_mebibytes <= 300)); then
+        echo "Expected repo1 PVC size suggestion greater than 300Mi, got ${suggested_size}"
+        exit 1
+      fi
+
+      kubectl -n "${NAMESPACE}" exec "${repo_pod}" -c pgbackrest-config -- \
+        rm -f /pgbackrest/repo1/autogrow-e2e.fill

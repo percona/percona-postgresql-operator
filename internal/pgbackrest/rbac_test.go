@@ -46,6 +46,7 @@ func TestPermissions(t *testing.T) {
   - pods
   verbs:
   - list
+  - patch
 - apiGroups:
   - ""
   resources:

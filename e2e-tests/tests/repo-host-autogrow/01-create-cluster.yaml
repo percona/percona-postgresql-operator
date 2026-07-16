@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval '
+            .spec.instances[0].replicas = 1 |
+            .spec.proxy.pgBouncer.replicas = 1 |
+            .spec.backups.pgbackrest.repos[0].volume.volumeClaimSpec.resources.requests.storage = "256Mi" |
+            .spec.backups.pgbackrest.repos[0].volume.volumeClaimSpec.resources.limits.storage = "300Mi"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -

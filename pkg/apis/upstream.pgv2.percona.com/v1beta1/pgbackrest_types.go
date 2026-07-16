@@ -434,6 +434,10 @@ type RepoStatus struct {
 	// +optional
 	VolumeName string `json:"volume,omitempty"`
 
+	// Desired size of the PersistentVolumeClaim containing the repository.
+	// +optional
+	DesiredRepoVolume string `json:"desiredRepoVolume,omitempty"`
+
 	// Specifies whether or not a stanza has been successfully created for the repository
 	// +optional
 	StanzaCreated bool `json:"stanzaCreated"`

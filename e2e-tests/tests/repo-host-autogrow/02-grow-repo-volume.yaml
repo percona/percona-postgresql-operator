@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o nounset
+      set -o pipefail
+      set -o xtrace
+
+      cluster=repo-host-autogrow
+      selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-dedicated"
+      pvc_selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-volume,postgres-operator.crunchydata.com/pgbackrest-repo=repo1"
+
+      repo_pod=$(kubectl -n "${NAMESPACE}" get pods -l "${selector}" -o jsonpath='{.items[0].metadata.name}')
+      repo_pvc=$(kubectl -n "${NAMESPACE}" get pvc -l "${pvc_selector}" -o jsonpath='{.items[0].metadata.name}')
+      storage=$(kubectl -n "${NAMESPACE}" get pvc "${repo_pvc}" -o jsonpath='{.spec.resources.requests.storage}')
+
+      if [[ "${storage}" != "256Mi" ]]; then
+        echo "Expected repo1 PVC storage request to be 256Mi, got ${storage}"
+        exit 1
+      fi
+
+      read -r size used <<<"$(
+        kubectl -n "${NAMESPACE}" exec "${repo_pod}" -c pgbackrest-config -- \
+          df -Pm /pgbackrest/repo1 | awk 'FNR == 2 {print $2, $3}'
+      )"
+      fill_mebibytes=$(((size * 80 + 99) / 100 - used))
+      if ((fill_mebibytes > 0)); then
+        kubectl -n "${NAMESPACE}" exec "${repo_pod}" -c pgbackrest-config -- \
+          dd if=/dev/zero of=/pgbackrest/repo1/autogrow-e2e.fill \
+          bs=1M count="${fill_mebibytes}" conv=fsync status=none
+      fi

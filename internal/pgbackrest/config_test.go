@@ -310,25 +310,27 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 func TestReloadCommand(t *testing.T) {
 	shellcheck := require.ShellCheck(t)
 
-	command := reloadCommand("some-name", true)
+	for _, repos := range [][]string{nil, {"repo1", "repo4"}} {
+		command := reloadCommand("some-name", true, repos)
 
-	// Expect a bash command with an inline script.
-	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
-	assert.Assert(t, len(command) > 3)
+		// Expect a bash command with an inline script.
+		assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
+		assert.Assert(t, len(command) > 3)
 
-	// Write out that inline script.
-	dir := t.TempDir()
-	file := filepath.Join(dir, "script.bash")
-	assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+		// Write out that inline script.
+		dir := t.TempDir()
+		file := filepath.Join(dir, "script.bash")
+		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
 
-	// Expect shellcheck to be happy.
-	cmd := exec.Command(shellcheck, "--enable=all", file)
-	output, err := cmd.CombinedOutput()
-	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+		// Expect shellcheck to be happy.
+		cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
+		output, err := cmd.CombinedOutput()
+		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+	}
 }
 
 func TestReloadCommandPrettyYAML(t *testing.T) {
-	assert.Assert(t, cmp.MarshalContains(reloadCommand("any", true), "\n- |"),
+	assert.Assert(t, cmp.MarshalContains(reloadCommand("any", true, nil), "\n- |"),
 		"expected literal block scalar")
 }
 

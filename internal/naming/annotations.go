@@ -4,6 +4,8 @@
 
 package naming
 
+import "strings"
+
 const (
 	annotationPrefix        = labelPrefix
 	perconaAnnotationPrefix = perconaLabelPrefix
@@ -81,4 +83,29 @@ const (
 	// is present, the controller will not update the ConfigMap, allowing users to make custom
 	// modifications that won't be overwritten during reconciliation.
 	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
+
+	// SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix identifies Pod annotations
+	// containing a desired size for a volume-backed pgBackRest repository.
+	SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix = "suggested-pgbackrest-"
 )
+
+// SuggestedPGBackRestRepoVolumeSizeAnnotation returns the Pod annotation used
+// to communicate an automatically calculated PVC size for repoName.
+func SuggestedPGBackRestRepoVolumeSizeAnnotation(repoName string) string {
+	return SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix + repoName + "-pvc-size"
+}
+
+// PGBackRestRepoFromVolumeSizeAnnotation extracts a repository name from an
+// automatic volume-size annotation.
+func PGBackRestRepoFromVolumeSizeAnnotation(annotation string) (string, bool) {
+	if !strings.HasPrefix(annotation, SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix) ||
+		!strings.HasSuffix(annotation, "-pvc-size") {
+		return "", false
+	}
+
+	repoName := strings.TrimSuffix(
+		strings.TrimPrefix(annotation, SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix),
+		"-pvc-size",
+	)
+	return repoName, repoName != ""
+}
