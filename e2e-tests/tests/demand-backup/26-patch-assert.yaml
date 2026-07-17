@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Verify the startup deadline was set
+      kubectl get postgrescluster demand-backup -n "${NAMESPACE}" -o json | \
+        jq -e '.spec.backups.pgbackrest.jobs.startupDeadlineSeconds == 60' >/dev/null

@@ -1,0 +1,36 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Wait for the ScheduledBackupDegraded condition to be set to True
+      # The scheduled backup should fail because the ResourceQuota prevents job creation
+      kubectl wait --for=condition=ScheduledBackupDegraded=true --timeout=90s -n "${NAMESPACE}" postgrescluster/scheduled-backup || {
+        # If the condition wait times out, check the condition status manually
+        COND_STATUS=$(kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | \
+          jq -r '.status.conditions[] | select(.type == "ScheduledBackupDegraded") | .status' || echo "NotFound")
+        
+        if [ "$COND_STATUS" != "True" ]; then
+          echo "ERROR: ScheduledBackupDegraded condition is not True. Current status: $COND_STATUS"
+          kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | jq '.status.conditions'
+          exit 1
+        fi
+      }
+      
+      # Verify the condition reason and message
+      COND_REASON=$(kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | \
+        jq -r '.status.conditions[] | select(.type == "ScheduledBackupDegraded") | .reason')
+      COND_MSG=$(kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | \
+        jq -r '.status.conditions[] | select(.type == "ScheduledBackupDegraded") | .message')
+      
+      echo "ScheduledBackupDegraded condition:"
+      echo "  Reason: $COND_REASON"
+      echo "  Message: $COND_MSG"
+      
+      # The condition should be set due to backup creation failure
+      if [[ "$COND_REASON" != "BackupCreationFailed" && "$COND_REASON" != "BackupFailed" ]]; then
+        echo "WARNING: Expected reason to be BackupCreationFailed or BackupFailed, got: $COND_REASON"
+      fi

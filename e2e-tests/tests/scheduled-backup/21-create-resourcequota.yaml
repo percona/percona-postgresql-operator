@@ -1,0 +1,52 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Create a ResourceQuota that prevents new Jobs from being created
+      # This will cause the scheduled backup to fail to create its job
+      cat <<EOF | kubectl apply -f -
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: no-jobs-quota
+        namespace: ${NAMESPACE}
+      spec:
+        hard:
+          count/jobs.batch: "0"
+EOF
+      
+      # Disable the current schedules to prevent interference
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "schedules": {
+                "repo1": null,
+                "repo2": null,
+                "repo3": null
+              }
+            }
+          }
+        }
+      }' 2>/dev/null || true
+      
+      # Wait a moment for schedules to be disabled
+      sleep 5
+      
+      # Re-enable one schedule with a very short interval to trigger a backup attempt
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "schedules": {
+                "repo1": "*/1 * * * *"
+              }
+            }
+          }
+        }
+      }'

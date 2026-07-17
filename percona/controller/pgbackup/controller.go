@@ -251,13 +251,17 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		log.Info("Backup is starting", "backup", pgBackup.Name, "cluster", pgCluster.Name)
 		return reconcile.Result{}, nil
 	case v2.BackupStarting:
-		// Fail if the Job hasn't appeared within 10 minutes.
+		// Fail if the Job hasn't appeared within the configured startup timeout.
 		// Once the Job exists, activeDeadlineSeconds (from BackupJobs config) handles runtime timeout.
-		if time.Since(pgBackup.CreationTimestamp.Time) > 10*time.Minute {
+		startupDeadline := int64(600) // Default to 10 minutes
+		if pgCluster != nil && pgCluster.Spec.Backups.PGBackRest.Jobs.StartupDeadlineSeconds != nil {
+			startupDeadline = *pgCluster.Spec.Backups.PGBackRest.Jobs.StartupDeadlineSeconds
+		}
+		if time.Since(pgBackup.CreationTimestamp.Time) > time.Duration(startupDeadline)*time.Second {
 			log.Info("Backup timed out waiting for job to start")
 			if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
 				bcp.Status.State = v2.BackupFailed
-				bcp.Status.Error = "timed out waiting for job to start (timeout: 10m)"
+				bcp.Status.Error = fmt.Sprintf("timed out waiting for job to start (timeout: %ds)", startupDeadline)
 			}); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 			}
