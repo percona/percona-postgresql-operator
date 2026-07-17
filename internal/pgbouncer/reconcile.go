@@ -85,12 +85,14 @@ func Secret(ctx context.Context,
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		if frontendCertManagerSecret != nil {
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+				outSecret.Data[certFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
 			}
 			if err == nil {
 				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
 				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
 			}
+		} else if inRoot == nil {
+			err = errors.New("waiting for cert-manager to issue pgbouncer frontend certificate")
 		} else {
 			leaf := &pki.LeafCertificate{}
 			var dnsNames []string
@@ -128,6 +130,20 @@ func Secret(ctx context.Context,
 	}
 
 	return err
+}
+
+// frontendAuthorityCert returns the CA certificate bytes to trust for the
+// PgBouncer frontend certificate. It prefers the internal PKI root, which is
+// nil when an external cert-manager issuer is in use; in that case, it falls
+// back to the "ca.crt" that cert-manager writes into the frontend Secret.
+func frontendAuthorityCert(inRoot *pki.RootCertificateAuthority, frontendCertManagerSecret *corev1.Secret) ([]byte, error) {
+	if inRoot != nil {
+		return inRoot.Certificate.MarshalText()
+	}
+	if ca := frontendCertManagerSecret.Data[tlsAuthoritySecretKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	return nil, errors.New("external issuer did not return a CA certificate for pgbouncer frontend")
 }
 
 // Pod populates a PodSpec with the container and volumes needed to run PgBouncer.
