@@ -13,7 +13,7 @@ commands:
       repl_ssl_count=$(echo "$repl_ssl_count" | tr -d '[:space:]')
 
       if [[ "$repl_ssl_count" -lt 1 ]]; then
-          echo "No SSL replication connections found after switching to the managed ClusterIssuer, got: $repl_ssl_count"
+          echo "No SSL replication connections found after switching to the external ClusterIssuer, got: $repl_ssl_count"
           exit 1
       fi
     timeout: 30

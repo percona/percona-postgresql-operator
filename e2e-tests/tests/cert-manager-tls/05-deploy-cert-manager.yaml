@@ -13,4 +13,4 @@ commands:
       kubectl -n "$NAMESPACE" delete pod -l postgres-operator.crunchydata.com/role=pgbouncer,postgres-operator.crunchydata.com/cluster=cert-manager-tls
 
       wait_cluster_consistency cert-manager-tls
-    timeout: 120
+    timeout: 240

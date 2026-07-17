@@ -27,7 +27,7 @@ commands:
       echo "SSL status: $ssl_info"
 
       if [[ "$ssl_info" != *"on"* ]]; then
-          echo "SSL is not enabled on PostgreSQL after switching to the managed ClusterIssuer"
+          echo "SSL is not enabled on PostgreSQL after switching to the external ClusterIssuer"
           exit 1
       fi
     timeout: 30

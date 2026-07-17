@@ -25,7 +25,7 @@ commands:
       pgb_ssl=$(run_psql_local "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid();" "cert-manager-tls:$(get_psql_user_pass cert-manager-tls-pguser-cert-manager-tls)@cert-manager-tls-pgbouncer/postgres")
 
       if [[ "$pgb_ssl" != *"t"* ]]; then
-          echo "PgBouncer-to-PostgreSQL connection is not using SSL after switching to the managed ClusterIssuer"
+          echo "PgBouncer-to-PostgreSQL connection is not using SSL after switching to the external ClusterIssuer"
           exit 1
       fi
     timeout: 30
