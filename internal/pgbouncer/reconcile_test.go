@@ -6,6 +6,7 @@ package pgbouncer
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	gocmp "github.com/google/go-cmp/cmp"
@@ -69,17 +70,22 @@ func TestSecret(t *testing.T) {
 	t.Run("Disabled", func(t *testing.T) {
 		// Nothing happens when PgBouncer is disabled.
 		constant := intent.DeepCopy()
-		require.NoError(t, Secret(ctx, cluster, root, existing, service, intent, nil, nil))
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, nil))
 		assert.DeepEqual(t, constant, intent)
 	})
 
 	cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
 	cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+	userSecret := &corev1.Secret{
+		Data: map[string][]byte{
+			"stats_user": []byte("stats-password"),
+		},
+	}
 	err = cluster.Default(context.Background(), nil)
 	assert.NilError(t, err)
 
 	constant := existing.DeepCopy()
-	require.NoError(t, Secret(ctx, cluster, root, existing, service, intent, nil, nil))
+	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil, nil))
 	assert.DeepEqual(t, constant, existing)
 
 	// A password should be generated.
@@ -88,11 +94,13 @@ func TestSecret(t *testing.T) {
 
 	// The output of authFileContents should go into intent.
 	assert.Assert(t, len(intent.Data["pgbouncer-users.txt"]) != 0)
+	assert.Assert(t, strings.Contains(string(intent.Data["pgbouncer-users.txt"]),
+		`"stats_user" "stats-password"`))
 
 	// Assuming the intent is written, no change when called again.
 	existing.Data = intent.Data
 	before := intent.DeepCopy()
-	require.NoError(t, Secret(ctx, cluster, root, existing, service, intent, nil, nil))
+	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil, nil))
 	assert.DeepEqual(t, before, intent)
 }
 
@@ -127,7 +135,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		cluster := newCluster("3.1.0")
 		intent := new(corev1.Secret)
 
-		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), service, intent, nil, [][]byte{ca1, ca2}))
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
 		expected := append(append([]byte{}, rootPEM...), ca1...)
 		expected = append(expected, ca2...)
@@ -138,7 +146,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		cluster := newCluster("3.1.0")
 		intent := new(corev1.Secret)
 
-		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), service, intent, nil, [][]byte{ca2, ca1}))
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca2, ca1}))
 
 		expected := append(append([]byte{}, rootPEM...), ca2...)
 		expected = append(expected, '\n')
@@ -154,7 +162,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 			corev1.TLSPrivateKeyKey: []byte("tls-key"),
 		}}
 
-		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), service, intent, frontend, [][]byte{ca1}))
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, frontend, [][]byte{ca1}))
 
 		expected := append(append([]byte{}, rootPEM...), ca1...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
@@ -169,7 +177,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		}
 		intent := new(corev1.Secret)
 
-		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), service, intent, nil, [][]byte{ca1, ca2}))
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
 		expected := append(append([]byte{}, ca1...), ca2...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
@@ -182,7 +190,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		}
 		intent := new(corev1.Secret)
 
-		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), service, intent, nil, nil))
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, nil))
 
 		_, ok := intent.Data["pgbouncer-frontend.ca-roots"]
 		assert.Assert(t, !ok)
@@ -193,11 +201,11 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		existing := new(corev1.Secret)
 		intent := new(corev1.Secret)
 
-		require.NoError(t, Secret(ctx, cluster, root, existing, service, intent, nil, [][]byte{ca1, ca2}))
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, [][]byte{ca1, ca2}))
 
 		existing.Data = intent.Data
 		before := intent.DeepCopy()
-		require.NoError(t, Secret(ctx, cluster, root, existing, service, intent, nil, [][]byte{ca1, ca2}))
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, [][]byte{ca1, ca2}))
 		assert.DeepEqual(t, before, intent)
 	})
 }

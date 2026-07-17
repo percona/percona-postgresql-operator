@@ -47,6 +47,7 @@ func Secret(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inRoot *pki.RootCertificateAuthority,
 	inSecret *corev1.Secret,
+	inUserSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
 	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
@@ -77,7 +78,7 @@ func Secret(ctx context.Context,
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey] = authFileContents(password)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
 	}
@@ -94,11 +95,15 @@ func Secret(ctx context.Context,
 		} else {
 			leaf := &pki.LeafCertificate{}
 			var dnsNames []string
-			dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
-			if err != nil {
-				return errors.Wrap(err, "get service dns names")
+			var dnsFQDN string
+
+			if err == nil {
+				dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+				if err != nil {
+					return errors.Wrap(err, "get service dns names")
+				}
+				dnsFQDN = dnsNames[0]
 			}
-			dnsFQDN := dnsNames[0]
 
 			if err == nil {
 				// Unmarshal and validate the stored leaf. These first errors can
