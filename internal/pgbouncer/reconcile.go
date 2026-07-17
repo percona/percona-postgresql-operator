@@ -54,6 +54,7 @@ func Secret(ctx context.Context,
 	// PgBouncer frontend. When non-nil, its tls.crt/tls.key are used instead
 	// of generating a certificate with the internal PKI.
 	frontendCertManagerSecret *corev1.Secret,
+	additionalCAs [][]byte,
 ) error {
 	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled; there is nothing to do.
@@ -129,6 +130,21 @@ func Secret(ctx context.Context,
 		}
 	}
 
+	// K8SPG-952: Append any additional CAs to the PgBouncer frontend CA
+	// bundle so PgBouncer also trusts them when verifying client
+	// certificates. Entries keep their given order so identical inputs
+	// always produce identical bundle bytes.
+	if err == nil && len(additionalCAs) > 0 {
+		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
+		for _, ca := range additionalCAs {
+			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
+				bundle = append(bundle, '\n')
+			}
+			bundle = append(bundle, ca...)
+		}
+		outSecret.Data[certFrontendAuthoritySecretKey] = bundle
+	}
+
 	return err
 }
 
@@ -165,10 +181,10 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(
-			append([]corev1.VolumeProjection{},
-				podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret),
+		Sources: append(append(append([]corev1.VolumeProjection{},
+			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
+			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

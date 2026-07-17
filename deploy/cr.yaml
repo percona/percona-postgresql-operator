@@ -406,7 +406,8 @@ spec:
 #        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
-#
+#      additionalTrustedCAs:
+#      - name: some-client-ca
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

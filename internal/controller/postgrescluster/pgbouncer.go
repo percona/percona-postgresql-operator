@@ -247,7 +247,6 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
-
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
@@ -322,14 +321,72 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 			naming.LabelRole:    naming.RolePGBouncer,
 		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
 
+	var additionalTrustedCAs [][]byte
 	if err == nil {
-		err = pgbouncer.Secret(ctx, cluster, root, existing, userSecret, service, intent, frontendCertManagerSecret)
+		additionalTrustedCAs, err = r.getAdditionalTrustedCAs(ctx, cluster)
+	}
+	if err == nil {
+		err = pgbouncer.Secret(ctx, cluster, root, existing, userSecret, service, intent, frontendCertManagerSecret, additionalTrustedCAs)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
 
 	return intent, err
+}
+
+func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
+	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
+		return nil, nil
+	}
+
+	result := [][]byte{}
+
+	// K8SPG-952: in manual TLS mode the frontend CA file is built solely from
+	// this list, so it must begin with the authority of the custom TLS Secret.
+	if projection := pgBouncer.CustomTLSSecret; projection != nil {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      projection.Name,
+				Namespace: cluster.GetNamespace(),
+			},
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			return nil, errors.Wrapf(err, "failed to get custom TLS secret '%s'", projection.Name)
+		}
+
+		key := pgbouncer.CustomTLSAuthorityKey(projection)
+		ca, ok := secret.Data[key]
+		if !ok {
+			return nil, errors.Errorf("custom TLS secret '%s' does not contain key '%s'", projection.Name, key)
+		}
+		result = append(result, ca)
+	}
+
+	for _, ref := range pgBouncer.AdditionalTrustedCAs {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ref.Name,
+				Namespace: cluster.GetNamespace(),
+			},
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); k8serrors.IsNotFound(err) {
+			logging.FromContext(ctx).Info("additional CA secret not found, skipping", "name", ref.Name)
+			continue
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "failed to get additional CA secret '%s'", ref.Name)
+		}
+		if ca, ok := secret.Data["ca.crt"]; !ok {
+			return nil, errors.Errorf("additional CA Secret '%s' does not contain key 'ca.crt'", ref.Name)
+		} else {
+			result = append(result, ca)
+		}
+	}
+
+	return result, nil
 }
 
 // generatePGBouncerService returns a v1.Service that exposes PgBouncer pods.
