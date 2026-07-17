@@ -487,6 +487,7 @@ spec:
 #          pool_mode: transaction
 
   backups:
+#    enabled: true
 #    trackLatestRestorableTime: true
 #    volumeSnapshots:
 #      mode: offline
