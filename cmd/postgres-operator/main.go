@@ -146,7 +146,7 @@ func main() {
 		log.Info("upgrade checking enabled")
 		// get the URL for the check for upgrades endpoint if set in the env
 		assertNoError(upgradecheck.ManagedScheduler(mgr,
-			isOpenshift(ctx, mgr.GetConfig()), os.Getenv("CHECK_FOR_UPGRADES_URL"), versionString, nil))
+			false, os.Getenv("CHECK_FOR_UPGRADES_URL"), versionString, nil))
 	}
 
 	assertNoError(mgr.Start(ctx))
@@ -158,7 +158,8 @@ func main() {
 func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
-	openShift := isOpenshift(ctx, mgr.GetConfig())
+	platform := detectPlatform(ctx, mgr.GetConfig())
+	openShift := platform == "openshift"
 
 	r := &postgrescluster.Reconciler{
 		Client:              mgr.GetClient(),
@@ -196,7 +197,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Owner:                pgcluster.PGClusterControllerName,
 		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
 		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:             detectPlatform(ctx, mgr.GetConfig(), openShift),
+		Platform:             platform,
 		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
 		CrunchyController:    cm.Controller(),
 		IsOpenShift:          openShift,
@@ -409,6 +410,7 @@ func (p platformProbe) detect(ctx context.Context, cfg *rest.Config) bool {
 }
 
 var platformProbes = []platformProbe{
+	{name: "openshift", label: "Openshift", apiGroups: []string{"security.openshift.io"}},
 	{name: "gke", label: "GKE", apiGroups: []string{"networking.gke.io"}},
 	// crd.k8s.amazonaws.com (VPC CNI) and metrics.eks.amazonaws.com are independent EKS signals.
 	{name: "eks", label: "EKS", apiGroups: []string{"crd.k8s.amazonaws.com", "metrics.eks.amazonaws.com"}},
@@ -449,10 +451,7 @@ func detectAKS(ctx context.Context, cfg *rest.Config) bool {
 	return false
 }
 
-func detectPlatform(ctx context.Context, cfg *rest.Config, openShift bool) string {
-	if openShift {
-		return "openshift"
-	}
+func detectPlatform(ctx context.Context, cfg *rest.Config) string {
 	for _, probe := range platformProbes {
 		if probe.detect(ctx, cfg) {
 			logging.FromContext(ctx).Info("detected " + probe.label + " environment")
@@ -520,13 +519,6 @@ func getLogLevel() zapcore.LevelEnabler {
 	}
 }
 
-func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
-	if hasAPIGroup(ctx, cfg, "security.openshift.io") {
-		logging.FromContext(ctx).Info("detected Openshift environment")
-		return true
-	}
-	return false
-}
 
 type envConfig struct {
 	LeaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`
