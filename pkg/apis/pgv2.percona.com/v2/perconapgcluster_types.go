@@ -314,6 +314,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.AutoCreateUserSchema = new(true)
 	}
 
+	if cr.CompareVersion("3.1.0") >= 0 && cr.Spec.Backups.Enabled == nil {
+		cr.Spec.Backups.Enabled = new(true)
+	}
+
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
 		cr.Spec.Config = &crunchyv1beta1.PostgresConfigSpec{}
 	}
@@ -643,8 +647,8 @@ type Patroni struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
 	// Enabled controls whether backups are enabled for the cluster.
+	// Defaulted to true by the operator for crVersion >= 3.1.0.
 	// +optional
-	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// pgBackRest archive configuration
