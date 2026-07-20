@@ -17,7 +17,6 @@ major-upgrade-17-to-18
 ldap
 ldap-tls
 monitoring
-monitoring-pmm3
 one-pod
 operator-self-healing
 pgbouncer-mtls

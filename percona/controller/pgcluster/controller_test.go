@@ -218,34 +218,9 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 			})
 		})
 
-		When("pmm secret has no data", func() {
+		When("pmm secret has data for PMM_SERVER_KEY only (PMM2 no longer supported)", func() {
 			BeforeAll(func() {
 				Expect(k8sClient.Create(ctx, &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-					Data: map[string][]byte{
-						"PMM_SERVER_KEY": {},
-					},
-				})).Should(Succeed())
-
-				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("should not have pmm container", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-
-				Expect(havePMMSidecar(sts)).To(BeFalse())
-			})
-		})
-
-		When("pmm secret has data for PMM_SERVER_KEY", func() {
-			BeforeAll(func() {
-				Expect(k8sClient.Update(ctx, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cluster1-pmm-secret",
 						Namespace: ns,
@@ -261,29 +236,10 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should have pmm container", func() {
+			It("should not have pmm container", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
 
-				Expect(havePMMSidecar(sts)).To(BeTrue())
-			})
-
-			It("should have PMM secret hash", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
-			})
-
-			It("should label PMM secret", func() {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-				}
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
-				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+				Expect(havePMMSidecar(sts)).To(BeFalse())
 			})
 		})
 
