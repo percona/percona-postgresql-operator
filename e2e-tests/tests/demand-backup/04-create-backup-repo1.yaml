@@ -1,4 +1,4 @@
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: demand-backup-full-repo1
@@ -8,7 +8,7 @@ spec:
   options:
     - --type=full
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: demand-backup-differential-repo1
@@ -18,7 +18,7 @@ spec:
   options:
     - --type=diff
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   name: demand-backup-incremental-repo1

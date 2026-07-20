@@ -13,8 +13,8 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type fakeClient struct {

@@ -2,13 +2,13 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 180
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: tablespaces
   generation: 4
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: tablespaces
       controller: true
@@ -36,7 +36,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: tablespaces-restore

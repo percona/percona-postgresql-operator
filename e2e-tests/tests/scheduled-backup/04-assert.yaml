@@ -8,14 +8,14 @@ metadata:
   labels:
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
   succeeded: 1
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
@@ -27,7 +27,7 @@ status:
   state: Succeeded
   storageType: s3
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
@@ -35,7 +35,7 @@ spec:
   pgCluster: scheduled-backup
   repoName: repo1
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup

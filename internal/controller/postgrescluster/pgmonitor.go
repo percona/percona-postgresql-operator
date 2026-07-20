@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	pgpassword "github.com/percona/percona-postgresql-operator/v3/internal/postgres/password"
 	"github.com/percona/percona-postgresql-operator/v3/internal/util"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // If pgMonitor is enabled the pgMonitor sidecar(s) have been added to the

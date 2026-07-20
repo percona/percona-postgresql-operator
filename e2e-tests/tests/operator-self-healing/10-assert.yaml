@@ -12,7 +12,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: operator-self-healing
       controller: true
@@ -23,7 +23,7 @@ status:
   updatedReplicas: 5
   readyReplicas: 5
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: operator-self-healing

@@ -39,5 +39,5 @@ commands:
       manual_backup_name="one-pod-full"
       check_backup "$manual_backup_name" "percona.com/backup-name" "$manual_backup_name"
 
-      replica_backup_name=$(kubectl get -n "${NAMESPACE}" pg-backup -o jsonpath='{.items[?(@.metadata.annotations.pgv3\.percona\.com/pgbackrest-backup-job-type=="replica-create")].metadata.name}')
+      replica_backup_name=$(kubectl get -n "${NAMESPACE}" pg-backup -o jsonpath='{.items[?(@.metadata.annotations.pgv2\.percona\.com/pgbackrest-backup-job-type=="replica-create")].metadata.name}')
       check_backup "$replica_backup_name" "percona.com/backup-job-type" "replica-create"

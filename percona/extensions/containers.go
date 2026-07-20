@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v3/percona/naming"
-	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func GetExtensionKey(pgMajor int, name, version string) string {

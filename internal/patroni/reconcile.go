@@ -19,7 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // ClusterBootstrapped returns a bool indicating whether or not Patroni has successfully

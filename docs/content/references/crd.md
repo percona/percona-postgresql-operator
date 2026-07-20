@@ -6,10 +6,10 @@ weight: 100
 
 Packages:
 
-- [pgv3.percona.com/v2](#pgv3perconacomv2)
-- [upstream.pgv3.percona.com/v1beta1](#postgres-operatorcrunchydatacomv1beta1)
+- [pgv2.percona.com/v2](#pgv2perconacomv2)
+- [upstream.pgv2.percona.com/v1beta1](#postgres-operatorcrunchydatacomv1beta1)
 
-<h1 id="pgv3perconacomv2">pgv3.percona.com/v2</h1>
+<h1 id="pgv2perconacomv2">pgv2.percona.com/v2</h1>
 
 Resource Types:
 
@@ -43,7 +43,7 @@ PerconaPGBackup is the CRD that defines a Percona PostgreSQL Backup
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>pgv3.percona.com/v2</td>
+      <td>pgv2.percona.com/v2</td>
       <td>true</td>
       </tr>
       <tr>
@@ -780,7 +780,7 @@ PerconaPGCluster is the CRD that defines a Percona PG Cluster
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>pgv3.percona.com/v2</td>
+      <td>pgv2.percona.com/v2</td>
       <td>true</td>
       </tr>
       <tr>
@@ -25824,7 +25824,7 @@ PerconaPGRestore is the CRD that defines a Percona PostgreSQL Restore
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>pgv3.percona.com/v2</td>
+      <td>pgv2.percona.com/v2</td>
       <td>true</td>
       </tr>
       <tr>
@@ -25928,7 +25928,7 @@ https://pgbackrest.org/command.html#command-restore</td>
       </tr></tbody>
 </table>
 
-<h1 id="postgres-operatorcrunchydatacomv1beta1">upstream.pgv3.percona.com/v1beta1</h1>
+<h1 id="postgres-operatorcrunchydatacomv1beta1">upstream.pgv2.percona.com/v1beta1</h1>
 
 Resource Types:
 
@@ -25960,7 +25960,7 @@ PGUpgrade is the Schema for the pgupgrades API
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>upstream.pgv3.percona.com/v1beta1</td>
+      <td>upstream.pgv2.percona.com/v1beta1</td>
       <td>true</td>
       </tr>
       <tr>
@@ -27794,7 +27794,7 @@ PostgresCluster is the Schema for the postgresclusters API
     <tbody><tr>
       <td><b>apiVersion</b></td>
       <td>string</td>
-      <td>upstream.pgv3.percona.com/v1beta1</td>
+      <td>upstream.pgv2.percona.com/v1beta1</td>
       <td>true</td>
       </tr>
       <tr>

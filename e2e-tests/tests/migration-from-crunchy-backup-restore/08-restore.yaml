@@ -66,7 +66,7 @@ commands:
 
       # Restore to the step-07 backup point; post-backup rows must disappear.
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
-      apiVersion: pgv3.percona.com/v2
+      apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore
       metadata:
         name: post-migration-restore

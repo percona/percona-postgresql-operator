@@ -43,7 +43,7 @@ import (
 	pgpassword "github.com/percona/percona-postgresql-operator/v3/internal/postgres/password"
 	"github.com/percona/percona-postgresql-operator/v3/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v3/internal/util"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // generatePostgresUserSecret returns a Secret containing a password and

@@ -4,7 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func init() {
@@ -113,4 +113,4 @@ type PerconaPGUpgradeStatus struct {
 	crunchyv1beta1.PGUpgradeStatus `json:",inline"`
 }
 
-const AnnotationAllowUpgrade = "pgv3.percona.com/allow-upgrade"
+const AnnotationAllowUpgrade = "pgv2.percona.com/allow-upgrade"

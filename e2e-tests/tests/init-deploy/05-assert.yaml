@@ -12,7 +12,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv3.percona.com/version: 3.1.0
+    pgv2.percona.com/version: 3.1.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/pgbackrest: ""
     postgres-operator.crunchydata.com/pgbackrest-config: ""
@@ -81,7 +81,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv3.percona.com/version: 3.1.0
+    pgv2.percona.com/version: 3.1.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/role: pgbouncer
     test-label: test
@@ -113,7 +113,7 @@ metadata:
     test-label: test
   name: init-deploy-cluster-ca-cert
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     kind: PostgresCluster
     name: init-deploy
 type: Opaque
@@ -128,7 +128,7 @@ metadata:
     test-label: test
   name: init-deploy-config
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -144,14 +144,14 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv3.percona.com/version: 3.1.0
+    pgv2.percona.com/version: 3.1.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/pgbackrest: ""
     postgres-operator.crunchydata.com/pgbackrest-config: ""
     test-label: test
   name: init-deploy-pgbackrest-config
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -168,13 +168,13 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv3.percona.com/version: 3.1.0
+    pgv2.percona.com/version: 3.1.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/role: pgbouncer
     test-label: test
   name: init-deploy-pgbouncer
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -209,7 +209,7 @@ metadata:
     app.kubernetes.io/managed-by: percona-postgresql-operator
     app.kubernetes.io/name: percona-postgresql
     app.kubernetes.io/part-of: percona-postgresql
-    pgv3.percona.com/version: 3.1.0
+    pgv2.percona.com/version: 3.1.0
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/data: pgbackrest
     postgres-operator.crunchydata.com/pgbackrest: ""
@@ -217,7 +217,7 @@ metadata:
     test-label: test
   name: init-deploy-repo-host
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -232,7 +232,7 @@ spec:
         app.kubernetes.io/managed-by: percona-postgresql-operator
         app.kubernetes.io/name: percona-postgresql
         app.kubernetes.io/part-of: percona-postgresql
-        pgv3.percona.com/version: 3.1.0
+        pgv2.percona.com/version: 3.1.0
         postgres-operator.crunchydata.com/cluster: init-deploy
         postgres-operator.crunchydata.com/data: pgbackrest
         postgres-operator.crunchydata.com/pgbackrest: ""

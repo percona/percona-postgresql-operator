@@ -13,7 +13,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/percona/testutils"
 	"github.com/percona/percona-postgresql-operator/v3/percona/version"
-	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func mustParseTime(layout string, value string) time.Time { //nolint:unparam

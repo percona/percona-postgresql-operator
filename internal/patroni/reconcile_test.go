@@ -17,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestClusterConfigMap(t *testing.T) {
@@ -267,12 +267,12 @@ volumes:
   name: crunchy-bin
 	`,
 			labels: map[string]string{
-				"pgv3.percona.com/version": "2.7.0",
+				"pgv2.percona.com/version": "2.7.0",
 			},
 		},
 		"version <2.7.0 specified": {
 			labels: map[string]string{
-				"pgv3.percona.com/version": "2.6.0",
+				"pgv2.percona.com/version": "2.6.0",
 			},
 			expectedSpec: `
 containers:

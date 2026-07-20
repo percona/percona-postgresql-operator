@@ -17,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/events"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestUpgradeAuthorized(t *testing.T) {

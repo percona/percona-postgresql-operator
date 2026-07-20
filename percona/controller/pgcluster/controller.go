@@ -45,8 +45,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/v3/percona/version"
 	"github.com/percona/percona-postgresql-operator/v3/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -211,11 +211,11 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 	}
 }
 
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;watch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters/status,verbs=patch;update
-// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 // +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update

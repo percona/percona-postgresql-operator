@@ -17,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
 	perconaPG "github.com/percona/percona-postgresql-operator/v3/percona/postgres"
-	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (

@@ -2,7 +2,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 420
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   labels:
@@ -21,12 +21,12 @@ status:
     size: 3
   state: ready
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: monitoring
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: monitoring
 status:
@@ -44,7 +44,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: monitoring
       controller: true

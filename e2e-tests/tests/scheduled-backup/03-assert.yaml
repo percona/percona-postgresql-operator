@@ -9,7 +9,7 @@ metadata:
 data:
   data: ' 100500'
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
   generation: 1
@@ -20,7 +20,7 @@ status:
   backupType: full
   state: Succeeded
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: scheduled-backup

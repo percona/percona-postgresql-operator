@@ -16,10 +16,10 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/percona/version/service/client/version_service"
 )
 
-//go:generate sh -c "yq -i '.metadata.labels.\"pgv3.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgclusters.yaml"
-//go:generate sh -c "yq -i '.metadata.labels.\"pgv3.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgbackups.yaml"
-//go:generate sh -c "yq -i '.metadata.labels.\"pgv3.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgrestores.yaml"
-//go:generate sh -c "yq -i '.metadata.labels.\"pgv3.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgupgrade.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgclusters.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgbackups.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgrestores.yaml"
+//go:generate sh -c "yq -i '.metadata.labels.\"pgv2.percona.com/version\" = \"v\" + load(\"version.txt\")' ../../config/crd/patches/versionlabel_in_perconapgupgrade.yaml"
 
 //go:embed version.txt
 var version string

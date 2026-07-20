@@ -2,18 +2,18 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 timeout: 300
 delete:
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: source-cluster
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: source-cluster
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: standby-cluster
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: standby-cluster
 commands:

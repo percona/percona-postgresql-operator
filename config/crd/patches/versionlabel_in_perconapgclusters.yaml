@@ -1,6 +1,6 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: perconapgclusters.pgv3.percona.com
+  name: perconapgclusters.pgv2.percona.com
   labels:
-    pgv3.percona.com/version: v3.1.0
+    pgv2.percona.com/version: v3.1.0

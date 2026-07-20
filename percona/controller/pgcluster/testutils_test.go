@@ -25,8 +25,8 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v3/percona/utils/registry"
 	"github.com/percona/percona-postgresql-operator/v3/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var k8sClient client.Client

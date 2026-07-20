@@ -1,10 +1,10 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   name: start-from-backup-source
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   name: start-from-backup-source
 timeout: 300

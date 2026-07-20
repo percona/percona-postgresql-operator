@@ -38,8 +38,8 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v3/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -94,13 +94,13 @@ func (r *PGBackupReconciler) SetupWithManager(ctx context.Context, mgr manager.M
 	return b.Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgbackups/finalizers,verbs=update;patch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgrestores/finalizers,verbs=update;patch
-// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=postgresclusters/status,verbs=create;update;patch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups,verbs=create;get;list;watch;update;delete;patch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/status,verbs=create;patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgbackups/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores/finalizers,verbs=update;patch
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters/status,verbs=create;update;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

@@ -17,10 +17,10 @@ import (
 
 func TestCRDVersionLabel(t *testing.T) {
 	crdNames := []string{
-		"perconapgbackups.pgv3.percona.com",
-		"perconapgclusters.pgv3.percona.com",
-		"perconapgrestores.pgv3.percona.com",
-		"perconapgupgrades.pgv3.percona.com",
+		"perconapgbackups.pgv2.percona.com",
+		"perconapgclusters.pgv2.percona.com",
+		"perconapgrestores.pgv2.percona.com",
+		"perconapgupgrades.pgv2.percona.com",
 	}
 
 	_, filename, _, ok := runtime.Caller(0)

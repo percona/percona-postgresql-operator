@@ -20,8 +20,8 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/percona/extensions"
-	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -39,11 +39,11 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr manager.Manager) error {
 	return builder.ControllerManagedBy(mgr).For(&pgv3.PerconaPGUpgrade{}).Complete(r)
 }
 
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades/status,verbs=patch;update
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
-// +kubebuilder:rbac:groups=pgv3.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
-// +kubebuilder:rbac:groups=upstream.pgv3.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades,verbs=get;list;create;update;patch;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/status,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgupgrades/finalizers,verbs=patch;update
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;patch;update
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=pgupgrades,verbs=get;list;create;update;patch;delete;watch
 //+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={get,list,watch}
 
 var errLegacyUpgradeFinalized = errors.New("legacy upgrade is already finished")

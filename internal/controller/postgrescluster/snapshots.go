@@ -25,7 +25,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="snapshot.storage.k8s.io",resources="volumesnapshots",verbs={get,list,create,patch,delete}

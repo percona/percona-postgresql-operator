@@ -2,7 +2,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: post-migration-restore
@@ -18,7 +18,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: percona-standby
       controller: true
@@ -31,7 +31,7 @@ status:
 ---
 # For user-triggered restores the upstream operator sets restore.id to the
 # PerconaPGRestore CR name (unlike bootstrap restores which use ~pgo-bootstrap-*).
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: percona-standby
@@ -48,7 +48,7 @@ status:
       succeeded: 1
 ---
 # cluster must be fully ready again after the restore-triggered restart
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: percona-standby

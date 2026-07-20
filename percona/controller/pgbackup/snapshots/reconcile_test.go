@@ -18,7 +18,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func TestShouldFailSnapshot(t *testing.T) {
@@ -721,7 +721,7 @@ func TestGenerateSnapshotIntent(t *testing.T) {
 			// Owner reference should be set to the backup
 			require.NotEmpty(t, vs.OwnerReferences, "expected owner reference to be set")
 			assert.Equal(t, backupName, vs.OwnerReferences[0].Name)
-			assert.Equal(t, "pgv3.percona.com/v2", vs.OwnerReferences[0].APIVersion)
+			assert.Equal(t, "pgv2.percona.com/v2", vs.OwnerReferences[0].APIVersion)
 			assert.Equal(t, "PerconaPGBackup", vs.OwnerReferences[0].Kind)
 		})
 	}

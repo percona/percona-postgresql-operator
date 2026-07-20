@@ -6,7 +6,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
-    pgv3.percona.com/snapshot-restore: restore1
+    pgv2.percona.com/snapshot-restore: restore1
   labels:
     postgres-operator.crunchydata.com/cluster: backup-snapshot
     postgres-operator.crunchydata.com/role: pgdata
@@ -16,14 +16,14 @@ spec:
     kind: VolumeSnapshot
     name: backup1-pgdata
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
   name: restore1
 status:
   state: Succeeded
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: backup-snapshot

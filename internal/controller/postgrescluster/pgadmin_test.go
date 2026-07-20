@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePGAdminConfigMap(t *testing.T) {
@@ -83,7 +83,7 @@ labels:
 name: pg1-pgadmin
 namespace: some-ns
 ownerReferences:
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster
@@ -178,7 +178,7 @@ labels:
 name: my-cluster-pgadmin
 namespace: my-ns
 ownerReferences:
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster

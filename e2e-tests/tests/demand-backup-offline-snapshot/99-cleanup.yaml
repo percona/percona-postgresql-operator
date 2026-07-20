@@ -1,19 +1,19 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 delete:
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
     name: backup-snapshot
-- apiVersion: upstream.pgv3.percona.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   metadata:
     name: backup-snapshot
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGBackup
   metadata:
     name: backup1
-- apiVersion: pgv3.percona.com/v2
+- apiVersion: pgv2.percona.com/v2
   kind: PerconaPGBackup
   metadata:
     name: backup2

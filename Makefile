@@ -191,6 +191,12 @@ build-postgres-operator-image: build/postgres-operator/Dockerfile
 		--file $< --format docker --layers .
 
 ##@ Test
+GOLANGCI_LINT_VERSION ?= v2.12.2
+
+.PHONY: lint
+lint: ## Run golangci-lint (same as CI)
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout 5m --max-issues-per-linter 0 --max-same-issues 0
+
 .PHONY: check
 check: ## Run basic go tests with coverage output
 check: get-pgmonitor
@@ -246,7 +252,7 @@ generate: generate-cw
 generate-crunchy-crd: ## Generate crd
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		$(CRD_OPTIONS) \
-		paths='./pkg/apis/upstream.pgv3.percona.com/...' \
+		paths='./pkg/apis/upstream.pgv2.percona.com/...' \
 		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
@@ -264,10 +270,10 @@ generate-crunchy-crd: ## Generate crd
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
-	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/upstream.pgv3.percona.com_postgresclusters.yaml
-	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/upstream.pgv3.percona.com_pgupgrades.yaml
-	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/upstream.pgv3.percona.com_pgadmins.yaml
-	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/upstream.pgv3.percona.com_crunchybridgeclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/upstream.pgv2.percona.com_postgresclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/upstream.pgv2.percona.com_pgupgrades.yaml
+	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/upstream.pgv2.percona.com_pgadmins.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/upstream.pgv2.percona.com_crunchybridgeclusters.yaml
 
 .PHONY: generate-deepcopy
 generate-deepcopy: ## Generate deepcopy functions
@@ -294,9 +300,9 @@ generate-percona-crd:
 	go generate ./percona/...
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
 		$(CRD_OPTIONS) \
-		paths='./pkg/apis/pgv3.percona.com/...' \
+		paths='./pkg/apis/pgv2.percona.com/...' \
 		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
-	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv3.percona.com_perconapgclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
 
 generate-manager:
 	cd ./config/manager/namespace/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
@@ -433,7 +439,7 @@ release: generate
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
-	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv3.percona.com/v2/perconapgcluster_types.go
+	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
        -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
@@ -441,7 +447,7 @@ release: generate
        -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
 
 # Update sidecars
-	$(SED) -i -r "s#pgv3.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv3.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
 
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
@@ -461,7 +467,7 @@ after-release: update-version generate after-release-versions
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
-	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv3.percona.com/v2/perconapgcluster_types.go
+	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-upgrade#}" \
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
@@ -469,7 +475,7 @@ after-release: update-version generate after-release-versions
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
 
 # Update sidecars
-	$(SED) -i -r "s#pgv3.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv3.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
 
 # Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml

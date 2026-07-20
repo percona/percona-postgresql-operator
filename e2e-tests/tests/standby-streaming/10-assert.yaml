@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-  - apiVersion: upstream.pgv3.percona.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -30,7 +30,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: standby-cluster
       controller: true
@@ -50,19 +50,19 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
       controller: true
       blockOwnerDeletion: true
 status:
   succeeded: 1
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: standby-cluster
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: standby-cluster
       controller: true
@@ -85,7 +85,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: standby-cluster

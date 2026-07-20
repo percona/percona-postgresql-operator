@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: migration-backup-s3
       controller: true
@@ -33,7 +33,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: migration-backup-s3
       controller: true
@@ -53,7 +53,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGBackup
       # name: migration-backup-s3
       controller: true
@@ -61,12 +61,12 @@ metadata:
 status:
   succeeded: 1
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: migration-backup-s3
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: migration-backup-s3
       controller: true
@@ -89,7 +89,7 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: migration-backup-s3

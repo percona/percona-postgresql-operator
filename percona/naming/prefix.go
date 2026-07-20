@@ -5,7 +5,7 @@ import "strings"
 const (
 	PrefixPercona         = "percona.com/"
 	PrefixPerconaInternal = "internal." + PrefixPercona
-	PrefixPerconaPGV3     = "pgv3.percona.com/"
+	PrefixPerconaPGV3     = "pgv2.percona.com/"
 	PrefixCrunchy         = "postgres-operator.crunchydata.com/"
 )
 

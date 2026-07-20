@@ -46,8 +46,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v3/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v3/percona/utils/registry"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (

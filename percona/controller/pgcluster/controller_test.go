@@ -27,8 +27,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v3/percona/version"
-	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv3.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var _ = Describe("PG Cluster", Ordered, func() {
@@ -109,7 +109,7 @@ var _ = Describe("Annotations", Ordered, func() {
 	})
 
 	It("should create PerconaPGCluster with annotations", func() {
-		cr.Annotations["pgv3.percona.com/trigger-switchover"] = "true"
+		cr.Annotations["pgv2.percona.com/trigger-switchover"] = "true"
 		cr.Annotations["egedemo.com/test"] = "true"
 
 		status := cr.Status

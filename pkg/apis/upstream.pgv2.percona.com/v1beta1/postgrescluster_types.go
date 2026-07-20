@@ -912,7 +912,7 @@ func NewPostgresCluster() *PostgresCluster {
 	return cluster
 }
 
-const LabelVersion = "pgv3.percona.com/version"
+const LabelVersion = "pgv2.percona.com/version"
 
 func (cr *PostgresCluster) CompareVersion(ver string) int {
 	crVersion, err := gover.NewVersion(cr.Labels[LabelVersion])

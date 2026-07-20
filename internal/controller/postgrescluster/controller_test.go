@@ -33,7 +33,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv3.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestDeleteControlled(t *testing.T) {
