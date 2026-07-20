@@ -11,7 +11,6 @@ import (
 
 // PGBouncerConfiguration represents PgBouncer configuration files.
 type PGBouncerConfiguration struct {
-
 	// Files to mount under "/etc/pgbouncer". When specified, settings in the
 	// "pgbouncer.ini" file are loaded before all others. From there, other
 	// files may be included by absolute path. Changing these references causes
@@ -79,6 +78,11 @@ type PGBouncerPodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#projection-of-secret-keys-to-specific-paths
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
+
+	// K8SPG-952
+	// Additional CA bundles that PgBouncer should trust when verifying client certificates.
+	// Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+	AdditionalTrustedCAs []corev1.LocalObjectReference `json:"additionalTrustedCAs,omitempty"`
 
 	// Allow SUPERUSERs to connect through PGBouncer.
 	// +optional
@@ -178,7 +182,6 @@ func (s *PGBouncerPodSpec) Default() {
 }
 
 type PGBouncerPodStatus struct {
-
 	// Identifies the revision of PgBouncer assets that have been installed into
 	// PostgreSQL.
 	PostgreSQLRevision string `json:"postgresRevision,omitempty"`
