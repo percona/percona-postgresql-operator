@@ -16,12 +16,13 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: upgrade-minor
       controller: true
       blockOwnerDeletion: true
 status:
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
@@ -31,6 +32,7 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
+  generation: 2
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -41,7 +43,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: upgrade-minor
       controller: true
@@ -62,6 +64,7 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
+  observedGeneration: 2
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
@@ -79,24 +82,42 @@ metadata:
     postgres-operator.crunchydata.com/cluster: upgrade-minor
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
-    - apiVersion: upstream.pgv3.percona.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: upgrade-minor
       controller: true
       blockOwnerDeletion: true
 status:
+  observedGeneration: 2
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
 ---
-apiVersion: upstream.pgv3.percona.com/v1beta1
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: upgrade-minor
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
+  generation: 2
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
   ownerReferences:
-    - apiVersion: pgv3.percona.com/v2
+    - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
       name: upgrade-minor
       controller: true
@@ -109,6 +130,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
+  observedGeneration: 2
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -124,9 +146,10 @@ status:
       readyReplicas: 3
       replicas: 3
 ---
-apiVersion: pgv3.percona.com/v2
+apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
+  generation: 2
   name: upgrade-minor
 status:
   pgbouncer:

@@ -125,6 +125,20 @@ metadata:
   name: upgrade-minor
   generation: 1
 status:
+  conditions:
+  - type: ReadyForBackup
+    status: "True"
+  - type: PGBackRestRepoHostReady    
+    status: "True"
+  - type: PGBackRestReplicaRepoReady
+    status: "True"
+  - type: PGBackRestReplicaCreate
+    status: "True"
+  - type: ProxyAvailable
+    status: "True"
+  - type: APIGroupMigration
+    reason: APIGroupMigrationNotNeeded
+    status: "True"
   pgbouncer:
     ready: 3
     size: 3
