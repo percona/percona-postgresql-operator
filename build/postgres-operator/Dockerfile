@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubi9
+ARG BASE_IMAGE=ubi10
 
 FROM --platform=${BUILDPLATFORM} golang:1.26 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
