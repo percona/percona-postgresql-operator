@@ -9,5 +9,5 @@ commands:
       source ../../functions
 
       get_cr \
-        | yq eval '.metadata.finalizers += ["percona.com/delete-pvc", "percona.com/delete-ssl"]' \
+        | yq eval '.metadata.finalizers += ["percona.com/delete-pvc", "percona.com/delete-ssl", "percona.com/delete-backups"]' \
         | kubectl -n "${NAMESPACE}" apply -f -
