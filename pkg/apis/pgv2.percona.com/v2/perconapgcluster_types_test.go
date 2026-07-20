@@ -27,7 +27,7 @@ func TestPerconaPGCluster_Default(t *testing.T) {
 func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
 	t.Run("nil is defaulted to true for CRVersion >= 3.1.0", func(t *testing.T) {
 		cr := new(PerconaPGCluster)
-		cr.Spec.CRVersion = "3.1.0"
+		cr.Spec.CRVersion = version.Version()
 		cr.Default()
 
 		require.NotNil(t, cr.Spec.Backups.Enabled)
@@ -44,7 +44,7 @@ func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
 
 	t.Run("explicit false is preserved for CRVersion >= 3.1.0", func(t *testing.T) {
 		cr := new(PerconaPGCluster)
-		cr.Spec.CRVersion = "3.1.0"
+		cr.Spec.CRVersion = version.Version()
 		cr.Spec.Backups.Enabled = new(false)
 		cr.Default()
 
