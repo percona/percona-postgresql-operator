@@ -70,7 +70,7 @@ func TestSecret(t *testing.T) {
 	t.Run("Disabled", func(t *testing.T) {
 		// Nothing happens when PgBouncer is disabled.
 		constant := intent.DeepCopy()
-		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil))
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, nil))
 		assert.DeepEqual(t, constant, intent)
 	})
 
@@ -85,7 +85,7 @@ func TestSecret(t *testing.T) {
 	assert.NilError(t, err)
 
 	constant := existing.DeepCopy()
-	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil))
+	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil, nil))
 	assert.DeepEqual(t, constant, existing)
 
 	// A password should be generated.
@@ -100,8 +100,114 @@ func TestSecret(t *testing.T) {
 	// Assuming the intent is written, no change when called again.
 	existing.Data = intent.Data
 	before := intent.DeepCopy()
-	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil))
+	require.NoError(t, Secret(ctx, cluster, root, existing, userSecret, service, intent, nil, nil))
 	assert.DeepEqual(t, before, intent)
+}
+
+func TestSecretAdditionalCAs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	service := new(corev1.Service)
+	service.Namespace = "ns1"
+	service.Name = "some-name"
+
+	root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+
+	rootPEM, err := root.Certificate.MarshalText()
+	assert.NilError(t, err)
+
+	newCluster := func(version string) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.SetLabels(map[string]string{naming.LabelVersion: version})
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		return cluster
+	}
+
+	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+	// No trailing newline; a separator must be inserted before the next entry.
+	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----")
+
+	t.Run("AppendedToGeneratedBundle", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
+
+		expected := append(append([]byte{}, rootPEM...), ca1...)
+		expected = append(expected, ca2...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("SeparatorInsertedWhenMissingNewline", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca2, ca1}))
+
+		expected := append(append([]byte{}, rootPEM...), ca2...)
+		expected = append(expected, '\n')
+		expected = append(expected, ca1...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("AppendedToCertManagerBundle", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+		frontend := &corev1.Secret{Data: map[string][]byte{
+			corev1.TLSCertKey:       []byte("tls-cert"),
+			corev1.TLSPrivateKeyKey: []byte("tls-key"),
+		}}
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, frontend, [][]byte{ca1}))
+
+		expected := append(append([]byte{}, rootPEM...), ca1...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("CustomTLSSecret", func(t *testing.T) {
+		// In manual mode nothing generates the bundle; the key holds
+		// exactly the CAs the caller resolved.
+		cluster := newCluster("3.1.0")
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+		}
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
+
+		expected := append(append([]byte{}, ca1...), ca2...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("CustomTLSSecretWithoutCAs", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+		}
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, nil))
+
+		_, ok := intent.Data["pgbouncer-frontend.ca-roots"]
+		assert.Assert(t, !ok)
+	})
+
+	t.Run("NoChangeWhenCalledAgain", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		existing := new(corev1.Secret)
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, [][]byte{ca1, ca2}))
+
+		existing.Data = intent.Data
+		before := intent.DeepCopy()
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, [][]byte{ca1, ca2}))
+		assert.DeepEqual(t, before, intent)
+	})
 }
 
 func TestPod(t *testing.T) {
@@ -230,6 +336,59 @@ volumes:
 		before := pod.DeepCopy()
 		call()
 		assert.DeepEqual(t, before, pod)
+	})
+
+	// K8SPG-952: in manual TLS mode with additional CAs, the frontend
+	// authority is mounted from the operator Secret where the merged CA
+	// bundle is stored; tls.crt/tls.key still come from the custom Secret.
+	t.Run("CustomTLSSecretWithAdditionalTrustedCAs", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+			Items: []corev1.KeyToPath{
+				{Key: "k1", Path: "tls.crt"},
+				{Key: "k2", Path: "tls.key"},
+			},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "external-ca"},
+		}
+
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: pgbouncer-config
+  projected:
+    sources:
+    - configMap:
+        items:
+        - key: pgbouncer-empty
+          path: pgbouncer.ini
+    - configMap:
+        items:
+        - key: pgbouncer.ini
+          path: ~postgres-operator.ini
+    - secret:
+        items:
+        - key: pgbouncer-users.txt
+          path: ~postgres-operator/users.txt
+    - secret:
+        items:
+        - key: k1
+          path: ~postgres-operator/frontend-tls.crt
+        - key: k2
+          path: ~postgres-operator/frontend-tls.key
+        name: tls-name
+    - secret:
+        items:
+        - key: pgbouncer-frontend.ca-roots
+          path: ~postgres-operator/frontend-ca.crt
+    - secret:
+        items:
+        - key: ca.crt
+          path: ~postgres-operator/backend-ca.crt
+		`))
 	})
 
 	t.Run("Customizations", func(t *testing.T) {
@@ -460,7 +619,6 @@ volumes:
 		}
 
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
-
 			call()
 			assert.Equal(t, len(pod.Containers), 2, "expected 2 containers in Pod, got %d", len(pod.Containers))
 		})
