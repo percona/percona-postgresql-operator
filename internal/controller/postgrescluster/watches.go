@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // watchCertManagerSecrets returns a handler.EventHandler for cert-manager-issued
@@ -32,6 +34,32 @@ func (*Reconciler) watchCertManagerSecrets() handler.EventHandler {
 			}
 		}
 		return nil
+	})
+}
+
+// watchPGBouncerUserSecrets returns a handler.EventHandler for Secrets
+// referenced by spec.proxy.pgBouncer.usersSecret.
+func (r *Reconciler) watchPGBouncerUserSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v1beta1.PostgresClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v1beta1.IndexFieldPGBouncerUserSecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for i := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&clusters.Items[i]),
+			})
+		}
+		return reqs
 	})
 }
 
