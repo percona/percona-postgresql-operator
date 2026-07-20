@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubi10
+ARG BASE_IMAGE=ubi9
 
 FROM --platform=${BUILDPLATFORM} golang:1.26 AS go_builder
 WORKDIR /go/src/github.com/percona/percona-postgresql-operator
@@ -48,7 +48,7 @@ RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
 FROM registry.access.redhat.com/${BASE_IMAGE}/ubi-minimal AS ubi
-RUN microdnf update -y && microdnf clean all -y || true
+RUN microdnf update -y && microdnf clean all -y
 
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \
