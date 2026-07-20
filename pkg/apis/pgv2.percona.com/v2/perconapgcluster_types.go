@@ -645,7 +645,7 @@ type Patroni struct {
 
 // Backups struct.
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
-type Backups struct {//nolint:recvcheck
+type Backups struct { //nolint:recvcheck
 	// Enabled controls whether backups are enabled for the cluster.
 	// Defaulted to true by the operator for crVersion >= 3.1.0.
 	// +optional
