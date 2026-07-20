@@ -90,6 +90,59 @@ func TestPostgreSQLParameters(t *testing.T) {
 		})
 	})
 
+	t.Run("backups disabled", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		parameters := new(postgres.Parameters)
+
+		if cluster.Labels == nil {
+			cluster.Labels = make(map[string]string)
+		}
+		cluster.Labels["pgv2.percona.com/version"] = version.Version()
+
+		// No restore_command override: the key is omitted entirely, since a
+		// pgBackRest command would fail with no repository configured.
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+		})
+
+		// An explicit user override is still respected even with backups disabled.
+		dynamic := map[string]any{
+			"postgresql": map[string]any{
+				"parameters": map[string]any{
+					"restore_command": "/bin/true",
+				},
+			},
+		}
+		if cluster.Spec.Patroni == nil {
+			cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+		}
+		cluster.Spec.Patroni.DynamicConfiguration = dynamic
+
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+			"restore_command": "/bin/true",
+		})
+
+		// A standby cluster following an external repo needs restore_command
+		// regardless of this cluster's own backups.enabled setting.
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{
+			Enabled:  true,
+			RepoName: "repo99",
+		}
+		cluster.Spec.Patroni.DynamicConfiguration = nil
+
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+			"restore_command": `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+		})
+	})
+
 	t.Run("2.8.0< version", func(t *testing.T) {
 		cluster := new(v1beta1.PostgresCluster)
 		parameters := new(postgres.Parameters)

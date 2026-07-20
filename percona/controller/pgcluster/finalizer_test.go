@@ -5,6 +5,7 @@ package pgcluster
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -349,6 +350,81 @@ var _ = Describe("Finalizers", Ordered, func() {
 					return err == nil
 				}, time.Second*15, time.Millisecond*250).Should(BeTrue())
 				Expect(len(secretList.Items)).Should(Equal(8))
+			})
+		})
+	})
+
+	Context("pre-deletion finalizers removed before PostgresCluster is gone", Ordered, func() {
+		crName := ns + "-pre-finalizer-order"
+		crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+
+		When("CR has all four finalizers", func() {
+			cr, err := readDefaultCR(crName, ns)
+			It("should read default cr.yaml", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerStopWatchers)
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerDeleteBackups)
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerDeletePVC)
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerDeleteSSL)
+
+			It("should create PerconaPGCluster and a labeled pod for deleteBackups", func() {
+				status := cr.Status
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+				cr.Status = status
+				Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      crName + "-pod",
+						Namespace: ns,
+						Labels: map[string]string{
+							"app.kubernetes.io/instance":  crName,
+							"app.kubernetes.io/component": "pg",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "database", Image: "busybox"},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+			})
+
+			It("should reconcile to create PostgresCluster", func() {
+				rec := reconciler(cr)
+				rec.PodExec = func(_ context.Context, _, _, _ string, _ io.Reader, _ io.Writer, _ io.Writer, _ ...string) error {
+					return nil
+				}
+				_, err = rec.Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should delete PerconaPGCluster", func() {
+				Expect(k8sClient.Delete(ctx, cr)).Should(Succeed())
+			})
+
+			It("should run one Reconcile pass (pre-finalizers run, PostgresCluster still exists)", func() {
+				rec := reconciler(cr)
+				rec.PodExec = func(_ context.Context, _, _, _ string, _ io.Reader, _ io.Writer, _ io.Writer, _ ...string) error {
+					return nil
+				}
+				_, err = rec.Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should have pre-deletion finalizers removed and post-deletion finalizers still present", func() {
+				fetched := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, crNamespacedName, fetched)).Should(Succeed())
+
+				Expect(fetched.Finalizers).ShouldNot(ContainElement(pNaming.FinalizerStopWatchers))
+				Expect(fetched.Finalizers).ShouldNot(ContainElement(pNaming.FinalizerDeleteBackups))
+				Expect(fetched.Finalizers).Should(ContainElement(pNaming.FinalizerDeletePVC))
+				Expect(fetched.Finalizers).Should(ContainElement(pNaming.FinalizerDeleteSSL))
 			})
 		})
 	})

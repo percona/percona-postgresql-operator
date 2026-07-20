@@ -35,3 +35,4 @@ commands:
           kubectl wait -n $NAMESPACE --timeout 180s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$target_image_postgresql sts/${s}
       done
     timeout: 180
+

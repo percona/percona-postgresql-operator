@@ -24,6 +24,35 @@ func TestPerconaPGCluster_Default(t *testing.T) {
 	new(PerconaPGCluster).Default()
 }
 
+func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
+	t.Run("nil is defaulted to true for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.True(t, *cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("nil is left untouched for CRVersion < 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "3.0.0"
+		cr.Default()
+
+		assert.Nil(t, cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("explicit false is preserved for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Spec.Backups.Enabled = new(false)
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.False(t, *cr.Spec.Backups.Enabled)
+	})
+}
+
 func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	trueVal := true
 	falseVal := false

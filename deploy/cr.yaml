@@ -374,6 +374,8 @@ spec:
 #      - secretRef:
 #          name: pgbouncer-env-secret
 #      exposeSuperusers: false
+#      usersSecret:
+#        name: pgbouncer-users
 #      resources:
 #        limits:
 #          cpu: 200m
@@ -400,7 +402,8 @@ spec:
 #        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
-#
+#      additionalTrustedCAs:
+#      - name: some-client-ca
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -484,6 +487,7 @@ spec:
 #          pool_mode: transaction
 
   backups:
+#    enabled: true
 #    trackLatestRestorableTime: true
 #    volumeSnapshots:
 #      mode: offline

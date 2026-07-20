@@ -1,0 +1,43 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      client_pod=$(get_client_pod)
+      kubectl -n "${NAMESPACE}" exec -i "${client_pod}" -- \
+        bash -c 'cat > /tmp/client.crt' < "${TEMP_DIR}/client.crt"
+      kubectl -n "${NAMESPACE}" exec -i "${client_pod}" -- \
+        bash -c 'cat > /tmp/client.key && chmod 600 /tmp/client.key' < "${TEMP_DIR}/client.key"
+
+      # The operator root CA signs the PgBouncer frontend certificate; the
+      # client uses it to verify the server side of the mTLS handshake.
+      kubectl -n "${NAMESPACE}" get secret pgbouncer-mtls-cluster-cert \
+        -o jsonpath='{.data.ca\.crt}' | base64 -d > "${TEMP_DIR}/root-ca.crt"
+      kubectl -n "${NAMESPACE}" exec -i "${client_pod}" -- \
+        bash -c 'cat > /tmp/root-ca.crt' < "${TEMP_DIR}/root-ca.crt"
+
+      password=$(get_psql_user_pass pgbouncer-mtls-pguser-pgbouncer-mtls)
+      uri="pgbouncer-mtls:${password}@pgbouncer-mtls-pgbouncer.${NAMESPACE}.svc/postgres"
+      server_verify="sslmode=verify-full&sslrootcert=/tmp/root-ca.crt"
+
+      # Full mTLS: the client verifies PgBouncer's certificate and hostname
+      # against the operator root CA while PgBouncer verifies the client
+      # certificate against the external CA. The same certificate that was
+      # rejected before must be accepted once the external CA is trusted.
+      # Propagation of the updated Secret into the projected volume plus the
+      # PgBouncer config reload can take a couple of minutes.
+      connect_mtls() {
+        run_psql_local 'SELECT 1' "${uri}?${server_verify}&sslcert=/tmp/client.crt&sslkey=/tmp/client.key"
+      }
+      retry 30 10 connect_mtls
+
+      # A connection without a client certificate must still be rejected.
+      if run_psql_local 'SELECT 1' "${uri}?${server_verify}"; then
+        echo "ERROR: connection without a client certificate must be rejected"
+        exit 1
+      fi
+    timeout: 420

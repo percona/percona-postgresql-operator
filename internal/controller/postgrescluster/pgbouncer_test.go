@@ -25,6 +25,117 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
+func TestGetAdditionalTrustedCAs(t *testing.T) {
+	ctx := context.Background()
+	_, cc := setupKubernetes(t)
+	require.ParallelCapacity(t, 0)
+
+	reconciler := &Reconciler{Client: cc}
+
+	ns := setupNamespace(t, cc)
+	cluster := testCluster()
+	cluster.Namespace = ns.Name
+	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+		PGBouncer: &v1beta1.PGBouncerPodSpec{},
+	}
+
+	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----\n")
+	customCA := []byte("-----BEGIN CERTIFICATE-----\nCCCC\n-----END CERTIFICATE-----\n")
+
+	for name, data := range map[string]map[string][]byte{
+		"ca-one": {"ca.crt": ca1},
+		"ca-two": {"ca.crt": ca2},
+		"custom-tls": {
+			"my-ca":   customCA,
+			"tls.crt": []byte("cert"),
+			"tls.key": []byte("key"),
+		},
+		"custom-tls-without-ca": {
+			"tls.crt": []byte("cert"),
+			"tls.key": []byte("key"),
+		},
+	} {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns.Name},
+			Data:       data,
+		}
+		assert.NilError(t, cc.Create(ctx, secret))
+	}
+
+	t.Run("ReferencedSecrets", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"}, {Name: "does-not-exist"}, {Name: "ca-two"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{ca1, ca2})
+	})
+
+	// K8SPG-952: in manual TLS mode the frontend CA file is built solely
+	// from this list, so it must begin with the authority of the custom
+	// TLS Secret.
+	t.Run("CustomTLSAuthorityPrepended", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-tls"},
+			Items: []corev1.KeyToPath{
+				{Key: "my-ca", Path: "ca.crt"},
+				{Key: "tls.crt", Path: "tls.crt"},
+				{Key: "tls.key", Path: "tls.key"},
+			},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{customCA, ca1})
+	})
+
+	t.Run("CustomTLSSecretMissing", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "does-not-exist"},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		_, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.ErrorContains(t, err, "does-not-exist")
+	})
+
+	t.Run("CustomTLSAuthorityKeyMissing", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-tls-without-ca"},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		_, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.ErrorContains(t, err, "ca.crt")
+	})
+
+	// The custom TLS Secret plays no part in the bundle when no additional
+	// CAs are requested; its authority is mounted directly from it.
+	t.Run("CustomTLSWithoutAdditionalCAs", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "does-not-exist"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Equal(t, len(cas), 0)
+	})
+}
+
 func TestGeneratePGBouncerService(t *testing.T) {
 	_, cc := setupKubernetes(t)
 	require.ParallelCapacity(t, 0)

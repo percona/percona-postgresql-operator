@@ -56,7 +56,7 @@ func (exec Executor) ChangePrimaryAndWait(
 	err := exec(ctx, nil, &stdout, &stderr, cmd...)
 
 	log := logging.FromContext(ctx)
-	log.V(1).Info("changed primary",
+	log.Info("changed primary",
 		"stdout", stdout.String(),
 		"stderr", stderr.String(),
 	)
@@ -85,7 +85,7 @@ func (exec Executor) SwitchoverAndWait(
 		"--candidate="+target)
 
 	log := logging.FromContext(ctx)
-	log.V(1).Info("changed primary",
+	log.Info("changed primary",
 		"stdout", stdout.String(),
 		"stderr", stderr.String(),
 	)
@@ -116,7 +116,7 @@ func (exec Executor) FailoverAndWait(
 		"--candidate="+target)
 
 	log := logging.FromContext(ctx)
-	log.V(1).Info("changed primary",
+	log.Info("changed primary",
 		"stdout", stdout.String(),
 		"stderr", stderr.String(),
 	)
@@ -168,7 +168,7 @@ func (exec Executor) RestartPendingMembers(ctx context.Context, role, scope stri
 		"patronictl", "restart", "--pending", "--force", "--role="+role, scope)
 
 	log := logging.FromContext(ctx)
-	log.V(1).Info("restarted members",
+	log.Info("restarted members",
 		"stdout", stdout.String(),
 		"stderr", stderr.String(),
 	)

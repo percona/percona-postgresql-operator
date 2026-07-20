@@ -570,6 +570,15 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 
 	r.Cache = mgr.GetCache()
 
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v1beta1.PostgresCluster{},
+		v1beta1.IndexFieldPGBouncerUserSecrets,
+		v1beta1.PGBouncerUserSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -599,6 +608,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Watches(&corev1.Pod{}, r.watchPods()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()) // watch all StatefulSets
 
