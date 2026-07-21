@@ -779,7 +779,7 @@ func stageVaultCredentials(
 	}
 	files := []stagedFile{{path: tokenPath, data: token}}
 
-	if vault.CASecret.Name != "" && vault.CASecret.Key != "" {
+	if vault.HasCA() {
 		ca, err := secretValue(ctx, k8sClient, namespace, vault.CASecret)
 		if err != nil {
 			return errors.Wrap(err, "CA secret")

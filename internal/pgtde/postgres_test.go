@@ -629,3 +629,59 @@ func TestReconcileVaultProvider(t *testing.T) {
 			"an existing cluster must not silently fall back to adding a provider")
 	})
 }
+
+// TestVaultCAAgreement pins the three answers that have to match for a CA to
+// work: whether it is projected into the Pod, where pg_tde is told to read it
+// from, and where it is staged during a provider change. They were once three
+// separate expressions over CASecret, and any pair of them disagreeing is a
+// configuration the operator cannot serve.
+func TestVaultCAAgreement(t *testing.T) {
+	t.Parallel()
+
+	vaultWith := func(name, key string) *crunchyv1beta1.PGTDEVaultSpec {
+		return &crunchyv1beta1.PGTDEVaultSpec{
+			Host:        "https://vault.example.com:8200",
+			MountPath:   "secret/data",
+			TokenSecret: crunchyv1beta1.PGTDESecretObjectReference{Name: "vault", Key: "token"},
+			CASecret:    crunchyv1beta1.PGTDESecretObjectReference{Name: name, Key: key},
+		}
+	}
+
+	// projectsCA reports whether the Pod would mount a CA certificate. The
+	// volume projects the token and nothing else until a CA is configured, and
+	// the two secrets may share a name, so count the sources rather than try to
+	// tell them apart by name.
+	projectsCA := func(vault *crunchyv1beta1.PGTDEVaultSpec) bool {
+		sources := postgres.PGTDEVolume(vault).Projected.Sources
+		assert.Assert(t, len(sources) == 1 || len(sources) == 2,
+			"expected the token and at most a CA, got %v", sources)
+		return len(sources) == 2
+	}
+
+	for _, tc := range []struct {
+		name     string
+		vault    *crunchyv1beta1.PGTDEVaultSpec
+		expected bool
+	}{
+		{"Both", vaultWith("vault", "ca.crt"), true},
+		{"Neither", vaultWith("", ""), false},
+		// Half a reference cannot be resolved, so it is no CA at all. The CRD
+		// requires both once caSecret is given, but nothing in the operator
+		// should depend on that to stay consistent.
+		{"NameOnly", vaultWith("vault", ""), false},
+		{"KeyOnly", vaultWith("", "ca.crt"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, caPath := VaultCredentialPaths(tc.vault)
+			_, tempCAPath := TempVaultCredentialPaths(tc.vault)
+
+			assert.Equal(t, tc.vault.HasCA(), tc.expected)
+			assert.Equal(t, caPath != "", tc.expected,
+				"the provider should name a CA only when one is configured")
+			assert.Equal(t, tempCAPath != "", tc.expected,
+				"a CA should be staged only when one is configured")
+			assert.Equal(t, projectsCA(tc.vault), tc.expected,
+				"the Pod should mount a CA only when one is configured")
+		})
+	}
+}

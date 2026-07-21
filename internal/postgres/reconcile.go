@@ -88,7 +88,7 @@ func PGTDEVolume(vault *v1beta1.PGTDEVaultSpec) corev1.Volume {
 		},
 	}
 
-	if vault.CASecret.Name != "" {
+	if vault.HasCA() {
 		volume.Projected.Sources = append(
 			volume.Projected.Sources, corev1.VolumeProjection{
 				Secret: &corev1.SecretProjection{

@@ -253,6 +253,17 @@ type PGTDEVaultSpec struct {
 	MountPath string `json:"mountPath,omitempty"`
 }
 
+// HasCA reports whether a CA certificate is configured for verifying the Vault
+// server. Both halves of the reference are needed to reach the certificate, so
+// this is the single answer for whether to project it into the Pod, where to
+// read it from, and whether it belongs in the key provider configuration.
+// Those three have to agree: naming a path pg_tde cannot read fails every
+// request to Vault, and projecting a key that is not set is rejected by the
+// API server.
+func (s *PGTDEVaultSpec) HasCA() bool {
+	return s.CASecret.Name != "" && s.CASecret.Key != ""
+}
+
 // +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`

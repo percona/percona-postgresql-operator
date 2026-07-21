@@ -124,7 +124,7 @@ func PostgreSQLParameters(outParameters *postgres.Parameters) {
 // token and CA certificate based on the vault spec's secret key names.
 func VaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
 	tokenPath = naming.PGTDEMountPath + "/" + vault.TokenSecret.Key
-	if vault.CASecret.Key != "" {
+	if vault.HasCA() {
 		caPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
 	}
 	return tokenPath, caPath
@@ -134,7 +134,7 @@ func VaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPa
 // provider change, before the pod volume is updated with new credentials.
 func TempVaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
 	tokenPath = TempTokenPath
-	if vault.CASecret.Name != "" && vault.CASecret.Key != "" {
+	if vault.HasCA() {
 		caPath = TempCAPath
 	}
 	return tokenPath, caPath
