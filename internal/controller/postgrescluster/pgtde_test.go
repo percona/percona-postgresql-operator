@@ -895,8 +895,11 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		// The failure is folded into the "OK" flags rather than returned, the
 		// same way the other extensions handle theirs; it withholds the
 		// DatabaseRevision so the next reconcile retries.
-		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(), failPatch(t)))
+		patched := 0
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(),
+			func() error { patched++; return nil }))
 		assert.Equal(t, calls, 1, "only the real run reaches PodExec")
+		assert.Equal(t, patched, 1, "the failure event and condition still need persisting")
 
 		// The regression: the hash run executes the same statements against a
 		// fake executor that cannot fail, and used to flip this to True before
@@ -928,7 +931,7 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		assert.Assert(t, condition != nil)
 		assert.Equal(t, condition.Status, metav1.ConditionTrue)
 		assert.Assert(t, cluster.Status.DatabaseRevision != "")
-		assert.Equal(t, patched, 1)
+		assert.Equal(t, patched, 1, "the condition and the revision share one patch")
 	})
 
 	t.Run("NothingIsReportedWithoutAWritablePod", func(t *testing.T) {
@@ -962,7 +965,8 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 			},
 		}
 
-		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(), failPatch(t)))
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(),
+			func() error { return nil }))
 		assert.Equal(t, cluster.Status.DatabaseRevision, "", "the drop must be retried")
 
 		// Reporting False here would strip pg_tde from shared_preload_libraries
@@ -970,5 +974,90 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		assert.Assert(t, pgTDECondition(cluster) == nil,
 			"a failed DROP EXTENSION must not be reported as disabled")
 		assertEvent(t, r.Recorder, "PGTDEDisableFailed")
+	})
+}
+
+func TestReconcilePostgresDatabasesPGTDEStatusIsIndependent(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	newCluster := func() *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns1", Name: "pgc1", UID: "the-uid",
+				Labels: map[string]string{naming.LabelVersion: "17.2.0"},
+			},
+		}
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{Enabled: true}
+		return cluster
+	}
+
+	observed := func() *observedInstances {
+		return &observedInstances{forCluster: []*Instance{tdeInstance(nil)}}
+	}
+
+	// failOn returns a PodExec that fails every statement mentioning marker.
+	failOn := func(marker string) func(
+		ctx context.Context, namespace, pod, container string,
+		stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return func(ctx context.Context, namespace, pod, container string,
+			stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			b, err := io.ReadAll(stdin)
+			assert.NilError(t, err)
+			if strings.Contains(string(b), marker) {
+				return errors.New(marker + " is unavailable")
+			}
+			return nil
+		}
+	}
+
+	t.Run("PersistedWhenAnotherExtensionFails", func(t *testing.T) {
+		cluster := newCluster()
+		patched := 0
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  failOn("pgaudit"),
+		}
+
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(),
+			func() error { patched++; return nil }))
+
+		// pgaudit failing withholds the revision, which is what makes the
+		// whole batch of SQL run again next time.
+		assert.Equal(t, cluster.Status.DatabaseRevision, "")
+
+		// pg_tde installed fine, so its condition must not be held hostage:
+		// reconcilePGTDEProviders runs next and needs it.
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEEnabled)
+		assert.Assert(t, condition != nil,
+			"the pg_tde condition must not wait on unrelated extensions")
+		assert.Equal(t, condition.Status, metav1.ConditionTrue)
+		assert.Equal(t, patched, 1, "the condition should be persisted on its own")
+	})
+
+	t.Run("PatchFailureDoesNotCancelTheReconcile", func(t *testing.T) {
+		cluster := newCluster()
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				return nil
+			},
+		}
+
+		// A conflict on the status subresource says nothing about whether the
+		// SQL worked, and Reconcile patches again before it returns.
+		err := r.reconcilePostgresDatabases(ctx, cluster, observed(),
+			func() error { return errors.New("the object has been modified") })
+
+		assert.NilError(t, err,
+			"a status conflict must not stop reconcilePGTDEProviders from running")
+		assert.Assert(t, cluster.Status.DatabaseRevision != "",
+			"the revision is still correct in memory for the final patch")
 	})
 }

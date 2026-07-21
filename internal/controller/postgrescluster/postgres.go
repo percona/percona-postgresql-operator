@@ -432,12 +432,18 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// condition gates shared_preload_libraries and the vault volume, so
 	// claiming the extension exists before CREATE EXTENSION has succeeded
 	// sends the operator on to configure a key provider that cannot work.
+	//
+	// This is deliberately outside the revision guard below. Whether pg_tde is
+	// installed is a fact about pg_tde alone, and reconcilePGTDEProviders acts
+	// on it later in this same reconcile; making it wait for every other
+	// extension to succeed would let an unrelated failure, such as a missing
+	// pgvector library, stall the key provider setup indefinitely.
 	if pgTdeRan {
 		pgtde.ReportExtension(cluster, r.Recorder, pgTdeErr)
 	}
 
 	// K8SPG-472
-	if err == nil &&
+	allExtensionsOK := err == nil &&
 		pgStatMonitorOK &&
 		pgAuditOK &&
 		pgvectorOK &&
@@ -445,10 +451,20 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		pgRepackOK &&
 		pgCronOK &&
 		setUserOK &&
-		pgTdeOK {
+		pgTdeOK
+
+	if allExtensionsOK {
+		// Every statement above succeeded, so none of them need to run again.
 		cluster.Status.DatabaseRevision = revision
-		if err := patchStatus(); err != nil {
-			return errors.Wrap(err, "patch status")
+	}
+
+	if pgTdeRan || allExtensionsOK {
+		if patchErr := patchStatus(); patchErr != nil {
+			// Losing this patch only costs a repeat of the SQL above, all of
+			// which is idempotent, and Reconcile patches the status again on
+			// its way out. Cancelling the reconcilers that follow, including
+			// the pg_tde key provider setup, would cost more.
+			logging.FromContext(ctx).Error(patchErr, "failed to patch cluster status")
 		}
 	}
 
