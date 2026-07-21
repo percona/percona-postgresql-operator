@@ -1503,7 +1503,12 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 // paths for comparing with cluster.Status.PGTDERevision.
 func pgTDEVaultRevision(vault *v1beta1.PGTDEVaultSpec, tokenPath, caPath string) (string, error) {
 	return safeHash32(func(hasher io.Writer) error {
-		_, err := fmt.Fprint(hasher,
+		// Quote every value so the fields cannot run together. fmt.Fprint
+		// separates operands with a space only when neither is a string, and
+		// all of these are, so plain Fprint would hash host="vault:8200" with
+		// mountPath="secret/data" the same as host="vault:8200secret" with
+		// mountPath="/data" and never notice the change.
+		_, err := fmt.Fprintf(hasher, "%q%q%q%q%q%q%q%q",
 			vault.Host, vault.MountPath,
 			vault.TokenSecret.Name, vault.TokenSecret.Key,
 			vault.CASecret.Name, vault.CASecret.Key,

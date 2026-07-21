@@ -182,6 +182,37 @@ func TestPGTDEVaultRevision(t *testing.T) {
 			assert.Assert(t, rev != base, "changing %s should change the revision", tc.name)
 		})
 	}
+
+	// Host and MountPath are hashed one after another and neither feeds into
+	// the credential paths, so they isolate how the fields are delimited from
+	// everything else that goes into the revision.
+	hostMount := func(host, mountPath string) string {
+		t.Helper()
+		vault := tdeVaultSpec()
+		vault.Host, vault.MountPath = host, mountPath
+
+		token, ca := pgtde.VaultCredentialPaths(vault)
+		revision, err := pgTDEVaultRevision(vault, token, ca)
+		assert.NilError(t, err)
+		return revision
+	}
+
+	// Without a delimiter, moving a character across a field boundary produces
+	// the same revision, and reconcilePGTDEProviders takes its "matches the
+	// spec" early return on a Vault the cluster has never been pointed at.
+	t.Run("FieldBoundaries", func(t *testing.T) {
+		assert.Assert(t,
+			hostMount("https://vault:8200", "secret/data") !=
+				hostMount("https://vault:8200secret", "/data"),
+			"a character moved from one field to the next must change the revision")
+	})
+
+	// Delimiting with a quote is only injective when a quote appearing inside a
+	// value is escaped.
+	t.Run("QuotesInValues", func(t *testing.T) {
+		assert.Assert(t, hostMount(`a"`, `b`) != hostMount(`a`, `"b`),
+			"a quote inside a value must not fake a field boundary")
+	})
 }
 
 func TestPreserveOldTDEVolume(t *testing.T) {
