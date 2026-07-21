@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -254,26 +255,147 @@ func TestPreserveOldTDEVolume(t *testing.T) {
 	})
 }
 
-func TestFetchSecretToTempFile(t *testing.T) {
+func TestStageVaultCredentials(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "vault-secret"},
-		Data:       map[string][]byte{"token": []byte("hvs.sometoken")},
+		Data: map[string][]byte{
+			"token":  []byte("hvs.sometoken"),
+			"ca.crt": []byte("-----BEGIN CERTIFICATE-----"),
+		},
 	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1-instance1-abcd-0"},
-	}
-	ref := v1beta1.PGTDESecretObjectReference{Name: "vault-secret", Key: "token"}
 
-	t.Run("WritesSecretToPod", func(t *testing.T) {
+	newPods := func(names ...string) []*corev1.Pod {
+		pods := make([]*corev1.Pod, 0, len(names))
+		for _, name := range names {
+			pods = append(pods, &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: name},
+			})
+		}
+		return pods
+	}
+
+	vault := tdeVaultSpec()
+	tokenPath, caPath := pgtde.TempVaultCredentialPaths(vault)
+
+	t.Run("WritesToEveryPod", func(t *testing.T) {
+		var calls []execCall
+		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
+		pods := newPods("pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0")
+
+		assert.NilError(t, stageVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+			"ns1", vault, pods, naming.ContainerDatabase, tokenPath, caPath))
+
+		// pg_tde names one path cluster-wide, but each instance has its own
+		// /pgdata, so every one of them needs its own copy.
+		assert.Equal(t, len(calls), 6, "two files on each of three instances")
+
+		for i, pod := range pods {
+			token, ca := calls[i*2], calls[i*2+1]
+
+			assert.Equal(t, token.pod, pod.Name)
+			assert.Equal(t, token.stdin, "hvs.sometoken")
+			assert.Assert(t, strings.Contains(token.command[2], tokenPath))
+
+			assert.Equal(t, ca.pod, pod.Name)
+			assert.Equal(t, ca.stdin, "-----BEGIN CERTIFICATE-----")
+			assert.Assert(t, strings.Contains(ca.command[2], caPath))
+		}
+	})
+
+	t.Run("ReadsEachSecretOnce", func(t *testing.T) {
+		var calls []execCall
+		gets := 0
+		k8s := &countingReader{
+			Reader: fake.NewClientBuilder().WithObjects(secret).Build(),
+			gets:   &gets,
+		}
+
+		assert.NilError(t, stageVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+			"ns1", vault, newPods("a", "b", "c", "d"), naming.ContainerDatabase,
+			tokenPath, caPath))
+
+		assert.Equal(t, gets, 2,
+			"the token and CA Secrets should be read once, not once per instance")
+	})
+
+	t.Run("WithoutCASecret", func(t *testing.T) {
 		var calls []execCall
 		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 
-		assert.NilError(t, fetchSecretToTempFile(ctx, k8s,
-			execRecorder(&calls, nil), "ns1", ref, pod,
-			naming.ContainerDatabase, pgtde.TempTokenPath))
+		noCA := tdeVaultSpec()
+		noCA.CASecret = v1beta1.PGTDESecretObjectReference{}
+		_, noCAPath := pgtde.TempVaultCredentialPaths(noCA)
+
+		assert.NilError(t, stageVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+			"ns1", noCA, newPods("a", "b"), naming.ContainerDatabase,
+			tokenPath, noCAPath))
+
+		assert.Equal(t, len(calls), 2, "only the token is staged")
+	})
+
+	t.Run("MissingSecretWritesNothing", func(t *testing.T) {
+		var calls []execCall
+		k8s := fake.NewClientBuilder().Build()
+
+		err := stageVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+			"ns1", vault, newPods("a", "b"), naming.ContainerDatabase, tokenPath, caPath)
+
+		assert.ErrorContains(t, err, "token secret")
+		assert.Equal(t, len(calls), 0,
+			"the Secrets are read before anything is written to any Pod")
+	})
+
+	t.Run("MissingKey", func(t *testing.T) {
+		var calls []execCall
+		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
+
+		badKey := tdeVaultSpec()
+		badKey.TokenSecret.Key = "nope"
+
+		err := stageVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+			"ns1", badKey, newPods("a"), naming.ContainerDatabase, tokenPath, caPath)
+
+		assert.ErrorContains(t, err, `key "nope" not found`)
+		assert.Equal(t, len(calls), 0)
+	})
+
+	t.Run("FailureNamesThePod", func(t *testing.T) {
+		var calls []execCall
+		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
+
+		err := stageVaultCredentials(ctx, k8s,
+			execRecorder(&calls, func(call execCall) error {
+				if call.pod == "b" {
+					return errors.New("no space left on device")
+				}
+				return nil
+			}),
+			"ns1", vault, newPods("a", "b", "c"), naming.ContainerDatabase,
+			tokenPath, caPath)
+
+		assert.ErrorContains(t, err, "pod b")
+		assert.ErrorContains(t, err, "no space left on device")
+		assert.Equal(t, len(calls), 3,
+			"staging stops at the first instance it cannot write to")
+	})
+}
+
+func TestWriteTempFile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1-instance1-abcd-0"},
+	}
+
+	t.Run("PipesDataAndSetsMode", func(t *testing.T) {
+		var calls []execCall
+
+		assert.NilError(t, writeTempFile(ctx, execRecorder(&calls, nil), pod,
+			naming.ContainerDatabase, pgtde.TempTokenPath, []byte("hvs.sometoken")))
 
 		assert.Equal(t, len(calls), 1)
 		assert.Equal(t, calls[0].namespace, "ns1")
@@ -288,63 +410,45 @@ func TestFetchSecretToTempFile(t *testing.T) {
 	})
 
 	t.Run("ShortWrite", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-
 		// The container reports fewer bytes on disk than were sent.
-		err := fetchSecretToTempFile(ctx, k8s,
+		err := writeTempFile(ctx,
 			func(ctx context.Context, namespace, pod, container string,
 				stdin io.Reader, stdout, stderr io.Writer, command ...string,
 			) error {
 				_, _ = io.WriteString(stdout, "4\n")
 				return nil
 			},
-			"ns1", ref, pod, naming.ContainerDatabase, pgtde.TempTokenPath)
+			pod, naming.ContainerDatabase, pgtde.TempTokenPath, []byte("hvs.sometoken"))
 
 		assert.ErrorContains(t, err, "wrote 4 of 13 bytes",
 			"a truncated token must not be accepted as written")
-		assert.Equal(t, len(calls), 0)
-	})
-
-	t.Run("MissingSecret", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().Build()
-
-		err := fetchSecretToTempFile(ctx, k8s,
-			execRecorder(&calls, nil), "ns1", ref, pod,
-			naming.ContainerDatabase, pgtde.TempTokenPath)
-
-		assert.ErrorContains(t, err, "vault-secret")
-		assert.Equal(t, len(calls), 0, "nothing should be written when the Secret is missing")
-	})
-
-	t.Run("MissingKey", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-
-		err := fetchSecretToTempFile(ctx, k8s,
-			execRecorder(&calls, nil), "ns1",
-			v1beta1.PGTDESecretObjectReference{Name: "vault-secret", Key: "nope"},
-			pod, naming.ContainerDatabase, pgtde.TempTokenPath)
-
-		assert.ErrorContains(t, err, `key "nope" not found`)
-		assert.Equal(t, len(calls), 0,
-			"an empty file must not be written when the key is absent")
 	})
 
 	t.Run("ExecFails", func(t *testing.T) {
 		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 
-		err := fetchSecretToTempFile(ctx, k8s,
+		err := writeTempFile(ctx,
 			execRecorder(&calls, func(execCall) error {
 				return errors.New("no such file or directory")
 			}),
-			"ns1", ref, pod, naming.ContainerDatabase, pgtde.TempTokenPath)
+			pod, naming.ContainerDatabase, pgtde.TempTokenPath, []byte("x"))
 
 		assert.ErrorContains(t, err, pgtde.TempTokenPath)
 		assert.ErrorContains(t, err, "no such file or directory")
 	})
+}
+
+// countingReader counts Get calls made against the embedded reader.
+type countingReader struct {
+	client.Reader
+	gets *int
+}
+
+func (c *countingReader) Get(
+	ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
+) error {
+	*c.gets++
+	return c.Reader.Get(ctx, key, obj, opts...)
 }
 
 func TestReconcilePGTDEProviders(t *testing.T) {
@@ -1059,5 +1163,190 @@ func TestReconcilePostgresDatabasesPGTDEStatusIsIndependent(t *testing.T) {
 			"a status conflict must not stop reconcilePGTDEProviders from running")
 		assert.Assert(t, cluster.Status.DatabaseRevision != "",
 			"the revision is still correct in memory for the final patch")
+	})
+}
+
+func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "vault-secret"},
+		Data: map[string][]byte{
+			"token":  []byte("hvs.newtoken"),
+			"ca.crt": []byte("-----BEGIN CERTIFICATE-----"),
+		},
+	}
+
+	vault := tdeVaultSpec()
+	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
+	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+
+	standardRevision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
+	assert.NilError(t, err)
+	tempRevision, err := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+	assert.NilError(t, err)
+
+	newCluster := func(revision string) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1", UID: "the-uid"},
+		}
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{Enabled: true, Vault: tdeVaultSpec()}
+		cluster.Status.PGTDERevision = revision
+		return cluster
+	}
+
+	// replica returns a running, up-to-date instance that is not writable.
+	replica := func(name string) *Instance {
+		instance := tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"})
+		instance.Name = name
+		instance.Pods[0].Name = "pgc1-" + name + "-0"
+		instance.Pods[0].Annotations["status"] = `{"role":"replica"}`
+		return instance
+	}
+
+	// threeInstances returns a primary plus two replicas, all healthy.
+	threeInstances := func() *observedInstances {
+		return &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+			replica("instance2-efgh"),
+			replica("instance3-ijkl"),
+		}}
+	}
+
+	podsWritten := func(calls []execCall, marker string) []string {
+		var names []string
+		for _, call := range calls {
+			if len(call.command) > 2 && strings.Contains(call.command[2], marker) {
+				names = append(names, call.pod)
+			}
+		}
+		return names
+	}
+
+	t.Run("PhaseOneStagesOnEveryInstance", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster("stale")
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, threeInstances(),
+			func() error { return nil }))
+
+		// pg_tde resolves one path cluster-wide; a replica promoted before
+		// phase 2 must find the credentials on its own volume.
+		assert.DeepEqual(t, podsWritten(calls, tempTokenPath), []string{
+			"pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0",
+		})
+		assert.DeepEqual(t, podsWritten(calls, tempCAPath), []string{
+			"pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0",
+		})
+
+		// The SQL still runs once, on the primary.
+		var sql []execCall
+		for _, call := range calls {
+			if call.command[0] == "psql" {
+				sql = append(sql, call)
+			}
+		}
+		assert.Equal(t, len(sql), 1)
+		assert.Equal(t, sql[0].pod, "pgc1-instance1-abcd-0")
+		assert.Equal(t, cluster.Status.PGTDERevision, tempRevision)
+	})
+
+	t.Run("PhaseOneWaitsForEveryInstance", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster("stale")
+
+		// One replica's database container is not running yet.
+		instances := threeInstances()
+		instances.forCluster[2].Pods[0].Status.ContainerStatuses[0].State =
+			corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		patched := 0
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, instances,
+			func() error { patched++; return nil }))
+
+		assert.Equal(t, len(calls), 0,
+			"the provider must not name a path that one instance cannot read")
+		assert.Equal(t, cluster.Status.PGTDERevision, "stale",
+			"the volume hold stays until every instance is staged")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "WaitingForInstances")
+		assert.Equal(t, patched, 1, "the reason for waiting must be visible")
+	})
+
+	t.Run("PhaseTwoCleansEveryInstance", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster(tempRevision)
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, threeInstances(),
+			func() error { return nil }))
+
+		assert.DeepEqual(t, podsWritten(calls, "rm -f"), []string{
+			"pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0",
+		})
+		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
+	})
+
+	t.Run("PhaseTwoCleanupIncompleteIsRetried", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster(tempRevision)
+
+		// A replica is down, so its copy of the token cannot be removed.
+		instances := threeInstances()
+		instances.forCluster[2].Pods[0].Status.ContainerStatuses[0].State =
+			corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{}}
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, instances,
+			func() error { return nil }))
+
+		// The rotation finished, so it must not repeat...
+		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
+		// ...but a token is still sitting on the unreachable instance.
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse,
+			pgTDEReasonCredentialsNotRemoved)
+		assertEvent(t, r.Recorder, "PGTDECredentialCleanupFailed")
+	})
+
+	t.Run("DisableSweepsEveryInstance", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster(standardRevision)
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, threeInstances(),
+			failPatch(t)))
+
+		assert.DeepEqual(t, podsWritten(calls, "rm -f"), []string{
+			"pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0",
+		})
+		assert.Equal(t, cluster.Status.PGTDERevision, "")
 	})
 }

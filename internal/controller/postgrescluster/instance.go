@@ -292,6 +292,31 @@ func (observed *observedInstances) writablePod(container string) (*corev1.Pod, *
 	return nil, nil
 }
 
+// runningPods returns the Pod of every non-terminating instance whose named
+// container is running, and whether that accounts for every instance in the
+// cluster. Callers that must reach the whole cluster, rather than any one
+// member of it, should wait while complete is false.
+func (observed *observedInstances) runningPods(container string) (pods []*corev1.Pod, complete bool) {
+	if observed == nil {
+		return nil, false
+	}
+
+	complete = true
+	for _, instance := range observed.forCluster {
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			complete = false
+			continue
+		}
+		if running, known := instance.IsRunning(container); !running || !known || len(instance.Pods) == 0 {
+			complete = false
+			continue
+		}
+		pods = append(pods, instance.Pods[0])
+	}
+
+	return pods, complete
+}
+
 // +kubebuilder:rbac:groups="",resources="pods",verbs={list}
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
 
