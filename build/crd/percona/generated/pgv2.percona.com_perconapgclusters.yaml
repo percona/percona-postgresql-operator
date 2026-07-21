@@ -121,6 +121,9 @@ spec:
                 description: PostgreSQL backup configuration
                 properties:
                   enabled:
+                    description: |-
+                      Enabled controls whether backups are enabled for the cluster.
+                      Defaulted to true by the operator for crVersion >= 3.1.0.
                     type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
