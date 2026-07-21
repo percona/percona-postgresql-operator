@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"context"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,11 +15,15 @@ import (
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -58,7 +63,15 @@ func execRecorder(calls *[]execCall, result func(call execCall) error) func(
 		*calls = append(*calls, call)
 
 		if result != nil {
-			return result(call)
+			if err := result(call); err != nil {
+				return err
+			}
+		}
+
+		// Stand in for the "wc -c" that fetchSecretToTempFile appends to its
+		// write command to detect short writes.
+		if len(command) > 2 && strings.Contains(command[2], "wc -c") {
+			_, _ = io.WriteString(stdout, strconv.Itoa(len(call.stdin))+"\n")
 		}
 		return nil
 	}
@@ -268,10 +281,29 @@ func TestFetchSecretToTempFile(t *testing.T) {
 		assert.Equal(t, calls[0].container, naming.ContainerDatabase)
 		assert.Equal(t, calls[0].stdin, "hvs.sometoken",
 			"the secret value should be piped in, not interpolated into the command")
-		assert.DeepEqual(t, calls[0].command[:2], []string{"bash", "-c"})
+		assert.DeepEqual(t, calls[0].command[:2], []string{"bash", "-ceu"})
 		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempTokenPath))
-		assert.Assert(t, strings.Contains(calls[0].command[2], "chmod 600"),
-			"the token file must not be world readable")
+		assert.Assert(t, strings.Contains(calls[0].command[2], "umask 077"),
+			"the token file must never exist in a world readable state")
+	})
+
+	t.Run("ShortWrite", func(t *testing.T) {
+		var calls []execCall
+		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
+
+		// The container reports fewer bytes on disk than were sent.
+		err := fetchSecretToTempFile(ctx, k8s,
+			func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				_, _ = io.WriteString(stdout, "4\n")
+				return nil
+			},
+			"ns1", ref, pod, naming.ContainerDatabase, pgtde.TempTokenPath)
+
+		assert.ErrorContains(t, err, "wrote 4 of 13 bytes",
+			"a truncated token must not be accepted as written")
+		assert.Equal(t, len(calls), 0)
 	})
 
 	t.Run("MissingSecret", func(t *testing.T) {
@@ -365,7 +397,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Enabled = false
 		cluster.Status.PGTDERevision = standardRevision
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
 		}}
@@ -373,7 +408,11 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
 		assert.Equal(t, cluster.Status.PGTDERevision, "",
 			"the revision must be cleared so re-enabling starts from scratch")
-		assert.Equal(t, len(calls), 0)
+
+		assert.Equal(t, len(calls), 1,
+			"staged credentials must not outlive the feature being disabled")
+		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempTokenPath))
+		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempCAPath))
 	})
 
 	t.Run("NoVaultSpec", func(t *testing.T) {
@@ -382,14 +421,17 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Spec.Extensions.PGTDE.Vault = nil
 		cluster.Status.PGTDERevision = standardRevision
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
 		}}
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
 		assert.Equal(t, cluster.Status.PGTDERevision, "")
-		assert.Equal(t, len(calls), 0)
+		assert.Equal(t, len(calls), 1, "staged credentials are swept here too")
 	})
 
 	t.Run("WaitsForRollout", func(t *testing.T) {
@@ -400,7 +442,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		// The Pod is running an older revision than the StatefulSet intends.
 		instance.Pods[0].Labels[appsv1.StatefulSetRevisionLabel] = "rev-0"
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{instance}}
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
@@ -420,7 +465,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		replica.Pods[0].Annotations["status"] = `{"role":"replica"}`
 		replica.Pods[0].Labels[appsv1.StatefulSetRevisionLabel] = "rev-0"
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{primary, replica}}
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
@@ -435,7 +483,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		instance := tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"})
 		instance.Pods[0].Annotations["status"] = `{"role":"replica"}`
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{instance}}
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
@@ -446,7 +497,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		var calls []execCall
 		cluster := newCluster()
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		// No TDEInstalledAnnotation: the Pod predates the extension install.
 		observed := &observedInstances{forCluster: []*Instance{tdeInstance(nil)}}
 
@@ -461,7 +515,10 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster := newCluster()
 		cluster.Status.PGTDERevision = standardRevision
 
-		r := &Reconciler{PodExec: execRecorder(&calls, nil)}
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
 		}}
@@ -476,8 +533,9 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster := newCluster()
 
 		r := &Reconciler{
-			Client:  fake.NewClientBuilder().WithObjects(secret).Build(),
-			PodExec: execRecorder(&calls, nil),
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
@@ -501,6 +559,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			"no temporary files are needed when there is nothing to rotate")
 		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
 		assert.Equal(t, patched, 1, "the revision must be persisted immediately")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
 	})
 
 	t.Run("PhaseOne", func(t *testing.T) {
@@ -512,8 +571,9 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Status.PGTDERevision = "stale"
 
 		r := &Reconciler{
-			Client:  fake.NewClientBuilder().WithObjects(secret).Build(),
-			PodExec: execRecorder(&calls, nil),
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
@@ -538,6 +598,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		assert.Equal(t, cluster.Status.PGTDERevision, tempRevision,
 			"the temp revision releases the volume hold in reconcileInstance")
 		assert.Equal(t, patched, 1)
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeInProgress")
 	})
 
 	t.Run("PhaseOneSecretMissing", func(t *testing.T) {
@@ -546,19 +607,31 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Status.PGTDERevision = "stale"
 
 		r := &Reconciler{
-			Client:  fake.NewClientBuilder().Build(),
-			PodExec: execRecorder(&calls, nil),
+			Client:   fake.NewClientBuilder().Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
 		}}
 
-		err := r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t))
+		patched := 0
+		err := r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { patched++; return nil })
 		assert.ErrorContains(t, err, "token secret")
 		assert.Equal(t, len(psqlCalls(calls)), 0,
 			"the provider must not be changed to paths that were never written")
 		assert.Equal(t, cluster.Status.PGTDERevision, "stale",
 			"the revision must not advance when phase one fails")
+
+		// reconcileInstance keeps holding the old vault volume while the
+		// revision is stale, so the reason must reach the user.
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeFailed")
+		assert.Assert(t, strings.Contains(tdeCondition(cluster).Message, "vault-secret"),
+			"the condition should name the Secret that could not be read")
+		assert.Equal(t, patched, 1,
+			"the failure condition is useless unless it is written to the API")
+		assertEvent(t, r.Recorder, "PGTDEVaultProviderChangeFailed")
 	})
 
 	t.Run("PhaseTwo", func(t *testing.T) {
@@ -568,8 +641,9 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Status.PGTDERevision = tempRevision
 
 		r := &Reconciler{
-			Client:  fake.NewClientBuilder().WithObjects(secret).Build(),
-			PodExec: execRecorder(&calls, nil),
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
@@ -586,12 +660,13 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		assert.Assert(t, argsContain(sql[0].command, "--set=ca_path="+caPath))
 
 		// The staged credentials are removed once nothing references them.
-		assert.Equal(t, len(calls), 3)
+		assert.Equal(t, len(calls), 2)
 		assert.Assert(t, strings.Contains(calls[1].command[2], tempTokenPath))
-		assert.Assert(t, strings.Contains(calls[2].command[2], tempCAPath))
+		assert.Assert(t, strings.Contains(calls[1].command[2], tempCAPath))
 
 		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
 		assert.Equal(t, patched, 1)
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
 	})
 
 	t.Run("PhaseTwoKeepsTempFilesOnFailure", func(t *testing.T) {
@@ -600,7 +675,8 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Status.PGTDERevision = tempRevision
 
 		r := &Reconciler{
-			Client: fake.NewClientBuilder().WithObjects(secret).Build(),
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec: execRecorder(&calls, func(call execCall) error {
 				if call.command[0] == "psql" {
 					return errors.New("could not connect to server")
@@ -612,11 +688,86 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
 		}}
 
-		err := r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t))
+		err := r.reconcilePGTDEProviders(ctx, cluster, observed, func() error { return nil })
 		assert.ErrorContains(t, err, "could not connect to server")
 		assert.Equal(t, len(calls), 1,
 			"temp files must survive a failed phase two so it can be retried")
 		assert.Equal(t, cluster.Status.PGTDERevision, tempRevision)
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeFailed")
+	})
+
+	t.Run("PhaseTwoCleanupFailure", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Status.PGTDERevision = tempRevision
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: execRecorder(&calls, func(call execCall) error {
+				if strings.HasPrefix(call.command[len(call.command)-1], "rm -f") {
+					return errors.New("permission denied")
+				}
+				return nil
+			}),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		patched := 0
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { patched++; return nil }))
+
+		// The rotation itself succeeded, so it must not be repeated...
+		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
+		// ...but a vault token left in plaintext on the PersistentVolume is
+		// not something to swallow.
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse,
+			pgTDEReasonCredentialsNotRemoved)
+		assertEvent(t, r.Recorder, "PGTDECredentialCleanupFailed")
+		assert.Equal(t, patched, 1)
+
+		// The next reconcile has nothing to change, but retries the removal.
+		before := len(calls)
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { patched++; return nil }))
+		assert.Equal(t, len(calls), before+1, "cleanup should be retried")
+		assert.Assert(t, strings.Contains(calls[before].command[2], tempTokenPath))
+	})
+
+	t.Run("CleanupRetrySucceeds", func(t *testing.T) {
+		var calls []execCall
+		fail := true
+		cluster := newCluster()
+		cluster.Status.PGTDERevision = standardRevision
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGTDEVaultProviderReady,
+			Status:  metav1.ConditionFalse,
+			Reason:  pgTDEReasonCredentialsNotRemoved,
+			Message: "permission denied",
+		})
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: execRecorder(&calls, func(execCall) error {
+				if fail {
+					return errors.New("permission denied")
+				}
+				return nil
+			}),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		fail = false
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { return nil }))
+		assert.Equal(t, len(calls), 1)
+		assert.Equal(t, len(psqlCalls(calls)), 0, "nothing about the provider changed")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
 	})
 
 	t.Run("PatchStatusFails", func(t *testing.T) {
@@ -624,8 +775,9 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster := newCluster()
 
 		r := &Reconciler{
-			Client:  fake.NewClientBuilder().WithObjects(secret).Build(),
-			PodExec: execRecorder(&calls, nil),
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 		observed := &observedInstances{forCluster: []*Instance{
 			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
@@ -635,6 +787,44 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			func() error { return errors.New("conflict") })
 		assert.ErrorContains(t, err, "patch status")
 	})
+}
+
+// tdeCondition returns the PGTDEVaultProviderReady condition, failing the test
+// when it is absent.
+func tdeCondition(cluster *v1beta1.PostgresCluster) metav1.Condition {
+	condition := meta.FindStatusCondition(cluster.Status.Conditions,
+		v1beta1.PGTDEVaultProviderReady)
+	if condition == nil {
+		return metav1.Condition{Reason: "<missing>"}
+	}
+	return *condition
+}
+
+// assertTDEProviderCondition checks the status and reason of the
+// PGTDEVaultProviderReady condition.
+func assertTDEProviderCondition(
+	t *testing.T, cluster *v1beta1.PostgresCluster,
+	status metav1.ConditionStatus, reason string,
+) {
+	t.Helper()
+
+	condition := tdeCondition(cluster)
+	assert.Equal(t, string(condition.Status), string(status))
+	assert.Equal(t, condition.Reason, reason)
+}
+
+// assertEvent checks that an event with the given reason was recorded.
+func assertEvent(t *testing.T, recorder record.EventRecorder, reason string) {
+	t.Helper()
+
+	rec, ok := recorder.(*events.Recorder)
+	assert.Assert(t, ok, "expected a testing recorder")
+	for _, event := range rec.Events {
+		if event.Reason == reason {
+			return
+		}
+	}
+	t.Errorf("expected an event with reason %q, got %v", reason, rec.Events)
 }
 
 // failPatch returns a patch function that fails the test when it is called.

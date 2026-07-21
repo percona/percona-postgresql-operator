@@ -533,6 +533,13 @@ const (
 	ProxyAvailable             = "ProxyAvailable"
 	Registered                 = "Registered"
 	PGTDEEnabled               = "PGTDEEnabled"
+
+	// PGTDEVaultProviderReady reports whether the pg_tde vault key provider
+	// matches the configuration in the spec. It is false while a credential
+	// change is in progress and when one has failed. Unlike PGTDEEnabled it
+	// does not influence shared_preload_libraries or Pod contents; it exists
+	// so a stalled credential change is visible to the user.
+	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
 )
 
 type PostgresInstanceSetSpec struct {
