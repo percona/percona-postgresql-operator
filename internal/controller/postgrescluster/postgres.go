@@ -570,7 +570,14 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	}
 
 	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
-	tempRevision, _ := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+	tempRevision, tempErr := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+	if err == nil {
+		// A revision that could not be computed is not a revision to compare
+		// against. Discarding this error let an empty tempRevision match an
+		// empty PGTDERevision below and route a cluster that has never
+		// configured pg_tde into the wrong phase.
+		err = tempErr
+	}
 
 	// Set when the provider change succeeded but the staged credentials could
 	// not be removed afterwards.
@@ -579,6 +586,16 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	var revision string
 	if err == nil {
 		switch {
+		case cluster.Status.PGTDERevision == "":
+			// Initial setup: no provider has been configured, so the Pods
+			// already mount the credentials in the spec and there is nothing to
+			// stage. This is tested first because an empty revision is a state
+			// of its own, not the absence of the two below; leaving it to fall
+			// through let a tempRevision that failed to compute claim it.
+			err = errors.WithStack(
+				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
+			revision = standardRevision
+
 		case cluster.Status.PGTDERevision == tempRevision:
 			// Phase 2: pod restarted with new volume mounted at standard paths.
 			// Change provider from temp paths to persistent mount paths, then
@@ -594,7 +611,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			}
 			revision = standardRevision
 
-		case cluster.Status.PGTDERevision != "":
+		default:
 			// Phase 1: vault config changed, pods still have old credentials.
 			// Stage the new credentials in temp files on /pgdata (persistent
 			// volume) and change the provider to use those paths. The temp
@@ -627,12 +644,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			err = errors.WithStack(
 				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tempTokenPath, tempCAPath))
 			revision = tempRevision
-
-		default:
-			// Initial setup: PGTDERevision is empty, use standard paths.
-			err = errors.WithStack(
-				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
-			revision = standardRevision
 		}
 	}
 
