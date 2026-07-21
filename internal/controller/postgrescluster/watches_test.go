@@ -10,44 +10,12 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllertest"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
-
-func TestWatchClusterSecretsWithoutLabel(t *testing.T) {
-	ctx := t.Context()
-	scheme := runtime.NewScheme()
-	assert.NilError(t, v1beta1.AddToScheme(scheme))
-
-	reconciler := &Reconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(
-		&v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{Name: "hippo", Namespace: "test-ns"}},
-		&v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{Name: "rhino", Namespace: "test-ns"}},
-		&v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{Name: "elephant", Namespace: "other-ns"}},
-	).Build()}
-	queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
-
-	reconciler.watchClusterSecrets().Generic(ctx, event.GenericEvent{
-		Object: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"}},
-	}, queue)
-
-	requests := make(map[reconcile.Request]bool, queue.Len())
-	for queue.Len() > 0 {
-		item, _ := queue.Get()
-		requests[item] = true
-		queue.Done(item)
-	}
-	assert.DeepEqual(t, requests, map[reconcile.Request]bool{
-		{NamespacedName: client.ObjectKey{Namespace: "test-ns", Name: "hippo"}}: true,
-		{NamespacedName: client.ObjectKey{Namespace: "test-ns", Name: "rhino"}}: true,
-	})
-}
 
 func TestWatchCertManagerSecrets(t *testing.T) {
 	ctx := t.Context()

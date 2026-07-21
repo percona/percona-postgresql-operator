@@ -16,15 +16,11 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-// watchClusterSecrets returns a handler.EventHandler for Secrets that have no owner reference.
-//
-// Secrets with a PostgresCluster label enqueue that cluster.
-//
-// Secrets without one enqueue every PostgresCluster in their namespace.
-func (r *Reconciler) watchClusterSecrets() handler.EventHandler {
+// watchClusterSecrets returns a handler.EventHandler for Secrets that are
+// labeled with a PostgresCluster name but intentionally have no owner reference.
+func (*Reconciler) watchClusterSecrets() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		cluster := obj.GetLabels()[naming.LabelCluster]
 		if len(cluster) > 0 {
@@ -35,19 +31,7 @@ func (r *Reconciler) watchClusterSecrets() handler.EventHandler {
 				}},
 			}
 		}
-
-		clusters := &v1beta1.PostgresClusterList{}
-		if err := r.Client.List(ctx, clusters, client.InNamespace(obj.GetNamespace())); err != nil {
-			return nil
-		}
-
-		requests := make([]reconcile.Request, 0, len(clusters.Items))
-		for i := range clusters.Items {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: client.ObjectKeyFromObject(&clusters.Items[i]),
-			})
-		}
-		return requests
+		return nil
 	})
 }
 

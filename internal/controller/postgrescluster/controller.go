@@ -629,7 +629,10 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
-		Watches(&corev1.Secret{}, r.watchClusterSecrets()).
+		Watches(&corev1.Secret{}, r.watchClusterSecrets(), builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			return hasCluster
+		}))).
 		Watches(&corev1.Pod{}, r.watchPods()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},
