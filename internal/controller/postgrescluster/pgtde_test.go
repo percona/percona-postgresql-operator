@@ -1575,3 +1575,71 @@ func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
 		assert.Equal(t, cluster.Status.PGTDERevision, "")
 	})
 }
+
+func TestPGTDEVaultChangeFor(t *testing.T) {
+	t.Parallel()
+
+	vault := tdeVaultSpec()
+	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
+	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+
+	standardRevision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
+	assert.NilError(t, err)
+	tempRevision, err := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
+	assert.NilError(t, err)
+
+	clusterWith := func(revision string) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{}
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+			Enabled: true,
+			Vault:   tdeVaultSpec(),
+		}
+		cluster.Status.PGTDERevision = revision
+		return cluster
+	}
+
+	for _, tc := range []struct {
+		name     string
+		revision string
+		expected pgTDEPhase
+	}{
+		{"InitialSetup", "", pgTDEInitialSetup},
+		{"Configured", standardRevision, pgTDEConfigured},
+		{"Finalize", tempRevision, pgTDEFinalize},
+		{"StageCredentials", "a-revision-from-another-vault", pgTDEStageCredentials},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			change, err := pgTDEVaultChangeFor(clusterWith(tc.revision))
+			assert.NilError(t, err)
+			assert.Equal(t, change.Phase, tc.expected)
+
+			assert.Equal(t, change.TokenPath, tokenPath)
+			assert.Equal(t, change.CAPath, caPath)
+			assert.Equal(t, change.TempTokenPath, tempTokenPath)
+			assert.Equal(t, change.TempCAPath, tempCAPath)
+			assert.Equal(t, change.StandardRevision, standardRevision)
+			assert.Equal(t, change.TempRevision, tempRevision)
+		})
+	}
+
+	// reconcileInstance holds the Pods' vault volume in exactly one phase.
+	// Holding in any other one pins the StatefulSet to credentials the provider
+	// has already moved off of, and the Pods never roll.
+	t.Run("HoldsTheVolumeInOnePhase", func(t *testing.T) {
+		held := map[pgTDEPhase]bool{}
+		for _, revision := range []string{
+			"", standardRevision, tempRevision, "a-revision-from-another-vault",
+		} {
+			change, err := pgTDEVaultChangeFor(clusterWith(revision))
+			assert.NilError(t, err)
+			held[change.Phase] = change.Phase == pgTDEStageCredentials
+		}
+
+		assert.DeepEqual(t, held, map[pgTDEPhase]bool{
+			pgTDEInitialSetup:     false,
+			pgTDEConfigured:       false,
+			pgTDEStageCredentials: true,
+			pgTDEFinalize:         false,
+		})
+	})
+}

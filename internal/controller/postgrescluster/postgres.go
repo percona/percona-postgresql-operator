@@ -546,10 +546,9 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	}
 
 	vault := cluster.Spec.Extensions.PGTDE.Vault
-	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
 
-	standardRevision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
-	if err == nil && standardRevision == cluster.Status.PGTDERevision {
+	change, err := pgTDEVaultChangeFor(cluster)
+	if err == nil && change.Phase == pgTDEConfigured {
 		// The provider matches the spec, so nothing references the credentials
 		// staged for a change and any copy still on a data volume is leftover.
 		// Sweep until the condition says the volumes are clean rather than
@@ -569,47 +568,34 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		return nil
 	}
 
-	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
-	tempRevision, tempErr := pgTDEVaultRevision(vault, tempTokenPath, tempCAPath)
-	if err == nil {
-		// A revision that could not be computed is not a revision to compare
-		// against. Discarding this error let an empty tempRevision match an
-		// empty PGTDERevision below and route a cluster that has never
-		// configured pg_tde into the wrong phase.
-		err = tempErr
-	}
-
 	// Set when the provider change succeeded but the staged credentials could
 	// not be removed afterwards.
 	var cleanupErr error
 
 	var revision string
 	if err == nil {
-		switch {
-		case cluster.Status.PGTDERevision == "":
-			// Initial setup: no provider has been configured, so the Pods
-			// already mount the credentials in the spec and there is nothing to
-			// stage. This is tested first because an empty revision is a state
-			// of its own, not the absence of the two below; leaving it to fall
-			// through let a tempRevision that failed to compute claim it.
-			err = errors.WithStack(
-				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
-			revision = standardRevision
+		switch change.Phase {
+		case pgTDEInitialSetup:
+			// No provider has been configured, so the Pods already mount the
+			// credentials in the spec and there is nothing to stage.
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
+			revision = change.StandardRevision
 
-		case cluster.Status.PGTDERevision == tempRevision:
+		case pgTDEFinalize:
 			// Phase 2: pod restarted with new volume mounted at standard paths.
 			// Change provider from temp paths to persistent mount paths, then
 			// clean up the temp files from /pgdata.
 			log.Info("finalizing vault provider change with standard mount paths")
-			err = errors.WithStack(
-				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tokenPath, caPath))
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
 			if err == nil {
 				// Nothing references the staged credentials now. Removing them
 				// must not fail the change itself, which already succeeded; the
 				// retry above picks up whatever is left behind.
 				cleanupErr = r.cleanupTempFiles(ctx, cluster, pods, allRunning, container)
 			}
-			revision = standardRevision
+			revision = change.StandardRevision
 
 		default:
 			// Phase 1: vault config changed, pods still have old credentials.
@@ -637,13 +623,13 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			log.Info("changing vault provider using temporary credentials",
 				"instances", len(pods))
 			if err = stageVaultCredentials(ctx, r.Client, r.PodExec, cluster.Namespace,
-				vault, pods, container, tempTokenPath, tempCAPath); err != nil {
+				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
 				break
 			}
 
-			err = errors.WithStack(
-				pgtde.ReconcileVaultProvider(ctx, pgExecutor, cluster, tempTokenPath, tempCAPath))
-			revision = tempRevision
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TempTokenPath, change.TempCAPath))
+			revision = change.TempRevision
 		}
 	}
 
@@ -674,7 +660,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	cluster.Status.PGTDERevision = revision
 
-	if revision == tempRevision {
+	if revision == change.TempRevision {
 		// Phase 1 done, phase 2 still pending: the provider currently points at
 		// the staged credentials, not at the ones in the spec.
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
