@@ -95,4 +95,4 @@ kind: PostgresCluster
 metadata:
   name: pg-tde
 status:
-  pgTDERevision: 85f4c65f59
+  pgTDERevision: 6b5b555d8c

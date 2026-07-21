@@ -99,7 +99,7 @@ kind: PostgresCluster
 metadata:
   name: pg-tde
 status:
-  pgTDERevision: 9f64d9447
+  pgTDERevision: 58dc94b68c
 ---
 kind: Job
 apiVersion: batch/v1
