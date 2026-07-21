@@ -777,6 +777,13 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		var calls []execCall
 		cluster := newCluster()
 		cluster.Status.PGTDERevision = standardRevision
+		// Steady state: the revision matches and the last reconcile confirmed
+		// the data volumes hold no staged credentials.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEVaultProviderReady,
+			Status: metav1.ConditionTrue,
+			Reason: "Configured",
+		})
 
 		r := &Reconciler{
 			Recorder: events.NewRecorder(t, runtime.Scheme),
@@ -788,6 +795,65 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
 		assert.Equal(t, len(calls), 0, "a matching revision is a no-op")
+	})
+
+	// A change that fails after staging leaves the new vault token on every
+	// data volume. Reverting the spec makes the stored revision match again,
+	// so nothing else in this function will ever look at those files.
+	t.Run("RevertedAfterFailedChange", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Status.PGTDERevision = standardRevision
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGTDEVaultProviderReady,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ChangeFailed",
+			Message: "permission denied",
+		})
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		patched := 0
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { patched++; return nil }))
+
+		assert.Equal(t, len(calls), 1,
+			"the credentials staged for the abandoned change must be removed")
+		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempTokenPath))
+		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempCAPath))
+
+		// The failure the user already resolved must stop being reported.
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
+		assert.Equal(t, patched, 1)
+	})
+
+	// The revision is only ever stored alongside a condition, so a missing one
+	// means the status was lost rather than that the volumes are known clean.
+	t.Run("RevisionWithoutCondition", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Status.PGTDERevision = standardRevision
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed,
+			func() error { return nil }))
+
+		assert.Equal(t, len(calls), 1,
+			"an unknown state should be swept rather than assumed clean")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
 	})
 
 	t.Run("InitialSetup", func(t *testing.T) {

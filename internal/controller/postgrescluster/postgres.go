@@ -550,12 +550,18 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	standardRevision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
 	if err == nil && standardRevision == cluster.Status.PGTDERevision {
-		// The provider matches the spec. Retry the cleanup of any credentials
-		// a previous reconcile failed to remove, so a transient exec failure
-		// does not leave the vault token on the data volume forever.
+		// The provider matches the spec, so nothing references the credentials
+		// staged for a change and any copy still on a data volume is leftover.
+		// Sweep until the condition says the volumes are clean rather than
+		// looking for the particular reason that left them behind: a cleanup
+		// that failed leaves CredentialsNotRemoved, but a change that failed
+		// after staging and was then reverted leaves ChangeFailed, and both
+		// end here with a vault token sitting in plaintext on every instance.
+		// Sweeping also clears a condition that would otherwise report a
+		// failure the user has already resolved.
 		if condition := meta.FindStatusCondition(cluster.Status.Conditions,
-			v1beta1.PGTDEVaultProviderReady); condition != nil &&
-			condition.Reason == pgTDEReasonCredentialsNotRemoved {
+			v1beta1.PGTDEVaultProviderReady); condition == nil ||
+			condition.Status != metav1.ConditionTrue {
 			r.setVaultProviderCondition(cluster,
 				r.cleanupTempFiles(ctx, cluster, pods, allRunning, container))
 			return patchStatus()
