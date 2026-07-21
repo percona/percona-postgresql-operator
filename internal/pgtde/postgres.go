@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,8 +127,6 @@ func TempVaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, 
 	return tokenPath, caPath
 }
 
-var errAlreadyExists = errors.New("already exists")
-
 func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) error {
 	log := logging.FromContext(ctx)
 
@@ -158,10 +155,6 @@ func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunch
 		log.Info("added pg_tde vault provider", "stdout", stdout, "stderr", stderr)
 	}
 
-	if strings.Contains(stderr, "already exists") {
-		return errAlreadyExists
-	}
-
 	return err
 }
 
@@ -188,10 +181,6 @@ func createGlobalKey(ctx context.Context, exec postgres.Executor, clusterID type
 		log.Info("failed to create global key", "globalKey", globalKey, "stdout", stdout, "stderr", stderr)
 	} else {
 		log.Info("created global key", "globalKey", globalKey, "stdout", stdout, "stderr", stderr)
-	}
-
-	if strings.Contains(stderr, "already exists") {
-		return errAlreadyExists
 	}
 
 	return err
@@ -260,22 +249,47 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 // tokenPath and caPath are the file paths inside the pod where the vault
 // credentials can be read. For initial setup these are the standard volume
 // mount paths; for provider changes they may be temporary file paths.
+//
+// The provider and the global key may already exist even on the initial setup
+// path: a cluster that is deleted and recreated with its PVCs retained, or one
+// where pg_tde was disabled and re-enabled, starts with an empty PGTDERevision
+// but a populated pg_tde state. Rather than interpreting the error text to
+// recognize those cases, each step recovers from a failure by driving the state
+// towards the spec and lets the following step decide whether that worked.
 func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster, tokenPath, caPath string) error {
+	log := logging.FromContext(ctx)
 	vault := cluster.Spec.Extensions.PGTDE.Vault
 
-	if cluster.Status.PGTDERevision == "" {
-		err := addVaultProvider(ctx, exec, vault, tokenPath, caPath)
+	if cluster.Status.PGTDERevision != "" {
+		return changeVaultProvider(ctx, exec, vault, tokenPath, caPath)
+	}
 
-		if err == nil || errors.Is(err, errAlreadyExists) {
-			err = createGlobalKey(ctx, exec, cluster.UID)
+	if addErr := addVaultProvider(ctx, exec, vault, tokenPath, caPath); addErr != nil {
+		// The provider probably exists already. Its configuration belongs to
+		// whatever created it, which may be an older incarnation of this
+		// cluster pointing at a different Vault; overwrite it so it matches
+		// the spec instead of assuming it already does.
+		log.V(1).Info("could not add pg_tde vault provider, rewriting the existing one",
+			"error", addErr.Error())
+
+		if err := changeVaultProvider(ctx, exec, vault, tokenPath, caPath); err != nil {
+			// Neither statement worked, so the provider is not usable. The
+			// failure to add it is the more useful of the two to report.
+			return addErr
 		}
+	}
 
-		if err == nil || errors.Is(err, errAlreadyExists) {
-			err = setDefaultKey(ctx, exec, cluster.UID)
+	// Creating the key fails when it already exists, which is expected for a
+	// recreated cluster. Setting it as the default is the real test of whether
+	// the provider and the key are usable, so defer to that result.
+	createErr := createGlobalKey(ctx, exec, cluster.UID)
+
+	if err := setDefaultKey(ctx, exec, cluster.UID); err != nil {
+		if createErr != nil {
+			return createErr
 		}
-
 		return err
 	}
 
-	return changeVaultProvider(ctx, exec, vault, tokenPath, caPath)
+	return nil
 }

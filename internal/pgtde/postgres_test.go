@@ -139,10 +139,12 @@ func TestAddVaultProvider(t *testing.T) {
 		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 
-	t.Run("already exists", func(t *testing.T) {
+	t.Run("does not interpret stderr", func(t *testing.T) {
 		exec := func(
 			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
+			// psql exits zero, so the statement succeeded no matter what a
+			// NOTICE or a localized message on stderr happens to say.
 			_, _ = stderr.Write([]byte("ERROR: already exists"))
 			return nil
 		}
@@ -157,7 +159,7 @@ func TestAddVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.Assert(t, errors.Is(addVaultProvider(ctx, exec, vault, tokenPath, caPath), errAlreadyExists))
+		assert.NilError(t, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -213,17 +215,19 @@ func TestCreateGlobalKey(t *testing.T) {
 		assert.Equal(t, expected, createGlobalKey(ctx, exec, clusterID))
 	})
 
-	t.Run("already exists", func(t *testing.T) {
+	t.Run("does not interpret stderr", func(t *testing.T) {
 		clusterID := types.UID("test-cluster-uid")
 		exec := func(
 			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
+			// Whether the key already existed is decided by setDefaultKey,
+			// not by reading the message psql printed.
 			_, _ = stderr.Write([]byte("ERROR: already exists"))
 			return nil
 		}
 
 		ctx := t.Context()
-		assert.Assert(t, errors.Is(createGlobalKey(ctx, exec, clusterID), errAlreadyExists))
+		assert.NilError(t, createGlobalKey(ctx, exec, clusterID))
 	})
 }
 
@@ -434,171 +438,162 @@ func TestReconcileVaultProvider(t *testing.T) {
 	}
 	tokenPath, caPath := VaultCredentialPaths(vault)
 
-	t.Run("first time all succeed", func(t *testing.T) {
-		callCount := 0
-		exec := func(
+	// statement names the pg_tde function a psql invocation called, so the
+	// tests below can describe the expected sequence instead of counting.
+	statement := func(sql string) string {
+		for _, name := range []string{
+			"pg_tde_add_global_key_provider_vault_v2",
+			"pg_tde_change_global_key_provider_vault_v2",
+			"pg_tde_create_key_using_global_key_provider",
+			"pg_tde_set_default_key_using_global_key_provider",
+		} {
+			if strings.Contains(sql, name) {
+				return name
+			}
+		}
+		return sql
+	}
+
+	// execSequence returns an Executor that records the pg_tde function each
+	// call ran and fails the calls named in failures.
+	execSequence := func(called *[]string, failures map[string]error) postgres.Executor {
+		return func(
 			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
-			callCount++
-			return nil
-		}
+			b, err := io.ReadAll(stdin)
+			assert.NilError(t, err)
 
-		ctx := t.Context()
+			name := statement(string(b))
+			*called = append(*called, name)
+			return failures[name]
+		}
+	}
+
+	newCluster := func(revision string) *crunchyv1beta1.PostgresCluster {
 		cluster := &crunchyv1beta1.PostgresCluster{}
 		cluster.Spec.Extensions.PGTDE.Vault = vault
+		cluster.Status.PGTDERevision = revision
 		cluster.UID = "test-uid"
+		return cluster
+	}
 
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
+	t.Run("initial setup", func(t *testing.T) {
+		var called []string
+		err := ReconcileVaultProvider(t.Context(), execSequence(&called, nil),
+			newCluster(""), tokenPath, caPath)
+
 		assert.NilError(t, err)
-		assert.Equal(t, callCount, 3)
+		assert.DeepEqual(t, called, []string{
+			"pg_tde_add_global_key_provider_vault_v2",
+			"pg_tde_create_key_using_global_key_provider",
+			"pg_tde_set_default_key_using_global_key_provider",
+		})
 	})
 
-	t.Run("first time addVaultProvider fails", func(t *testing.T) {
-		expected := errors.New("vault error")
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return expected
-		}
+	t.Run("existing provider is rewritten", func(t *testing.T) {
+		// A cluster recreated on retained PVCs: the provider is already there,
+		// possibly pointing at a different Vault than the spec asks for.
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_add_global_key_provider_vault_v2": errors.New("already exists"),
+			}),
+			newCluster(""), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
-		assert.Equal(t, expected, err)
-	})
-
-	t.Run("first time addVaultProvider already exists proceeds", func(t *testing.T) {
-		callCount := 0
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			callCount++
-			if callCount == 1 {
-				_, _ = stderr.Write([]byte("already exists"))
-				return nil
-			}
-			return nil
-		}
-
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
-		assert.Equal(t, callCount, 3)
+		assert.DeepEqual(t, called, []string{
+			"pg_tde_add_global_key_provider_vault_v2",
+			// The existing provider must be overwritten rather than trusted
+			// to match the spec.
+			"pg_tde_change_global_key_provider_vault_v2",
+			"pg_tde_create_key_using_global_key_provider",
+			"pg_tde_set_default_key_using_global_key_provider",
+		})
 	})
 
-	t.Run("first time createGlobalKey fails", func(t *testing.T) {
-		expected := errors.New("key error")
-		callCount := 0
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			callCount++
-			if callCount == 2 {
-				return expected
-			}
-			return nil
-		}
+	t.Run("provider unusable", func(t *testing.T) {
+		// Neither statement works, so this is not an "already exists" case.
+		addErr := errors.New("vault is unreachable")
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_add_global_key_provider_vault_v2":    addErr,
+				"pg_tde_change_global_key_provider_vault_v2": errors.New("no such provider"),
+			}),
+			newCluster(""), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
-		assert.Equal(t, expected, err)
-		assert.Equal(t, callCount, 2)
+		assert.Equal(t, addErr, err, "the failure to add the provider is the useful one")
+		assert.DeepEqual(t, called, []string{
+			"pg_tde_add_global_key_provider_vault_v2",
+			"pg_tde_change_global_key_provider_vault_v2",
+		})
 	})
 
-	t.Run("first time createGlobalKey already exists proceeds", func(t *testing.T) {
-		callCount := 0
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			callCount++
-			if callCount == 2 {
-				_, _ = stderr.Write([]byte("already exists"))
-				return nil
-			}
-			return nil
-		}
+	t.Run("existing key", func(t *testing.T) {
+		// Creating the key fails because it is already there; setting it as
+		// the default proves the state is good.
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_create_key_using_global_key_provider": errors.New("already exists"),
+			}),
+			newCluster(""), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
-		assert.Equal(t, callCount, 3)
+		assert.DeepEqual(t, called, []string{
+			"pg_tde_add_global_key_provider_vault_v2",
+			"pg_tde_create_key_using_global_key_provider",
+			"pg_tde_set_default_key_using_global_key_provider",
+		})
 	})
 
-	t.Run("first time setDefaultKey fails", func(t *testing.T) {
-		expected := errors.New("default key error")
-		callCount := 0
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			callCount++
-			if callCount == 3 {
-				return expected
-			}
-			return nil
-		}
+	t.Run("key unusable", func(t *testing.T) {
+		createErr := errors.New("permission denied")
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_create_key_using_global_key_provider":      createErr,
+				"pg_tde_set_default_key_using_global_key_provider": errors.New("key not found"),
+			}),
+			newCluster(""), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.UID = "test-uid"
+		assert.Equal(t, createErr, err,
+			"the failure to create the key is the root cause, not the failure to use it")
+	})
 
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
-		assert.Equal(t, expected, err)
-		assert.Equal(t, callCount, 3)
+	t.Run("set default key fails", func(t *testing.T) {
+		setErr := errors.New("default key error")
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_set_default_key_using_global_key_provider": setErr,
+			}),
+			newCluster(""), tokenPath, caPath)
+
+		assert.Equal(t, setErr, err)
 	})
 
 	t.Run("revision set calls changeVaultProvider", func(t *testing.T) {
-		callCount := 0
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			callCount++
-			b, _ := io.ReadAll(stdin)
-			assert.Assert(t, strings.Contains(string(b), "pg_tde_change_global_key_provider_vault_v2"))
-			return nil
-		}
+		var called []string
+		err := ReconcileVaultProvider(t.Context(), execSequence(&called, nil),
+			newCluster("some-revision"), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.Status.PGTDERevision = "some-revision"
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
 		assert.NilError(t, err)
-		assert.Equal(t, callCount, 1)
+		assert.DeepEqual(t, called, []string{
+			"pg_tde_change_global_key_provider_vault_v2",
+		})
 	})
 
 	t.Run("revision set changeVaultProvider fails", func(t *testing.T) {
 		expected := errors.New("change error")
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return expected
-		}
+		var called []string
+		err := ReconcileVaultProvider(t.Context(),
+			execSequence(&called, map[string]error{
+				"pg_tde_change_global_key_provider_vault_v2": expected,
+			}),
+			newCluster("some-revision"), tokenPath, caPath)
 
-		ctx := t.Context()
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Vault = vault
-		cluster.Status.PGTDERevision = "some-revision"
-		cluster.UID = "test-uid"
-
-		err := ReconcileVaultProvider(ctx, exec, cluster, tokenPath, caPath)
-		assert.Equal(t, expected, err)
+		assert.Equal(t, expected, err,
+			"an existing cluster must not silently fall back to adding a provider")
 	})
 }
