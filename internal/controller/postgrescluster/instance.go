@@ -1244,8 +1244,11 @@ func (r *Reconciler) reconcileInstance(
 		// temp-file-based provider change SQL runs. After phase 1, the
 		// revision matches tempRevision, so we release the hold and let
 		// the volume update trigger a pod restart for phase 2.
-		if observed != nil && observed.Runner != nil &&
-			cluster.Spec.Extensions.PGTDE.Vault != nil &&
+		//
+		// The volume has to come from "existing": observed.Runner is this very
+		// StatefulSet, which was emptied and regenerated above, so reading the
+		// old volume from it would copy the new volume onto itself.
+		if cluster.Spec.Extensions.PGTDE.Vault != nil &&
 			cluster.Status.PGTDERevision != "" {
 			vault := cluster.Spec.Extensions.PGTDE.Vault
 			tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
@@ -1255,7 +1258,7 @@ func (r *Reconciler) reconcileInstance(
 
 			if cluster.Status.PGTDERevision != standardRev &&
 				cluster.Status.PGTDERevision != tempRev {
-				preserveOldTDEVolume(&instance.Spec.Template.Spec, observed.Runner)
+				preserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
 			}
 		}
 
@@ -1509,15 +1512,17 @@ func pgTDEVaultRevision(vault *v1beta1.PGTDEVaultSpec, tokenPath, caPath string)
 	})
 }
 
-// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with
-// the one from the currently running StatefulSet. This prevents pods from
-// restarting with new vault credentials before the vault provider change
-// SQL has been executed.
-func preserveOldTDEVolume(podSpec *corev1.PodSpec, runner *appsv1.StatefulSet) {
+// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with the
+// one from the StatefulSet as it exists in the cluster. This prevents pods from
+// restarting with new vault credentials before the vault provider change SQL
+// has been executed. Pass the StatefulSet read from the API server, not the one
+// being generated: reconcileInstance regenerates its argument in place, so by
+// the time the pod spec is built the two are the same object.
+func preserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet) {
 	var oldVolume *corev1.Volume
-	for i := range runner.Spec.Template.Spec.Volumes {
-		if runner.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
-			oldVolume = &runner.Spec.Template.Spec.Volumes[i]
+	for i := range existing.Spec.Template.Spec.Volumes {
+		if existing.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
+			oldVolume = &existing.Spec.Template.Spec.Volumes[i]
 			break
 		}
 	}

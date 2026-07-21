@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +25,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
+	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -253,6 +256,131 @@ func TestPreserveOldTDEVolume(t *testing.T) {
 			"the old volume should not be grafted onto a Pod that has none")
 		assert.Equal(t, podSpec.Volumes[0].Name, "pgdata")
 	})
+}
+
+// TestScaleUpInstancesPreservesTDEVolume covers the wiring around
+// preserveOldTDEVolume rather than the helper itself. scaleUpInstances passes
+// the observed StatefulSet as the intent to build into, and reconcileInstance
+// empties that object before generating the new Pod spec. Reading the old
+// volume from the observed instance therefore copies the new volume onto
+// itself, and every unit test of the helper still passes because it builds the
+// two objects separately.
+func TestScaleUpInstancesPreservesTDEVolume(t *testing.T) {
+	ctx := context.Background()
+	_, cc := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+
+	ns := setupNamespace(t, cc)
+
+	r := &Reconciler{
+		Client:   cc,
+		Owner:    client.FieldOwner(t.Name()),
+		Recorder: new(record.FakeRecorder),
+		Tracer:   otel.Tracer(t.Name()),
+	}
+
+	rootCA, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+
+	vaultWith := func(secretName string) *v1beta1.PGTDEVaultSpec {
+		return &v1beta1.PGTDEVaultSpec{
+			Host:        "https://vault.example.com:8200",
+			MountPath:   "secret/data",
+			TokenSecret: v1beta1.PGTDESecretObjectReference{Name: secretName, Key: "token"},
+		}
+	}
+
+	cluster := testCluster()
+	cluster.Namespace = ns.Name
+	cluster.Spec.PostgresVersion = 17
+	cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+		Enabled: true,
+		Vault:   vaultWith("vault-old"),
+	}
+	assert.NilError(t, cluster.Default(ctx, nil))
+	assert.NilError(t, cc.Create(ctx, cluster))
+
+	set := &cluster.Spec.InstanceSets[0]
+
+	// observe lists the StatefulSets the previous round applied, the way
+	// Reconcile does at the top of each pass.
+	observe := func() *observedInstances {
+		t.Helper()
+		var runners appsv1.StatefulSetList
+		assert.NilError(t, cc.List(ctx, &runners, client.InNamespace(ns.Name)))
+		return newObservedInstances(cluster, runners.Items, nil)
+	}
+
+	scaleUp := func(observed *observedInstances) {
+		t.Helper()
+		object := func(name string) metav1.ObjectMeta {
+			return metav1.ObjectMeta{Namespace: ns.Name, Name: name}
+		}
+		_, err := r.scaleUpInstances(ctx, cluster, observed, set,
+			&corev1.ConfigMap{ObjectMeta: object("cluster-config")},
+			&corev1.Secret{ObjectMeta: object("cluster-replication")},
+			rootCA,
+			&corev1.Service{ObjectMeta: object("cluster-pods")},
+			&corev1.ServiceAccount{ObjectMeta: object("cluster-instance")},
+			&corev1.Service{ObjectMeta: object("cluster-ha")},
+			clusterCertSecretProjection(&corev1.Secret{ObjectMeta: object("cluster-cert")}),
+			nil, 1, nil, nil, nil, false)
+		assert.NilError(t, err)
+	}
+
+	// appliedTokenSecret returns the Secret projected into the pg-tde volume of
+	// the instance StatefulSet as it exists in the API.
+	appliedTokenSecret := func() string {
+		t.Helper()
+		var runners appsv1.StatefulSetList
+		assert.NilError(t, cc.List(ctx, &runners, client.InNamespace(ns.Name)))
+		assert.Equal(t, len(runners.Items), 1)
+
+		for _, volume := range runners.Items[0].Spec.Template.Spec.Volumes {
+			if volume.Name == naming.PGTDEVolume {
+				return volume.Projected.Sources[0].Secret.Name
+			}
+		}
+		t.Fatalf("no %q volume in %v", naming.PGTDEVolume,
+			runners.Items[0].Spec.Template.Spec.Volumes)
+		return ""
+	}
+
+	// revisionFor is the value reconcilePGTDEProviders stores in
+	// Status.PGTDERevision once the provider names the given paths.
+	revisionFor := func(vault *v1beta1.PGTDEVaultSpec, temp bool) string {
+		t.Helper()
+		paths := pgtde.VaultCredentialPaths
+		if temp {
+			paths = pgtde.TempVaultCredentialPaths
+		}
+		tokenPath, caPath := paths(vault)
+		revision, err := pgTDEVaultRevision(vault, tokenPath, caPath)
+		assert.NilError(t, err)
+		return revision
+	}
+
+	// Initial setup: no provider has been configured, so there is nothing to
+	// hold and the Pod gets the Secret named in the spec.
+	scaleUp(observe())
+	assert.Equal(t, appliedTokenSecret(), "vault-old")
+
+	cluster.Status.PGTDERevision = revisionFor(vaultWith("vault-old"), false)
+
+	// The user points pg_tde at a different Vault token. Until phase 1 has run
+	// the provider still names the old credentials, so the Pod has to keep
+	// mounting them; rolling now would leave pg_tde unable to fetch its key.
+	cluster.Spec.Extensions.PGTDE.Vault = vaultWith("vault-new")
+	scaleUp(observe())
+	assert.Equal(t, appliedTokenSecret(), "vault-old",
+		"the vault volume should be held until the provider change has run")
+
+	// Phase 1 has run: the provider now names the staged credentials on the
+	// data volume, so the hold is released and the Pods roll.
+	cluster.Status.PGTDERevision = revisionFor(vaultWith("vault-new"), true)
+	scaleUp(observe())
+	assert.Equal(t, appliedTokenSecret(), "vault-new",
+		"the hold should be released once the provider names the staged credentials")
 }
 
 func TestStageVaultCredentials(t *testing.T) {
