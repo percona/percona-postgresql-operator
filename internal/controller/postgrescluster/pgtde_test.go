@@ -845,3 +845,130 @@ func argsContain(command []string, arg string) bool {
 	}
 	return false
 }
+
+func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// newCluster returns a cluster that reconcilePostgresDatabases will act on.
+	newCluster := func(enabled bool) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns1", Name: "pgc1", UID: "the-uid",
+				Labels: map[string]string{naming.LabelVersion: "17.2.0"},
+			},
+		}
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{Enabled: enabled}
+		return cluster
+	}
+
+	observed := func() *observedInstances {
+		return &observedInstances{forCluster: []*Instance{tdeInstance(nil)}}
+	}
+
+	// pgTDECondition reports the PGTDEEnabled condition, which decides whether
+	// pg_tde goes into shared_preload_libraries and whether the vault volume is
+	// mounted.
+	pgTDECondition := func(cluster *v1beta1.PostgresCluster) *metav1.Condition {
+		return meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEEnabled)
+	}
+
+	t.Run("InstallFailureIsNotReportedAsEnabled", func(t *testing.T) {
+		cluster := newCluster(true)
+		calls := 0
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				b, err := io.ReadAll(stdin)
+				assert.NilError(t, err)
+				if strings.Contains(string(b), "pg_tde") {
+					calls++
+					return errors.New("could not open extension control file")
+				}
+				return nil
+			},
+		}
+
+		// The failure is folded into the "OK" flags rather than returned, the
+		// same way the other extensions handle theirs; it withholds the
+		// DatabaseRevision so the next reconcile retries.
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(), failPatch(t)))
+		assert.Equal(t, calls, 1, "only the real run reaches PodExec")
+
+		// The regression: the hash run executes the same statements against a
+		// fake executor that cannot fail, and used to flip this to True before
+		// CREATE EXTENSION had been attempted.
+		condition := pgTDECondition(cluster)
+		assert.Assert(t, condition == nil || condition.Status != metav1.ConditionTrue,
+			"pg_tde must not be reported as enabled when CREATE EXTENSION failed")
+		assertEvent(t, r.Recorder, "PGTDEInstallFailed")
+		assert.Equal(t, cluster.Status.DatabaseRevision, "")
+	})
+
+	t.Run("SuccessIsReported", func(t *testing.T) {
+		cluster := newCluster(true)
+		patched := 0
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				return nil
+			},
+		}
+
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(),
+			func() error { patched++; return nil }))
+
+		condition := pgTDECondition(cluster)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionTrue)
+		assert.Assert(t, cluster.Status.DatabaseRevision != "")
+		assert.Equal(t, patched, 1)
+	})
+
+	t.Run("NothingIsReportedWithoutAWritablePod", func(t *testing.T) {
+		cluster := newCluster(true)
+
+		instance := tdeInstance(nil)
+		instance.Pods[0].Annotations["status"] = `{"role":"replica"}`
+
+		r := &Reconciler{Recorder: events.NewRecorder(t, runtime.Scheme)}
+
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster,
+			&observedInstances{forCluster: []*Instance{instance}}, failPatch(t)))
+		assert.Assert(t, pgTDECondition(cluster) == nil,
+			"no SQL ran, so there is nothing to report")
+	})
+
+	t.Run("DisableIsReportedOnlyAfterItRuns", func(t *testing.T) {
+		cluster := newCluster(false)
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: func(ctx context.Context, namespace, pod, container string,
+				stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				b, err := io.ReadAll(stdin)
+				assert.NilError(t, err)
+				if strings.Contains(string(b), "pg_tde") {
+					return errors.New("cannot drop extension")
+				}
+				return nil
+			},
+		}
+
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster, observed(), failPatch(t)))
+		assert.Equal(t, cluster.Status.DatabaseRevision, "", "the drop must be retried")
+
+		// Reporting False here would strip pg_tde from shared_preload_libraries
+		// and restart the Pods while the extension is still installed.
+		assert.Assert(t, pgTDECondition(cluster) == nil,
+			"a failed DROP EXTENSION must not be reported as disabled")
+		assertEvent(t, r.Recorder, "PGTDEDisableFailed")
+	})
+}

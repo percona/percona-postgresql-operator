@@ -259,6 +259,13 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
 	// K8SPG-375, K8SPG-577, K8SPG-699, K8SPG-911
 	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, pgCronOK, setUserOK, pgTdeOK, postgisInstallOK bool
+
+	// K8SPG-911: create runs twice, once against a fake executor to hash the
+	// statements and once for real. Only the real run may be reported, so its
+	// result is kept separately from the flag above.
+	var pgTdeRan bool
+	var pgTdeErr error
+
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -370,7 +377,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		}
 
 		// K8SPG-911
-		pgTdeOK = pgtde.ReconcileExtension(ctx, exec, r.Recorder, cluster) == nil
+		pgTdeRan, pgTdeErr = true, pgtde.ReconcileExtension(ctx, exec, cluster)
+		pgTdeOK = pgTdeErr == nil
 
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
@@ -412,8 +420,20 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// Apply the necessary SQL and record its hash in cluster.Status. Include
 	// the hash in any log messages.
 	if err == nil {
+		// Forget what the hash run observed; those statements were never sent
+		// to PostgreSQL.
+		pgTdeRan, pgTdeErr = false, nil
+
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
+	}
+
+	// K8SPG-911: report pg_tde only when it really ran. The PGTDEEnabled
+	// condition gates shared_preload_libraries and the vault volume, so
+	// claiming the extension exists before CREATE EXTENSION has succeeded
+	// sends the operator on to configure a key provider that cannot work.
+	if pgTdeRan {
+		pgtde.ReportExtension(cluster, r.Recorder, pgTdeErr)
 	}
 
 	// K8SPG-472

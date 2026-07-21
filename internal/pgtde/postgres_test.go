@@ -328,70 +328,58 @@ func TestChangeVaultProvider(t *testing.T) {
 }
 
 func TestReconcileExtension(t *testing.T) {
-	t.Run("disabled successfully", func(t *testing.T) {
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return nil
+	// ReconcileExtension must stay free of side effects on the cluster: the
+	// controller runs it against a fake executor to hash the SQL it would send.
+	t.Run("reports nothing", func(t *testing.T) {
+		for _, enabled := range []bool{true, false} {
+			var sql string
+			exec := func(
+				_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+			) error {
+				b, err := io.ReadAll(stdin)
+				assert.NilError(t, err)
+				sql = string(b)
+				return nil
+			}
+
+			cluster := &crunchyv1beta1.PostgresCluster{}
+			cluster.Spec.Extensions.PGTDE.Enabled = enabled
+
+			assert.NilError(t, ReconcileExtension(t.Context(), exec, cluster))
+			assert.Equal(t, len(cluster.Status.Conditions), 0,
+				"a dry run must not claim pg_tde reached any state")
+
+			if enabled {
+				assert.Assert(t, strings.Contains(sql, "CREATE EXTENSION IF NOT EXISTS pg_tde"))
+			} else {
+				assert.Assert(t, strings.Contains(sql, "DROP EXTENSION IF EXISTS pg_tde"))
+			}
 		}
-
-		ctx := t.Context()
-		recorder := record.NewFakeRecorder(10)
-		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Enabled = false
-		cluster.Generation = 1
-
-		err := ReconcileExtension(ctx, exec, recorder, cluster)
-		assert.NilError(t, err)
-
-		condition := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
-		assert.Assert(t, condition != nil)
-		assert.Equal(t, condition.Status, metav1.ConditionFalse)
-		assert.Equal(t, condition.Reason, "Disabled")
-		assert.Equal(t, condition.Message, "pg_tde is disabled in PerconaPGCluster")
-		assert.Equal(t, condition.ObservedGeneration, int64(1))
 	})
 
-	t.Run("disable error records event", func(t *testing.T) {
-		expected := errors.New("disable failed")
+	t.Run("propagates errors", func(t *testing.T) {
+		expected := errors.New("whoops")
 		exec := func(
 			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
 		) error {
 			return expected
 		}
 
-		ctx := t.Context()
-		recorder := record.NewFakeRecorder(10)
 		cluster := &crunchyv1beta1.PostgresCluster{}
-		cluster.Spec.Extensions.PGTDE.Enabled = false
+		cluster.Spec.Extensions.PGTDE.Enabled = true
 
-		err := ReconcileExtension(ctx, exec, recorder, cluster)
-		assert.Equal(t, expected, err)
-
-		select {
-		case event := <-recorder.Events:
-			assert.Assert(t, strings.Contains(event, "pgTdeEnabled"))
-			assert.Assert(t, strings.Contains(event, "Unable to disable pg_tde"))
-		default:
-			t.Fatal("expected event to be recorded")
-		}
+		assert.Equal(t, expected, ReconcileExtension(t.Context(), exec, cluster))
 	})
+}
 
+func TestReportExtension(t *testing.T) {
 	t.Run("enabled successfully", func(t *testing.T) {
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return nil
-		}
-
-		ctx := t.Context()
 		recorder := record.NewFakeRecorder(10)
 		cluster := &crunchyv1beta1.PostgresCluster{}
 		cluster.Spec.Extensions.PGTDE.Enabled = true
 		cluster.Generation = 2
 
-		err := ReconcileExtension(ctx, exec, recorder, cluster)
-		assert.NilError(t, err)
+		ReportExtension(cluster, recorder, nil)
 
 		condition := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
 		assert.Assert(t, condition != nil)
@@ -401,29 +389,73 @@ func TestReconcileExtension(t *testing.T) {
 		assert.Equal(t, condition.ObservedGeneration, int64(2))
 	})
 
-	t.Run("enable error records event", func(t *testing.T) {
-		expected := errors.New("enable failed")
-		exec := func(
-			_ context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
-		) error {
-			return expected
-		}
+	t.Run("disabled successfully", func(t *testing.T) {
+		recorder := record.NewFakeRecorder(10)
+		cluster := &crunchyv1beta1.PostgresCluster{}
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+		cluster.Generation = 1
 
-		ctx := t.Context()
+		ReportExtension(cluster, recorder, nil)
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionFalse)
+		assert.Equal(t, condition.Reason, "Disabled")
+		assert.Equal(t, condition.Message, "pg_tde is disabled in PerconaPGCluster")
+		assert.Equal(t, condition.ObservedGeneration, int64(1))
+	})
+
+	t.Run("install error records event", func(t *testing.T) {
 		recorder := record.NewFakeRecorder(10)
 		cluster := &crunchyv1beta1.PostgresCluster{}
 		cluster.Spec.Extensions.PGTDE.Enabled = true
 
-		err := ReconcileExtension(ctx, exec, recorder, cluster)
-		assert.Equal(t, expected, err)
+		ReportExtension(cluster, recorder, errors.New("enable failed"))
 
 		select {
 		case event := <-recorder.Events:
-			assert.Assert(t, strings.Contains(event, "pgTdeDisabled"))
+			assert.Assert(t, strings.Contains(event, "PGTDEInstallFailed"))
 			assert.Assert(t, strings.Contains(event, "Unable to install pg_tde"))
 		default:
 			t.Fatal("expected event to be recorded")
 		}
+
+		assert.Equal(t, len(cluster.Status.Conditions), 0,
+			"a failed CREATE EXTENSION must not report pg_tde as enabled")
+	})
+
+	t.Run("disable error records event", func(t *testing.T) {
+		recorder := record.NewFakeRecorder(10)
+		cluster := &crunchyv1beta1.PostgresCluster{}
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+
+		ReportExtension(cluster, recorder, errors.New("disable failed"))
+
+		select {
+		case event := <-recorder.Events:
+			assert.Assert(t, strings.Contains(event, "PGTDEDisableFailed"))
+			assert.Assert(t, strings.Contains(event, "Unable to disable pg_tde"))
+		default:
+			t.Fatal("expected event to be recorded")
+		}
+	})
+
+	t.Run("failure keeps the previous condition", func(t *testing.T) {
+		recorder := record.NewFakeRecorder(10)
+		cluster := &crunchyv1beta1.PostgresCluster{}
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+
+		// pg_tde is installed; the user asked to disable it and DROP failed.
+		ReportExtension(cluster, recorder, nil)
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+		ReportExtension(cluster, recorder, nil)
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+		ReportExtension(cluster, recorder, errors.New("nope"))
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionTrue,
+			"the extension is still installed, so it must stay in shared_preload_libraries")
 	})
 }
 

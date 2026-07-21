@@ -66,40 +66,53 @@ func disableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-func ReconcileExtension(ctx context.Context, exec postgres.Executor, record record.EventRecorder, cluster *crunchyv1beta1.PostgresCluster) error {
+// ReconcileExtension installs or drops the pg_tde extension according to the
+// spec. It only runs SQL and reports the result: callers run it speculatively
+// against a fake executor to hash the statements it would send, so it must not
+// touch the cluster's status or record events. Pass the result of a real
+// execution to ReportExtension to do that.
+func ReconcileExtension(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
 	if !cluster.Spec.Extensions.PGTDE.Enabled {
-		err := disableInPostgreSQL(ctx, exec)
-		if err != nil {
-			record.Event(cluster, corev1.EventTypeWarning, "pgTdeEnabled", "Unable to disable pg_tde")
-			return err
-		}
-
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:               crunchyv1beta1.PGTDEEnabled,
-			Status:             metav1.ConditionFalse,
-			Reason:             "Disabled",
-			Message:            "pg_tde is disabled in PerconaPGCluster",
-			ObservedGeneration: cluster.GetGeneration(),
-		})
-
-		return nil
+		return disableInPostgreSQL(ctx, exec)
 	}
 
-	err := enableInPostgreSQL(ctx, exec)
+	return enableInPostgreSQL(ctx, exec)
+}
+
+// ReportExtension records the outcome of a ReconcileExtension call that really
+// ran against PostgreSQL. The PGTDEEnabled condition decides whether pg_tde is
+// in shared_preload_libraries and whether instance Pods carry the vault volume,
+// so it must only be set from an execution that actually happened.
+func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.EventRecorder, err error) {
+	enabled := cluster.Spec.Extensions.PGTDE.Enabled
+
 	if err != nil {
-		record.Event(cluster, corev1.EventTypeWarning, "pgTdeDisabled", "Unable to install pg_tde")
-		return err
+		// Leave the condition alone: a failed DROP means the extension is
+		// still installed, and a failed CREATE means whatever was there
+		// before still is.
+		if enabled {
+			record.Event(cluster, corev1.EventTypeWarning,
+				"PGTDEInstallFailed", "Unable to install pg_tde")
+		} else {
+			record.Event(cluster, corev1.EventTypeWarning,
+				"PGTDEDisableFailed", "Unable to disable pg_tde")
+		}
+		return
 	}
 
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+	condition := metav1.Condition{
 		Type:               crunchyv1beta1.PGTDEEnabled,
 		Status:             metav1.ConditionTrue,
 		Reason:             "Enabled",
 		Message:            "pg_tde is enabled in PerconaPGCluster",
 		ObservedGeneration: cluster.GetGeneration(),
-	})
-
-	return nil
+	}
+	if !enabled {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "Disabled"
+		condition.Message = "pg_tde is disabled in PerconaPGCluster"
+	}
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
