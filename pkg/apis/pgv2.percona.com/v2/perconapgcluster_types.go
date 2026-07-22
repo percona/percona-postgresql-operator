@@ -314,6 +314,10 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.AutoCreateUserSchema = new(true)
 	}
 
+	if cr.CompareVersion("3.1.0") >= 0 && cr.Spec.Backups.Enabled == nil {
+		cr.Spec.Backups.Enabled = new(true)
+	}
+
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
 		cr.Spec.Config = &crunchyv1beta1.PostgresConfigSpec{}
 	}
@@ -642,6 +646,9 @@ type Patroni struct {
 // Backups struct.
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
+	// Enabled controls whether backups are enabled for the cluster.
+	// Defaulted to true by the operator for crVersion >= 3.1.0.
+	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// pgBackRest archive configuration
@@ -1226,6 +1233,11 @@ type PGBouncerSpec struct {
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
 
+	// K8SPG-952
+	// Additional CA bundles that PgBouncer should trust when verifying client certificates.
+	// Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+	AdditionalTrustedCAs []corev1.LocalObjectReference `json:"additionalTrustedCAs,omitempty"`
+
 	// Allow SUPERUSERs to connect through PGBouncer.
 	// +optional
 	ExposeSuperusers bool `json:"exposeSuperusers,omitempty"`
@@ -1324,6 +1336,7 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		UsersSecret:               p.UsersSecret,
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
+		AdditionalTrustedCAs:      p.AdditionalTrustedCAs,
 	}
 
 	spec.Default()

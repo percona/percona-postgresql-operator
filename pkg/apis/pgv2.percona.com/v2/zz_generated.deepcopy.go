@@ -363,6 +363,11 @@ func (in *PGBouncerSpec) DeepCopyInto(out *PGBouncerSpec) {
 		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AdditionalTrustedCAs != nil {
+		in, out := &in.AdditionalTrustedCAs, &out.AdditionalTrustedCAs
+		*out = make([]corev1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(int32)
