@@ -2,12 +2,12 @@ package pgtde
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -545,16 +545,16 @@ func TestReconcileVaultProvider(t *testing.T) {
 
 	t.Run("provider unusable", func(t *testing.T) {
 		// Neither statement works, so this is not an "already exists" case.
-		addErr := errors.New("vault is unreachable")
+		expectedErr := errors.New("add vault provider: vault is unreachable")
 		var called []string
 		err := ReconcileVaultProvider(t.Context(),
 			execSequence(&called, map[string]error{
-				"pg_tde_add_global_key_provider_vault_v2":    addErr,
+				"pg_tde_add_global_key_provider_vault_v2":    errors.New("vault is unreachable"),
 				"pg_tde_change_global_key_provider_vault_v2": errors.New("no such provider"),
 			}),
 			newCluster(""), tokenPath, caPath)
 
-		assert.Equal(t, addErr, err, "the failure to add the provider is the useful one")
+		assert.Equal(t, expectedErr.Error(), err.Error())
 		assert.DeepEqual(t, called, []string{
 			"pg_tde_add_global_key_provider_vault_v2",
 			"pg_tde_change_global_key_provider_vault_v2",
@@ -580,29 +580,28 @@ func TestReconcileVaultProvider(t *testing.T) {
 	})
 
 	t.Run("key unusable", func(t *testing.T) {
-		createErr := errors.New("permission denied")
+		expectedErr := errors.New("create global key: permission denied")
 		var called []string
 		err := ReconcileVaultProvider(t.Context(),
 			execSequence(&called, map[string]error{
-				"pg_tde_create_key_using_global_key_provider":      createErr,
+				"pg_tde_create_key_using_global_key_provider":      errors.New("permission denied"),
 				"pg_tde_set_default_key_using_global_key_provider": errors.New("key not found"),
 			}),
 			newCluster(""), tokenPath, caPath)
 
-		assert.Equal(t, createErr, err,
-			"the failure to create the key is the root cause, not the failure to use it")
+		assert.Equal(t, expectedErr.Error(), err.Error())
 	})
 
 	t.Run("set default key fails", func(t *testing.T) {
-		setErr := errors.New("default key error")
+		expectedErr := errors.New("set default key: oops")
 		var called []string
 		err := ReconcileVaultProvider(t.Context(),
 			execSequence(&called, map[string]error{
-				"pg_tde_set_default_key_using_global_key_provider": setErr,
+				"pg_tde_set_default_key_using_global_key_provider": errors.New("oops"),
 			}),
 			newCluster(""), tokenPath, caPath)
 
-		assert.Equal(t, setErr, err)
+		assert.Equal(t, expectedErr.Error(), err.Error())
 	})
 
 	t.Run("revision set calls changeVaultProvider", func(t *testing.T) {

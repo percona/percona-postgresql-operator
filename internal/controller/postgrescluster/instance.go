@@ -1244,12 +1244,8 @@ func (r *Reconciler) reconcileInstance(
 		// name. Rolling now would leave pg_tde reading a token the provider was
 		// never told about. Once phase 1 lands, the phase moves on and the
 		// volume updates, which is what restarts the Pods for phase 2.
-		//
-		// The volume has to come from "existing": observed.Runner is this very
-		// StatefulSet, which was emptied and regenerated above, so reading the
-		// old volume from it would copy the new volume onto itself.
 		if cluster.Spec.Extensions.PGTDE.Vault != nil {
-			change, changeErr := pgTDEVaultChangeFor(cluster)
+			change, changeErr := pgtde.VaultChangeFor(cluster)
 			if changeErr != nil {
 				// Without the revisions there is no way to tell a pending
 				// change from a settled one. Hold the volume: a Pod that keeps
@@ -1257,8 +1253,8 @@ func (r *Reconciler) reconcileInstance(
 				// cannot get them back.
 				log.Error(changeErr, "keeping the pg_tde vault volume")
 			}
-			if changeErr != nil || change.Phase == pgTDEStageCredentials {
-				preserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+			if changeErr != nil || change.Phase == pgtde.StageCredentials {
+				pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
 			}
 		}
 
@@ -1497,126 +1493,6 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// of propagation to existing pods when the CRD is updated:
 	// https://github.com/kubernetes/kubernetes/issues/88456
 	sts.Spec.Template.Spec.ImagePullSecrets = cluster.Spec.ImagePullSecrets
-}
-
-// pgTDEPhase is where a cluster stands in the two-phase vault credential change
-// described on reconcilePGTDEProviders.
-type pgTDEPhase int
-
-const (
-	// pgTDEInitialSetup means no key provider has been configured yet, so the
-	// credentials in the spec are the only ones there have ever been.
-	pgTDEInitialSetup pgTDEPhase = iota
-
-	// pgTDEConfigured means the key provider names the credentials in the spec.
-	pgTDEConfigured
-
-	// pgTDEStageCredentials means the spec names credentials the key provider
-	// has not been pointed at yet. Phase 1 has to copy them onto the data
-	// volumes and repoint the provider before the Pods may mount them.
-	pgTDEStageCredentials
-
-	// pgTDEFinalize means the key provider names the staged copies on the data
-	// volumes. Phase 2 repoints it at the mount paths and removes them.
-	pgTDEFinalize
-)
-
-// pgTDEVaultChange is the state of a vault credential change. reconcileInstance
-// decides whether to hold the Pods' vault volume from it and
-// reconcilePGTDEProviders decides which SQL to run; the two have to agree,
-// because releasing the volume in a phase that still expects the old
-// credentials mounted is what leaves pg_tde unable to fetch its key.
-type pgTDEVaultChange struct {
-	Phase pgTDEPhase
-
-	// Paths inside the Pod. The standard pair are the projected Secret's mount
-	// paths; the temp pair are the copies staged on the data volume.
-	TokenPath, CAPath         string
-	TempTokenPath, TempCAPath string
-
-	// Revisions matching each pair of paths, to compare with
-	// cluster.Status.PGTDERevision.
-	StandardRevision, TempRevision string
-}
-
-// pgTDEVaultChangeFor derives the change from the spec and the stored revision.
-// The caller must have established that a vault is configured.
-func pgTDEVaultChangeFor(cluster *v1beta1.PostgresCluster) (pgTDEVaultChange, error) {
-	var change pgTDEVaultChange
-	var err error
-
-	vault := cluster.Spec.Extensions.PGTDE.Vault
-	change.TokenPath, change.CAPath = pgtde.VaultCredentialPaths(vault)
-	change.TempTokenPath, change.TempCAPath = pgtde.TempVaultCredentialPaths(vault)
-
-	if change.StandardRevision, err = pgTDEVaultRevision(
-		vault, change.TokenPath, change.CAPath); err != nil {
-		return change, err
-	}
-	if change.TempRevision, err = pgTDEVaultRevision(
-		vault, change.TempTokenPath, change.TempCAPath); err != nil {
-		return change, err
-	}
-
-	// An empty revision is a state of its own rather than the absence of the
-	// others, so it is matched first: a revision that somehow came out empty
-	// must not be able to claim a cluster that has never configured pg_tde.
-	switch cluster.Status.PGTDERevision {
-	case "":
-		change.Phase = pgTDEInitialSetup
-	case change.StandardRevision:
-		change.Phase = pgTDEConfigured
-	case change.TempRevision:
-		change.Phase = pgTDEFinalize
-	default:
-		change.Phase = pgTDEStageCredentials
-	}
-
-	return change, nil
-}
-
-// pgTDEVaultRevision computes a hash of the vault configuration and credential
-// paths for comparing with cluster.Status.PGTDERevision.
-func pgTDEVaultRevision(vault *v1beta1.PGTDEVaultSpec, tokenPath, caPath string) (string, error) {
-	return safeHash32(func(hasher io.Writer) error {
-		// Quote every value so the fields cannot run together. fmt.Fprint
-		// separates operands with a space only when neither is a string, and
-		// all of these are, so plain Fprint would hash host="vault:8200" with
-		// mountPath="secret/data" the same as host="vault:8200secret" with
-		// mountPath="/data" and never notice the change.
-		_, err := fmt.Fprintf(hasher, "%q%q%q%q%q%q%q%q",
-			vault.Host, vault.MountPath,
-			vault.TokenSecret.Name, vault.TokenSecret.Key,
-			vault.CASecret.Name, vault.CASecret.Key,
-			tokenPath, caPath)
-		return err
-	})
-}
-
-// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with the
-// one from the StatefulSet as it exists in the cluster. This prevents pods from
-// restarting with new vault credentials before the vault provider change SQL
-// has been executed. Pass the StatefulSet read from the API server, not the one
-// being generated: reconcileInstance regenerates its argument in place, so by
-// the time the pod spec is built the two are the same object.
-func preserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet) {
-	var oldVolume *corev1.Volume
-	for i := range existing.Spec.Template.Spec.Volumes {
-		if existing.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
-			oldVolume = &existing.Spec.Template.Spec.Volumes[i]
-			break
-		}
-	}
-	if oldVolume == nil {
-		return
-	}
-
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].Name == naming.PGTDEVolume {
-			podSpec.Volumes[i] = *oldVolume
-			return
-		}
-	}
 }
 
 // addPGBackRestToInstancePodSpec adds pgBackRest configurations and sidecars

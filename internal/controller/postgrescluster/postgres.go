@@ -396,7 +396,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages about executing SQL.
 		return create(logging.NewContext(ctx, logging.Discard()), func(
 			_ context.Context, stdin io.Reader, _, _ io.Writer, command ...string,
@@ -498,15 +498,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		cluster.Status.PGTDERevision = ""
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
 
-		// Credentials staged by an interrupted change would otherwise stay on
-		// the data volume in plaintext for the life of the cluster, on every
-		// instance that has a copy. There is nothing to clean up on a deleted
-		// or not-yet-running cluster; the sweep runs again on every reconcile
-		// until it succeeds.
-		if pods, complete := instances.runningPods(container); len(pods) > 0 {
-			_ = r.cleanupTempFiles(ctx, cluster, pods, complete, container)
-		}
-
 		return nil
 	}
 
@@ -519,16 +510,12 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		}
 	}
 
-	// Find the PostgreSQL instance that can execute SQL that writes system
-	// catalogs. When there is none, return early.
 	pod, _ := instances.writablePod(container)
 	if pod == nil {
 		log.V(1).Info("Waiting for a writable instance")
 		return nil
 	}
 
-	// The SQL runs on the primary, but the credentials it names have to be
-	// readable on every instance. See stageVaultCredentials.
 	pods, allRunning := instances.runningPods(container)
 
 	// We need to configure pg_tde after volumes are mounted and extension is created
@@ -547,8 +534,8 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	vault := cluster.Spec.Extensions.PGTDE.Vault
 
-	change, err := pgTDEVaultChangeFor(cluster)
-	if err == nil && change.Phase == pgTDEConfigured {
+	change, err := pgtde.VaultChangeFor(cluster)
+	if err == nil && change.Phase == pgtde.Configured {
 		// The provider matches the spec, so nothing references the credentials
 		// staged for a change and any copy still on a data volume is leftover.
 		// Sweep until the condition says the volumes are clean rather than
@@ -561,28 +548,28 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		if condition := meta.FindStatusCondition(cluster.Status.Conditions,
 			v1beta1.PGTDEVaultProviderReady); condition == nil ||
 			condition.Status != metav1.ConditionTrue {
-			r.setVaultProviderCondition(cluster,
-				r.cleanupTempFiles(ctx, cluster, pods, allRunning, container))
+			r.setPGTDEVaultProviderCondition(cluster)
+
+			if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, allRunning, container); err != nil {
+				log.Error(err, "failed to clean up staged vault credentials")
+			}
+
 			return patchStatus()
 		}
 		return nil
 	}
 
-	// Set when the provider change succeeded but the staged credentials could
-	// not be removed afterwards.
-	var cleanupErr error
-
 	var revision string
 	if err == nil {
 		switch change.Phase {
-		case pgTDEInitialSetup:
+		case pgtde.InitialSetup:
 			// No provider has been configured, so the Pods already mount the
 			// credentials in the spec and there is nothing to stage.
 			err = errors.WithStack(pgtde.ReconcileVaultProvider(
 				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
 			revision = change.StandardRevision
 
-		case pgTDEFinalize:
+		case pgtde.Finalize:
 			// Phase 2: pod restarted with new volume mounted at standard paths.
 			// Change provider from temp paths to persistent mount paths, then
 			// clean up the temp files from /pgdata.
@@ -593,7 +580,9 @@ func (r *Reconciler) reconcilePGTDEProviders(
 				// Nothing references the staged credentials now. Removing them
 				// must not fail the change itself, which already succeeded; the
 				// retry above picks up whatever is left behind.
-				cleanupErr = r.cleanupTempFiles(ctx, cluster, pods, allRunning, container)
+				if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, allRunning, container); err != nil {
+					log.Error(err, "failed to clean up staged vault credentials")
+				}
 			}
 			revision = change.StandardRevision
 
@@ -620,9 +609,8 @@ func (r *Reconciler) reconcilePGTDEProviders(
 				return patchStatus()
 			}
 
-			log.Info("changing vault provider using temporary credentials",
-				"instances", len(pods))
-			if err = stageVaultCredentials(ctx, r.Client, r.PodExec, cluster.Namespace,
+			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
+			if err = stagePGTDEVaultCredentials(ctx, r.Client, r.PodExec, cluster.Namespace,
 				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
 				break
 			}
@@ -638,8 +626,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		// advances, so a change that keeps failing pins the StatefulSet to
 		// the old credentials indefinitely. Surface the cause rather than
 		// leaving the user to guess why their Pods never roll.
-		r.Recorder.Event(cluster, corev1.EventTypeWarning,
-			"PGTDEVaultProviderChangeFailed", err.Error())
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, "PGTDEVaultProviderChangeFailed", err.Error())
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:               v1beta1.PGTDEVaultProviderReady,
 			Status:             metav1.ConditionFalse,
@@ -671,7 +658,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			ObservedGeneration: cluster.GetGeneration(),
 		})
 	} else {
-		r.setVaultProviderCondition(cluster, cleanupErr)
+		r.setPGTDEVaultProviderCondition(cluster)
 	}
 
 	if err := patchStatus(); err != nil {
@@ -681,15 +668,9 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	return nil
 }
 
-// pgTDEReasonCredentialsNotRemoved marks that vault credentials staged during a
-// provider change are still on the data volume.
-const pgTDEReasonCredentialsNotRemoved = "CredentialsNotRemoved"
-
-// setVaultProviderCondition reports a provider that matches the spec, noting
+// setPGTDEVaultProviderCondition reports a provider that matches the spec, noting
 // whether the credentials staged during the change were removed afterwards.
-func (r *Reconciler) setVaultProviderCondition(
-	cluster *v1beta1.PostgresCluster, cleanupErr error,
-) {
+func (r *Reconciler) setPGTDEVaultProviderCondition(cluster *v1beta1.PostgresCluster) {
 	condition := metav1.Condition{
 		Type:               v1beta1.PGTDEVaultProviderReady,
 		Status:             metav1.ConditionTrue,
@@ -697,15 +678,11 @@ func (r *Reconciler) setVaultProviderCondition(
 		Message:            "pg_tde vault key provider matches the spec",
 		ObservedGeneration: cluster.GetGeneration(),
 	}
-	if cleanupErr != nil {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = pgTDEReasonCredentialsNotRemoved
-		condition.Message = cleanupErr.Error()
-	}
+
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
-// cleanupTempFiles removes the vault credentials staged during a provider
+// cleanupTempPGTDEFiles removes the vault credentials staged during a provider
 // change from every Pod's data volume. Each instance has its own volume, so
 // each has its own copy to remove. When complete is false some instance could
 // not be reached and its copy is still there, which counts as a failure so the
@@ -713,7 +690,7 @@ func (r *Reconciler) setVaultProviderCondition(
 // differ in how much they can do about it, but it is always logged and
 // recorded: a token left behind sits in plaintext on a PersistentVolume until
 // something removes it.
-func (r *Reconciler) cleanupTempFiles(
+func (r *Reconciler) cleanupTempPGTDEFiles(
 	ctx context.Context,
 	cluster *v1beta1.PostgresCluster,
 	pods []*corev1.Pod,
@@ -741,20 +718,18 @@ func (r *Reconciler) cleanupTempFiles(
 
 	logging.FromContext(ctx).Error(err, "failed to remove staged pg_tde vault credentials",
 		"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
-	r.Recorder.Event(cluster, corev1.EventTypeWarning,
-		"PGTDECredentialCleanupFailed", err.Error())
 
 	return err
 }
 
-// stageVaultCredentials copies the vault credentials out of their Secrets and
+// stagePGTDEVaultCredentials copies the vault credentials out of their Secrets and
 // into temporary files on every Pod's data volume.
 //
 // pg_tde's key provider configuration is cluster-wide: whatever path it names
 // is the path every instance reads, including a replica that gets promoted
 // while the change is in flight. Each instance has its own /pgdata, so the
 // files have to exist on all of them, not just on the one running the SQL.
-func stageVaultCredentials(
+func stagePGTDEVaultCredentials(
 	ctx context.Context,
 	k8sClient client.Reader,
 	podExec runtime.PodExecutor,
@@ -769,15 +744,14 @@ func stageVaultCredentials(
 		data []byte
 	}
 
-	// Read each Secret once rather than once per Pod.
-	token, err := secretValue(ctx, k8sClient, namespace, vault.TokenSecret)
+	token, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.TokenSecret)
 	if err != nil {
 		return errors.Wrap(err, "token secret")
 	}
 	files := []stagedFile{{path: tokenPath, data: token}}
 
 	if vault.HasCA() {
-		ca, err := secretValue(ctx, k8sClient, namespace, vault.CASecret)
+		ca, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.CASecret)
 		if err != nil {
 			return errors.Wrap(err, "CA secret")
 		}
@@ -796,8 +770,8 @@ func stageVaultCredentials(
 	return nil
 }
 
-// secretValue reads one key from a Kubernetes Secret.
-func secretValue(
+// pgTDESecretValue reads one key from PGTDESecretObjectReference.
+func pgTDESecretValue(
 	ctx context.Context,
 	k8sClient client.Reader,
 	namespace string,
@@ -1230,7 +1204,7 @@ func (r *Reconciler) reconcilePostgresUsersInPostgreSQL(
 		return postgres.WriteUsersInPostgreSQL(ctx, cluster, exec, specUsers, verifiers)
 	}
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages about executing SQL.
 		return write(logging.NewContext(ctx, logging.Discard()), func(
 			_ context.Context, stdin io.Reader, _, _ io.Writer, command ...string,

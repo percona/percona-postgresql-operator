@@ -3,8 +3,11 @@ package pgtde
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -66,11 +70,7 @@ func disableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-// ReconcileExtension installs or drops the pg_tde extension according to the
-// spec. It only runs SQL and reports the result: callers run it speculatively
-// against a fake executor to hash the statements it would send, so it must not
-// touch the cluster's status or record events. Pass the result of a real
-// execution to ReportExtension to do that.
+// ReconcileExtension installs or drops the pg_tde extension according to the spec.
 func ReconcileExtension(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
 	if !cluster.Spec.Extensions.PGTDE.Enabled {
 		return disableInPostgreSQL(ctx, exec)
@@ -79,10 +79,9 @@ func ReconcileExtension(ctx context.Context, exec postgres.Executor, cluster *cr
 	return enableInPostgreSQL(ctx, exec)
 }
 
-// ReportExtension records the outcome of a ReconcileExtension call that really
-// ran against PostgreSQL. The PGTDEEnabled condition decides whether pg_tde is
-// in shared_preload_libraries and whether instance Pods carry the vault volume,
-// so it must only be set from an execution that actually happened.
+// ReportExtension records the outcome of a ReconcileExtension.
+// The PGTDEEnabled condition decides whether pg_tde is in shared_preload_libraries
+// and whether instance Pods carry the vault volume.
 func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.EventRecorder, err error) {
 	enabled := cluster.Spec.Extensions.PGTDE.Enabled
 
@@ -282,13 +281,12 @@ func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster
 		// whatever created it, which may be an older incarnation of this
 		// cluster pointing at a different Vault; overwrite it so it matches
 		// the spec instead of assuming it already does.
-		log.V(1).Info("could not add pg_tde vault provider, rewriting the existing one",
-			"error", addErr.Error())
+		log.V(1).Info("could not add pg_tde vault provider, rewriting the existing one", "error", addErr.Error())
 
 		if err := changeVaultProvider(ctx, exec, vault, tokenPath, caPath); err != nil {
 			// Neither statement worked, so the provider is not usable. The
 			// failure to add it is the more useful of the two to report.
-			return addErr
+			return errors.Wrap(addErr, "add vault provider")
 		}
 	}
 
@@ -299,10 +297,119 @@ func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster
 
 	if err := setDefaultKey(ctx, exec, cluster.UID); err != nil {
 		if createErr != nil {
-			return createErr
+			return errors.Wrap(createErr, "create global key")
 		}
-		return err
+		return errors.Wrap(err, "set default key")
 	}
 
 	return nil
+}
+
+// Phase is where a cluster stands in the two-phase vault credential change
+// described on reconcilePGTDEProviders.
+type Phase int
+
+const (
+	// InitialSetup means no key provider has been configured yet, so the
+	// credentials in the spec are the only ones there have ever been.
+	InitialSetup Phase = iota
+
+	// Configured means the key provider names the credentials in the spec.
+	Configured
+
+	// StageCredentials means the spec names credentials the key provider
+	// has not been pointed at yet. Phase 1 has to copy them onto the data
+	// volumes and repoint the provider before the Pods may mount them.
+	StageCredentials
+
+	// Finalize means the key provider names the staged copies on the data
+	// volumes. Phase 2 repoints it at the mount paths and removes them.
+	Finalize
+)
+
+// vaultChange is the state of a vault credential change. reconcileInstance
+// decides whether to hold the Pods' vault volume from it and
+// reconcilePGTDEProviders decides which SQL to run; the two have to agree,
+// because releasing the volume in a phase that still expects the old
+// credentials mounted is what leaves pg_tde unable to fetch its key.
+type vaultChange struct {
+	Phase Phase
+
+	// Paths inside the Pod. The standard pair are the projected Secret's mount
+	// paths; the temp pair are the copies staged on the data volume.
+	TokenPath, CAPath         string
+	TempTokenPath, TempCAPath string
+
+	// Revisions matching each pair of paths, to compare with
+	// cluster.Status.PGTDERevision.
+	StandardRevision, TempRevision string
+}
+
+// VaultChangeFor derives the change from the spec and the stored revision.
+func VaultChangeFor(cluster *crunchyv1beta1.PostgresCluster) (vaultChange, error) {
+	var change vaultChange
+	var err error
+
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+	change.TokenPath, change.CAPath = VaultCredentialPaths(vault)
+	change.TempTokenPath, change.TempCAPath = TempVaultCredentialPaths(vault)
+
+	if change.StandardRevision, err = VaultRevision(
+		vault, change.TokenPath, change.CAPath); err != nil {
+		return change, err
+	}
+	if change.TempRevision, err = VaultRevision(
+		vault, change.TempTokenPath, change.TempCAPath); err != nil {
+		return change, err
+	}
+
+	switch cluster.Status.PGTDERevision {
+	case "":
+		change.Phase = InitialSetup
+	case change.StandardRevision:
+		change.Phase = Configured
+	case change.TempRevision:
+		change.Phase = Finalize
+	default:
+		change.Phase = StageCredentials
+	}
+
+	return change, nil
+}
+
+// VaultRevision computes a hash of the vault configuration and credential
+// paths for comparing with cluster.Status.PGTDERevision.
+func VaultRevision(vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) (string, error) {
+	return util.SafeHash32(func(hasher io.Writer) error {
+		_, err := fmt.Fprintf(hasher, "%q%q%q%q%q%q%q%q",
+			vault.Host, vault.MountPath,
+			vault.TokenSecret.Name, vault.TokenSecret.Key,
+			vault.CASecret.Name, vault.CASecret.Key,
+			tokenPath, caPath)
+		return err
+	})
+}
+
+// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with the
+// one from the StatefulSet as it exists in the cluster. This prevents pods from
+// restarting with new vault credentials before the vault provider change SQL
+// has been executed.
+func PreserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet) {
+	var oldVolume *corev1.Volume
+	for i := range existing.Spec.Template.Spec.Volumes {
+		if existing.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
+			oldVolume = &existing.Spec.Template.Spec.Volumes[i]
+			break
+		}
+	}
+	if oldVolume == nil {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name == naming.PGTDEVolume {
+			podSpec.Volumes[i] = *oldVolume
+			return
+		}
+	}
 }

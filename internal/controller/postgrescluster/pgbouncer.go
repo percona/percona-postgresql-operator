@@ -25,6 +25,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -153,7 +154,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	// First, calculate a hash of the SQL that should be executed in PostgreSQL.
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages from the pgbouncer package about executing SQL.
 		// Nothing is being "executed" yet.
 		return action(logging.NewContext(ctx, logging.Discard()), func(
