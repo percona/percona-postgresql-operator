@@ -4,9 +4,11 @@ metadata:
   name: custom-extensions
 spec:
   extensions:
-    custom: []
+    custom:
+    - name: pg_stat_kcache
+      version: 2.3.1
   patroni:
     dynamicConfiguration:
       postgresql:
         parameters:
-          shared_preload_libraries: ""
+          shared_preload_libraries: pg_stat_statements,pg_stat_kcache

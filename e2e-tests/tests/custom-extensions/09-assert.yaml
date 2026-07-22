@@ -8,5 +8,6 @@ metadata:
   name: 11-check-extensions
 data:
   data: |2-
+     pg_stat_statements
      pgaudit
      plpgsql

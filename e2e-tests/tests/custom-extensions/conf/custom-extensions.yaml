@@ -6,6 +6,9 @@ spec:
   extensions:
     image: <image>
     imagePullPolicy: Always
+    builtin:
+      pg_stat_monitor: false
+      pg_stat_statements: true
     storage:
       type: s3
       bucket: operator-testing
