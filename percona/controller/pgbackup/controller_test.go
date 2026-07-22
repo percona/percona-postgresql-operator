@@ -15,12 +15,128 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
+	gate := feature.NewGate()
+	require.NoError(t, gate.SetFromMap(map[string]bool{feature.BackupSnapshots: true}))
+	ctx := feature.NewContext(t.Context(), gate)
+
+	tests := []struct {
+		name          string
+		deleteCluster bool
+		snapshot      bool
+		expectedError string
+	}{
+		{
+			name:          "cluster is deleted",
+			deleteCluster: true,
+			expectedError: "PerconaPGCluster test-cluster is not found",
+		},
+		{
+			name:          "cluster is terminating",
+			expectedError: "PerconaPGCluster test-cluster is being deleted",
+		},
+		{
+			name:          "cluster is deleted during snapshot",
+			deleteCluster: true,
+			snapshot:      true,
+			expectedError: "PerconaPGCluster test-cluster is not found",
+		},
+		{
+			name:          "cluster is terminating during snapshot",
+			snapshot:      true,
+			expectedError: "PerconaPGCluster test-cluster is being deleted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := readDefaultCR("test-cluster", "test-namespace")
+			require.NoError(t, err)
+			cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			if tt.snapshot {
+				cluster.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
+					Mode:      v2.VolumeSnapshotModeOffline,
+					ClassName: "snapshot-class",
+				}
+			}
+
+			backup := &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-backup",
+					Namespace:  cluster.Namespace,
+					Finalizers: []string{pNaming.FinalizerDeleteBackup},
+				},
+				Spec: v2.PerconaPGBackupSpec{
+					PGCluster: cluster.Name,
+					RepoName:  new("repo1"),
+				},
+				Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+			}
+			if tt.snapshot {
+				backup.Spec.Method = new(v2.BackupMethodVolumeSnapshot)
+				backup.UID = "snapshot-uid"
+				backup.Finalizers = []string{pNaming.FinalizerSnapshotInProgress}
+				backup.Status.Conditions = []metav1.Condition{{
+					Type:   v2.ConditionBackupLeaseAcquired,
+					Status: metav1.ConditionTrue,
+				}}
+			}
+
+			objects := []client.Object{backup}
+			if tt.snapshot {
+				holder := backupLeaseHolder(backup)
+				objects = append(objects, &coordinationv1.Lease{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      backupLeaseName(cluster.Name),
+						Namespace: cluster.Namespace,
+						UID:       "lease-uid",
+					},
+					Spec: coordinationv1.LeaseSpec{HolderIdentity: &holder},
+				})
+			}
+
+			cl, err := buildFakeClient(ctx, cluster, objects...)
+			require.NoError(t, err)
+			require.NoError(t, cl.Delete(ctx, cluster))
+			if tt.deleteCluster {
+				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+				cluster.Finalizers = nil
+				require.NoError(t, cl.Update(ctx, cluster))
+			}
+
+			r := &PGBackupReconciler{Client: cl}
+			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+			require.NoError(t, err)
+
+			updated := new(v2.PerconaPGBackup)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.Equal(t, v2.BackupFailed, updated.Status.State)
+			assert.Equal(t, tt.expectedError, updated.Status.Error)
+
+			if tt.snapshot {
+				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerSnapshotInProgress)
+				assert.False(t, meta.IsStatusConditionTrue(updated.Status.Conditions, v2.ConditionBackupLeaseAcquired))
+
+				err = cl.Get(ctx, client.ObjectKey{
+					Name:      backupLeaseName(cluster.Name),
+					Namespace: cluster.Namespace,
+				}, new(coordinationv1.Lease))
+				assert.True(t, k8serrors.IsNotFound(err))
+			} else {
+				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+			}
+		})
+	}
+}
 
 func TestFailIfClusterIsNotReady(t *testing.T) {
 	ctx := context.Background()

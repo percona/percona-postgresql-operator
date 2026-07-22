@@ -127,13 +127,34 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
-	if ok, err := r.handleLease(ctx, pgBackup); err != nil {
+	if pgCluster == nil || !pgCluster.DeletionTimestamp.IsZero() {
+		if pgBackup.Status.State == v2.BackupStarting || pgBackup.Status.State == v2.BackupRunning {
+			statusError := fmt.Sprintf("PerconaPGCluster %s is not found", pgBackup.Spec.PGCluster)
+			if pgCluster != nil {
+				statusError = fmt.Sprintf("PerconaPGCluster %s is being deleted", pgBackup.Spec.PGCluster)
+			}
+
+			if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+				bcp.Status.State = v2.BackupFailed
+				bcp.Status.Error = statusError
+			}); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "update backup status")
+			}
+
+			pgBackup.Status.State = v2.BackupFailed
+			pgBackup.Status.Error = statusError
+		}
+
+		pgCluster = nil
+	}
+
+	if ok, err := r.handleLease(ctx, pgCluster, pgBackup); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to process lease")
 	} else if !ok {
 		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	if *pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot {
+	if *pgBackup.Spec.Method == v2.BackupMethodVolumeSnapshot && pgCluster != nil {
 		return snapshots.Reconcile(ctx, r.Client, r.PodExec, pgBackup, pgCluster)
 	}
 
@@ -410,18 +431,29 @@ func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx co
 	}
 }
 
-func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (bool, error) {
-	pg := new(v2.PerconaPGCluster)
-	if err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pg); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return false, errors.Wrap(err, "get PostgresCluster")
+func snapshotInProgressFinalizer(pg *v2.PerconaPGCluster) func(context.Context, *v2.PerconaPGBackup) error {
+	return func(context.Context, *v2.PerconaPGBackup) error {
+		if pg != nil {
+			return controller.ErrFinalizerPending
 		}
 
+		return nil
+	}
+}
+
+func runFinalizers(ctx context.Context, c client.Client, pgBackup *v2.PerconaPGBackup) (bool, error) {
+	pg := new(v2.PerconaPGCluster)
+	err := c.Get(ctx, types.NamespacedName{Name: pgBackup.Spec.PGCluster, Namespace: pgBackup.Namespace}, pg)
+	if client.IgnoreNotFound(err) != nil {
+		return false, errors.Wrap(err, "get PostgresCluster")
+	}
+	if k8serrors.IsNotFound(err) || !pg.DeletionTimestamp.IsZero() {
 		pg = nil
 	}
 
 	finalizers := map[string]controller.FinalizerFunc[*v2.PerconaPGBackup]{
-		pNaming.FinalizerDeleteBackup: deleteBackupFinalizer(c, pg),
+		pNaming.FinalizerDeleteBackup:       deleteBackupFinalizer(c, pg),
+		pNaming.FinalizerSnapshotInProgress: snapshotInProgressFinalizer(pg),
 	}
 
 	finished := true
@@ -889,10 +921,11 @@ func (r *PGBackupReconciler) releaseLeaseIfNeeded(ctx context.Context, backup *v
 // Returns true if the caller can continue with the reconciliation.
 func (r *PGBackupReconciler) handleLease(
 	ctx context.Context,
+	cluster *v2.PerconaPGCluster,
 	backup *v2.PerconaPGBackup,
 ) (bool, error) {
 	if (backup.Status.State.IsTerminal() || !backup.DeletionTimestamp.IsZero()) &&
-		!controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress) {
+		(cluster == nil || !controllerutil.ContainsFinalizer(backup, pNaming.FinalizerSnapshotInProgress)) {
 		if err := r.releaseLeaseIfNeeded(ctx, backup); err != nil {
 			return false, errors.Wrap(err, "failed to release lease")
 		}
