@@ -545,7 +545,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		if condition == nil || condition.Status != metav1.ConditionTrue {
 			r.setPGTDEVaultProviderCondition(cluster)
 
-			if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, container); err != nil {
+			if err := r.cleanupTempPGTDEFiles(ctx, pods, container); err != nil {
 				log.Error(err, "failed to remove staged pg_tde vault credentials",
 					"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
 			}
@@ -578,7 +578,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			err = errors.WithStack(pgtde.ReconcileVaultProvider(
 				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
 			if err == nil {
-				if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, container); err != nil {
+				if err := r.cleanupTempPGTDEFiles(ctx, pods, container); err != nil {
 					log.Error(err, "failed to remove staged pg_tde vault credentials",
 						"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
 				}
@@ -689,12 +689,7 @@ func (r *Reconciler) setPGTDEVaultProviderCondition(cluster *v1beta1.PostgresClu
 // differ in how much they can do about it, but it is always logged and
 // recorded: a token left behind sits in plaintext on a PersistentVolume until
 // something removes it.
-func (r *Reconciler) cleanupTempPGTDEFiles(
-	ctx context.Context,
-	cluster *v1beta1.PostgresCluster,
-	pods []*corev1.Pod,
-	container string,
-) error {
+func (r *Reconciler) cleanupTempPGTDEFiles(ctx context.Context, pods []*corev1.Pod, container string) error {
 	var err error
 
 	for _, pod := range pods {
