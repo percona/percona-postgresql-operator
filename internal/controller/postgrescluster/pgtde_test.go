@@ -1493,7 +1493,11 @@ func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, instances,
 			func() error { return nil }))
+		assert.Equal(t, cluster.Status.PGTDERevision, tempRevision)
 
+		instances = threeInstances()
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, instances,
+			func() error { return nil }))
 		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
 	})
 }

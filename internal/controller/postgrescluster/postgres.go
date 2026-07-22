@@ -517,10 +517,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	}
 
 	pods, allRunning := instances.runningPods(container)
-	if !allRunning {
-		log.V(1).Info("Waiting for all pods to be running")
-		return nil
-	}
 
 	// We need to configure pg_tde after volumes are mounted and extension is created
 	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
@@ -540,6 +536,11 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	change, err := pgtde.VaultChangeFor(cluster)
 	if err == nil && change.Phase == pgtde.Configured {
+		if !allRunning {
+			log.V(1).Info("Waiting for all pods to be running")
+			return nil
+		}
+
 		condition := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
 		if condition == nil || condition.Status != metav1.ConditionTrue {
 			r.setPGTDEVaultProviderCondition(cluster)
@@ -562,6 +563,11 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			revision = change.StandardRevision
 
 		case pgtde.Finalize:
+			if !allRunning {
+				log.V(1).Info("Waiting for all pods to be running before finalizing provider change")
+				return nil
+			}
+
 			// Phase 2: pod restarted with new volume mounted at standard paths.
 			// Change provider from temp paths to persistent mount paths, then
 			// clean up the temp files from /pgdata.
