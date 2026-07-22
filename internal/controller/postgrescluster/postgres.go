@@ -462,7 +462,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		if patchErr := patchStatus(); patchErr != nil {
 			// Losing this patch only costs a repeat of the SQL above, all of
 			// which is idempotent, and Reconcile patches the status again on
-			// its way out. Cancelling the reconcilers that follow, including
+			// its way out. Canceling the reconcilers that follow, including
 			// the pg_tde key provider setup, would cost more.
 			logging.FromContext(ctx).Error(patchErr, "failed to patch cluster status")
 		}
