@@ -251,7 +251,28 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
+	// +kubebuilder:default=auto
+	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
+	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 }
+
+func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
+	if s == nil || s.CertManagementPolicy == "" {
+		return CertManagementAuto
+	}
+	return s.CertManagementPolicy
+}
+
+type CertManagementPolicy string
+
+const (
+	CertManagementAuto             CertManagementPolicy = "auto"
+	CertManagementUserProvidedOnly CertManagementPolicy = "userProvidedOnly"
+)
+
+const (
+	ConditionTypeTLSSecretsReady = "TLSSecretsReady"
+)
 
 // DataSource defines data sources for a new PostgresCluster.
 type DataSource struct {

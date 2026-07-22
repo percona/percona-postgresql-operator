@@ -256,6 +256,27 @@ func (r *Reconciler) Reconcile(
 		}
 	}
 
+	// K8SPG-1045
+	if err == nil {
+		if err = r.reconcileTLSCertManagementPolicy(ctx, cluster); err != nil {
+			return runtime.ErrorWithBackoff(err)
+		}
+
+		if cond := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady); cond != nil {
+			if cond.Status == metav1.ConditionFalse {
+				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+					Type:               v1beta1.PostgresClusterProgressing,
+					Status:             metav1.ConditionFalse,
+					Reason:             "Paused",
+					Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
+					ObservedGeneration: cluster.GetGeneration(),
+				})
+				return runtime.ErrorWithBackoff(patchClusterStatus())
+			}
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+		}
+	}
+
 	pgHBAs := postgres.NewHBAs()
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
@@ -608,6 +629,10 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Watches(&corev1.Secret{}, r.watchClusterSecrets(), builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			return hasCluster
+		}))).
 		Watches(&corev1.Pod{}, r.watchPods()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},

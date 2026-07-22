@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: cert-management-policy
+status:
+  conditions:
+  - reason: PGBackRestRepoHostReady
+    status: "False"
+    type: ReadyForBackup
+  - reason: TLSSecretsMissing
+    status: "False"
+    type: TLSSecretsReady
+  - reason: Paused
+    status: "False"
+    type: Progressing

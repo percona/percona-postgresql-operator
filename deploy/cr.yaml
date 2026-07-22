@@ -59,6 +59,7 @@ spec:
 #      name: replication1-cert
 #  tlsOnly: false
 #  tls:
+#    certManagementPolicy: auto
 #    certValidityDuration: 2160h
 #    caValidityDuration: 26280h
 #    pgBackRestCertValidityDuration: 2160h
