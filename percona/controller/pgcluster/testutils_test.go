@@ -56,6 +56,7 @@ func reconciler(cr *v2.PerconaPGCluster) *PGClusterReconciler {
 		KubeVersion:          "1.26",
 		Cron:                 NewCronRegistry(),
 		Watchers:             reg,
+		Recorder:             new(record.FakeRecorder),
 		ExternalChan:         externalChan,
 		StopExternalWatchers: stopChan,
 	})

@@ -14,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -562,15 +563,30 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 	return nil
 }
 
+// reportPMMMisconfiguration surfaces a PMM misconfiguration to the user: PMM
+// stays disabled, but the cluster keeps running, so the problem is reported
+// via a warning event and the PMMReady status condition instead of an error.
+func (r *PGClusterReconciler) reportPMMMisconfiguration(ctx context.Context, cr *v2.PerconaPGCluster, reason, message string) {
+	logging.FromContext(ctx).Info(fmt.Sprintf("Can't enable PMM: %s", message))
+	r.Recorder.Event(cr, corev1.EventTypeWarning, "PMMMisconfigured", message)
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: cr.Generation,
+	})
+}
+
 func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.PMMEnabled() {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, v2.ConditionPMMReady)
 		return nil
 	}
 
-	log := logging.FromContext(ctx)
-
 	if cr.Spec.PMM.Secret == "" {
-		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotSpecified",
+			fmt.Sprintf("`.spec.pmm.secret` is empty in %s", cr.Name))
 		return nil
 	}
 
@@ -580,7 +596,8 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		Namespace: cr.Namespace,
 	}, pmmSecret); err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("Can't enable PMM: %s secret doesn't exist", cr.Spec.PMM.Secret))
+			r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotFound",
+				fmt.Sprintf("%s secret doesn't exist", cr.Spec.PMM.Secret))
 			return nil
 		}
 		return errors.Wrap(err, "failed to get pmm secret")
@@ -603,9 +620,16 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 
 	pmmContainer, err := pmm.Container(pmmSecret, cr)
 	if err != nil {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s", err.Error()))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretInvalid", err.Error())
 		return nil
 	}
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "PMMConfigured",
+		ObservedGeneration: cr.Generation,
+	})
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
 	if err != nil {

@@ -42,31 +42,15 @@ func TestContainer(t *testing.T) {
 		verificationEnvVar func() corev1.EnvVar
 		err                error
 	}{
-		"pmm2 server key is ignored": {
+		"error when token is missing": {
 			secret: func() *corev1.Secret {
 				secret := &corev1.Secret{}
 				secret.Data = map[string][]byte{
-					"PMM_SERVER_KEY": []byte(`key`),
+					"SOME_RANDOM_KEY": []byte(`key`),
 				}
 				return secret
 			},
 			err: errors.New("can't enable PMM: PMM_SERVER_TOKEN doesn't exist in the provided secret or it is empty (PMM2 is no longer supported, migrate to PMM3)"),
-		},
-		"pmm3 when both server key and token exist": {
-			secret: func() *corev1.Secret {
-				secret := &corev1.Secret{}
-				secret.Data = map[string][]byte{
-					"PMM_SERVER_KEY":   []byte(`key`),
-					"PMM_SERVER_TOKEN": []byte(`token`),
-				}
-				return secret
-			},
-			verificationEnvVar: func() corev1.EnvVar {
-				return corev1.EnvVar{
-					Name:  "PMM_AGENT_SERVER_USERNAME",
-					Value: "service_token",
-				}
-			},
 		},
 		"pmm3 when only token exists": {
 			secret: func() *corev1.Secret {
