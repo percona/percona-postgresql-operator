@@ -25,7 +25,7 @@ func ConfigMap(
 	inCluster *v1beta1.PostgresCluster,
 	outConfigMap *corev1.ConfigMap,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}
@@ -56,7 +56,7 @@ func Secret(ctx context.Context,
 	frontendCertManagerSecret *corev1.Secret,
 	additionalCAs [][]byte,
 ) error {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return nil
 	}
@@ -155,7 +155,7 @@ func Pod(
 	inSecret *corev1.Secret,
 	outPod *corev1.PodSpec,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}
@@ -286,7 +286,7 @@ func PostgreSQL(
 	inCluster *v1beta1.PostgresCluster,
 	outHBAs *postgres.HBAs,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}

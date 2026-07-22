@@ -145,6 +145,46 @@ func TestPerconaPGCluster_Proxy(t *testing.T) {
 	})
 }
 
+func TestPGProxySpec_PGBouncerEnabled(t *testing.T) {
+	tests := map[string]struct {
+		spec     *PGProxySpec
+		expected bool
+	}{
+		"nil proxy": {
+			spec:     nil,
+			expected: false,
+		},
+		"nil PgBouncer": {
+			spec:     &PGProxySpec{},
+			expected: false,
+		},
+		"replicas unspecified": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{},
+			},
+			expected: true,
+		},
+		"zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(0))},
+			},
+			expected: false,
+		},
+		"non-zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(1))},
+			},
+			expected: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.spec.PGBouncerEnabled())
+		})
+	}
+}
+
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 	cluster := new(PerconaPGCluster)
 	cluster.Default()
