@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role pg-tde primary name)
+      data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      kubectl create configmap -n "${NAMESPACE}" 10-read-after-change --from-literal=data="${data}"
+
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri pg-tde postgres)/myapp"
+
+      # Verify phase 2 cleanup: temp credential files should not exist on /pgdata
+      if kubectl exec ${primary} -n "${NAMESPACE}" -- test -f /pgdata/tde-new-token; then
+        echo "ERROR: /pgdata/tde-new-token should have been cleaned up after phase 2"
+        exit 1
+      fi
+      if kubectl exec ${primary} -n "${NAMESPACE}" -- test -f /pgdata/tde-new-ca.crt; then
+        echo "ERROR: /pgdata/tde-new-ca.crt should have been cleaned up after phase 2"
+        exit 1
+      fi

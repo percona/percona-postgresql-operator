@@ -1,8 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 180
 commands:
-  - script: |-
+  - timeout: 180
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -12,7 +12,10 @@ commands:
         data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres) -c "\c postgres" -c "SELECT extname FROM pg_extension ORDER BY extname")
 
         for ext in pg_cron pg_repack pg_stat_statements pgaudit plpgsql set_user vector; do
-          echo "${data}" | grep -q "${ext}" || return 1
+          if ! echo "${data}" | grep -q "${ext}"; then
+            echo "${ext} is not enabled!"
+            return 1
+          fi 
         done
       }
 

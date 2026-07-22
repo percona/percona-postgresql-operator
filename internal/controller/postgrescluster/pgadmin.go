@@ -24,6 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -467,7 +468,7 @@ func (r *Reconciler) reconcilePGAdminUsers(
 		return pgadmin.WriteUsersInPGAdmin(ctx, cluster, exec, specUsers, passwords)
 	}
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages about executing.
 		return write(logging.NewContext(ctx, logging.Discard()), func(
 			_ context.Context, stdin io.Reader, _, _ io.Writer, command ...string,

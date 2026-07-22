@@ -108,7 +108,7 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 		}
 	}
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log message from pgmonitor package about executing SQL.
 		// Nothing is being "executed" yet.
 		return action(logging.NewContext(ctx, logging.Discard()), func(
