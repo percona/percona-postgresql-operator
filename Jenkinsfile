@@ -259,6 +259,7 @@ void runTest(Integer TEST_ID) {
                     if [ ! -d "e2e-tests/logs" ]; then
                         mkdir "e2e-tests/logs"
                     fi
+                    export PG_DISTRIBUTION=community
                     export KUBECONFIG=/tmp/$CLUSTER_NAME-$clusterSuffix
                     export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH"
                     set -o pipefail
