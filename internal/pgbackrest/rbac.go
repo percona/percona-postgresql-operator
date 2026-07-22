@@ -16,13 +16,12 @@ import (
 
 // Permissions returns the RBAC rules pgBackRest needs for a cluster.
 func Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
-
 	rules := make([]rbacv1.PolicyRule, 0, 2)
 
 	rules = append(rules, rbacv1.PolicyRule{
 		APIGroups: []string{corev1.SchemeGroupVersion.Group},
 		Resources: []string{"pods"},
-		Verbs:     []string{"list"},
+		Verbs:     []string{"list", "patch"},
 	})
 
 	rules = append(rules, rbacv1.PolicyRule{

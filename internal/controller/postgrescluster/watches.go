@@ -117,6 +117,20 @@ func (*Reconciler) watchPods() handler.Funcs {
 				}})
 				return
 			}
+
+			// Reconcile when any pgBackRest repository volume suggestion changes.
+			if len(cluster) != 0 {
+				for annotation := range newAnnotations {
+					if _, ok := naming.PGBackRestRepoFromVolumeSizeAnnotation(annotation); ok &&
+						oldAnnotations[annotation] != newAnnotations[annotation] {
+						q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+							Namespace: e.ObjectNew.GetNamespace(),
+							Name:      cluster,
+						}})
+						return
+					}
+				}
+			}
 		},
 	}
 }

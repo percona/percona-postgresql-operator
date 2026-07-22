@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o nounset
+      set -o pipefail
+      set -o xtrace
+
+      cluster=repo-host-autogrow
+      selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-dedicated"
+
+      repo_pod=$(kubectl -n "${NAMESPACE}" get pods -l "${selector}" -o jsonpath='{.items[0].metadata.name}')
+      suggested_size=$(kubectl -n "${NAMESPACE}" get pod "${repo_pod}" \
+        -o jsonpath='{.metadata.annotations.suggested-pgbackrest-repo1-pvc-size}')
+
+      if [[ -z "${suggested_size}" ]]; then
+        echo "Expected repo1 PVC size suggestion"
+        exit 1
+      fi
+
+      status_size=
+      for _ in $(seq 1 60); do
+        status_size=$(kubectl -n "${NAMESPACE}" get \
+          postgrescluster.upstream.pgv2.percona.com/"${cluster}" \
+          -o jsonpath='{.status.pgbackrest.repos[?(@.name=="repo1")].desiredRepoVolume}')
+        if [[ "${status_size}" == "${suggested_size}" ]]; then
+          break
+        fi
+        sleep 5
+      done
+
+      if [[ "${status_size}" != "${suggested_size}" ]]; then
+        echo "Expected desired repo volume ${suggested_size}, got ${status_size}"
+        exit 1
+      fi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: repo-host-autogrow
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+    postgres-operator.crunchydata.com/pgbackrest-volume: ""
+spec:
+  resources:
+    requests:
+      storage: 300Mi

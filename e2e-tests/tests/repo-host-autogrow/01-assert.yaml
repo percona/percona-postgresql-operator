@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 420
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: repo-host-autogrow
+status:
+  state: ready
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: repo-host-autogrow-repo-host
+status:
+  readyReplicas: 1

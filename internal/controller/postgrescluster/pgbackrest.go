@@ -23,6 +23,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -179,12 +180,16 @@ func (r *Reconciler) applyRepoHostIntent(ctx context.Context, postgresCluster *v
 // representing a repository.
 func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 	postgresCluster *v1beta1.PostgresCluster, spec corev1.PersistentVolumeClaimSpec,
-	repoName string, repoResources *RepoResources,
+	repoName string, repoResources *RepoResources, desiredVolume string,
 ) (*corev1.PersistentVolumeClaim, error) {
 	repo, err := r.generateRepoVolumeIntent(postgresCluster, spec, repoName, repoResources)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+	r.setRepoVolumeSize(ctx, postgresCluster, repo, repoName, desiredVolume)
+	// Clear any set limit before applying PVC. This is needed to allow the limit
+	// value to change later.
+	repo.Spec.Resources.Limits = nil
 
 	if err := r.apply(ctx, repo); err != nil {
 		return nil, r.handlePersistentVolumeClaimError(postgresCluster,
@@ -192,6 +197,50 @@ func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 	}
 
 	return repo, nil
+}
+
+// setRepoVolumeSize applies an observed automatic-growth suggestion without
+// exceeding the ceiling configured in the repository PVC resource limits.
+func (r *Reconciler) setRepoVolumeSize(ctx context.Context, cluster *v1beta1.PostgresCluster,
+	pvc *corev1.PersistentVolumeClaim, repoName, desiredVolume string,
+) {
+	limit := pvc.Spec.Resources.Limits.Storage()
+	request := pvc.Spec.Resources.Requests.Storage()
+	if limit.IsZero() {
+		return
+	}
+
+	if request.Cmp(*limit) > 0 {
+		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "RepoVolumeRequestOverLimit",
+			"pgBackRest repository volume request (%v) for %s/%s is greater than its limit (%v); the limit will be used.",
+			request, cluster.Name, repoName, limit)
+		request = limit
+	} else if feature.Enabled(ctx, feature.AutoGrowVolumes) && desiredVolume != "" {
+		desired, err := resource.ParseQuantity(desiredVolume)
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "Unable to parse pgBackRest repository volume request",
+				"repo", repoName, "value", desiredVolume)
+			return
+		}
+		if desired.Cmp(*request) > 0 {
+			request = &desired
+		}
+		if request.Cmp(*limit) >= 0 {
+			if request.Cmp(*limit) > 0 {
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "DesiredRepoVolumeAboveLimit",
+					"The desired size (%v) for the %s/%s pgBackRest repository volume is greater than its limit (%v).",
+					request, cluster.Name, repoName, limit)
+			}
+			request = limit
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "RepoVolumeLimitReached",
+				"pgBackRest repository volume for %s/%s is at its size limit (%v).",
+				cluster.Name, repoName, limit)
+		}
+	}
+
+	pvc.Spec.Resources.Requests = corev1.ResourceList{
+		corev1.ResourceStorage: *resource.NewQuantity(request.Value(), resource.BinarySI),
+	}
 }
 
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
@@ -687,13 +736,15 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
 	repo.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
-	// pgBackRest does not make any Kubernetes API calls. Use the default
-	// ServiceAccount and do not mount its credentials.
-	repo.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
+	// The repo host only needs Kubernetes credentials when it reports automatic
+	// volume-growth suggestions through Pod annotations.
+	autoGrowRepoVolumes := len(pgbackrest.AutoGrowRepoNames(ctx, postgresCluster)) > 0
+	repo.Spec.Template.Spec.AutomountServiceAccountToken = new(autoGrowRepoVolumes)
 
 	// K8SPG-138
 	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
-	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0"))) {
+	if autoGrowRepoVolumes ||
+		(err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0")))) {
 		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 	}
 
@@ -713,9 +764,12 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 		pgbackrest.MakePGBackrestLogDir(&repo.Spec.Template, postgresCluster)
 
 		// add pgBackRest repo volumes to pod
+		containerNames := []string{naming.PGBackRestRepoContainerName}
+		if autoGrowRepoVolumes {
+			containerNames = append(containerNames, naming.ContainerPGBackRestConfig)
+		}
 		if err := pgbackrest.AddRepoVolumesToPod(postgresCluster, &repo.Spec.Template,
-			getRepoPVCNames(postgresCluster, repoResources.pvcs),
-			naming.PGBackRestRepoContainerName); err != nil {
+			getRepoPVCNames(postgresCluster, repoResources.pvcs), containerNames...); err != nil {
 			return nil, errors.WithStack(err)
 		}
 	}
@@ -2894,6 +2948,10 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 	errMsg := "reconciling repository volume"
 	repoVols := []*corev1.PersistentVolumeClaim{}
 	var replicaCreateRepo v1beta1.PGBackRestRepo
+	desiredVolumes, err := r.observeDesiredRepoVolumes(ctx, postgresCluster)
+	if err != nil {
+		return replicaCreateRepo, err
+	}
 	for i, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		// the repo at index 0 is the replica creation repo
 		if i == 0 {
@@ -2904,7 +2962,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 			continue
 		}
 		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
-			repo.Name, repoResources)
+			repo.Name, repoResources, desiredVolumes[repo.Name])
 		if err != nil {
 			log.Error(err, errMsg)
 			errors = append(errors, err)
@@ -2915,10 +2973,69 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		}
 	}
 
-	postgresCluster.Status.PGBackRest.Repos = getRepoVolumeStatus(postgresCluster.Status.PGBackRest.Repos, repoVols, extConfigHashes,
-		replicaCreateRepo.Name)
+	postgresCluster.Status.PGBackRest.Repos = getRepoVolumeStatus(postgresCluster.Status.PGBackRest.Repos,
+		repoVols, extConfigHashes, replicaCreateRepo.Name, desiredVolumes)
 
 	return replicaCreateRepo, utilerrors.NewAggregate(errors)
+}
+
+// observeDesiredRepoVolumes reads automatic-growth suggestions from the
+// dedicated repo-host Pod and retains the latest values through Pod restarts.
+func (r *Reconciler) observeDesiredRepoVolumes(ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+) (map[string]string, error) {
+	desired := make(map[string]string)
+	if !feature.Enabled(ctx, feature.AutoGrowVolumes) {
+		return desired, nil
+	}
+
+	if cluster.Status.PGBackRest != nil {
+		for _, status := range cluster.Status.PGBackRest.Repos {
+			if status.DesiredRepoVolume != "" {
+				desired[status.Name] = status.DesiredRepoVolume
+			}
+		}
+	}
+
+	pods := &corev1.PodList{}
+	if err := r.Client.List(
+		ctx, pods,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabelsSelector{Selector: naming.PGBackRestDedicatedSelector(cluster.Name)},
+	); err != nil {
+		return nil, errors.Wrap(err, "list pods")
+	}
+
+	limits := make(map[string]bool)
+	for _, repo := range cluster.Spec.Backups.PGBackRest.Repos {
+		limits[repo.Name] = repo.Volume != nil &&
+			!repo.Volume.VolumeClaimSpec.Resources.Limits.Storage().IsZero()
+	}
+	for _, pod := range pods.Items {
+		for annotation, value := range pod.Annotations {
+			repoName, ok := naming.PGBackRestRepoFromVolumeSizeAnnotation(annotation)
+			if !ok || !limits[repoName] || value == "" {
+				continue
+			}
+
+			current, err := resource.ParseQuantity(value)
+			if err != nil {
+				return nil, errors.Wrap(err, "parse quantity")
+			}
+			previous, err := resource.ParseQuantity(desired[repoName])
+			if err != nil {
+				previous = resource.Quantity{}
+			}
+			if current.Cmp(previous) > 0 {
+				desired[repoName] = value
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "RepoVolumeAutoGrow",
+					"pgBackRest repository volume expansion to %v requested for %s/%s.",
+					current.String(), cluster.Name, repoName)
+			}
+		}
+	}
+
+	return desired, nil
 }
 
 // +kubebuilder:rbac:groups="",resources="pods",verbs={get,list}
@@ -3081,7 +3198,7 @@ func getRepoHostStatus(repoHost *appsv1.StatefulSet) *v1beta1.RepoHostStatus {
 // (i.e. PVCs) reconciled  for the cluster, and the hashes calculated for the configuration for any
 // external repositories defined for the cluster.
 func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.PersistentVolumeClaim,
-	configHashes map[string]string, replicaCreateRepoName string,
+	configHashes map[string]string, replicaCreateRepoName string, desiredVolumes map[string]string,
 ) []v1beta1.RepoStatus {
 	// the new repository status that will be generated and returned
 	updatedRepoStatus := []v1beta1.RepoStatus{}
@@ -3118,6 +3235,7 @@ func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.
 					rs.ReplicaCreateBackupComplete = false
 				}
 				rs.VolumeName = rv.Spec.VolumeName
+				rs.DesiredRepoVolume = desiredVolumes[repoName]
 
 				updatedRepoStatus = append(updatedRepoStatus, rs)
 				break
@@ -3125,9 +3243,10 @@ func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.
 		}
 		if newRepoVolStatus {
 			updatedRepoStatus = append(updatedRepoStatus, v1beta1.RepoStatus{
-				Bound:      (rv.Status.Phase == corev1.ClaimBound),
-				Name:       repoName,
-				VolumeName: rv.Spec.VolumeName,
+				Bound:             (rv.Status.Phase == corev1.ClaimBound),
+				Name:              repoName,
+				VolumeName:        rv.Spec.VolumeName,
+				DesiredRepoVolume: desiredVolumes[repoName],
 			})
 		}
 	}

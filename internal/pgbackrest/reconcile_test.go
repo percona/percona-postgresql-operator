@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -974,6 +975,44 @@ func TestAddServerToRepoPod(t *testing.T) {
         name: hippo-pgbackrest
 		`))
 	})
+}
+
+func TestRepoVolumeAutoGrowMonitoring(t *testing.T) {
+	gate := feature.NewGate()
+	assert.NilError(t, gate.SetFromMap(map[string]bool{feature.AutoGrowVolumes: true}))
+	ctx := feature.NewContext(t.Context(), gate)
+
+	cluster := new(v1beta1.PostgresCluster)
+	cluster.Name = "hippo"
+	cluster.Labels = map[string]string{naming.LabelVersion: "2.5.0"}
+	cluster.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+		{
+			Name: "repo1",
+			Volume: &v1beta1.RepoPVC{VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{Limits: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("10Gi"),
+				}},
+			}},
+		},
+		{Name: "repo2", Volume: &v1beta1.RepoPVC{}},
+		{Name: "repo3"},
+	}
+
+	assert.DeepEqual(t, AutoGrowRepoNames(ctx, cluster), []string{"repo1"})
+
+	instance := new(corev1.PodSpec)
+	AddServerToInstancePod(ctx, cluster, instance, "instance-secret")
+	instanceScript := instance.Containers[len(instance.Containers)-1].Command[3]
+	assert.Assert(t, !strings.Contains(instanceScript, "monitor_volume"))
+	assert.Assert(t, !strings.Contains(instanceScript, "suggested-pgbackrest-"))
+
+	repoHost := new(corev1.PodSpec)
+	AddServerToRepoPod(ctx, cluster, repoHost)
+	repoHostScript := repoHost.Containers[len(repoHost.Containers)-1].Command[3]
+	assert.Assert(t, strings.Contains(repoHostScript,
+		`monitor_volume "/pgbackrest/repo1" "suggested-pgbackrest-repo1-pvc-size"`))
+	assert.Assert(t, !strings.Contains(repoHostScript, "/pgbackrest/repo2"))
+	assert.Assert(t, !strings.Contains(repoHostScript, "/pgbackrest/repo3"))
 }
 
 func getContainerNames(containers []corev1.Container) []string {

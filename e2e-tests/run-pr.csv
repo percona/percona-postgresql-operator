@@ -19,6 +19,7 @@ ldap-tls
 monitoring
 monitoring-pmm3
 one-pod
+repo-host-autogrow
 operator-self-healing
 pgbouncer-mtls
 pitr

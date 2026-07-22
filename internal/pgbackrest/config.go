@@ -491,7 +491,7 @@ func getExternalRepoConfigs(repo v1beta1.PGBackRestRepo) map[string]string {
 // reloadCommand returns an entrypoint that convinces the pgBackRest TLS server
 // to reload its options and certificate files when they change. The process
 // will appear as name in `ps` and `top`.
-func reloadCommand(name string, post250 bool) []string {
+func reloadCommand(name string, post250 bool, autoGrowRepos []string) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted server
 	// volume and configuration file. When either changes, signal pgBackRest
 	// and print the observed timestamp.
@@ -549,6 +549,47 @@ until read -r -t 5 -u "${fd}"; do
   fi
 done
 `
+	}
+
+	if len(autoGrowRepos) > 0 {
+		var monitorCalls strings.Builder
+		for _, repoName := range autoGrowRepos {
+			fmt.Fprintf(&monitorCalls, "  monitor_volume %q %q\n",
+				repoMountPath+"/"+repoName,
+				naming.SuggestedPGBackRestRepoVolumeSizeAnnotation(repoName))
+		}
+
+		autoGrowScript := `
+# Parameters for updating automatic volume-growth annotations.
+APISERVER="https://kubernetes.default.svc"
+SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+NAMESPACE=$(<"${SERVICEACCOUNT}/namespace")
+TOKEN=$(<"${SERVICEACCOUNT}/token")
+CACERT="${SERVICEACCOUNT}/ca.crt"
+
+monitor_volume() {
+  local path="$1" annotation="$2" df_output size use size_int use_int new_size patch
+  df_output=$(df --human-readable --block-size=M "${path}")
+  size=$(awk 'FNR == 2 {print $2}' <<<"${df_output}")
+  use=$(awk 'FNR == 2 {print $5}' <<<"${df_output}")
+  size_int="${size//M/}"
+  use_int="${use//[[:punct:]]/}"
+  if ((use_int > 75)); then
+    new_size="$((size_int + size_int / 2))Mi"
+    patch='{"metadata":{"annotations":{"'"${annotation}"'":"'"${new_size}"'"}}}'
+    curl --fail --silent --show-error --cacert "${CACERT}" \
+      --header "Authorization: Bearer ${TOKEN}" \
+      --header "Content-Type: application/merge-patch+json" \
+      --request PATCH \
+      --data "${patch}" \
+      "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}"
+  fi
+}
+`
+
+		// Run each repository check from the existing five-second reload loop.
+		script = strings.Replace(script, "done\n", monitorCalls.String()+"done\n", 1)
+		script = autoGrowScript + script
 	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function
