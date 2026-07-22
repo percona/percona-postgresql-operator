@@ -371,25 +371,19 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 }
 
 // hasAPIGroup returns true if the cluster exposes the given API group name.
-// Uses the discovery API; note that hardened clusters may restrict discovery access.
 func hasAPIGroup(ctx context.Context, cfg *rest.Config, groupName string) bool {
 	log := logging.FromContext(ctx)
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
 		log.V(1).Info("platform detection: could not create discovery client", "error", err.Error())
 		return false
 	}
-	groups, err := client.ServerGroups()
+	ok, err := k8s.GroupExists(dc, groupName)
 	if err != nil {
 		log.V(1).Info("platform detection: could not list API groups", "error", err.Error())
 		return false
 	}
-	for _, g := range groups.Groups {
-		if g.Name == groupName {
-			return true
-		}
-	}
-	return false
+	return ok
 }
 
 type platformProbe struct {
@@ -442,7 +436,9 @@ func detectAKS(ctx context.Context, cfg *rest.Config) bool {
 	}
 	host := strings.TrimPrefix(cfg.Host, "https://")
 	host = strings.TrimPrefix(host, "http://")
-	netConn, err := (&tls.Dialer{Config: tlsCfg}).DialContext(ctx, "tcp", host)
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	netConn, err := (&tls.Dialer{Config: tlsCfg}).DialContext(dialCtx, "tcp", host)
 	if err != nil {
 		logging.FromContext(ctx).V(1).Info("platform detection: could not dial API server", "error", err.Error())
 		return false
