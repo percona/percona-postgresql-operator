@@ -517,6 +517,10 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	}
 
 	pods, allRunning := instances.runningPods(container)
+	if !allRunning {
+		log.V(1).Info("Waiting for all pods to be running")
+		return nil
+	}
 
 	// We need to configure pg_tde after volumes are mounted and extension is created
 	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
@@ -536,23 +540,11 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	change, err := pgtde.VaultChangeFor(cluster)
 	if err == nil && change.Phase == pgtde.Configured {
-		// The provider matches the spec, so nothing references the credentials
-		// staged for a change and any copy still on a data volume is leftover.
-		// Sweep until the condition says the volumes are clean rather than
-		// looking for the particular reason that left them behind: a cleanup
-		// that failed leaves CredentialsNotRemoved, but a change that failed
-		// after staging and was then reverted leaves ChangeFailed, and both
-		// end here with a vault token sitting in plaintext on every instance.
-		// Sweeping also clears a condition that would otherwise report a
-		// failure the user has already resolved.
-		if condition := meta.FindStatusCondition(cluster.Status.Conditions,
-			v1beta1.PGTDEVaultProviderReady); condition == nil ||
-			condition.Status != metav1.ConditionTrue {
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
+		if condition == nil || condition.Status != metav1.ConditionTrue {
 			r.setPGTDEVaultProviderCondition(cluster)
 
-			if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, allRunning, container); err != nil {
-				log.Error(err, "failed to clean up staged vault credentials")
-			}
+			r.cleanupTempPGTDEFiles(ctx, cluster, pods, container)
 
 			return patchStatus()
 		}
@@ -580,9 +572,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 				// Nothing references the staged credentials now. Removing them
 				// must not fail the change itself, which already succeeded; the
 				// retry above picks up whatever is left behind.
-				if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, allRunning, container); err != nil {
-					log.Error(err, "failed to clean up staged vault credentials")
-				}
+				r.cleanupTempPGTDEFiles(ctx, cluster, pods, container)
 			}
 			revision = change.StandardRevision
 
@@ -694,7 +684,6 @@ func (r *Reconciler) cleanupTempPGTDEFiles(
 	ctx context.Context,
 	cluster *v1beta1.PostgresCluster,
 	pods []*corev1.Pod,
-	complete bool,
 	container string,
 ) error {
 	var err error
@@ -709,9 +698,6 @@ func (r *Reconciler) cleanupTempPGTDEFiles(
 		}
 	}
 
-	if err == nil && !complete {
-		err = errors.New("some instances are not running")
-	}
 	if err == nil {
 		return nil
 	}
