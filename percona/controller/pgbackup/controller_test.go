@@ -671,20 +671,13 @@ func TestStartBackup(t *testing.T) {
 		assert.Equal(t, "repo1", updated.Spec.Backups.PGBackRest.Manual.RepoName)
 	})
 
-	// Starting a backup must not rewrite the parts of the spec it was not asked
-	// to touch. Defaults belong to the PerconaPGCluster reconciler, which
-	// applies them in memory; persisting them from here would turn values the
-	// user never set into values the user appears to have chosen, and
-	// SetExtensionDefaults gives the deprecated builtin fields precedence over
-	// the ones that replaced them.
 	t.Run("does not persist defaults", func(t *testing.T) {
 		cluster, backup := newCluster(), newBackup()
 		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
 
-		// Prove the defaults under test are ones Default() would in fact set.
 		defaulted := cluster.DeepCopy()
 		defaulted.Default()
-		require.NotNil(t, defaulted.Spec.Extensions.BuiltIn.PGStatMonitor)
+		require.NotNil(t, defaulted.Spec.Extensions.BuiltIn.PGStatMonitor) // nolint:staticcheck
 		require.NotNil(t, defaulted.Spec.Extensions.PGStatMonitor.Enabled)
 		require.NotNil(t, defaulted.Spec.AutoCreateUserSchema)
 
@@ -693,7 +686,7 @@ func TestStartBackup(t *testing.T) {
 		updated := &v2.PerconaPGCluster{}
 		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updated))
 
-		assert.Nil(t, updated.Spec.Extensions.BuiltIn.PGStatMonitor,
+		assert.Nil(t, updated.Spec.Extensions.BuiltIn.PGStatMonitor, // nolint:staticcheck
 			"a backup must not write the deprecated builtin extension fields")
 		assert.Nil(t, updated.Spec.Extensions.PGStatMonitor.Enabled,
 			"a backup must not decide which extensions the user enabled")

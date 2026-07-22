@@ -545,7 +545,10 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		if condition == nil || condition.Status != metav1.ConditionTrue {
 			r.setPGTDEVaultProviderCondition(cluster)
 
-			r.cleanupTempPGTDEFiles(ctx, cluster, pods, container)
+			if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, container); err != nil {
+				log.Error(err, "failed to remove staged pg_tde vault credentials",
+					"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
+			}
 
 			return patchStatus()
 		}
@@ -575,10 +578,10 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			err = errors.WithStack(pgtde.ReconcileVaultProvider(
 				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
 			if err == nil {
-				// Nothing references the staged credentials now. Removing them
-				// must not fail the change itself, which already succeeded; the
-				// retry above picks up whatever is left behind.
-				r.cleanupTempPGTDEFiles(ctx, cluster, pods, container)
+				if err := r.cleanupTempPGTDEFiles(ctx, cluster, pods, container); err != nil {
+					log.Error(err, "failed to remove staged pg_tde vault credentials",
+						"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
+				}
 			}
 			revision = change.StandardRevision
 
@@ -704,13 +707,6 @@ func (r *Reconciler) cleanupTempPGTDEFiles(
 		}
 	}
 
-	if err == nil {
-		return nil
-	}
-
-	logging.FromContext(ctx).Error(err, "failed to remove staged pg_tde vault credentials",
-		"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
-
 	return err
 }
 
@@ -728,7 +724,7 @@ func stagePGTDEVaultCredentials(
 	namespace string,
 	vault *v1beta1.PGTDEVaultSpec,
 	pods []*corev1.Pod,
-	container string,
+	container string, // nolint:unparam
 	tokenPath, caPath string,
 ) error {
 	type stagedFile struct {
