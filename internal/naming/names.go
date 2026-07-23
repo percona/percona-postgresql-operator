@@ -320,7 +320,8 @@ func InstanceCertificates(instance metav1.Object) metav1.ObjectMeta {
 // InstanceSet returns the ObjectMeta necessary to lookup the objects
 // associated with a single instance set. Includes PodDisruptionBudgets
 func InstanceSet(cluster *v1beta1.PostgresCluster,
-	set *v1beta1.PostgresInstanceSetSpec) metav1.ObjectMeta {
+	set *v1beta1.PostgresInstanceSetSpec,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.Name + "-set-" + set.Name,
 		Namespace: cluster.Namespace,
@@ -500,7 +501,8 @@ func PGBackRestRBAC(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 
 // PGBackRestRepoVolume returns the ObjectMeta for a pgBackRest repository volume
 func PGBackRestRepoVolume(cluster *v1beta1.PostgresCluster,
-	repoName string) metav1.ObjectMeta {
+	repoName string,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      fmt.Sprintf("%s-%s", cluster.GetName(), repoName),
 		Namespace: cluster.GetNamespace(),
@@ -657,7 +659,6 @@ func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
-// K8SPG-951
 // ClusterCAIssuer returns the ObjectMeta for the cluster-scoped CA ClusterIssuer used by cert-manager.
 func ClusterCAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
@@ -665,7 +666,6 @@ func ClusterCAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
-// K8SPG-951
 // ClusterCACertSecret returns the ObjectMeta for the cluster-scoped CA Secret in cert-manager's namespace.
 func ClusterCACertSecret(cluster *v1beta1.PostgresCluster, certManagerNamespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{

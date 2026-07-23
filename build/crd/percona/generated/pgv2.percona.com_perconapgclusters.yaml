@@ -28735,7 +28735,8 @@ spec:
                   certValidityDuration:
                     type: string
                   issuerConf:
-                    description: K8SPG-951
+                    description: IssuerReference is a reference to a certificate issuer
+                      object with a given name, kind and group.
                     properties:
                       group:
                         description: |-

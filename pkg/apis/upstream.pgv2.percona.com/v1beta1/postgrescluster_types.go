@@ -252,7 +252,6 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
-	// K8SPG-951
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }

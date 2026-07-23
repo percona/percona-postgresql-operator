@@ -400,30 +400,39 @@ func (m *mockCertManagerController) Check(context.Context, *rest.Config, string)
 func (m *mockCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return false, nil
 }
+
 func (m *mockCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
@@ -448,39 +457,49 @@ type recoveryCertManagerController struct {
 func (m *recoveryCertManagerController) Check(context.Context, *rest.Config, string) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return true, nil
 }
+
 func (m *recoveryCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyIssuerCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	m.applyClusterCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
 	m.applyInstanceCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	m.applyPGBouncerCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyReplicationCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyPGBackRestClientCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	return nil
 }
@@ -792,7 +811,7 @@ func getCertFromSecret(
 }
 
 // installedCertManagerController reports cert-manager as installed and lets
-// every Apply* call succeed as a no-op — used for K8SPG-951 issuer-mode
+// every Apply* call succeed as a no-op — used for issuer-mode
 // tests that only need isCertManagerInstalled to return true, not real
 // Issuer/Certificate object creation (envtest has no cert-manager CRDs).
 type installedCertManagerController struct{}
@@ -800,33 +819,43 @@ type installedCertManagerController struct{}
 func (installedCertManagerController) Check(context.Context, *rest.Config, string) error {
 	return nil
 }
+
 func (installedCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return false, nil
 }
+
 func (installedCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (installedCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	return nil
 }

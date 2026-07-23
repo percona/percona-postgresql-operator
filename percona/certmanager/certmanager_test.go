@@ -1223,8 +1223,7 @@ func TestCustomTLSDurations(t *testing.T) {
 
 // forbiddenGetClient wraps a client.Client and returns a Forbidden error from
 // Get for *v1.ClusterIssuer, simulating a cluster that hasn't granted RBAC
-// for clusterissuers.cert-manager.io (the default — see K8SPG-951's design:
-// no such RBAC ships by default in either deployment mode).
+// for clusterissuers.cert-manager.io
 type forbiddenGetClient struct {
 	sigs.Client
 }

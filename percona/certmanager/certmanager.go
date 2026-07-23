@@ -197,8 +197,7 @@ func (c *controller) CertificateExists(ctx context.Context, namespace, certName 
 
 // ApplyIssuer creates the CA-backed Issuer resource that signs every leaf
 // Certificate for the given PostgresCluster (or a cluster-scoped CA-backed
-// ClusterIssuer when spec.tls.issuerConf.kind is "ClusterIssuer" —
-// K8SPG-951). No-op when the resolved mode is external.
+// ClusterIssuer when spec.tls.issuerConf.kind is "ClusterIssuer"). No-op when the resolved mode is external.
 func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
 	if err != nil {
@@ -296,7 +295,7 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 
 // ApplyCAIssuer creates a SelfSigned Issuer resource for the given
 // PostgresCluster (or a cluster-scoped SelfSigned ClusterIssuer when
-// spec.tls.issuerConf.kind is "ClusterIssuer" — K8SPG-951). No-op when the
+// spec.tls.issuerConf.kind is "ClusterIssuer"). No-op when the
 // resolved mode is external.
 func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
@@ -378,7 +377,7 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 }
 
 // ApplyCACertificate creates the self-signed CA Certificate for the given
-// PostgresCluster. For IssuerModeManagedCluster (K8SPG-951), it's placed in
+// PostgresCluster. For IssuerModeManagedCluster, it's placed in
 // cert-manager's shared namespace under a cluster-qualified name and gets no
 // owner reference (it may be shared by other PostgresClusters). No-op for
 // IssuerModeExternal.
