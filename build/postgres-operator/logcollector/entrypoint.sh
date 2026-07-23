@@ -71,6 +71,10 @@ run_fluentbit() {
 	local fluentbit_opt=(-c /opt/crunchy/logcollector/fluentbit/fluentbit.conf)
 	mkdir -p /tmp/fluentbit/custom
 	mkdir -p /pgdata/fluentbit
+
+	FLB_DB_VER="$(fluent-bit --version 2>/dev/null | grep -oE 'v[0-9]+' | head -1)"
+	export FLB_DB_VER="${FLB_DB_VER:-v0}"
+
 	set +e
 	local fluentbit_conf_dir="/opt/crunchy/logcollector/fluentbit/custom"
 	for conf_file in $fluentbit_conf_dir/*.conf; do
