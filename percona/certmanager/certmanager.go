@@ -2,9 +2,11 @@ package certmanager
 
 import (
 	"context"
+	"os"
 	"regexp"
 	"time"
 
+	"github.com/cert-manager/cert-manager/pkg/apis/certmanager"
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
@@ -46,6 +48,87 @@ const (
 	// DefaultRenewBefore is the default renewal time: 30 days before expiry
 	DefaultRenewBefore = 30 * 24 * time.Hour
 )
+
+type IssuerMode int
+
+const (
+	// IssuerModeManagedNamespaced: operator owns and manages a namespaced self-signed Issuer
+	IssuerModeManagedNamespaced IssuerMode = iota
+	// IssuerModeManagedCluster: operator owns and manages a cluster-scoped self-signed ClusterIssuer
+	IssuerModeManagedCluster
+	// IssuerModeExternal: operator does nothing for issuer, simply trusts that it exists and uses it to sign certificates
+	IssuerModeExternal
+)
+
+// CertManagerNamespace returns the namespace where cert-manager is installed.
+func CertManagerNamespace() string {
+	if ns := os.Getenv("CERTMANAGER_NAMESPACE"); ns != "" {
+		return ns
+	}
+	return "cert-manager"
+}
+
+func issuerConf(cluster *v1beta1.PostgresCluster) *cmmeta.IssuerReference {
+	if cluster.Spec.TLS == nil {
+		return nil
+	}
+	return cluster.Spec.TLS.IssuerConf
+}
+
+// ResolveIssuerMode determines how the operator should handle cluster.Spec.TLS.IssuerConf.
+func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (IssuerMode, error) {
+	ic := issuerConf(cluster)
+	if ic == nil {
+		return IssuerModeManagedNamespaced, nil
+	}
+
+	switch ic.Kind {
+	case "", v1.IssuerKind:
+		return IssuerModeManagedNamespaced, nil
+	case v1.ClusterIssuerKind:
+		existing := &v1.ClusterIssuer{}
+		err := cl.Get(ctx, types.NamespacedName{Name: ic.Name}, existing)
+		switch {
+		// ClusterIssuer not found, operator will create it
+		case k8serrors.IsNotFound(err):
+			return IssuerModeManagedCluster, nil
+		case err == nil:
+			// ClusterIssuer found, check if the operator created it
+			if val, ok := existing.GetLabels()[naming.LabelPerconaManagedBy]; ok && val == naming.LabelPerconaManagedByValue {
+				return IssuerModeManagedCluster, nil
+			}
+			// Operator did not create it, it is managed externally
+			return IssuerModeExternal, nil
+		case k8serrors.IsForbidden(err):
+			// Operator does not have permission, trust blindly that it exists and managed externally
+			return IssuerModeExternal, nil
+		default:
+			return IssuerModeManagedNamespaced, errors.Wrap(err, "failed to get cluster issuer")
+		}
+	default:
+		return IssuerModeExternal, nil
+	}
+}
+
+func issuerRef(cluster *v1beta1.PostgresCluster, mode IssuerMode) cmmeta.IssuerReference {
+	switch mode {
+	case IssuerModeExternal:
+		ic := issuerConf(cluster)
+		group := ic.Group
+		if group == "" {
+			group = certmanager.GroupName
+		}
+		return cmmeta.IssuerReference{Name: ic.Name, Kind: ic.Kind, Group: group}
+	case IssuerModeManagedCluster:
+		return cmmeta.IssuerReference{Name: issuerConf(cluster).Name, Kind: v1.ClusterIssuerKind, Group: certmanager.GroupName}
+	default:
+		name := naming.TLSIssuer(cluster).Name
+		if ic := issuerConf(cluster); ic != nil && ic.Name != "" {
+			name = ic.Name
+		}
+		return cmmeta.IssuerReference{Name: name, Kind: v1.IssuerKind, Group: certmanager.GroupName}
+	}
+}
 
 type controller struct {
 	cl         client.Client
@@ -112,11 +195,57 @@ func (c *controller) CertificateExists(ctx context.Context, namespace, certName 
 	return false, errors.Wrapf(err, "get certificate/%s", certName)
 }
 
+// ApplyIssuer creates the CA-backed Issuer resource that signs every leaf
+// Certificate for the given PostgresCluster (or a cluster-scoped CA-backed
+// ClusterIssuer when spec.tls.issuerConf.kind is "ClusterIssuer"). No-op when the resolved mode is external.
 func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	if mode == IssuerModeExternal {
+		return nil
+	}
+
+	if mode == IssuerModeManagedCluster {
+		caSecretName := naming.ClusterCACertSecret(cluster, CertManagerNamespace()).Name
+		meta := metav1.ObjectMeta{
+			Name: issuerRef(cluster, mode).Name,
+			Labels: map[string]string{
+				naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue,
+			},
+		}
+
+		existing := &v1.ClusterIssuer{}
+		err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name}, existing)
+		if err == nil {
+			return nil
+		}
+		if !k8serrors.IsNotFound(err) {
+			return errors.Wrap(err, "failed to get cluster issuer")
+		}
+
+		issuer := &v1.ClusterIssuer{
+			ObjectMeta: meta,
+			Spec: v1.IssuerSpec{
+				IssuerConfig: v1.IssuerConfig{
+					CA: &v1.CAIssuer{SecretName: caSecretName},
+				},
+			},
+		}
+		if err := c.cl.Create(ctx, issuer); err != nil {
+			return errors.Wrap(err, "failed to create cluster issuer")
+		}
+		return nil
+	}
+
 	meta := naming.TLSIssuer(cluster)
+	if ic := issuerConf(cluster); ic != nil && ic.Name != "" {
+		meta.Name = ic.Name
+	}
 
 	existing := &v1.Issuer{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
 	if err == nil {
 		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
 		if err != nil {
@@ -164,12 +293,51 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 	return nil
 }
 
-// ApplyCAIssuer creates a SelfSigned Issuer resource for the given PostgresCluster.
+// ApplyCAIssuer creates a SelfSigned Issuer resource for the given
+// PostgresCluster (or a cluster-scoped SelfSigned ClusterIssuer when
+// spec.tls.issuerConf.kind is "ClusterIssuer"). No-op when the
+// resolved mode is external.
 func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	if mode == IssuerModeExternal {
+		return nil
+	}
+
+	spec := v1.IssuerSpec{
+		IssuerConfig: v1.IssuerConfig{
+			SelfSigned: &v1.SelfSignedIssuer{},
+		},
+	}
+
+	if mode == IssuerModeManagedCluster {
+		meta := naming.ClusterCAIssuer(cluster)
+		meta.Labels = map[string]string{
+			naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue,
+		}
+
+		existing := &v1.ClusterIssuer{}
+		err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name}, existing)
+		if err == nil {
+			return nil
+		}
+		if !k8serrors.IsNotFound(err) {
+			return errors.Wrap(err, "failed to get CA cluster issuer")
+		}
+
+		issuer := &v1.ClusterIssuer{ObjectMeta: meta, Spec: spec}
+		if err := c.cl.Create(ctx, issuer); err != nil {
+			return errors.Wrap(err, "failed to create ca cluster issuer")
+		}
+		return nil
+	}
+
 	meta := naming.CAIssuer(cluster)
 
 	existing := &v1.Issuer{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: meta.Name, Namespace: meta.Namespace}, existing)
 	if err == nil {
 		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
 		if err != nil {
@@ -195,14 +363,7 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 		return errors.Wrap(err, "failed to get CA issuer")
 	}
 
-	issuer := &v1.Issuer{
-		ObjectMeta: meta,
-		Spec: v1.IssuerSpec{
-			IssuerConfig: v1.IssuerConfig{
-				SelfSigned: &v1.SelfSignedIssuer{},
-			},
-		},
-	}
+	issuer := &v1.Issuer{ObjectMeta: meta, Spec: spec}
 
 	if err := controllerutil.SetControllerReference(cluster, issuer, c.scheme); err != nil {
 		return errors.Wrap(err, "failed to set controller reference")
@@ -215,35 +376,60 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 	return nil
 }
 
+// ApplyCACertificate creates the self-signed CA Certificate for the given
+// PostgresCluster. For IssuerModeManagedCluster, it's placed in
+// cert-manager's shared namespace under a cluster-qualified name and gets no
+// owner reference (it may be shared by other PostgresClusters). No-op for
+// IssuerModeExternal.
 func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
-	certName := naming.PostgresRootCASecret(cluster).Name
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	if mode == IssuerModeExternal {
+		return nil
+	}
 
 	caDuration := DefaultCertDuration
 	if cluster.Spec.TLS != nil && cluster.Spec.TLS.CAValidityDuration != nil {
 		caDuration = cluster.Spec.TLS.CAValidityDuration.Duration
 	}
 
+	clusterScoped := mode == IssuerModeManagedCluster
+
+	secretMeta := naming.PostgresRootCASecret(cluster)
+	issuerRefValue := cmmeta.IssuerReference{Name: naming.CAIssuer(cluster).Name, Kind: v1.IssuerKind}
+
+	if clusterScoped {
+		secretMeta = naming.ClusterCACertSecret(cluster, CertManagerNamespace())
+		issuerRefValue = cmmeta.IssuerReference{Name: naming.ClusterCAIssuer(cluster).Name, Kind: v1.ClusterIssuerKind}
+	}
+	certName := secretMeta.Name
+	certNamespace := secretMeta.Namespace
+
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: certNamespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
-		hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
-		if err != nil {
-			return errors.Wrap(err, "check owner reference")
-		}
+		if !clusterScoped {
+			hasOwnerRef, err := controllerutil.HasOwnerReference(existing.OwnerReferences, cluster, c.scheme)
+			if err != nil {
+				return errors.Wrap(err, "check owner reference")
+			}
 
-		if !hasOwnerRef {
-			gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
-			existing.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion:         gvk.GroupVersion().String(),
-				Kind:               gvk.Kind,
-				Name:               cluster.GetName(),
-				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
-			}}
-			needsUpdate = true
+			if !hasOwnerRef {
+				gvk := v1beta1.SchemeBuilder.GroupVersion.WithKind("PostgresCluster")
+				existing.OwnerReferences = []metav1.OwnerReference{{
+					APIVersion:         gvk.GroupVersion().String(),
+					Kind:               gvk.Kind,
+					Name:               cluster.GetName(),
+					UID:                cluster.GetUID(),
+					BlockOwnerDeletion: ptr.To(true),
+					Controller:         ptr.To(true),
+				}}
+				needsUpdate = true
+			}
 		}
 
 		if existing.Spec.Duration != nil && existing.Spec.Duration.Duration != caDuration {
@@ -264,19 +450,16 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 	cert := &v1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certName,
-			Namespace: cluster.Namespace,
+			Namespace: certNamespace,
 			Labels: naming.WithPerconaLabels(map[string]string{
 				naming.LabelCluster: cluster.Name,
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: certName,
-			CommonName: cluster.Name + "-ca",
-			IsCA:       true,
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.CAIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  certName,
+			CommonName:  cluster.Name + "-ca",
+			IsCA:        true,
+			IssuerRef:   issuerRefValue,
 			Duration:    &metav1.Duration{Duration: caDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -292,8 +475,10 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
-		return errors.Wrap(err, "failed to set controller reference")
+	if !clusterScoped {
+		if err := controllerutil.SetControllerReference(cluster, cert, c.scheme); err != nil {
+			return errors.Wrap(err, "failed to set controller reference")
+		}
 	}
 
 	if err := c.cl.Create(ctx, cert); err != nil {
@@ -310,6 +495,12 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 		return errors.New("dnsNames cannot be empty")
 	}
 
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	certName := ClusterCertificateName(cluster)
 
 	certDuration := DefaultCertDuration
@@ -318,7 +509,7 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 	}
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -345,6 +536,11 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -365,13 +561,10 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: certName,
-			CommonName: cluster.Name + "-postgres",
-			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  certName,
+			CommonName:  cluster.Name + "-postgres",
+			DNSNames:    dnsNames,
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -412,6 +605,12 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 		return errors.New("dnsNames cannot be empty")
 	}
 
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	certName := InstanceCertificateName(instanceName)
 	secretName := instanceName + "-certs"
 
@@ -421,7 +620,7 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 	}
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -448,6 +647,11 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -468,13 +672,10 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: secretName,
-			CommonName: instanceName,
-			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  secretName,
+			CommonName:  instanceName,
+			DNSNames:    dnsNames,
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -514,6 +715,12 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 		return errors.New("dnsNames cannot be empty")
 	}
 
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	secretMeta := naming.ClusterPGBouncer(cluster)
 	certName := PGBouncerCertificateName(cluster)
 
@@ -523,7 +730,7 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 	}
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -550,6 +757,11 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -570,13 +782,10 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 			}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: secretMeta.Name + "-frontend-tls",
-			CommonName: truncateForCommonName(cluster.Name, "-pgbouncer"),
-			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  secretMeta.Name + "-frontend-tls",
+			CommonName:  truncateForCommonName(cluster.Name, "-pgbouncer"),
+			DNSNames:    dnsNames,
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -612,6 +821,12 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 
 // ApplyReplicationCertificate creates a cert-manager Certificate resource for the replication client.
 func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	secretMeta := naming.ReplicationClientCertSecret(cluster)
 	certName := ReplicationCertificateName(cluster)
 	commonName := "_crunchyrepl"
@@ -622,7 +837,7 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 	}
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -649,6 +864,11 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -669,13 +889,10 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: secretMeta.Name,
-			CommonName: commonName,
-			DNSNames:   []string{commonName},
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  secretMeta.Name,
+			CommonName:  commonName,
+			DNSNames:    []string{commonName},
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -712,6 +929,12 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 // for the pgBackRest client used by all PostgreSQL instances to connect to the
 // repository host.
 func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	secretMeta := naming.PGBackRestClientCertSecret(cluster)
 	certName := PGBackRestClientCertificateName(cluster)
 
@@ -725,7 +948,7 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 	commonName := "pgbackrest@" + string(cluster.GetUID())
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -758,6 +981,11 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -777,13 +1005,10 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: secretMeta.Name,
-			CommonName: commonName,
-			DNSNames:   []string{commonName},
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  secretMeta.Name,
+			CommonName:  commonName,
+			DNSNames:    []string{commonName},
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{
@@ -822,6 +1047,12 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 		return errors.New("dnsNames cannot be empty")
 	}
 
+	mode, err := ResolveIssuerMode(ctx, c.cl, cluster)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	wantIssuerRef := issuerRef(cluster, mode)
+
 	secretMeta := naming.PGBackRestRepoCertSecret(cluster)
 	certName := PGBackRestRepoCertificateName(cluster)
 
@@ -831,7 +1062,7 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 	}
 
 	existing := &v1.Certificate{}
-	err := c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
+	err = c.cl.Get(ctx, types.NamespacedName{Name: certName, Namespace: cluster.Namespace}, existing)
 	if err == nil {
 		needsUpdate := false
 
@@ -858,6 +1089,11 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 			needsUpdate = true
 		}
 
+		if existing.Spec.IssuerRef != wantIssuerRef {
+			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -877,13 +1113,10 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 			}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 		},
 		Spec: v1.CertificateSpec{
-			SecretName: secretMeta.Name,
-			CommonName: truncateForCommonName(cluster.Name, "-pgbackrest-repo"),
-			DNSNames:   dnsNames,
-			IssuerRef: cmmeta.IssuerReference{
-				Name: naming.TLSIssuer(cluster).Name,
-				Kind: v1.IssuerKind,
-			},
+			SecretName:  secretMeta.Name,
+			CommonName:  truncateForCommonName(cluster.Name, "-pgbackrest-repo"),
+			DNSNames:    dnsNames,
+			IssuerRef:   wantIssuerRef,
 			Duration:    &metav1.Duration{Duration: certDuration},
 			RenewBefore: &metav1.Duration{Duration: DefaultRenewBefore},
 			PrivateKey: &v1.CertificatePrivateKey{

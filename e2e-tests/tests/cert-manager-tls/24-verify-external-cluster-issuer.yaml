@@ -1,0 +1,88 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # ClusterIssuers are cluster-scoped, so the name is qualified by the
+      # test's namespace to avoid collisions with other test runs sharing
+      # the same Kubernetes cluster.
+      #
+      # This ClusterIssuer is created here by the test itself, the way a
+      # cluster admin managing their own PKI would - NOT by the operator.
+      # It exercises the "external" issuer mode, where the operator only
+      # references a pre-existing ClusterIssuer it does not own or manage.
+      issuer_name="${NAMESPACE}-shared-issuer"
+      bootstrap_issuer_name="${issuer_name}-bootstrap"
+      ca_cert_name="${issuer_name}-ca-cert"
+
+      kubectl apply -f - <<EOF
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: ${bootstrap_issuer_name}
+      spec:
+        selfSigned: {}
+      EOF
+
+      kubectl -n cert-manager apply -f - <<EOF
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: ${ca_cert_name}
+      spec:
+        isCA: true
+        commonName: cert-manager-tls-ca
+        secretName: ${ca_cert_name}
+        privateKey:
+          algorithm: ECDSA
+          size: 256
+        issuerRef:
+          name: ${bootstrap_issuer_name}
+          kind: ClusterIssuer
+        duration: 8760h0m0s
+        renewBefore: 720h0m0s
+        usages:
+          - "cert sign"
+          - "crl sign"
+      EOF
+
+      kubectl -n cert-manager wait --for=condition=Ready "certificate/${ca_cert_name}" --timeout=60s
+
+      kubectl apply -f - <<EOF
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: ${issuer_name}
+      spec:
+        ca:
+          secretName: ${ca_cert_name}
+      EOF
+
+      kubectl wait --for=condition=Ready "clusterissuer/${issuer_name}" --timeout=60s
+
+      kubectl -n "$NAMESPACE" patch perconapgcluster cert-manager-tls \
+        --type=merge \
+        -p="{\"spec\":{\"tls\":{\"issuerConf\":{\"name\":\"${issuer_name}\",\"kind\":\"ClusterIssuer\"}}}}"
+      sleep 10
+
+      wait_cluster_consistency cert-manager-tls
+
+      issuer_managed_by=$(kubectl get clusterissuer "${issuer_name}" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}')
+      if [[ -n "$issuer_managed_by" ]]; then
+          echo "Externally-managed ClusterIssuer should not be labeled as operator-managed, got: $issuer_managed_by"
+          exit 1
+      fi
+
+      cluster_cert_issuer_name=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-cluster-cert -o jsonpath='{.spec.issuerRef.name}')
+      cluster_cert_issuer_kind=$(kubectl -n "$NAMESPACE" get certificate cert-manager-tls-cluster-cert -o jsonpath='{.spec.issuerRef.kind}')
+      if [[ "$cluster_cert_issuer_name" != "$issuer_name" || "$cluster_cert_issuer_kind" != "ClusterIssuer" ]]; then
+          echo "Cluster certificate does not reference the external ClusterIssuer, got name=$cluster_cert_issuer_name kind=$cluster_cert_issuer_kind"
+          exit 1
+      fi
+
+      kubectl -n "$NAMESPACE" wait --for=condition=Ready certificate/cert-manager-tls-cluster-cert --timeout=60s
+    timeout: 300

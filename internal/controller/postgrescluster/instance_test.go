@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
@@ -2156,5 +2157,47 @@ func TestCleanupDisruptionBudgets(t *testing.T) {
 			assert.Assert(t, foundPDB(expectedPDB))
 			assert.Assert(t, !foundPDB(leftoverPDB))
 		})
+	})
+}
+
+func TestInstanceCACert(t *testing.T) {
+	t.Run("uses rootCertificateAuth when present", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+
+		caCert, err := instanceCACert(root, &corev1.Secret{})
+		assert.NilError(t, err)
+
+		want, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		got, err := caCert.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, want, got)
+	})
+
+	t.Run("parses ca.crt from issued secret when rootCertificateAuth is nil", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		caBytes, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+
+		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: caBytes}}
+
+		caCert, err := instanceCACert(nil, issuedSecret)
+		assert.NilError(t, err)
+		got, err := caCert.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, caBytes, got)
+	})
+
+	t.Run("errors when issued secret has no ca.crt", func(t *testing.T) {
+		_, err := instanceCACert(nil, &corev1.Secret{})
+		assert.ErrorContains(t, err, "did not return a CA certificate")
+	})
+
+	t.Run("errors when ca.crt is not a valid certificate", func(t *testing.T) {
+		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("not a cert")}}
+		_, err := instanceCACert(nil, issuedSecret)
+		assert.ErrorContains(t, err, "failed to parse CA certificate")
 	})
 }

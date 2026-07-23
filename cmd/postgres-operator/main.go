@@ -124,15 +124,6 @@ func main() {
 	)
 	assertNoError(err)
 
-	// Add Percona custom resource types to scheme
-	assertNoError(v2.AddToScheme(mgr.GetScheme()))
-
-	assertNoError(volumesnapshotv1.AddToScheme(mgr.GetScheme()))
-
-	// K8SPG-552
-	// Add Scheme for cert-manager resources like Issuer and Certificate.
-	assertNoError(certmanagerscheme.AddToScheme(mgr.GetScheme()))
-
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -362,6 +353,13 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 			options.Controller.GroupKindConcurrency[kind] = envs.Workers
 		}
 	}
+
+	// add scheme
+	scheme := runtime.Scheme
+	assertNoError(v2.AddToScheme(scheme))
+	assertNoError(volumesnapshotv1.AddToScheme(scheme))
+	assertNoError(certmanagerscheme.AddToScheme(scheme))
+	options.Scheme = scheme
 
 	return options, nil
 }

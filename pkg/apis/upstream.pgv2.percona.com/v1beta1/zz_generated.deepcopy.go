@@ -9,6 +9,7 @@
 package v1beta1
 
 import (
+	metav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -2676,6 +2677,11 @@ func (in *TLSSpec) DeepCopyInto(out *TLSSpec) {
 	if in.PGBackRestCertValidityDuration != nil {
 		in, out := &in.PGBackRestCertValidityDuration, &out.PGBackRestCertValidityDuration
 		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.IssuerConf != nil {
+		in, out := &in.IssuerConf, &out.IssuerConf
+		*out = new(metav1.IssuerReference)
 		**out = **in
 	}
 }
