@@ -175,6 +175,11 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
 
+	// The specification of the log collector sidecar.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +optional
+	LogCollector *LogCollectorSpec `json:"logcollector,omitempty"`
+
 	// The specification of extensions.
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
@@ -893,6 +898,57 @@ type PMMSpec struct {
 
 func (cr *PerconaPGCluster) PMMEnabled() bool {
 	return cr.Spec.PMM != nil && cr.Spec.PMM.Enabled
+}
+
+type LogCollectorSpec struct {
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// +optional
+	Configuration string `json:"configuration,omitempty"`
+
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
+
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// +optional
+	LogRotate *LogRotateSpec `json:"logRotate,omitempty"`
+}
+
+type LogRotateSpec struct {
+	// +optional
+	Configuration string `json:"configuration,omitempty"`
+
+	// +optional
+	ExtraConfig corev1.LocalObjectReference `json:"extraConfig,omitempty"`
+
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+}
+
+func (cr *PerconaPGCluster) LogCollectorEnabled() bool {
+	return cr.Spec.LogCollector != nil && cr.Spec.LogCollector.Enabled
 }
 
 type CustomExtensionSpec struct {

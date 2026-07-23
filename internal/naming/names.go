@@ -142,9 +142,6 @@ const (
 	// restores
 	PGBackRestRestoreContainerName = "pgbackrest-restore"
 
-	// PGBackRestRepoName is the name used for a pgbackrest repository
-	PGBackRestRepoName = "%s-pgbackrest-repo-%s"
-
 	// PGBackRestPGDataLogPath is the pgBackRest default log path configuration used by the
 	// PostgreSQL instance.
 	PGBackRestPGDataLogPath = "/pgdata/pgbackrest/log"

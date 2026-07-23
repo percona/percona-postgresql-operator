@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
@@ -345,6 +346,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := logcollector.Reconcile(ctx, r.Client, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile log collector")
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
