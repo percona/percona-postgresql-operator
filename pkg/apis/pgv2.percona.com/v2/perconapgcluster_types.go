@@ -1355,6 +1355,11 @@ const (
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
 
+// ConditionPMMReady indicates whether the PMM sidecar is configured for the
+// cluster. It is False when PMM is enabled but misconfigured (e.g. the secret
+// is missing or doesn't contain PMM_SERVER_TOKEN).
+const ConditionPMMReady = "PMMReady"
+
 const (
 	UserMonitoring = "monitor"
 )

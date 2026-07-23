@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -218,7 +219,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 			})
 		})
 
-		When("pmm secret has no data", func() {
+		When("pmm secret doesn't contain PMM_SERVER_TOKEN", func() {
 			BeforeAll(func() {
 				Expect(k8sClient.Create(ctx, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -226,7 +227,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 						Namespace: ns,
 					},
 					Data: map[string][]byte{
-						"PMM_SERVER_KEY": {},
+						"SOME_RANDOM_KEY": []byte("some-data"),
 					},
 				})).Should(Succeed())
 
@@ -241,49 +242,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
 			})
-		})
 
-		When("pmm secret has data for PMM_SERVER_KEY", func() {
-			BeforeAll(func() {
-				Expect(k8sClient.Update(ctx, &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-					Data: map[string][]byte{
-						"PMM_SERVER_KEY": []byte("some-data"),
-					},
-				})).Should(Succeed())
+			It("should have PMMReady condition set to False", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
 
-				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("should have pmm container", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-
-				Expect(havePMMSidecar(sts)).To(BeTrue())
-			})
-
-			It("should have PMM secret hash", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
-			})
-
-			It("should label PMM secret", func() {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-				}
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
-				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal("PMMSecretInvalid"))
 			})
 		})
 
@@ -329,6 +296,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
 				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
 			})
+
+			It("should have PMMReady condition set to True", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			})
 		})
 
 		When("cr has disabled pmm", func() {
@@ -347,6 +323,13 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
+			})
+
+			It("should remove PMMReady condition", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				Expect(meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)).To(BeNil())
 			})
 		})
 	})

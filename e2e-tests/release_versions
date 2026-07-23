@@ -27,10 +27,8 @@ IMAGE_BACKREST18=perconalab/percona-postgresql-operator:main-pgbackrest18
 
 IMAGE_UPGRADE=perconalab/percona-postgresql-operator:main-upgrade
 
-IMAGE_PMM_CLIENT=perconalab/pmm-client:dev-latest
-IMAGE_PMM_SERVER=perconalab/pmm-server:dev-latest
-IMAGE_PMM3_CLIENT=perconalab/pmm-client:3-dev-latest
-IMAGE_PMM3_SERVER=perconalab/pmm-server:3-dev-latest
+IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest
+IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest
 GKE_MIN=1.33
 GKE_MAX=1.35
 EKS_MIN=1.33
