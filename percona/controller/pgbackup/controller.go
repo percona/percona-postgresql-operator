@@ -533,11 +533,11 @@ func updatePGBackrestInfo(ctx context.Context, c client.Client, pod *corev1.Pod,
 		return nil
 	}
 
-	if pgBackup.Status.BackupName != backup.Label || pgBackup.Status.BackupType != backup.Type || pgBackup.Status.Size != backup.Info.Size {
+	if pgBackup.Status.BackupName != backup.Label || pgBackup.Status.BackupType != backup.Type || pgBackup.Status.Size != backup.Info.Delta {
 		if err := pgBackup.UpdateStatus(ctx, c, func(bcp *v2.PerconaPGBackup) {
 			bcp.Status.BackupName = backup.Label
 			bcp.Status.BackupType = backup.Type
-			bcp.Status.Size = backup.Info.Size
+			bcp.Status.Size = backup.Info.Delta
 		}); err != nil {
 			return errors.Wrap(err, "update PGBackup status")
 		}
