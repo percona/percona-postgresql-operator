@@ -6,7 +6,7 @@ require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/cert-manager/cert-manager v1.21.0
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/go-openapi/errors v0.22.8
 	github.com/go-openapi/runtime v0.32.5
 	github.com/go-openapi/strfmt v0.27.0
@@ -38,7 +38,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/tools v0.48.0
-	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc v1.82.1
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.36.2
 	k8s.io/apiextensions-apiserver v0.36.2
