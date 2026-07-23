@@ -70,6 +70,7 @@ run_logrotate() {
 run_fluentbit() {
 	local fluentbit_opt=(-c /opt/crunchy/logcollector/fluentbit/fluentbit.conf)
 	mkdir -p /tmp/fluentbit/custom
+	mkdir -p /pgdata/fluentbit
 	set +e
 	local fluentbit_conf_dir="/opt/crunchy/logcollector/fluentbit/custom"
 	for conf_file in $fluentbit_conf_dir/*.conf; do

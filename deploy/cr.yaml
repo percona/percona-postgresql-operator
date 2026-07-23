@@ -771,8 +771,8 @@ spec:
 #    logRotate:
 #      # Override the operator-managed logrotate config for the postgres logs.
 #      configuration: |
-#        /pgdata/logs/postgres/*.log
-#        /pgdata/logs/postgres/*.csv {
+#        /pgdata/pg*/log/*.log
+#        /pgdata/pg*/log/*.csv {
 #            daily
 #            rotate 7
 #            missingok
