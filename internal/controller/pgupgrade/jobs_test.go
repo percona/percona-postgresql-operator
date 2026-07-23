@@ -262,6 +262,10 @@ status: {}
 		// Verify the suffix is deterministic (same input always produces same output)
 		longJob2 := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "")
 		assert.Assert(t, longJob.Name == longJob2.Name, "job name should be deterministic: %q vs %q", longJob.Name, longJob2.Name)
+
+		labelValue := longJob.Labels[LabelPGUpgrade]
+		assert.Equal(t, labelValue, longJob.Spec.Template.Labels[LabelPGUpgrade])
+		assert.Assert(t, len(labelValue) <= 63, "label value %q exceeds 63 characters", labelValue)
 	})
 
 	t.Run(feature.PGUpgradeCPUConcurrency+"Enabled", func(t *testing.T) {
@@ -397,7 +401,8 @@ func TestPGUpgradeContainerImage(t *testing.T) {
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "env-var-pgbackrest")
 
 	assert.NilError(t, yaml.Unmarshal(
-		[]byte(`{ image: spec-image }`), &upgrade.Spec))
+		[]byte(`{ image: spec-image }`), &upgrade.Spec,
+	))
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "spec-image")
 }
 
@@ -410,5 +415,4 @@ func TestVerifyUpgradeImageValue(t *testing.T) {
 		err := verifyUpgradeImageValue(upgrade)
 		assert.ErrorContains(t, err, "crunchy-upgrade")
 	})
-
 }
