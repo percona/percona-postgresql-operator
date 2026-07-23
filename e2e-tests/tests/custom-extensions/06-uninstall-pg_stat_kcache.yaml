@@ -4,11 +4,9 @@ metadata:
   name: custom-extensions
 spec:
   extensions:
-    custom:
-    - name: pg_cron
-      version: 1.6.6
+    custom: []
   patroni:
     dynamicConfiguration:
       postgresql:
         parameters:
-          shared_preload_libraries: pg_cron
+          shared_preload_libraries: pg_stat_statements
