@@ -2,6 +2,19 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 120
 ---
+# With etcd DCS the primary Service selects on role=primary, which is applied
+# only by the patroni-role-change.sh callback. Cluster "ready" (below) is gated
+# on pod readiness, not on that label, so wait for the labeled primary pod here
+# before writing data through the primary Service.
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: etcd-dcs
+    postgres-operator.crunchydata.com/role: primary
+status:
+  phase: Running
+---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
