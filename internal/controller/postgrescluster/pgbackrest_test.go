@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -3894,7 +3895,11 @@ func TestPrepareForRestore(t *testing.T) {
 	_, tClient := setupKubernetes(t)
 	require.ParallelCapacity(t, 1)
 
-	r := &Reconciler{Client: tClient, Owner: client.FieldOwner(t.Name())}
+	r := &Reconciler{
+		Client:   tClient,
+		Owner:    client.FieldOwner(t.Name()),
+		Recorder: record.NewFakeRecorder(10),
+	}
 	namespace := setupNamespace(t, tClient).Name
 
 	generateJob := func(clusterName string) *batchv1.Job {
@@ -4221,10 +4226,14 @@ func TestPrepareForRestore(t *testing.T) {
 		t.Run("failed cleanup job is deleted", func(t *testing.T) {
 			cluster := newEtcdCluster("prepare-restore-etcd-failed")
 			job := generateDCSCleanupJob(cluster.Name, nil, new(true))
+			// Client.Create strips the Status subresource from job; keep a copy
+			// with the failed condition to pass in, as observeRestoreEnv's List
+			// would return in production.
+			jobWithStatus := job.DeepCopy()
 			assert.NilError(t, r.Client.Create(ctx, job))
 
 			fakeObserved := &observedInstances{forCluster: []*Instance{}}
-			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, job, "test-restore-id"))
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, jobWithStatus, "test-restore-id"))
 
 			err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniDCSCleanupJob(cluster)), &batchv1.Job{})
 			assert.Assert(t, apierrors.IsNotFound(err))
@@ -4255,10 +4264,14 @@ func TestPrepareForRestore(t *testing.T) {
 		t.Run("completed cleanup job triggers bootstrap", func(t *testing.T) {
 			cluster := newEtcdCluster("prepare-restore-etcd-completed")
 			job := generateDCSCleanupJob(cluster.Name, new(true), nil)
+			// Client.Create strips the Status subresource from job; keep a copy
+			// with the completed condition to pass in, as observeRestoreEnv's List
+			// would return in production.
+			jobWithStatus := job.DeepCopy()
 			assert.NilError(t, r.Client.Create(ctx, job))
 
 			fakeObserved := &observedInstances{forCluster: []*Instance{}}
-			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, job, "test-restore-id"))
+			assert.NilError(t, r.prepareForRestore(ctx, cluster, fakeObserved, nil, nil, jobWithStatus, "test-restore-id"))
 
 			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionPGBackRestRestoreProgressing)
 			if assert.Check(t, condition != nil) {
