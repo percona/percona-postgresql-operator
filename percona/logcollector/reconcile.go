@@ -54,10 +54,7 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 	// The config is delivered through ConfigMaps mounted by a stable name, so a
 	// content change does not alter the pod template by itself. Stamping its hash
 	// onto the instance metadata rolls the pods when the config changes.
-	hash, err := configHash(cr)
-	if err != nil {
-		return errors.Wrap(err, "calculate config hash")
-	}
+	hash := configHash(cr)
 
 	for i := range cr.Spec.InstanceSets {
 		set := &cr.Spec.InstanceSets[i]
@@ -76,7 +73,7 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 	return nil
 }
 
-func configHash(cr *v2.PerconaPGCluster) (string, error) {
+func configHash(cr *v2.PerconaPGCluster) string {
 	payload := struct {
 		FluentBit   string `json:"fluentBit"`
 		LogRotate   string `json:"logRotate"`
@@ -89,11 +86,8 @@ func configHash(cr *v2.PerconaPGCluster) (string, error) {
 		payload.ExtraConfig = lr.ExtraConfig.Name
 	}
 
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+	data, _ := json.Marshal(payload)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
 func reconcileConfigMaps(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
