@@ -58,6 +58,20 @@ type PGBackupReconciler struct {
 	ExternalChan chan event.GenericEvent
 }
 
+func (r *PGBackupReconciler) failBackup(ctx context.Context, pgBackup *v2.PerconaPGBackup, reason string) error {
+	if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
+		bcp.Status.State = v2.BackupFailed
+		bcp.Status.Error = reason
+	}); err != nil {
+		return err
+	}
+
+	pgBackup.Status.State = v2.BackupFailed
+	pgBackup.Status.Error = reason
+
+	return nil
+}
+
 // SetupWithManager adds the PerconaPGBackup controller to the provided runtime manager
 func (r *PGBackupReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
 	if r.PodExec == nil {
@@ -134,15 +148,9 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 				statusError = fmt.Sprintf("PerconaPGCluster %s is being deleted", pgBackup.Spec.PGCluster)
 			}
 
-			if err := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
-				bcp.Status.State = v2.BackupFailed
-				bcp.Status.Error = statusError
-			}); err != nil {
+			if err := r.failBackup(ctx, pgBackup, statusError); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "update backup status")
 			}
-
-			pgBackup.Status.State = v2.BackupFailed
-			pgBackup.Status.Error = statusError
 		}
 
 		pgCluster = nil
@@ -172,11 +180,8 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	}
 
 	if ptr.Deref(pgBackup.Spec.RepoName, "") == "" {
-		if updErr := pgBackup.UpdateStatus(ctx, r.Client, func(bcp *v2.PerconaPGBackup) {
-			bcp.Status.State = v2.BackupFailed
-			bcp.Status.Error = "repoName is required when method is 'pgbackrest'"
-		}); updErr != nil {
-			return reconcile.Result{}, errors.Wrap(updErr, "failed to update backup status")
+		if err := r.failBackup(ctx, pgBackup, "repoName is required when method is 'pgbackrest'"); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to update backup status")
 		}
 		return reconcile.Result{}, errors.New("'repoName' is required when method is 'pgbackrest'")
 	}
@@ -188,17 +193,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		}
 
 		if !pgCluster.Spec.Backups.IsEnabled() {
-			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				bcp := new(v2.PerconaPGBackup)
-				if err := r.Client.Get(ctx, client.ObjectKeyFromObject(pgBackup), bcp); err != nil {
-					return errors.Wrap(err, "get PGBackup")
-				}
-
-				bcp.Status.State = v2.BackupFailed
-				bcp.Status.Error = "Backups are not enabled in the PerconaPGCluster configuration"
-
-				return r.Client.Status().Update(ctx, bcp)
-			}); err != nil {
+			if err := r.failBackup(ctx, pgBackup, "Backups are not enabled in the PerconaPGCluster configuration"); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 			}
 
