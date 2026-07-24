@@ -60,6 +60,7 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
@@ -517,7 +518,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 }
 
 func (cr *PerconaPGCluster) Version() *gover.Version {
-	return gover.Must(gover.NewVersion(cr.Spec.CRVersion))
+	crVersion := cr.Spec.CRVersion
+	if crVersion == "" {
+		crVersion = version.Version()
+	}
+	return gover.Must(gover.NewVersion(crVersion))
 }
 
 func (cr *PerconaPGCluster) CompareVersion(ver string) int {
