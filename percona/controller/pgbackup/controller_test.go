@@ -18,7 +18,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
 	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )

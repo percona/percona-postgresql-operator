@@ -523,7 +523,6 @@ func getLogLevel() zapcore.LevelEnabler {
 	}
 }
 
-
 type envConfig struct {
 	LeaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`
 	LeaderElectionID        string `envconfig:"PGO_CONTROLLER_LEASE_NAME"`
