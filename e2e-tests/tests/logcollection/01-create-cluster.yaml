@@ -8,29 +8,27 @@ commands:
 
       source ../../functions
 
-      export fluentbit_custom="$(cat <<'EOF'
-pipeline:
-  filters:
-    - name: record_modifier
-      match: '*'
-      record:
-        - e2e_marker present
-  outputs:
-    - name: s3
-      match: '*.postgres'
-      bucket: operator-testing
-      endpoint: https://minio-service:9000
-      tls: on
-      tls.ca_file: /etc/fluentbit/tls/ca.crt
-      region: us-east-1
-      store_dir: /tmp/fluent-bit/s3
-      total_file_size: 1M
-      upload_timeout: 15s
-      use_put_object: on
-      s3_key_format: /$TAG/%Y/%m/%d/%H-%M-%S-$UUID
-      s3_key_format_tag_delimiters: .
-EOF
-)"
+      export fluentbit_custom="$(printf '%s\n' \
+        'pipeline:' \
+        '  filters:' \
+        '    - name: record_modifier' \
+        '      match: "*"' \
+        '      record:' \
+        '        - e2e_marker present' \
+        '  outputs:' \
+        '    - name: s3' \
+        '      match: "*.postgres"' \
+        '      bucket: operator-testing' \
+        '      endpoint: https://minio-service:9000' \
+        '      tls: on' \
+        '      tls.ca_file: /etc/fluentbit/tls/ca.crt' \
+        '      region: us-east-1' \
+        '      store_dir: /tmp/fluent-bit/s3' \
+        '      total_file_size: 1M' \
+        '      upload_timeout: 15s' \
+        '      use_put_object: on' \
+        '      s3_key_format: /$TAG/%Y/%m/%d/%H-%M-%S-$UUID' \
+        '      s3_key_format_tag_delimiters: .')"
 
       export logrotate_custom="$(printf '%s\n' \
         '/pgdata/pg*/log/*.log' \

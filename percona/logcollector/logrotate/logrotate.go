@@ -24,8 +24,11 @@ const (
 	entrypoint      = "/opt/crunchy/logcollector/entrypoint.sh"
 
 	// nss_wrapper lets logrotate resolve its own (postgres) UID even when that
-	// UID has no /etc/passwd entry in the collector image.
-	nssWrapperLib    = "/usr/lib64/libnss_wrapper.so"
+	// UID has no /etc/passwd entry in the collector image. The collector image
+	// does not ship libnss_wrapper.so, so the nss-wrapper-init init container
+	// (which runs the Postgres image) stages it onto the shared /tmp volume
+	// alongside the passwd and group files; we preload it from there.
+	nssWrapperLib    = "/tmp/nss_wrapper/libnss_wrapper.so"
 	nssWrapperPasswd = "/tmp/nss_wrapper/postgres/passwd" // #nosec G101 this is a file path, not a credential
 	nssWrapperGroup  = "/tmp/nss_wrapper/postgres/group"
 )
@@ -71,8 +74,9 @@ func Container(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount) (*corev1.C
 				Name:  "LOGROTATE_SCHEDULE",
 				Value: schedule(cr.Spec.LogCollector.LogRotate),
 			},
-			// Resolve the postgres UID via nss_wrapper (files staged by the
-			// nss-wrapper-init init container on the shared /tmp volume).
+			// Resolve the postgres UID via nss_wrapper (library, passwd, and group
+			// all staged by the nss-wrapper-init init container on the shared /tmp
+			// volume).
 			{Name: "LD_PRELOAD", Value: nssWrapperLib},
 			{Name: "NSS_WRAPPER_PASSWD", Value: nssWrapperPasswd},
 			{Name: "NSS_WRAPPER_GROUP", Value: nssWrapperGroup},
