@@ -68,7 +68,7 @@ To build a new Operator image based on your local changes, do the following:
 2. Build the Docker image and push it to the specified repository:
 
    ```
-   $ make build-docker-image
+   $ make build
    ```
 
 #### Update deployment manifests

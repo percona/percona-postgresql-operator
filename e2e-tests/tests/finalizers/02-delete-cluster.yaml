@@ -4,3 +4,28 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   name: finalizers
+commands:
+  - timeout: 180
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      wait_for_delete "postgrescluster.upstream.pgv2.percona.com/finalizers"
+      wait_for_delete "pg/finalizers"
+
+      assert_no_cluster_secrets() {
+        local count
+        count=$(kubectl -n "${NAMESPACE}" get secret -l postgres-operator.crunchydata.com/cluster=finalizers --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "${count}" != "0" ]]; then
+          echo "Found recreated secrets for deleted cluster finalizers"
+          kubectl -n "${NAMESPACE}" get secret -l postgres-operator.crunchydata.com/cluster=finalizers
+          exit 1
+        fi
+      }
+
+      # Check twice with a short delay to catch late secret recreation.
+      assert_no_cluster_secrets
+      sleep 15
+      assert_no_cluster_secrets

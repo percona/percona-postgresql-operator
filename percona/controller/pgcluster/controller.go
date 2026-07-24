@@ -107,6 +107,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		Owns(&v1beta1.PostgresCluster{}).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -194,6 +195,33 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 	})
 }
 
+func (r *PGClusterReconciler) watchPGBouncerUserSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchPGBouncerUserSecrets")
+
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldPGBouncerUserSecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by PgBouncer user secrets index", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
 func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, reconcile.Request] {
 	return handler.TypedFuncs[*corev1.Secret, reconcile.Request]{
 		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -256,8 +284,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
-		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
+		// Run pre-deletion finalizers before deleting PostgresCluster,
+		// because they may need to exec into pods (e.g. deleteBackups).
+		if err := r.runPrePostgresClusterDeletionFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run pre-postgrescluster finalizers")
 		}
 
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
@@ -266,8 +296,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
+
 			log.Info("Waiting for PostgresCluster to be deleted")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		} else if client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "get postgres cluster")
+		}
+
+		if err := r.runPostPostgresClusterDeletionFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run post-postgrescluster finalizers")
 		}
 
 		return reconcile.Result{}, nil
