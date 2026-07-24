@@ -258,23 +258,21 @@ func (r *Reconciler) Reconcile(
 
 	// K8SPG-1045
 	if err == nil {
-		if err = r.reconcileTLSCertManagementPolicy(ctx, cluster); err != nil {
+		if err = r.reconcileTLSCondition(ctx, cluster); err != nil {
 			return runtime.ErrorWithBackoff(err)
 		}
 
-		if cond := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady); cond != nil {
-			if cond.Status == metav1.ConditionFalse {
-				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-					Type:               v1beta1.PostgresClusterProgressing,
-					Status:             metav1.ConditionFalse,
-					Reason:             "Paused",
-					Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
-					ObservedGeneration: cluster.GetGeneration(),
-				})
-				return runtime.ErrorWithBackoff(patchClusterStatus())
-			}
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady, metav1.ConditionFalse) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:               v1beta1.PostgresClusterProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Paused",
+				Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
+				ObservedGeneration: cluster.GetGeneration(),
+			})
+			return runtime.ErrorWithBackoff(patchClusterStatus())
 		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
 	}
 
 	pgHBAs := postgres.NewHBAs()

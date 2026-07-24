@@ -32,7 +32,7 @@ const (
 )
 
 // K8SPG-1045
-func (r *Reconciler) reconcileTLSCertManagementPolicy(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
 	cond := metav1.Condition{
 		Type:               v1beta1.ConditionTypeTLSSecretsReady,
 		Status:             metav1.ConditionTrue,
@@ -186,8 +186,12 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 
 		root := &pki.RootCertificateAuthority{}
-		_ = root.Certificate.UnmarshalText(existing.Data[certificateKey])
-		_ = root.PrivateKey.UnmarshalText(existing.Data[privateKey])
+		if err := root.Certificate.UnmarshalText(existing.Data[certificateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse certificate in user-provided root CA secret %q", existing.Name)
+		}
+		if err := root.PrivateKey.UnmarshalText(existing.Data[privateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse private key in user-provided root CA secret %q", existing.Name)
+		}
 		if !pki.RootIsValid(root) {
 			return nil, errors.Errorf("user-provided root CA secret %q is invalid", existing.Name)
 		}
