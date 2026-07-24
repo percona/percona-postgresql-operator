@@ -28,7 +28,10 @@ commands:
         '      upload_timeout: 15s' \
         '      use_put_object: on' \
         '      s3_key_format: /$TAG/%Y/%m/%d/%H-%M-%S-$UUID' \
-        '      s3_key_format_tag_delimiters: .')"
+        '      s3_key_format_tag_delimiters: .' \
+        '      processors:' \
+        '        logs:' \
+        '          - name: opentelemetry_envelope')"
 
       export logrotate_custom="$(printf '%s\n' \
         '/pgdata/pg*/log/*.log' \
