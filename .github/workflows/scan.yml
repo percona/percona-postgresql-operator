@@ -28,7 +28,7 @@ jobs:
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/arm64'
-          make build-docker-image
+          make build
 
       - name: Build an image from Dockerfile (linux/amd64)
         run: |
@@ -36,4 +36,4 @@ jobs:
           export DOCKER_PUSH=0
           export DOCKER_SQUASH=0
           export DOCKER_DEFAULT_PLATFORM='linux/amd64'
-          make build-docker-image
+          make build

@@ -1360,6 +1360,11 @@ func (in *PGBouncerPodSpec) DeepCopyInto(out *PGBouncerPodSpec) {
 		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AdditionalTrustedCAs != nil {
+		in, out := &in.AdditionalTrustedCAs, &out.AdditionalTrustedCAs
+		*out = make([]corev1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(int32)
@@ -1409,6 +1414,11 @@ func (in *PGBouncerPodSpec) DeepCopyInto(out *PGBouncerPodSpec) {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(corev1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.UsersSecret != nil {
+		in, out := &in.UsersSecret, &out.UsersSecret
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env

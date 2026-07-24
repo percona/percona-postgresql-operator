@@ -481,7 +481,7 @@ pipeline {
                                 export RELEASE=0
                                 export IMAGE=\$DOCKER_TAG
                                 docker buildx create --use
-                                make build-docker-image
+                                make build
                                 docker logout
                             "
                         sudo rm -rf build

@@ -47,12 +47,14 @@ func Secret(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inRoot *pki.RootCertificateAuthority,
 	inSecret *corev1.Secret,
+	inUserSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
 	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
 	// PgBouncer frontend. When non-nil, its tls.crt/tls.key are used instead
 	// of generating a certificate with the internal PKI.
 	frontendCertManagerSecret *corev1.Secret,
+	additionalCAs [][]byte,
 ) error {
 	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
 		// PgBouncer is disabled; there is nothing to do.
@@ -76,7 +78,7 @@ func Secret(ctx context.Context,
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey] = authFileContents(password)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
 	}
@@ -93,11 +95,15 @@ func Secret(ctx context.Context,
 		} else {
 			leaf := &pki.LeafCertificate{}
 			var dnsNames []string
-			dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
-			if err != nil {
-				return errors.Wrap(err, "get service dns names")
+			var dnsFQDN string
+
+			if err == nil {
+				dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+				if err != nil {
+					return errors.Wrap(err, "get service dns names")
+				}
+				dnsFQDN = dnsNames[0]
 			}
-			dnsFQDN := dnsNames[0]
 
 			if err == nil {
 				// Unmarshal and validate the stored leaf. These first errors can
@@ -122,6 +128,21 @@ func Secret(ctx context.Context,
 		}
 	}
 
+	// K8SPG-952: Append any additional CAs to the PgBouncer frontend CA
+	// bundle so PgBouncer also trusts them when verifying client
+	// certificates. Entries keep their given order so identical inputs
+	// always produce identical bundle bytes.
+	if err == nil && len(additionalCAs) > 0 {
+		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
+		for _, ca := range additionalCAs {
+			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
+				bundle = append(bundle, '\n')
+			}
+			bundle = append(bundle, ca...)
+		}
+		outSecret.Data[certFrontendAuthoritySecretKey] = bundle
+	}
+
 	return err
 }
 
@@ -144,9 +165,10 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append([]corev1.VolumeProjection{},
+		Sources: append(append(append([]corev1.VolumeProjection{},
 			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret),
+			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

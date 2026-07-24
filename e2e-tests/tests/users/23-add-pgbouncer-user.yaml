@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" create secret generic "${test_name}-pgbouncer-users" \
+        --from-literal=stats_user=stats-password
+
+      kubectl -n "${NAMESPACE}" patch perconapgcluster/${test_name} --type=json \
+        -p '[{"op":"add","path":"/spec/proxy/pgBouncer/usersSecret","value":{"name":"'${test_name}'-pgbouncer-users"}}]'
