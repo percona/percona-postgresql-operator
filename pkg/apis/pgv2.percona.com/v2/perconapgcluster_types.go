@@ -878,6 +878,11 @@ type LogCollectorSpec struct {
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// Custom Fluent Bit configuration, merged into the log collector pipeline.
+	// Must be in Fluent Bit's YAML configuration format (the classic ".conf"
+	// format is not supported); this is what enables YAML-only features such as
+	// pipeline processors (e.g. opentelemetry_envelope). Invalid configuration
+	// is ignored by the collector at startup.
 	// +optional
 	Configuration string `json:"configuration,omitempty"`
 
@@ -904,12 +909,19 @@ type LogCollectorSpec struct {
 }
 
 type LogRotateSpec struct {
+	// Configuration allows overriding the default logrotate configuration.
 	// +optional
 	Configuration string `json:"configuration,omitempty"`
 
+	// ExtraConfig allows specifying logrotate configuration files in addition to
+	// the main configuration file. This should be a reference to a ConfigMap in
+	// the same namespace. Keys must contain the .conf extension to be processed
+	// correctly.
 	// +optional
 	ExtraConfig corev1.LocalObjectReference `json:"extraConfig,omitempty"`
 
+	// Schedule is the cron schedule on which logrotate runs.
+	// +kubebuilder:default="0 0 * * *"
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 }

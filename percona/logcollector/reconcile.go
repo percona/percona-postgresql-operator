@@ -2,18 +2,24 @@ package logcollector
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"reflect"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Reconcile wires the log collector sidecars, volumes, and backing ConfigMaps for the given cluster.
@@ -45,17 +51,49 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 
 	volumes := volumes(cr)
 
-	// The log collector currently runs only on PostgreSQL instance pods. These
-	// collect Postgres server logs and pgBackRest client/archive logs
-	// (/pgdata/pgbackrest/log). Collecting pgBackRest server logs from the
-	// dedicated repo host needs additional volume wiring on that pod and is not
-	// yet supported.
+	// The config is delivered through ConfigMaps mounted by a stable name, so a
+	// content change does not alter the pod template by itself. Stamping its hash
+	// onto the instance metadata rolls the pods when the config changes.
+	hash, err := configHash(cr)
+	if err != nil {
+		return errors.Wrap(err, "calculate config hash")
+	}
+
 	for i := range cr.Spec.InstanceSets {
-		cr.Spec.InstanceSets[i].Sidecars = append(cr.Spec.InstanceSets[i].Sidecars, containers...)
-		cr.Spec.InstanceSets[i].SidecarVolumes = append(cr.Spec.InstanceSets[i].SidecarVolumes, volumes...)
+		set := &cr.Spec.InstanceSets[i]
+		set.Sidecars = append(set.Sidecars, containers...)
+		set.SidecarVolumes = append(set.SidecarVolumes, volumes...)
+
+		if set.Metadata == nil {
+			set.Metadata = &crunchyv1beta1.Metadata{}
+		}
+		if set.Metadata.Annotations == nil {
+			set.Metadata.Annotations = make(map[string]string)
+		}
+		set.Metadata.Annotations[pNaming.AnnotationLogCollectorConfigHash] = hash
 	}
 
 	return nil
+}
+
+func configHash(cr *v2.PerconaPGCluster) (string, error) {
+	payload := struct {
+		FluentBit   string `json:"fluentBit"`
+		LogRotate   string `json:"logRotate"`
+		ExtraConfig string `json:"extraConfig"`
+	}{
+		FluentBit: cr.Spec.LogCollector.Configuration,
+	}
+	if lr := cr.Spec.LogCollector.LogRotate; lr != nil {
+		payload.LogRotate = lr.Configuration
+		payload.ExtraConfig = lr.ExtraConfig.Name
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
 func reconcileConfigMaps(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
@@ -75,7 +113,7 @@ func reconcileFluentBitConfigMap(ctx context.Context, c client.Client, cr *v2.Pe
 		return deleteConfigMapIfExists(ctx, c, cr.Namespace, name)
 	}
 
-	return createOrUpdateConfigMap(ctx, c, &corev1.ConfigMap{
+	return createOrUpdateConfigMap(ctx, c, cr, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: cr.Namespace,
@@ -96,7 +134,7 @@ func reconcileLogRotateConfigMap(ctx context.Context, c client.Client, cr *v2.Pe
 		return deleteConfigMapIfExists(ctx, c, cr.Namespace, name)
 	}
 
-	return createOrUpdateConfigMap(ctx, c, &corev1.ConfigMap{
+	return createOrUpdateConfigMap(ctx, c, cr, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: cr.Namespace,
@@ -118,7 +156,12 @@ func deleteConfigMapIfExists(ctx context.Context, c client.Client, namespace, na
 	return nil
 }
 
-func createOrUpdateConfigMap(ctx context.Context, c client.Client, desired *corev1.ConfigMap) error {
+func createOrUpdateConfigMap(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster, desired *corev1.ConfigMap) error {
+	// Own the ConfigMap so it is garbage collected when the cluster is deleted.
+	if err := controllerutil.SetControllerReference(cr, desired, c.Scheme()); err != nil {
+		return errors.Wrap(err, "set controller reference")
+	}
+
 	existing := &corev1.ConfigMap{}
 	err := c.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, existing)
 	if k8serrors.IsNotFound(err) {
@@ -127,10 +170,13 @@ func createOrUpdateConfigMap(ctx context.Context, c client.Client, desired *core
 	if err != nil {
 		return err
 	}
-	if reflect.DeepEqual(existing.Data, desired.Data) && reflect.DeepEqual(existing.Labels, desired.Labels) {
+	if reflect.DeepEqual(existing.Data, desired.Data) &&
+		reflect.DeepEqual(existing.Labels, desired.Labels) &&
+		reflect.DeepEqual(existing.OwnerReferences, desired.OwnerReferences) {
 		return nil
 	}
 	existing.Data = desired.Data
 	existing.Labels = desired.Labels
+	existing.OwnerReferences = desired.OwnerReferences
 	return c.Update(ctx, existing)
 }

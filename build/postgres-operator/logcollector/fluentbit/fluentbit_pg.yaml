@@ -1,0 +1,33 @@
+service:
+  flush: 1
+  log_level: error
+  daemon: off
+  parsers_file: /opt/crunchy/logcollector/fluentbit/parsers_multiline.conf
+
+pipeline:
+  inputs:
+    - name: tail
+      path: ${PG_LOG_DIR}/*.log,${PG_LOG_DIR}/*.csv
+      tag: ${POD_NAMESPACE}.${POD_NAME}.postgres
+      refresh_interval: 5
+      db: /pgdata/fluentbit/flb_pg_${FLB_DB_VER}.db
+      ignore_older: 1d
+      read_from_head: true
+      path_key: file
+      skip_long_lines: on
+
+    - name: tail
+      path: ${PGBACKREST_LOG_DIR}/*.log
+      tag: ${POD_NAMESPACE}.${POD_NAME}.pgbackrest
+      refresh_interval: 5
+      db: /pgdata/fluentbit/flb_pgbackrest_${FLB_DB_VER}.db
+      ignore_older: 1d
+      read_from_head: true
+      path_key: file
+      skip_long_lines: on
+
+  outputs:
+    - name: stdout
+      match: '*'
+      format: json_lines
+      json_date_key: false

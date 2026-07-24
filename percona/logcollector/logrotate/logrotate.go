@@ -9,16 +9,16 @@ import (
 )
 
 const (
-	ContainerName = "logrotate"
+	containerName = "logrotate"
 
-	ConfigMapNameSuffix = "log-collector-logrotate-config"
+	configMapNameSuffix = "log-collector-logrotate-config"
 	VolumeName          = "log-collector-logrotate-volume"
 
 	// PostgresConfig is the ConfigMap key holding the operator-managed
 	// logrotate snippet.
 	PostgresConfig = "postgres.conf"
 
-	DefaultSchedule = "0 0 * * *"
+	defaultSchedule = "0 0 * * *"
 
 	configMountPath = "/opt/crunchy/logcollector/logrotate/conf.d"
 	entrypoint      = "/opt/crunchy/logcollector/entrypoint.sh"
@@ -32,9 +32,9 @@ const (
 
 func ConfigMapName(prefix string) string {
 	if prefix == "" {
-		return ConfigMapNameSuffix
+		return configMapNameSuffix
 	}
-	return prefix + "-" + ConfigMapNameSuffix
+	return prefix + "-" + configMapNameSuffix
 }
 
 func Container(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount) (*corev1.Container, error) {
@@ -43,7 +43,7 @@ func Container(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount) (*corev1.C
 	}
 
 	container := corev1.Container{
-		Name:            ContainerName,
+		Name:            containerName,
 		Image:           cr.Spec.LogCollector.Image,
 		ImagePullPolicy: cr.Spec.LogCollector.ImagePullPolicy,
 		SecurityContext: cr.Spec.LogCollector.ContainerSecurityContext,
@@ -102,5 +102,5 @@ func schedule(lr *v2.LogRotateSpec) string {
 	if lr != nil && lr.Schedule != "" {
 		return lr.Schedule
 	}
-	return DefaultSchedule
+	return defaultSchedule
 }

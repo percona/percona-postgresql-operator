@@ -22006,6 +22006,12 @@ spec:
                 description: The specification of the log collector sidecar.
                 properties:
                   configuration:
+                    description: |-
+                      Custom Fluent Bit configuration, merged into the log collector pipeline.
+                      Must be in Fluent Bit's YAML configuration format (the classic ".conf"
+                      format is not supported); this is what enables YAML-only features such as
+                      pipeline processors (e.g. opentelemetry_envelope). Invalid configuration
+                      is ignored by the collector at startup.
                     type: string
                   containerSecurityContext:
                     description: |-
@@ -22419,11 +22425,15 @@ spec:
                   logRotate:
                     properties:
                       configuration:
+                        description: Configuration allows overriding the default logrotate
+                          configuration.
                         type: string
                       extraConfig:
                         description: |-
-                          LocalObjectReference contains enough information to let you locate the
-                          referenced object inside the same namespace.
+                          ExtraConfig allows specifying logrotate configuration files in addition to
+                          the main configuration file. This should be a reference to a ConfigMap in
+                          the same namespace. Keys must contain the .conf extension to be processed
+                          correctly.
                         properties:
                           name:
                             default: ""
@@ -22437,6 +22447,9 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       schedule:
+                        default: 0 0 * * *
+                        description: Schedule is the cron schedule on which logrotate
+                          runs.
                         type: string
                     type: object
                   resources:

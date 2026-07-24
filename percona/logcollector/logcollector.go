@@ -3,12 +3,12 @@ package logcollector
 import (
 	"fmt"
 
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
@@ -17,7 +17,7 @@ const (
 	containerName                    = "logs"
 	configMapNameSuffix              = "log-collector-config"
 	volumeName                       = "log-collector-volume"
-	fluentBitCustomConfigurationFile = "fluentbit_custom.conf"
+	fluentBitCustomConfigurationFile = "fluentbit_custom.yaml"
 	customConfigMountPath            = "/opt/crunchy/logcollector/fluentbit/custom"
 	entrypoint                       = "/opt/crunchy/logcollector/entrypoint.sh"
 )
