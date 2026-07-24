@@ -141,8 +141,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 	}
 
 	if leader == nil {
-		// TODO(cbandy): We need to build a different kind of Service here.
-		return nil, nil, errors.New("Patroni DCS other than Kubernetes Endpoints is not implemented")
+		return nil, nil, errors.New("Patroni leader lease Service is missing")
 	}
 
 	// Allocate no IP address (headless) and manage the Endpoints ourselves.

@@ -1623,6 +1623,12 @@ func (r *Reconciler) generateDCSCleanupJobIntent(
 	)
 	meta.Labels = labels
 
+	// This Job is part of the in-place restore, so it reuses the restore's resources.
+	var resources corev1.ResourceRequirements
+	if restore := cluster.Spec.Backups.PGBackRest.Restore; restore != nil {
+		resources = restore.Resources
+	}
+
 	job.ObjectMeta = meta
 	job.Spec = batchv1.JobSpec{
 		// one attempt; prepareForRestore deletes and recreates the Job on failure
@@ -1637,6 +1643,7 @@ func (r *Reconciler) generateDCSCleanupJobIntent(
 					Image:           config.PostgresContainerImage(cluster),
 					ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 					SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
+					Resources:       resources,
 				}},
 				RestartPolicy:                corev1.RestartPolicyNever,
 				AutomountServiceAccountToken: new(false),
@@ -1645,6 +1652,16 @@ func (r *Reconciler) generateDCSCleanupJobIntent(
 				SecurityContext:              postgres.PodSecurityContext(cluster),
 			},
 		},
+	}
+
+	// This Job is part of the in-place restore, so it reuses the restore's
+	// scheduling configuration (affinity, tolerations, priorityClassName).
+	if restore := cluster.Spec.Backups.PGBackRest.Restore; restore != nil {
+		job.Spec.Template.Spec.Affinity = restore.Affinity
+		job.Spec.Template.Spec.Tolerations = restore.Tolerations
+		if restore.PriorityClassName != nil {
+			job.Spec.Template.Spec.PriorityClassName = *restore.PriorityClassName
+		}
 	}
 
 	patroni.DCSCleanupJob(cluster, clusterConfigMap, instanceConfigMap, instanceCertificates,
