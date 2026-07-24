@@ -55,9 +55,9 @@ func drainEvents(r *PGClusterReconciler) []string {
 	}
 }
 
-func etcdCR(namespace string, dcs *v1beta1.PatroniDCS) *v2.PerconaPGCluster {
+func etcdCR(dcs *v1beta1.PatroniDCS) *v2.PerconaPGCluster {
 	return &v2.PerconaPGCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "ns"},
 		Spec: v2.PerconaPGClusterSpec{
 			Patroni: &v1beta1.PatroniSpec{DCS: dcs},
 		},
@@ -78,21 +78,21 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 
 	t.Run("kubernetes DCS returns nil", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{Type: v1beta1.PatroniDCSTypeKubernetes})
+		cr := etcdCR(&v1beta1.PatroniDCS{Type: v1beta1.PatroniDCSTypeKubernetes})
 		assert.NilError(t, r.reconcilePatroniEtcd(ctx, cr))
 		assert.Equal(t, len(drainEvents(r)), 0)
 	})
 
 	t.Run("nil dcs returns nil", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", nil)
+		cr := etcdCR(nil)
 		assert.NilError(t, r.reconcilePatroniEtcd(ctx, cr))
 		assert.Equal(t, len(drainEvents(r)), 0)
 	})
 
 	t.Run("etcd DCS no secrets returns nil", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints: []string{"https://etcd:2379"},
@@ -104,7 +104,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 
 	t.Run("tls secret missing emits warning and error", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints: []string{"https://etcd:2379"},
@@ -128,7 +128,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 			},
 		}
 		r := newEtcdTestReconciler(t, secret)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints: []string{"https://etcd:2379"},
@@ -144,7 +144,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 
 	t.Run("auth secret missing emits warning and error", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints:  []string{"https://etcd:2379"},
@@ -167,7 +167,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 			},
 		}
 		r := newEtcdTestReconciler(t, secret)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints:  []string{"https://etcd:2379"},
@@ -198,7 +198,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 			},
 		}
 		r := newEtcdTestReconciler(t, tlsSecret, authSecret)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints:  []string{"https://etcd:2379"},
@@ -212,7 +212,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 
 	t.Run("both secrets missing reports both in one cycle", func(t *testing.T) {
 		r := newEtcdTestReconciler(t)
-		cr := etcdCR("ns", &v1beta1.PatroniDCS{
+		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
 			Etcd: &v1beta1.PatroniEtcdSpec{
 				Endpoints:  []string{"https://etcd:2379"},
