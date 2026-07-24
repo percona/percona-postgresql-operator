@@ -48,7 +48,7 @@ RUN ./bin/license_aggregator.sh ./cmd/...; \
 	cp -r ./licenses /licenses
 
 FROM registry.access.redhat.com/${BASE_IMAGE}/ubi-minimal AS ubi
-RUN microdnf update -y && microdnf clean all -y
+RUN microdnf update -y && microdnf clean all -y || true
 
 LABEL name="Percona Postgres Operator" \
       vendor="Percona" \

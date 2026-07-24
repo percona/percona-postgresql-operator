@@ -10,9 +10,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/kubeapi"
+	"github.com/percona/percona-postgresql-operator/v3/internal/kubeapi"
 )
 
 // apply sends an apply patch to object's endpoint in the Kubernetes API and
@@ -24,7 +25,7 @@ func (r *Reconciler) apply(ctx context.Context, object client.Object) error {
 	// Generate an apply-patch by comparing the object to its zero value.
 	zero := reflect.New(reflect.TypeOf(object).Elem()).Interface()
 	data, err := client.MergeFrom(zero.(client.Object)).Data(object)
-	apply := client.RawPatch(client.Apply.Type(), data)
+	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// Keep a copy of the object before any API calls.
 	intent := object.DeepCopyObject()

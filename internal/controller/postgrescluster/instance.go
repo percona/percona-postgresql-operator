@@ -27,20 +27,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Instance represents a single PostgreSQL instance of a PostgresCluster.
@@ -507,12 +507,12 @@ func (r *Reconciler) deleteInstances(
 	// There are multiple instances; stop the replicas. When none are found,
 	// requeue to try again.
 
-	result.Requeue = true
+	result.RequeueAfter = 1 * time.Second
 	for i := range pods.Items {
 		role := pods.Items[i].Labels[naming.LabelRole]
 		if err == nil && role == naming.RolePatroniReplica {
 			err = stop(&pods.Items[i])
-			result.Requeue = false
+			result.RequeueAfter = 0
 		}
 
 		// An instance without a role label is not participating in the Patroni
@@ -520,7 +520,7 @@ func (r *Reconciler) deleteInstances(
 		// stop these as well.
 		if err == nil && len(role) == 0 {
 			err = stop(&pods.Items[i])
-			result.Requeue = false
+			result.RequeueAfter = 0
 		}
 	}
 
@@ -1226,6 +1226,10 @@ func (r *Reconciler) reconcileInstance(
 		err = patroni.InstancePod(
 			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
 			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
+		if err != nil {
+			return errors.Wrap(err, "failed to populate pod")
+		}
+
 	}
 
 	// Add pgMonitor resources to the instance Pod spec

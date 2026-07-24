@@ -17,9 +17,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="services",verbs={get}
@@ -38,7 +38,7 @@ func (r *PGAdminReconciler) reconcilePGAdminService(
 	// need to delete any existing service(s). At the start of every reconcile
 	// get all services that match the current pgAdmin labels.
 	services := corev1.ServiceList{}
-	if err := r.Client.List(ctx, &services,
+	if err := r.List(ctx, &services,
 		client.InNamespace(pgadmin.Namespace),
 		client.MatchingLabels{
 			naming.LabelStandalonePGAdmin: pgadmin.Name,
@@ -64,7 +64,7 @@ func (r *PGAdminReconciler) reconcilePGAdminService(
 	if pgadmin.Spec.ServiceName != "" {
 		// Look for an existing service with name ServiceName in the namespace
 		existingService := &corev1.Service{}
-		err := r.Client.Get(ctx, types.NamespacedName{
+		err := r.Get(ctx, types.NamespacedName{
 			Name:      pgadmin.Spec.ServiceName,
 			Namespace: pgadmin.GetNamespace(),
 		}, existingService)

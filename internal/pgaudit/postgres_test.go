@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 )
 
 func TestEnableInPostgreSQL(t *testing.T) {

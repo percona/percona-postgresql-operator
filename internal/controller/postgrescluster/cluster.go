@@ -14,12 +14,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="configmaps",verbs={create,patch}
@@ -92,7 +92,7 @@ func (r *Reconciler) reconcileClusterPodService(
 // resolve to the PostgreSQL primary instance.
 func (r *Reconciler) generateClusterPrimaryService(
 	cluster *v1beta1.PostgresCluster, leader *corev1.Service,
-) (*corev1.Service, *corev1.Endpoints, error) {
+) (*corev1.Service, *corev1.Endpoints, error) { //nolint:staticcheck // SA1019
 	// We want to name and label our primary Service consistently. When Patroni is
 	// using Endpoints for its DCS, however, they and any Service that uses them
 	// must use the same name as the Patroni "scope" which has its own constraints.
@@ -118,7 +118,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	// Endpoints for a Service have the same name as the Service. Copy labels,
 	// annotations, and ownership, too.
-	endpoints := &corev1.Endpoints{}
+	endpoints := &corev1.Endpoints{} //nolint:staticcheck // SA1019
 	service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
 	endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
 
@@ -141,7 +141,7 @@ func (r *Reconciler) generateClusterPrimaryService(
 	}}
 
 	// Resolve to the ClusterIP for which Patroni has configured the Endpoints.
-	endpoints.Subsets = []corev1.EndpointSubset{{
+	endpoints.Subsets = []corev1.EndpointSubset{{ //nolint:staticcheck // SA1019
 		Addresses: []corev1.EndpointAddress{{IP: leader.Spec.ClusterIP}},
 	}}
 

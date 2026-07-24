@@ -15,9 +15,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/bridge"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePostgresRoleSecret(t *testing.T) {
@@ -36,7 +36,7 @@ func TestGeneratePostgresRoleSecret(t *testing.T) {
 		Name:       "application",
 		SecretName: "application-role-secret",
 	}
-	role := &bridge.ClusterRoleApiResource{
+	role := &bridge.ClusterRoleApiResource{ //nolint:gosec //test data
 		Name:     "application",
 		Password: "password",
 		URI:      "postgres://application:password@example.com:5432/postgres",
@@ -149,7 +149,7 @@ func TestReconcilePostgresRoleSecrets(t *testing.T) {
 			Name:       "application",
 			SecretName: "application-role-secret",
 		}
-		postgresSpec := &v1beta1.CrunchyBridgeClusterRoleSpec{
+		postgresSpec := &v1beta1.CrunchyBridgeClusterRoleSpec{ //nolint:gosec //test data
 			Name:       "postgres",
 			SecretName: "postgres-role-secret",
 		}

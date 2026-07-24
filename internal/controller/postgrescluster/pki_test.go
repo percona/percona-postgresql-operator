@@ -22,11 +22,11 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // TestReconcileCerts tests the proper reconciliation of the root ca certificate
@@ -99,7 +99,7 @@ func TestReconcileCerts(t *testing.T) {
 			err := tClient.Get(ctx, client.ObjectKeyFromObject(cluster1CASecret), cluster1CASecret)
 			assert.NilError(t, err)
 
-			assert.Check(t, len(cluster1CASecret.ObjectMeta.OwnerReferences) == 1, "first owner reference not set")
+			assert.Check(t, len(cluster1CASecret.OwnerReferences) == 1, "first owner reference not set")
 
 			expectedOR := metav1.OwnerReference{
 				APIVersion:         "upstream.pgv2.percona.com/v1beta1",
@@ -110,11 +110,11 @@ func TestReconcileCerts(t *testing.T) {
 				BlockOwnerDeletion: new(true),
 			}
 
-			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
-			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].Kind, expectedOR.Kind)
-			assert.Equal(t, cluster1CASecret.ObjectMeta.OwnerReferences[0].Name, expectedOR.Name)
-			assert.Equal(t, *cluster1CASecret.ObjectMeta.OwnerReferences[0].Controller, true)
-			assert.Equal(t, *cluster1CASecret.ObjectMeta.OwnerReferences[0].BlockOwnerDeletion, true)
+			assert.Equal(t, cluster1CASecret.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
+			assert.Equal(t, cluster1CASecret.OwnerReferences[0].Kind, expectedOR.Kind)
+			assert.Equal(t, cluster1CASecret.OwnerReferences[0].Name, expectedOR.Name)
+			assert.Equal(t, *cluster1CASecret.OwnerReferences[0].Controller, true)
+			assert.Equal(t, *cluster1CASecret.OwnerReferences[0].BlockOwnerDeletion, true)
 		})
 
 		t.Run("check root CA secret for cluster2", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestReconcileCerts(t *testing.T) {
 			clist := &v1beta1.PostgresClusterList{}
 			assert.NilError(t, tClient.List(ctx, clist))
 
-			assert.Check(t, len(cluster2CASecret.ObjectMeta.OwnerReferences) == 1, "should be single owner reference")
+			assert.Check(t, len(cluster2CASecret.OwnerReferences) == 1, "should be single owner reference")
 
 			expectedOR := metav1.OwnerReference{
 				APIVersion:         "upstream.pgv2.percona.com/v1beta1",
@@ -138,11 +138,11 @@ func TestReconcileCerts(t *testing.T) {
 				BlockOwnerDeletion: new(true),
 			}
 
-			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
-			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].Kind, expectedOR.Kind)
-			assert.Equal(t, cluster2CASecret.ObjectMeta.OwnerReferences[0].Name, expectedOR.Name)
-			assert.Equal(t, *cluster2CASecret.ObjectMeta.OwnerReferences[0].Controller, true)
-			assert.Equal(t, *cluster2CASecret.ObjectMeta.OwnerReferences[0].BlockOwnerDeletion, true)
+			assert.Equal(t, cluster2CASecret.OwnerReferences[0].APIVersion, expectedOR.APIVersion)
+			assert.Equal(t, cluster2CASecret.OwnerReferences[0].Kind, expectedOR.Kind)
+			assert.Equal(t, cluster2CASecret.OwnerReferences[0].Name, expectedOR.Name)
+			assert.Equal(t, *cluster2CASecret.OwnerReferences[0].Controller, true)
+			assert.Equal(t, *cluster2CASecret.OwnerReferences[0].BlockOwnerDeletion, true)
 		})
 
 		t.Run("root certificate is returned correctly", func(t *testing.T) {
@@ -318,7 +318,7 @@ func TestReconcileCerts(t *testing.T) {
 			testSecret := &corev1.Secret{}
 			testSecret.Namespace, testSecret.Name = namespace, "newcustomsecret"
 			// simulate cluster spec update
-			cluster2.Spec.CustomTLSSecret.LocalObjectReference.Name = "newcustomsecret"
+			cluster2.Spec.CustomTLSSecret.Name = "newcustomsecret"
 
 			// get the expected secret projection
 			testSecretProjection := clusterCertSecretProjection(testSecret)

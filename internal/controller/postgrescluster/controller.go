@@ -38,26 +38,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
-	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgcron"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pmm"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v3/internal/setuser"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -438,9 +438,8 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		var next reconcile.Result
 		if next, err = r.reconcilePGBackRest(ctx, cluster,
-			instances, rootCA, backupsSpecFound); err == nil && !next.IsZero() {
-			result.Requeue = result.Requeue || next.Requeue
-			if next.RequeueAfter > 0 {
+			instances, rootCA, backupsSpecFound); err == nil && next.RequeueAfter > 0 {
+			if result.RequeueAfter == 0 || next.RequeueAfter < result.RequeueAfter {
 				result.RequeueAfter = next.RequeueAfter
 			}
 		}
@@ -596,7 +595,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	bldr := builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
-		Owns(&corev1.Endpoints{}).
+		Owns(&corev1.Endpoints{}).                     //nolint:staticcheck // SA1019: matches production code
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).

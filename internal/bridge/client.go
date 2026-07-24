@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const defaultAPI = "https://api.crunchybridge.com"
@@ -279,7 +279,7 @@ func (c *Client) doWithBackoff(
 			request.Header = headers.Clone()
 
 			//nolint:bodyclose // This response is returned to the caller.
-			response, err = c.Client.Do(request)
+			response, err = c.Do(request)
 		}
 
 		// An error indicates there was no response from the server, and the
@@ -723,7 +723,7 @@ func (c *Client) UpdateCluster(
 ) (*ClusterApiResource, error) {
 	result := &ClusterApiResource{}
 
-	clusterbyte, err := json.Marshal(clusterRequestPayload)
+	clusterbyte, err := json.Marshal(clusterRequestPayload) //nolint:errchkjson //in case the struct changes, we would need to check the error anyway
 	if err != nil {
 		return result, err
 	}

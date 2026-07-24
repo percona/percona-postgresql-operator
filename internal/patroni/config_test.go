@@ -18,13 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestClusterYAML(t *testing.T) {
@@ -1285,7 +1285,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "command.sh")
 		assert.NilError(t, os.WriteFile(file, []byte(command), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", "--shell=sh", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", "--shell=sh", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}
@@ -1307,7 +1307,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "script.bash")
 		assert.NilError(t, os.WriteFile(file, []byte(script), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}

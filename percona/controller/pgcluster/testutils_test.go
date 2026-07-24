@@ -18,15 +18,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
-	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgbackup"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/v3/percona/watcher"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var k8sClient client.Client
@@ -150,23 +150,6 @@ func readDefaultOperator(name, namespace string) (*appsv1.Deployment, error) {
 	return cr, nil
 }
 
-func readDefaultBackup(name, namespace string) (*v2.PerconaPGBackup, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", "backup.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	bcp := &v2.PerconaPGBackup{}
-
-	if err := yaml.Unmarshal(data, bcp); err != nil {
-		return nil, err
-	}
-
-	bcp.Name = name
-	bcp.Namespace = namespace
-	return bcp, nil
-}
-
 type fakeClient struct {
 	client.Client
 }
@@ -178,7 +161,7 @@ func (f *fakeClient) Patch(ctx context.Context, obj client.Object, patch client.
 	if !k8serrors.IsNotFound(err) {
 		return err
 	}
-	if err := f.Client.Create(ctx, obj); err != nil {
+	if err := f.Create(ctx, obj); err != nil {
 		return err
 	}
 	return f.Client.Patch(ctx, obj, patch, options...)
@@ -202,7 +185,7 @@ func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...clien
 	}
 	objs = append(objs, postgresCluster)
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster)}
+	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster)} //nolint:staticcheck // SA1019: matches production code
 	dcs.Annotations = map[string]string{
 		"initialize": "system-identifier",
 	}

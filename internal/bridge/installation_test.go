@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
 )
 
 func TestExtractSecretContract(t *testing.T) {
@@ -99,7 +99,7 @@ func TestInstallationReconcile(t *testing.T) {
 
 				reconciler.NewClient = func() *Client {
 					c := NewClient(server.URL, "")
-					c.Backoff.Steps = 1
+					c.Steps = 1
 					assert.Equal(t, c.BaseURL.String(), server.URL)
 					return c
 				}
@@ -155,7 +155,7 @@ func TestInstallationReconcile(t *testing.T) {
 
 				reconciler.NewClient = func() *Client {
 					c := NewClient(server.URL, "")
-					c.Backoff.Steps = 1
+					c.Steps = 1
 					assert.Equal(t, c.BaseURL.String(), server.URL)
 					return c
 				}
@@ -289,7 +289,7 @@ func TestInstallationReconcile(t *testing.T) {
 
 				reconciler.NewClient = func() *Client {
 					c := NewClient(server.URL, "")
-					c.Backoff.Steps = 1
+					c.Steps = 1
 					assert.Equal(t, c.BaseURL.String(), server.URL)
 					return c
 				}
@@ -343,7 +343,7 @@ func TestInstallationReconcile(t *testing.T) {
 
 				reconciler.NewClient = func() *Client {
 					c := NewClient(server.URL, "")
-					c.Backoff.Steps = 1
+					c.Steps = 1
 					assert.Equal(t, c.BaseURL.String(), server.URL)
 					return c
 				}
@@ -426,7 +426,7 @@ func TestInstallationReconcile(t *testing.T) {
 
 					reconciler.NewClient = func() *Client {
 						c := NewClient(server.URL, "")
-						c.Backoff.Steps = 1
+						c.Steps = 1
 						assert.Equal(t, c.BaseURL.String(), server.URL)
 						return c
 					}

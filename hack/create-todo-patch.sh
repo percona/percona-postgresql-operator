@@ -36,9 +36,11 @@ name_desc_with_todo=$(
     .spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.customTLSSecret.properties.name.description \
     "${clusters_dir}/generated/upstream.pgv2.percona.com_postgresclusters.yaml"
 )
+# shellcheck disable=SC2001
 name_desc_without_todo=$(sed 's/ TODO.*//g' <<< "${name_desc_with_todo}")
 
 # Generate a JSON patch file to update the "name" description for all applicable paths in the CRD.
+# shellcheck disable=SC2016
 python3 -m yq -y --arg old "${name_desc_with_todo}" --arg new "${name_desc_without_todo}" '
 	[{ op: "add", path: "/work", value: $new }] +
 	[paths(select(. == $old)) | { op: "copy", from: "/work", path: "/\(map(tostring) | join("/"))" }] +
@@ -46,6 +48,7 @@ python3 -m yq -y --arg old "${name_desc_with_todo}" --arg new "${name_desc_witho
 ' \
 	"${clusters_dir}/generated/upstream.pgv2.percona.com_postgresclusters.yaml" > "${clusters_dir}/todos.yaml"
 
+# shellcheck disable=SC2016
 python3 -m yq -y --arg old "${name_desc_with_todo}" --arg new "${name_desc_without_todo}" '
 	[{ op: "add", path: "/work", value: $new }] +
 	[paths(select(. == $old)) | { op: "copy", from: "/work", path: "/\(map(tostring) | join("/"))" }] +

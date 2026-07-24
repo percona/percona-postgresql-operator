@@ -8,6 +8,7 @@ import (
 	"context"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -22,7 +23,7 @@ func (r *PGAdminReconciler) patch(
 	patch client.Patch, options ...client.PatchOption,
 ) error {
 	options = append([]client.PatchOption{r.Owner}, options...)
-	return r.Client.Patch(ctx, object, patch, options...)
+	return r.Patch(ctx, object, patch, options...)
 }
 
 // apply sends an apply patch to object's endpoint in the Kubernetes API and
@@ -36,7 +37,7 @@ func (r *PGAdminReconciler) apply(ctx context.Context, object client.Object) err
 	// Generate an apply-patch by comparing the object to its zero value.
 	zero := reflect.New(reflect.TypeOf(object).Elem()).Interface()
 	data, err := client.MergeFrom(zero.(client.Object)).Data(object)
-	apply := client.RawPatch(client.Apply.Type(), data)
+	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// Send the apply-patch with force=true.
 	if err == nil {

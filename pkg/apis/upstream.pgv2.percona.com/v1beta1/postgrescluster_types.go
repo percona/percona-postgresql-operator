@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster

@@ -30,21 +30,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -783,7 +783,7 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 func (r *Reconciler) generateRepoVolumeIntent(postgresCluster *v1beta1.PostgresCluster,
 	spec corev1.PersistentVolumeClaimSpec, repoName string,
 	repoResources *RepoResources,
-) (*corev1.PersistentVolumeClaim, error) {
+) (*corev1.PersistentVolumeClaim, error) { //nolint:unparam
 	annotations := naming.Merge(
 		postgresCluster.Spec.Metadata.GetAnnotationsOrNil(),
 		postgresCluster.Spec.Backups.PGBackRest.Metadata.GetAnnotationsOrNil())
@@ -1004,10 +1004,10 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 // restore Jobs and then updating pgBackRest restore status accordingly.
 func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 	cluster *v1beta1.PostgresCluster,
-) ([]corev1.Endpoints, *batchv1.Job, error) {
+) ([]corev1.Endpoints, *batchv1.Job, error) { //nolint:staticcheck // SA1019
 	// lookup the various patroni endpoints
-	leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{}
-	currentEndpoints := []corev1.Endpoints{}
+	leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{} //nolint:staticcheck // SA1019
+	currentEndpoints := []corev1.Endpoints{}                                                  //nolint:staticcheck // SA1019
 	if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniLeaderEndpoints(cluster)),
 		&leaderEP); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -1130,7 +1130,7 @@ func (r *Reconciler) observeRestoreEnv(ctx context.Context,
 // cluster to re-bootstrap using a restored data directory.
 func (r *Reconciler) prepareForRestore(ctx context.Context,
 	cluster *v1beta1.PostgresCluster, observed *observedInstances,
-	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string,
+	currentEndpoints []corev1.Endpoints, restoreJob *batchv1.Job, restoreID string, //nolint:staticcheck // SA1019
 ) error {
 	setPreparingClusterCondition := func(resource string) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -1565,7 +1565,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	sa, err := r.reconcilePGBackRestRBAC(ctx, postgresCluster)
 	if err != nil {
 		log.Error(err, "unable to create replica creation backup")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 		return result, nil
 	}
 
@@ -1575,14 +1575,14 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	repoHost, err = r.reconcileDedicatedRepoHost(ctx, postgresCluster, repoResources, instances)
 	if err != nil {
 		log.Error(err, "unable to reconcile pgBackRest repo host")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 		return result, nil
 	}
 	repoHostName = repoHost.GetName()
 
 	if err := r.reconcilePGBackRestSecret(ctx, postgresCluster, repoHost, rootCA); err != nil {
 		log.Error(err, "unable to reconcile pgBackRest secret")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 	}
 
 	// calculate hashes for the external repository configurations in the spec (e.g. for Azure,
@@ -1591,7 +1591,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	configHashes, configHash, err := pgbackrest.CalculateConfigHashes(postgresCluster)
 	if err != nil {
 		log.Error(err, "unable to calculate config hashes")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 		return result, nil
 	}
 
@@ -1599,7 +1599,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	replicaCreateRepo, err := r.reconcileRepos(ctx, postgresCluster, configHashes, repoResources)
 	if err != nil {
 		log.Error(err, "unable to reconcile pgBackRest repo host")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 		return result, nil
 	}
 
@@ -1614,7 +1614,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 		configHash, naming.ClusterPodService(postgresCluster).Name,
 		postgresCluster.GetNamespace(), instanceNames); err != nil {
 		log.Error(err, "unable to reconcile pgBackRest configuration")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 	}
 
 	// reconcile the pgBackRest stanza for all configuration pgBackRest repos
@@ -1658,7 +1658,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	if err := r.reconcileReplicaCreateBackup(ctx, postgresCluster, instances,
 		repoResources.replicaCreateBackupJobs, sa, configHash, replicaCreateRepo); err != nil {
 		log.Error(err, "unable to reconcile replica creation backup")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 	}
 
 	// Reconcile a manual backup as defined in the spec, and triggered by the end-user via
@@ -1666,7 +1666,7 @@ func (r *Reconciler) reconcilePGBackRest(ctx context.Context,
 	if err := r.reconcileManualBackup(ctx, postgresCluster, repoResources.manualBackupJobs,
 		sa, instances); err != nil {
 		log.Error(err, "unable to reconcile manual backup")
-		result.Requeue = true
+		result.RequeueAfter = 1 * time.Second
 	}
 
 	return result, nil
@@ -2460,7 +2460,7 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 
 	if isCreate {
 		r.Recorder.Eventf(postgresCluster, corev1.EventTypeNormal, EventRepoHostCreated,
-			"created pgBackRest repository host %s/%s", repoHost.TypeMeta.Kind, repoHostName)
+			"created pgBackRest repository host %s/%s", repoHost.Kind, repoHostName)
 	}
 
 	return repoHost, nil
@@ -2664,7 +2664,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if currentBackupJob != nil {
-		backupJob.ObjectMeta.Name = currentBackupJob.ObjectMeta.Name
+		backupJob.Name = currentBackupJob.Name
 	}
 
 	var labels, annotations map[string]string
@@ -2678,8 +2678,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 		map[string]string{
 			naming.PGBackRestBackup: manualAnnotation,
 		})
-	backupJob.ObjectMeta.Labels = labels
-	backupJob.ObjectMeta.Annotations = annotations
+	backupJob.Labels = labels
+	backupJob.Annotations = annotations
 	// K8SPG-703
 	backupJob.Finalizers = []string{pNaming.FinalizerKeepJob}
 
@@ -2834,7 +2834,7 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 	backupJob := &batchv1.Job{}
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if job != nil {
-		backupJob.ObjectMeta.Name = job.ObjectMeta.Name
+		backupJob.Name = job.Name
 	}
 
 	var labels, annotations map[string]string
@@ -2852,8 +2852,8 @@ func (r *Reconciler) reconcileReplicaCreateBackup(ctx context.Context,
 		map[string]string{
 			naming.PGBackRestConfigHash: configHash,
 		})
-	backupJob.ObjectMeta.Labels = labels
-	backupJob.ObjectMeta.Annotations = annotations
+	backupJob.Labels = labels
+	backupJob.Annotations = annotations
 
 	// K8SPG-613
 	initImage, err := k8s.InitImage(ctx, r.Client, postgresCluster, &postgresCluster.Spec.Backups.PGBackRest)

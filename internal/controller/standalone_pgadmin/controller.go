@@ -17,9 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	controllerruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	controllerruntime "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // PGAdminReconciler reconciles a PGAdmin object
@@ -158,7 +158,7 @@ func (r *PGAdminReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *PGAdminReconciler) setControllerReference(
 	owner *v1beta1.PGAdmin, controlled client.Object,
 ) error {
-	return controllerutil.SetControllerReference(owner, controlled, r.Client.Scheme())
+	return controllerutil.SetControllerReference(owner, controlled, r.Scheme())
 }
 
 // deleteControlled safely deletes object when it is controlled by pgAdmin.
@@ -170,7 +170,7 @@ func (r *PGAdminReconciler) deleteControlled(
 		version := object.GetResourceVersion()
 		exactly := client.Preconditions{UID: &uid, ResourceVersion: &version}
 
-		return r.Client.Delete(ctx, object, exactly)
+		return r.Delete(ctx, object, exactly)
 	}
 
 	return nil

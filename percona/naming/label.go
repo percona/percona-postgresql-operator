@@ -1,5 +1,5 @@
 package naming
 
 const (
-	LabelOperatorVersion = PrefixPerconaPGV2 + "version"
+	LabelOperatorVersion = PrefixPerconaPGV3 + "version"
 )

@@ -3,8 +3,8 @@ package setuser
 import (
 	"context"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 )
 
 // EnableInPostgreSQL installs set_user in every database.

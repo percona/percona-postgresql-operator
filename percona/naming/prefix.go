@@ -5,12 +5,12 @@ import "strings"
 const (
 	PrefixPercona         = "percona.com/"
 	PrefixPerconaInternal = "internal." + PrefixPercona
-	PrefixPerconaPGV2     = "pgv2.percona.com/"
+	PrefixPerconaPGV3     = "pgv2.percona.com/"
 	PrefixCrunchy         = "postgres-operator.crunchydata.com/"
 )
 
 func ToCrunchyAnnotation(annotation string) string {
-	return replacePrefix(annotation, PrefixPerconaPGV2, PrefixCrunchy)
+	return replacePrefix(annotation, PrefixPerconaPGV3, PrefixCrunchy)
 }
 
 func replacePrefix(s, oldPrefix, newPrefix string) string {

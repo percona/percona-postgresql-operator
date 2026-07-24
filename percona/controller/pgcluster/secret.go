@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func getEnvFromSecrets(ctx context.Context, cl client.Client, cr *v2.PerconaPGCluster, envFromSource []corev1.EnvFromSource) ([]corev1.Secret, error) {
@@ -32,7 +32,7 @@ func getSecretHash(secrets ...corev1.Secret) string {
 	var data strings.Builder
 
 	for _, secret := range secrets {
-		data.WriteString(fmt.Sprintln(secret.Data))
+		fmt.Fprintln(&data, secret.Data)
 	}
 
 	return fmt.Sprintf("%x", md5.Sum([]byte(data.String()))) //nolint:gosec

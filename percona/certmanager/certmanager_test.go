@@ -2,12 +2,12 @@ package certmanager
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -17,8 +17,8 @@ import (
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func setupFakeClient(t *testing.T, objs ...sigs.Object) sigs.Client {
@@ -95,7 +95,7 @@ func TestCheck(t *testing.T) {
 		cl := setupFakeClient(t)
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
-			return nil, fmt.Errorf("failed to create checker")
+			return nil, errors.Errorf("failed to create checker")
 		}
 
 		err := ctrl.Check(t.Context(), &rest.Config{}, "default")
@@ -108,7 +108,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`no matches for kind "CertificateRequest" in group "cert-manager.io"`),
+				err: errors.Errorf(`no matches for kind "CertificateRequest" in group "cert-manager.io"`),
 			}, nil
 		}
 
@@ -121,7 +121,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf("error finding the scope of the object: failed to get restmapping: unable to retrieve the complete list of server APIs: cert-manager.io/v1: no matches for cert-manager.io/v1, Resource="),
+				err: errors.Errorf("error finding the scope of the object: failed to get restmapping: unable to retrieve the complete list of server APIs: cert-manager.io/v1: no matches for cert-manager.io/v1, Resource="),
 			}, nil
 		}
 
@@ -134,7 +134,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": service "cert-manager-webhook" not found`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": service "cert-manager-webhook" not found`),
 			}, nil
 		}
 
@@ -147,7 +147,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": dial tcp 10.96.38.90:443: connect: connection refused`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": dial tcp 10.96.38.90:443: connect: connection refused`),
 			}, nil
 		}
 
@@ -160,7 +160,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": x509: certificate signed by unknown authority`),
+				err: errors.Errorf(`Post "https://cert-manager-webhook.cert-manager.svc:443/mutate?timeout=10s": x509: certificate signed by unknown authority`),
 			}, nil
 		}
 
@@ -173,7 +173,7 @@ func TestCheck(t *testing.T) {
 		ctrl := NewController(cl, cl.Scheme(), false).(*controller)
 		ctrl.newChecker = func(_ *rest.Config, _ string) (cmapichecker.Interface, error) {
 			return &mockChecker{
-				err: fmt.Errorf("some unexpected error"),
+				err: errors.Errorf("some unexpected error"),
 			}, nil
 		}
 

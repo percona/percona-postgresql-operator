@@ -14,8 +14,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPopulateCluster(t *testing.T) {
@@ -57,7 +57,7 @@ func TestPopulateCluster(t *testing.T) {
 }
 
 func TestPopulatePatroniEndpoint(t *testing.T) {
-	endpoints := []corev1.Endpoints{
+	endpoints := []corev1.Endpoints{ //nolint:staticcheck // SA1019
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -85,7 +85,7 @@ func TestPopulatePatroniEndpoint(t *testing.T) {
 	world.populatePatroniEndpoints(endpoints)
 
 	// The first two have the correct labels.
-	assert.DeepEqual(t, world.PatroniEndpoints, []*corev1.Endpoints{
+	assert.DeepEqual(t, world.PatroniEndpoints, []*corev1.Endpoints{ //nolint:staticcheck // SA1019
 		&endpoints[0],
 		&endpoints[1],
 	})

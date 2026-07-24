@@ -29,25 +29,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgcluster"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore"
-	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgupgrade"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/standalone_pgadmin"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/upgradecheck"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	perconaController "github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgbackup"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgcluster"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore"
+	perconaPGUpgrade "github.com/percona/percona-postgresql-operator/v3/percona/controller/pgupgrade"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	perconaRuntime "github.com/percona/percona-postgresql-operator/v3/percona/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/percona/utils/registry"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -161,7 +161,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:              mgr.GetClient(),
 		Scheme:              mgr.GetScheme(),
 		Owner:               postgrescluster.ControllerName,
-		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
+		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName), //nolint:staticcheck
 		Tracer:              otel.Tracer(postgrescluster.ControllerName),
 		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
 		CertManagerCtrlFunc: certmanager.NewController,
@@ -199,7 +199,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pc := &pgcluster.PGClusterReconciler{
 		Client:               mgr.GetClient(),
 		Owner:                pgcluster.PGClusterControllerName,
-		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
+		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName), //nolint:staticcheck
 		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
 		Platform:             detectPlatform(ctx, mgr.GetConfig()),
 		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
@@ -253,7 +253,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pr := &pgrestore.PGRestoreReconciler{
 		Client:   mgr.GetClient(),
 		Owner:    pgrestore.PGRestoreControllerName,
-		Recorder: mgr.GetEventRecorderFor(pgrestore.PGRestoreControllerName),
+		Recorder: mgr.GetEventRecorderFor(pgrestore.PGRestoreControllerName), //nolint:staticcheck
 		Tracer:   otel.Tracer(pgrestore.PGRestoreControllerName),
 	}
 	if err := pr.SetupWithManager(mgr); err != nil {
@@ -279,7 +279,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	pgAdminReconciler := &standalone_pgadmin.PGAdminReconciler{
 		Client:      mgr.GetClient(),
 		Owner:       "pgadmin-controller",
-		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
+		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin), //nolint:staticcheck
 		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
 	}
 
