@@ -214,3 +214,26 @@ func GroupVersionKindExists(dc *discovery.DiscoveryClient, groupVersion, kind st
 
 	return false, nil
 }
+
+// GroupExists checks whether a given API group exists in the Kubernetes API Server.
+func GroupExists(dc *discovery.DiscoveryClient, group string) (bool, error) {
+	if dc == nil {
+		return false, errors.New("discovery client is nil")
+	}
+	if group == "" {
+		return false, errors.New("group must not be empty")
+	}
+
+	groups, err := dc.ServerGroups()
+	if err != nil {
+		return false, errors.Wrap(err, "get server groups")
+	}
+
+	for _, g := range groups.Groups {
+		if g.Name == group {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
