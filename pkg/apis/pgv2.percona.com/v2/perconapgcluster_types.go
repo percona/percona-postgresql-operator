@@ -295,10 +295,7 @@ func (cr *PerconaPGCluster) Default() {
 		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		// pgAudit packages are not built for PostgreSQL 19 (beta) yet; loading it
-		// via shared_preload_libraries would make postgres fail to start.
-		// Remove the version check once PostgreSQL 19 goes GA and pgAudit is available.
-		cr.Spec.Extensions.BuiltIn.PGAudit = new(cr.Spec.PostgresVersion < 19)
+		cr.Spec.Extensions.BuiltIn.PGAudit = new(true)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = new(false)
@@ -342,13 +339,13 @@ func (cr *PerconaPGCluster) Validate() error {
 	}
 	// Extension packages are not built for PostgreSQL 19 (beta) yet; loading them
 	// via shared_preload_libraries would make postgres fail to start.
+	// pgAudit is the exception: the PG 19 community image compiles it from source.
 	// Remove this check once PostgreSQL 19 goes GA and the extensions are available.
 	if cr.Spec.PostgresVersion >= 19 {
 		for _, ext := range []struct {
 			name    string
 			enabled *bool
 		}{
-			{"pg_audit", cr.Spec.Extensions.BuiltIn.PGAudit},
 			{"pg_cron", cr.Spec.Extensions.BuiltIn.PGCron},
 			{"set_user", cr.Spec.Extensions.BuiltIn.SetUser},
 		} {
