@@ -32,6 +32,7 @@ sidecars
 standby-pgbackrest
 standby-streaming
 start-from-backup
+start-from-backup-tde
 tablespaces
 telemetry-transfer
 upgrade-consistency

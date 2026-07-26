@@ -1,0 +1,59 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name="start-from-backup-tde-source"
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri ${cluster_name} postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 04-verify-extension-source --from-literal=pg_tde_extension="$result"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri ${cluster_name} postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 04-verify-encryption-source --from-literal=pg_tde_is_encrypted="$result"
+
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_psql_uri ${cluster_name} postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 04-verify-wal-encryption-source --from-literal=pg_tde_wal_encrypt="$result"
+
+      archiving_healthy=$(run_psql_command \
+        "SELECT last_failed_time IS NULL OR last_archived_time > last_failed_time FROM pg_stat_archiver;" \
+        "$(get_psql_uri ${cluster_name} postgres)" | xargs)
+      if [[ ${archiving_healthy} != "t" ]]; then
+        echo "archive_command is failing on ${cluster_name}:"
+        run_psql_command \
+          "SELECT * FROM pg_stat_archiver;" \
+          "$(get_psql_uri ${cluster_name} postgres)"
+        exit 1
+      fi
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri ${cluster_name} postgres)/myapp"
+
+      primary=$(get_pod_by_role ${cluster_name} primary name)
+      echo "Primary pod: ${primary}"
+      data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      kubectl create configmap -n "${NAMESPACE}" 04-read-from-primary-source --from-literal=data="${data}"
+
+      # Verify encrypted data is readable on replicas (TDE key available on replicas)
+      t=1
+      for i in $(kubectl get pods -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=${cluster_name},postgres-operator.crunchydata.com/role=replica -o jsonpath='{.items[*].metadata.name}'); do
+        echo "Replica pod: ${i}"
+        data=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+        kubectl create configmap -n "${NAMESPACE}" 04-read-from-replica-source-${t} --from-literal=data="${data}"
+
+        result=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c "psql -q -t -d myapp -c \"SELECT pg_tde_is_encrypted('myTable');\"" | tr -d '\n')
+        kubectl create configmap -n "${NAMESPACE}" 04-verify-encryption-replica-source-${t} --from-literal=pg_tde_is_encrypted="${result}"
+        t=$((t+1))
+      done
