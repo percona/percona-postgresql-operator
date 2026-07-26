@@ -1,0 +1,58 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 04-verify-extension-source
+data:
+  pg_tde_extension: ' pg_tde'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 04-verify-encryption-source
+data:
+  pg_tde_is_encrypted: ' t'
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-read-from-primary-source
+data:
+  data: |2-
+     100500
+     100501
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-read-from-replica-source-1
+data:
+  data: |2-
+     100500
+     100501
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 04-read-from-replica-source-2
+data:
+  data: |2-
+     100500
+     100501
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 04-verify-encryption-replica-source-1
+data:
+  pg_tde_is_encrypted: ' t'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 04-verify-encryption-replica-source-2
+data:
+  pg_tde_is_encrypted: ' t'
