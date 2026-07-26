@@ -451,6 +451,25 @@ run_psql_command() {
 		psql -v ON_ERROR_STOP=1 -t -q "${driver}://${uri}" -c "${command}"
 }
 
+# Fail unless pg_tde_key_info() contains global-master-key-<PostgresCluster metadata.uid>.
+assert_pg_tde_key_info_uid() {
+	local uri=${1}
+	local cluster=${2}
+
+	local uid
+	uid=$(kubectl -n "${NAMESPACE}" get postgrescluster "${cluster}" -o jsonpath='{.metadata.uid}')
+
+	echo "Showing TDE key info"
+	local key_info
+	key_info=$(run_psql_command "SELECT pg_tde_key_info();" "${uri}")
+	echo "${key_info}"
+
+	if [[ ${key_info} != *"global-master-key-${uid}"* ]]; then
+		echo "TDE key does not contain PostgresCluster ${cluster} uid ${uid}: ${key_info}"
+		exit 1
+	fi
+}
+
 get_psql_user_pass() {
 	local secret_name=${1}
 
@@ -463,6 +482,16 @@ get_psql_uri() {
 	local secret_name="${cluster}-pguser-${user}"
 
 	echo "${user}:$(get_psql_user_pass ${secret_name})@$(get_psql_user_host ${secret_name})"
+}
+
+get_standby_psql_uri() {
+	local standby_cluster=$1
+	local user=$2
+	local source_cluster=$3
+	local standby_secret_name="${standby_cluster}-pguser-${user}"
+	local source_secret_name="${source_cluster}-pguser-${user}"
+
+	echo "${user}:$(get_psql_user_pass ${source_secret_name})@$(get_psql_user_host ${standby_secret_name})"
 }
 
 get_pgbouncer_host() {

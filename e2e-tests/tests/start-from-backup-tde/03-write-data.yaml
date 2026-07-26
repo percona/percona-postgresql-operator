@@ -10,8 +10,8 @@ commands:
 
       run_psql_local \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE myTable (id int PRIMARY KEY) USING tde_heap;' \
-        "$(get_psql_uri source-cluster postgres)"
+        "$(get_psql_uri start-from-backup-tde-source postgres)"
 
       run_psql_local \
-        '\c myapp \\\ INSERT INTO myTable (id) VALUES (100500)' \
-        "$(get_psql_uri source-cluster postgres)"
+        '\c myapp \\\ INSERT INTO myTable (id) VALUES (100500), (100501)' \
+        "$(get_psql_uri start-from-backup-tde-source postgres)"
