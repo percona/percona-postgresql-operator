@@ -59,7 +59,7 @@ type PGUpgradeSpec struct {
 	// The major version of PostgreSQL to be upgraded to.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=13
-	// +kubebuilder:validation:Maximum=18
+	// +kubebuilder:validation:Maximum=19
 	ToPostgresVersion int `json:"toPostgresVersion"`
 
 	// The image name to use for PostgreSQL containers after upgrade.

@@ -2600,7 +2600,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 18
+                maximum: 19
                 minimum: 13
                 type: integer
               tolerations:

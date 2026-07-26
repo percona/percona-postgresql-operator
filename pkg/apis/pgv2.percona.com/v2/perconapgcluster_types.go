@@ -106,7 +106,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=18
+	// +kubebuilder:validation:Maximum=19
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -295,7 +295,10 @@ func (cr *PerconaPGCluster) Default() {
 		}
 	}
 	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = new(true)
+		// pgAudit packages are not built for PostgreSQL 19 (beta) yet; loading it
+		// via shared_preload_libraries would make postgres fail to start.
+		// Remove the version check once PostgreSQL 19 goes GA and pgAudit is available.
+		cr.Spec.Extensions.BuiltIn.PGAudit = new(cr.Spec.PostgresVersion < 19)
 	}
 	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
 		cr.Spec.Extensions.BuiltIn.PGVector = new(false)
@@ -336,6 +339,23 @@ func (cr *PerconaPGCluster) Validate() error {
 	if ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatMonitor, false) &&
 		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
 		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
+	}
+	// Extension packages are not built for PostgreSQL 19 (beta) yet; loading them
+	// via shared_preload_libraries would make postgres fail to start.
+	// Remove this check once PostgreSQL 19 goes GA and the extensions are available.
+	if cr.Spec.PostgresVersion >= 19 {
+		for _, ext := range []struct {
+			name    string
+			enabled *bool
+		}{
+			{"pg_audit", cr.Spec.Extensions.BuiltIn.PGAudit},
+			{"pg_cron", cr.Spec.Extensions.BuiltIn.PGCron},
+			{"set_user", cr.Spec.Extensions.BuiltIn.SetUser},
+		} {
+			if ptr.Deref(ext.enabled, false) {
+				return errors.Errorf("spec.extensions.builtin.%s cannot be enabled for PostgreSQL %d: extension packages are not built for beta releases", ext.name, cr.Spec.PostgresVersion)
+			}
+		}
 	}
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err

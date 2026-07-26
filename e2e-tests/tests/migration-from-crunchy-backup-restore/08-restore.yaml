@@ -56,7 +56,7 @@ commands:
       # that backup (avoids ambiguity if older backups exist in the repo).
       backup_label=$(kubectl -n "${NAMESPACE}" exec "${primary}" -- \
         pgbackrest info --output json --log-level-console=info --stanza=db \
-        | jq -r '[.[] | .backup[] | select(.type == "full") | select(.database.["repo-key"] == 1)][-1].label')
+        | jq -r '[.[] | .backup[] | select(.type == "full") | select(.database["repo-key"] == 1)][-1].label')
 
       if [ -z "${backup_label}" ] || [ "${backup_label}" = "null" ]; then
         echo "ERROR: could not determine latest full backup label"

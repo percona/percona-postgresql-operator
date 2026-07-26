@@ -23118,7 +23118,7 @@ spec:
               postgresVersion:
                 description: The major version of PostgreSQL installed in the PostgreSQL
                   image
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
@@ -31154,7 +31154,7 @@ spec:
                 type: object
               fromPostgresVersion:
                 description: The major version of PostgreSQL before the upgrade.
-                maximum: 17
+                maximum: 18
                 minimum: 12
                 type: integer
               image:
@@ -32806,7 +32806,7 @@ spec:
                 type: string
               toPostgresVersion:
                 description: The major version of PostgreSQL to be upgraded to.
-                maximum: 18
+                maximum: 19
                 minimum: 13
                 type: integer
               tolerations:
