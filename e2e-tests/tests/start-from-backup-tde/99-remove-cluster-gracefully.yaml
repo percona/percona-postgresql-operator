@@ -1,14 +1,15 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 300
 delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: pg-tde
+    name: start-from-backup-tde
 - apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: pg-tde
+    name: start-from-backup-tde
 commands:
   - script: |-
       set -o errexit
