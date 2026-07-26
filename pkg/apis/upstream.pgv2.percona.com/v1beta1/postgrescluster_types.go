@@ -266,8 +266,12 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.walEncryption) || !self.walEncryption || (has(self.enabled) && self.enabled)",message="pg_tde must be enabled to enable WAL encryption"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
+
+	// Encrypt write-ahead log segments. Requires enabled to be true.
+	WALEncryption bool `json:"walEncryption,omitempty"`
 
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }

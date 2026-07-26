@@ -245,6 +245,69 @@ pg1-socket-path = /tmp/postgres
 			cmp.Contains(configmap.Data["pgbackrest_repo.conf"],
 				"pg-version-force"))
 	})
+
+	// K8SPG-911
+	t.Run("WALEncryption", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+		cluster.Spec.Extensions.PGTDE.WALEncryption = true
+		cluster.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+			{
+				Name:   "repo1",
+				Volume: &v1beta1.RepoPVC{},
+			},
+		}
+
+		configmap := CreatePGBackRestConfigMapIntent(cluster,
+			"repo1", "number", "pod-service-name", "test-ns",
+			[]string{"some-instance"})
+
+		// pg_tde encrypts data pages at rest, so pgBackRest cannot validate their
+		// checksums. Both configurations need this: the instance archives WAL, the
+		// repo host runs the backups.
+		for _, key := range []string{"pgbackrest_instance.conf", "pgbackrest_repo.conf"} {
+			assert.Assert(t, cmp.Contains(configmap.Data[key], "checksum-page = n"), key)
+		}
+
+		// Asynchronous archiving is only the instance's concern, and it does not
+		// play well with WAL encryption.
+		assert.Assert(t, cmp.Contains(configmap.Data["pgbackrest_instance.conf"], "archive-async = n"))
+		assert.Assert(t, !strings.Contains(configmap.Data["pgbackrest_repo.conf"], "archive-async"))
+
+		// They land in [global] ahead of the user's own global config, so a user can
+		// still override them.
+		cluster.Spec.Backups.PGBackRest.Global = map[string]string{
+			"archive-async": "y",
+			"checksum-page": "y",
+		}
+
+		configmap = CreatePGBackRestConfigMapIntent(cluster,
+			"repo1", "number", "pod-service-name", "test-ns",
+			[]string{"some-instance"})
+
+		for _, key := range []string{"pgbackrest_instance.conf", "pgbackrest_repo.conf"} {
+			assert.Assert(t, cmp.Contains(configmap.Data[key], "checksum-page = y"), key)
+		}
+		assert.Assert(t, cmp.Contains(configmap.Data["pgbackrest_instance.conf"], "archive-async = y"))
+	})
+
+	t.Run("WALEncryptionDisabled", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{
+			{
+				Name:   "repo1",
+				Volume: &v1beta1.RepoPVC{},
+			},
+		}
+
+		configmap := CreatePGBackRestConfigMapIntent(cluster,
+			"repo1", "number", "pod-service-name", "test-ns",
+			[]string{"some-instance"})
+
+		for _, key := range []string{"pgbackrest_instance.conf", "pgbackrest_repo.conf"} {
+			assert.Assert(t, !strings.Contains(configmap.Data[key], "checksum-page"), key)
+		}
+	})
 }
 
 func TestMakePGBackrestLogDir(t *testing.T) {
@@ -340,24 +403,65 @@ func TestRestoreCommand(t *testing.T) {
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
 		"--repo=1",
 	}
-	command := RestoreCommand(pgdata, "try", "", nil, false, strings.Join(opts, " "))
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.Spec.PostgresVersion = 13
 
-	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
-	assert.Assert(t, len(command) > 3)
+	shellcheckScript := func(t *testing.T, command []string) {
+		t.Helper()
 
-	dir := t.TempDir()
-	file := filepath.Join(dir, "script.bash")
-	assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+		assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
+		assert.Assert(t, len(command) > 3)
 
-	cmd := exec.Command(shellcheck, "--enable=all", file)
-	output, err := cmd.CombinedOutput()
-	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+		dir := t.TempDir()
+		file := filepath.Join(dir, "script.bash")
+		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+
+		cmd := exec.Command(shellcheck, "--enable=all", file)
+		output, err := cmd.CombinedOutput()
+		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+	}
+
+	command := RestoreCommand(cluster, nil, pgdata, "try", "", nil, strings.Join(opts, " "))
+	shellcheckScript(t, command)
+	assert.Assert(t, !strings.Contains(command[3], "tdelink"),
+		"expected no pg_tde link without WAL encryption")
+
+	// K8SPG-911: with WAL encryption, the keyring is linked into the root of the
+	// volume that holds the WAL files after the restore and before Postgres starts.
+	t.Run("WALEncryption", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+		cluster.Spec.Extensions.PGTDE.WALEncryption = true
+
+		instance := &v1beta1.PostgresInstanceSetSpec{}
+		instance.WALVolumeClaimSpec = new(corev1.PersistentVolumeClaimSpec)
+
+		command := RestoreCommand(cluster, instance, pgdata, "try", "", nil,
+			strings.Join(opts, " "))
+		shellcheckScript(t, command)
+
+		script := command[3]
+		assert.Assert(t, cmp.Contains(script, `tdelink "/pgdata/pg13/pg_tde" "/pgdata/pg_tde"`))
+		assert.Assert(t, cmp.Contains(script, `tdelink "/pgdata/pg13/pg_tde" "/pgwal/pg_tde"`))
+		assert.Assert(t, cmp.Contains(script, "pg_tde.wal_encrypt = 'on'"))
+
+		// The keyring has to be in place before recovery runs pg_tde_restore_encrypt,
+		// and it comes out of the restore, so the links go between the two.
+		assert.Assert(t,
+			strings.Index(script, `bash -xc "pgbackrest restore`) <
+				strings.Index(script, "tdelink \"/pgdata/pg13/pg_tde\""),
+			"expected the links after the restore")
+		assert.Assert(t,
+			strings.Index(script, "tdelink \"/pgdata/pg13/pg_tde\"") <
+				strings.Index(script, "pg_ctl start"),
+			"expected the links before Postgres starts")
+	})
 }
 
 func TestRestoreCommandPrettyYAML(t *testing.T) {
 	assert.Assert(t,
 		cmp.MarshalContains(
-			RestoreCommand("/dir", "try", "", nil, false, "--options"),
+			RestoreCommand(&v1beta1.PostgresCluster{}, nil, "/dir", "try", "", nil, "--options"),
 			"\n- |",
 		),
 		"expected literal block scalar")
@@ -366,7 +470,8 @@ func TestRestoreCommandPrettyYAML(t *testing.T) {
 func TestRestoreCommandTDE(t *testing.T) {
 	assert.Assert(t,
 		cmp.MarshalContains(
-			RestoreCommand("/dir", "try", "echo testValue", nil, false, "--options"),
+			RestoreCommand(&v1beta1.PostgresCluster{}, nil, "/dir", "try", "echo testValue",
+				nil, "--options"),
 			"encryption_key_command = 'echo testValue'",
 		),
 		"expected encryption_key_command setting")

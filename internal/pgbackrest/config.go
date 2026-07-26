@@ -102,7 +102,8 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
 			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
-			postgresCluster.Spec.ClusterServiceDNSSuffix).String()
+			postgresCluster.Spec.ClusterServiceDNSSuffix,
+			postgresCluster.Spec.Extensions.PGTDE.WALEncryption).String()
 
 	// PostgreSQL instances that have not rolled out expect to mount a server
 	// config file. Always populate that file so those volumes stay valid and
@@ -123,7 +124,8 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,
-				postgresCluster.Spec.ClusterServiceDNSSuffix).String()
+				postgresCluster.Spec.ClusterServiceDNSSuffix,
+				postgresCluster.Spec.Extensions.PGTDE.WALEncryption).String()
 	}
 
 	cm.Data[ConfigHashKey] = configHash
@@ -173,7 +175,11 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev1.PersistentVolumeClaim, tdeEnabled bool, args ...string) []string {
+func RestoreCommand(
+	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
+	pgdata, hugePagesSetting, fetchKeyCommand string,
+	_ []*corev1.PersistentVolumeClaim, args ...string,
+) []string {
 	ps := postgres.NewParameterSet()
 	ps.Add("data_directory", pgdata)
 	ps.Add("huge_pages", hugePagesSetting)
@@ -187,8 +193,15 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 	// progress during recovery.
 	ps.Add("hot_standby", "on")
 
-	if tdeEnabled {
+	if cluster.Spec.Extensions.PGTDE.Enabled {
 		ps.Add("shared_preload_libraries", "pg_tde")
+
+		// K8SPG-911: recovery ends by writing to WAL, so this server has to encrypt
+		// it the same way the cluster it is bootstrapping will. The parameter comes
+		// from the extension, so it can only be set alongside the library.
+		if cluster.Spec.Extensions.PGTDE.WALEncryption {
+			ps.Add("pg_tde.wal_encrypt", "on")
+		}
 	}
 
 	if fetchKeyCommand != "" {
@@ -234,7 +247,7 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 		`echo >> /tmp/postgres.restore.conf "unix_socket_directories = '${PGHOST}'"`,
 	}, "\n")
 
-	script := strings.Join([]string{
+	statements := []string{
 		`declare -r PGDATA="$1" opts="$2"; export PGDATA PGHOST`,
 
 		// Remove any "postmaster.pid" file leftover from a prior failure.
@@ -245,7 +258,14 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 
 		// Ignore any Patroni settings present in the backup.
 		`rm -f "${PGDATA}/patroni.dynamic.json"`,
+	}
 
+	// K8SPG-911: the restored data directory carries the pg_tde keyring, but the
+	// pg_tde tools that recovery runs look for it in the root of the volume that
+	// holds the WAL files. Link it there now that the restore has put it in place.
+	statements = append(statements, postgres.PGTDELinkCommands(cluster, instance)...)
+
+	statements = append(statements,
 		// By default, pg_ctl waits 60 seconds for Postgres to stop or start.
 		// We want to be certain when Postgres is running or not, so we use
 		// a very large timeout (365 days) to effectively wait forever. With
@@ -289,7 +309,8 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 		// into position for our Patroni bootstrap method.
 		`pg_ctl stop --silent --wait`,
 		`mv "${PGDATA}" "${PGDATA}_bootstrap"`,
-	}, "\n")
+	)
+	script := strings.Join(statements, "\n")
 
 	return append([]string{"bash", "-ceu", "--", script, "-", pgdata}, args...)
 }
@@ -336,6 +357,7 @@ func populatePGInstanceConfigurationMap(
 	fetchKeyCommand, postgresVersion string,
 	pgPort int32, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
+	walEncryption bool,
 ) iniSectionSet {
 	// TODO(cbandy): pass a FQDN in already.
 	repoHostFQDN := repoHostName + "-0." +
@@ -345,12 +367,19 @@ func populatePGInstanceConfigurationMap(
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
 
-	// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
-	global.Set("archive-async", "y")
 	// pgBackRest spool-path should always be co-located with the Postgres WAL path.
 	global.Set("spool-path", "/pgdata/pgbackrest-spool")
 	// pgBackRest will log to the pgData volume for commands run on the PostgreSQL instance
 	global.Set("log-path", naming.PGBackRestPGDataLogPath)
+
+	if walEncryption {
+		// WAL encryption doesn't play well with archive-async
+		global.Set("archive-async", "n")
+		global.Set("checksum-page", "n")
+	} else {
+		// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
+		global.Set("archive-async", "y")
+	}
 
 	for _, repo := range repos {
 		global.Set(repo.Name+"-path", defaultRepo1Path+repo.Name)
@@ -405,6 +434,7 @@ func populateRepoHostConfigurationMap(
 	fetchKeyCommand, postgresVersion string,
 	pgPort int32, pgHosts []string, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
+	walEncryption bool,
 ) iniSectionSet {
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
@@ -435,6 +465,10 @@ func populateRepoHostConfigurationMap(
 	// If no log path was set, don't log because the default path is not writable.
 	if !pgBackRestLogPathSet {
 		global.Set("log-level-file", "off")
+	}
+
+	if walEncryption {
+		global.Set("checksum-page", "n")
 	}
 
 	for option, val := range globalConfig {

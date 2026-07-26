@@ -22,6 +22,7 @@ one-pod
 operator-self-healing
 pgbouncer-mtls
 pg-tde
+pg-tde-wal-encrypt
 pitr
 scaling
 scheduled-backup

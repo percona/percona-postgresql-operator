@@ -60,6 +60,24 @@ safelink() (
 )
 `
 
+	bashTDELink = `
+tdelink() (
+  local keyring="$1" name="$2"
+  if [[ -d "${name}" && ! -L "${name}" ]]; then
+    rmdir "${name}" || {
+      >&2 echo "pg_tde: cannot link the keyring to ${name}: it is a directory that is not empty"
+      exit 1
+    }
+  fi
+  set -x; ln --no-dereference --force --symbolic "${keyring}" "${name}"
+)
+
+tdeunlink() (
+  local name="$1"
+  if [[ -L "${name}" ]]; then set -x; rm --force "${name}"; fi
+)
+`
+
 	// dataMountPath is where to mount the main data volume.
 	dataMountPath = "/pgdata"
 
@@ -115,6 +133,54 @@ func WALStorage(instance *v1beta1.PostgresInstanceSetSpec) string {
 	}
 	// When no WAL volume is specified, store WAL files on the main data volume.
 	return dataMountPath
+}
+
+// PGTDEDirectory returns the absolute path to the directory where pg_tde keeps
+// its keyring.
+func PGTDEDirectory(cluster *v1beta1.PostgresCluster) string {
+	return DataDirectory(cluster) + "/pg_tde"
+}
+
+// PGTDELinkCommands returns Bash statements that bring the pg_tde keyring links
+// in line with the spec: with WAL encryption on they link the keyring into the
+// root of the volume that holds the data directory and, when instance keeps its
+// WAL files on a volume of their own, into the root of that volume as well; with
+// WAL encryption off they take those links back out.
+//
+// K8SPG-911: the tools that archive_command and restore_command run --
+// pg_tde_archive_decrypt, pg_tde_restore_encrypt and pg_tde_waldump -- are handed
+// the path of a WAL segment and derive the keyring location from it. PostgreSQL
+// writes WAL in "pg_wal" inside the data directory, but that is a symbolic link
+// onto the volume that holds the WAL files here, so the tools end up looking for
+// the keyring in the root of that volume.
+func PGTDELinkCommands(
+	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
+) []string {
+	pgTDE := cluster.Spec.Extensions.PGTDE
+
+	if !pgTDE.WALEncryption {
+		if !pgTDE.Enabled && pgTDE.Vault == nil {
+			return nil
+		}
+
+		statements := []string{strings.TrimSpace(bashTDELink)}
+		for _, root := range []string{dataMountPath, walMountPath} {
+			statements = append(statements, fmt.Sprintf("tdeunlink %q", root+"/pg_tde"))
+		}
+		return statements
+	}
+
+	statements := []string{strings.TrimSpace(bashTDELink)}
+	roots := []string{dataMountPath}
+	if instance != nil && WALStorage(instance) != dataMountPath {
+		roots = append(roots, WALStorage(instance))
+	}
+
+	for _, root := range roots {
+		statements = append(statements, fmt.Sprintf(
+			"tdelink %q %q", PGTDEDirectory(cluster), root+"/pg_tde"))
+	}
+	return statements
 }
 
 // Environment returns the environment variables required to invoke PostgreSQL
@@ -512,6 +578,18 @@ chmod +x /tmp/pg_rewind_tde.sh
 			}
 
 			return pg_rewind_override
+		}(),
+
+		// K8SPG-911: link the pg_tde keyring where the standalone pg_tde WAL tools
+		// look for it. This has to happen before the early exit below: on a fresh
+		// volume there is nothing else to do here, but archive_command starts
+		// running long before this container runs again.
+		func() string {
+			links := PGTDELinkCommands(cluster, instance)
+			if len(links) == 0 {
+				return "remove"
+			}
+			return strings.Join(links, "\n")
 		}(),
 
 		tablespaceCmd,
