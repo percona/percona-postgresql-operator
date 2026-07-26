@@ -83,7 +83,7 @@ func TestUpgradeCommand(t *testing.T) {
 			{CPUs: 3, Jobs: "--jobs=2"},
 			{CPUs: 10, Jobs: "--jobs=9"},
 		} {
-			command := upgradeCommand(10, 11, "", tt.CPUs)
+			command := upgradeCommand(10, 11, "", tt.CPUs, false)
 			assert.Assert(t, len(command) > 3)
 			assert.DeepEqual(t, []string{"bash", "-ceu", "--"}, command[:3])
 
@@ -92,6 +92,17 @@ func TestUpgradeCommand(t *testing.T) {
 
 			expectScript(t, script)
 		}
+	})
+
+	// K8SPG-911: pg_tde_upgrade replaces pg_upgrade when pg_tde is enabled.
+	t.Run("PGTDE", func(t *testing.T) {
+		script := upgradeCommand(17, 18, "", 0, true)[3]
+		assert.Assert(t, cmp.Contains(script,
+			`/usr/pgsql-"${new_version}"/bin/pg_tde_upgrade --old-bindir`))
+		assert.Assert(t, !strings.Contains(script, `bin/pg_upgrade `),
+			"expected no pg_upgrade invocation, got:\n%s", script)
+
+		expectScript(t, script)
 	})
 }
 
@@ -141,7 +152,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 		},
 	}
 
-	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "", false)
 	assert.Assert(t, cmp.MarshalMatches(job, `
 apiVersion: batch/v1
 kind: Job
@@ -250,7 +261,7 @@ status: {}
 		longNameUpgrade.Spec.FromPostgresVersion = 14
 		longNameUpgrade.Spec.ToPostgresVersion = 15
 
-		longJob := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "")
+		longJob := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "", false)
 
 		// Verify the job name fits within DNS limits and has the correct format
 		assert.Assert(t, len(longJob.Name) <= 63, "job name %q exceeds 63 characters", longJob.Name)
@@ -260,7 +271,7 @@ status: {}
 		assert.Assert(t, regexp.MustCompile(`-[a-zA-Z0-9]{4}$`).MatchString(longJob.Name),
 			"job name %q should end with -<4 alphanumeric chars>", longJob.Name)
 		// Verify the suffix is deterministic (same input always produces same output)
-		longJob2 := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "")
+		longJob2 := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, "", false)
 		assert.Assert(t, longJob.Name == longJob2.Name, "job name should be deterministic: %q vs %q", longJob.Name, longJob2.Name)
 	})
 
@@ -271,11 +282,11 @@ status: {}
 		}))
 		ctx := feature.NewContext(context.Background(), gate)
 
-		job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+		job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "", false)
 		assert.Assert(t, cmp.MarshalContains(job, `--jobs=2`))
 	})
 
-	tdeJob := reconciler.generateUpgradeJob(ctx, upgrade, startup, "echo testKey")
+	tdeJob := reconciler.generateUpgradeJob(ctx, upgrade, startup, "echo testKey", false)
 	assert.Assert(t, cmp.MarshalContains(tdeJob,
 		`/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}" --encryption-key-command "echo testKey"`))
 }
