@@ -1,0 +1,37 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+      set -o errexit
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri standby-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-extension-standby --from-literal=pg_tde_extension="$result"
+
+      # verify encryption of database created before switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp"
+
+      # verify encryption of second database created after switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable2');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby2 --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2"
+

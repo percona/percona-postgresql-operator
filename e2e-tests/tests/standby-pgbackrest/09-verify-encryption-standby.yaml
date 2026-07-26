@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)")
+      kubectl -n "${NAMESPACE}" create configmap 09-verify-extension-standby --from-literal=pg_tde_extension="$result"
+
+      # with pgbackrest standby replicating data may take time. We need to give some time for this before failing
+      data=''
+      timer=0
+      until [[ -n "$data" ]]; do
+        data=$(run_psql_local \
+          '\c myapp \\\ SELECT * from myTable;' \
+          "$(get_standby_psql_uri standby-cluster postgres source-cluster)")
+        if [[ $timer -gt 20 ]]; then
+          echo "ERROR: data not replicated after 400 seconds"
+          exit 1
+        fi
+        sleep 20
+        timer=$((timer + 1))
+      done
+
+      kubectl create configmap -n "${NAMESPACE}" 09-verify-data-standby --from-literal=data="${data}"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 09-verify-encryption-standby --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp"
+

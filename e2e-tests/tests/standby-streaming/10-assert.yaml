@@ -89,9 +89,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: standby-cluster
-spec:
-  standby:
-    enabled: false
 status:
   pgbouncer:
     ready: 3
