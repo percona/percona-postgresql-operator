@@ -1,0 +1,50 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  # K8SPG-911: check that WAL encryption is really active before the upgrade, so that a
+  # failure in step 09 points at the upgrade rather than at the setup.
+  - script: |
+      set -o errexit
+
+      pgversion=$(kubectl -n ${NAMESPACE} get pg major-upgrade-17-to-18 -o jsonpath='{.spec.postgresVersion}')
+      primary=$(kubectl -n ${NAMESPACE} get pods -o jsonpath='{.items[].metadata.name}' \
+        --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=major-upgrade-17-to-18)
+
+      if [[ $(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
+        echo "pg_tde.wal_encrypt is not enabled in ${primary}"
+        exit 1
+      fi
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -o name \
+        --selector=postgres-operator.crunchydata.com/cluster=major-upgrade-17-to-18,postgres-operator.crunchydata.com/data=postgres); do
+        annotation=$(kubectl -n ${NAMESPACE} get ${pod} -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
+        if [[ ${annotation} != "true" ]]; then
+          echo "${pod} is not annotated for WAL encryption: ${annotation}"
+          exit 1
+        fi
+
+        target=$(kubectl -n ${NAMESPACE} exec ${pod} -c database -- readlink /pgdata/pg_tde)
+        if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
+          echo "${pod} does not link the pg_tde keyring: ${target}"
+          exit 1
+        fi
+        if ! kubectl -n ${NAMESPACE} exec ${pod} -c database -- test -d /pgdata/pg_tde; then
+          echo "${pod} pg_tde keyring link does not resolve"
+          exit 1
+        fi
+      done
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: major-upgrade-17-to-18
+status:
+  postgres:
+    instances:
+      - name: instance1
+        ready: 3
+        size: 3
+    ready: 3
+    size: 3
+  state: ready

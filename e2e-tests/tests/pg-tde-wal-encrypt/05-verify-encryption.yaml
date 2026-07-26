@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri pg-tde-wal-encrypt postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-extension --from-literal=pg_tde_extension="$result"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri pg-tde-wal-encrypt postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-encryption --from-literal=pg_tde_is_encrypted="$result"
+
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_psql_uri pg-tde-wal-encrypt postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-wal-encryption --from-literal=pg_tde_wal_encrypt="$result"
+
+      primary=$(get_pod_by_role pg-tde-wal-encrypt primary name)
+      commit_timestamp=$(kubectl -n "${NAMESPACE}" exec "${primary}" -- cat /pgdata/latest_commit_timestamp.txt) || {
+        echo "pg_tde_waldump wrote no commit timestamp for the WAL archived in step 04"
+        exit 1
+      }
+      if ! echo "${commit_timestamp}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$'; then
+        echo "pg_tde_waldump wrote an unusable commit timestamp: ${commit_timestamp}"
+        exit 1
+      fi
+
+      archiving_healthy=$(run_psql_command \
+        "SELECT last_failed_time IS NULL OR last_archived_time > last_failed_time FROM pg_stat_archiver;" \
+        "$(get_psql_uri pg-tde-wal-encrypt postgres)" | xargs)
+      if [[ ${archiving_healthy} != "t" ]]; then
+        echo "archive_command is failing:"
+        run_psql_command \
+          "SELECT * FROM pg_stat_archiver;" \
+          "$(get_psql_uri pg-tde-wal-encrypt postgres)"
+        exit 1
+      fi
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri pg-tde-wal-encrypt postgres)/myapp"

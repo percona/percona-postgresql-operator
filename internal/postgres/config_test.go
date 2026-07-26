@@ -51,6 +51,218 @@ func TestWALDirectory(t *testing.T) {
 	assert.Equal(t, WALDirectory(cluster, instance), "/pgwal/pg13_wal")
 }
 
+func TestPGTDEDirectory(t *testing.T) {
+	cluster := new(v1beta1.PostgresCluster)
+	cluster.Spec.PostgresVersion = 18
+
+	assert.Equal(t, PGTDEDirectory(cluster), "/pgdata/pg18/pg_tde")
+}
+
+func TestPGTDELinkCommands(t *testing.T) {
+	cluster := new(v1beta1.PostgresCluster)
+	cluster.Spec.PostgresVersion = 18
+	instance := new(v1beta1.PostgresInstanceSetSpec)
+
+	// A cluster that has never configured pg_tde has no links to remove. It must
+	// stay this way: any statement here changes the startup script of every
+	// cluster in the fleet and rolls its Pods.
+	assert.Assert(t, PGTDELinkCommands(cluster, instance) == nil)
+
+	// Turning WAL encryption off while pg_tde stays on removes the links.
+	cluster.Spec.Extensions.PGTDE.Enabled = true
+	assert.DeepEqual(t, PGTDELinkCommands(cluster, instance)[1:], []string{
+		`tdeunlink "/pgdata/pg_tde"`,
+		`tdeunlink "/pgwal/pg_tde"`,
+	})
+
+	// Disabling pg_tde keeps the vault configuration until the Pods have
+	// restarted, and that restart is the one that cleans up.
+	cluster.Spec.Extensions.PGTDE.Enabled = false
+	cluster.Spec.Extensions.PGTDE.Vault = new(v1beta1.PGTDEVaultSpec)
+	assert.DeepEqual(t, PGTDELinkCommands(cluster, instance)[1:], []string{
+		`tdeunlink "/pgdata/pg_tde"`,
+		`tdeunlink "/pgwal/pg_tde"`,
+	})
+
+	// Both volumes are cleaned even though this instance keeps its WAL files on
+	// the data volume; the WAL volume may have been detached in the same change.
+	assert.Assert(t, instance.WALVolumeClaimSpec == nil)
+
+	cluster.Spec.Extensions.PGTDE.Enabled = true
+	cluster.Spec.Extensions.PGTDE.Vault = nil
+	cluster.Spec.Extensions.PGTDE.WALEncryption = true
+
+	// Without a WAL volume, WAL files live on the data volume.
+	assert.DeepEqual(t, PGTDELinkCommands(cluster, instance)[1:],
+		[]string{`tdelink "/pgdata/pg18/pg_tde" "/pgdata/pg_tde"`})
+
+	// With a WAL volume, the tools look on that volume as well.
+	instance.WALVolumeClaimSpec = new(corev1.PersistentVolumeClaimSpec)
+	assert.DeepEqual(t, PGTDELinkCommands(cluster, instance)[1:], []string{
+		`tdelink "/pgdata/pg18/pg_tde" "/pgdata/pg_tde"`,
+		`tdelink "/pgdata/pg18/pg_tde" "/pgwal/pg_tde"`,
+	})
+
+	// The instance is unknown in some contexts, e.g. the restore Job.
+	assert.DeepEqual(t, PGTDELinkCommands(cluster, nil)[1:],
+		[]string{`tdelink "/pgdata/pg18/pg_tde" "/pgdata/pg_tde"`})
+}
+
+func TestBashTDELink(t *testing.T) {
+	// execute calls the bash function with args.
+	execute := func(args ...string) (string, error) {
+		cmd := exec.Command("bash")
+		cmd.Args = append(cmd.Args, "-ceu", "--", bashTDELink+`tdelink "$@"`, "-")
+		cmd.Args = append(cmd.Args, args...)
+		output, err := cmd.CombinedOutput()
+		return string(output), err
+	}
+
+	t.Run("NameDoesNotExist", func(t *testing.T) {
+		root := t.TempDir()
+		keyring, name := filepath.Join(root, "pg18", "pg_tde"), filepath.Join(root, "pg_tde")
+
+		// The keyring does not exist yet; the link may dangle.
+		output, err := execute(keyring, name)
+		assert.NilError(t, err, "\n%s", output)
+
+		result, err := os.Readlink(name)
+		assert.NilError(t, err, "expected symlink")
+		assert.Equal(t, result, keyring)
+
+		// Calling it again changes nothing.
+		output, err = execute(keyring, name)
+		assert.NilError(t, err, "\n%s", output)
+
+		result, err = os.Readlink(name)
+		assert.NilError(t, err, "expected symlink")
+		assert.Equal(t, result, keyring)
+	})
+
+	t.Run("NameIsSymlink", func(t *testing.T) {
+		root := t.TempDir()
+		keyring, name := filepath.Join(root, "pg18", "pg_tde"), filepath.Join(root, "pg_tde")
+
+		// name points at another existing directory, as it would after a major
+		// version upgrade.
+		previous := filepath.Join(root, "pg17", "pg_tde")
+		assert.NilError(t, os.MkdirAll(previous, 0o700))
+		assert.NilError(t, os.Symlink(previous, name))
+
+		output, err := execute(keyring, name)
+		assert.NilError(t, err, "\n%s", output)
+
+		// The link is repointed rather than followed.
+		result, err := os.Readlink(name)
+		assert.NilError(t, err, "expected symlink")
+		assert.Equal(t, result, keyring)
+
+		entries, err := os.ReadDir(previous)
+		assert.NilError(t, err)
+		assert.Equal(t, len(entries), 0, "expected nothing created inside the old target")
+	})
+
+	t.Run("NameIsEmptyDirectory", func(t *testing.T) {
+		root := t.TempDir()
+		keyring, name := filepath.Join(root, "pg18", "pg_tde"), filepath.Join(root, "pg_tde")
+		assert.NilError(t, os.MkdirAll(name, 0o700))
+
+		output, err := execute(keyring, name)
+		assert.NilError(t, err, "\n%s", output)
+
+		result, err := os.Readlink(name)
+		assert.NilError(t, err, "expected symlink")
+		assert.Equal(t, result, keyring)
+	})
+
+	// This situation is unexpected and aborts rather than discard anything.
+	t.Run("NameIsFullDirectory", func(t *testing.T) {
+		root := t.TempDir()
+		keyring, name := filepath.Join(root, "pg18", "pg_tde"), filepath.Join(root, "pg_tde")
+		assert.NilError(t, os.MkdirAll(name, 0o700))
+		file, err := os.Create(filepath.Join(name, "existing.file"))
+		assert.NilError(t, err)
+		assert.NilError(t, file.Close())
+
+		output, err := execute(keyring, name)
+		assert.ErrorContains(t, err, "exit status 1")
+		assert.Assert(t, strings.Contains(output, "not empty"), "\n%v", output)
+
+		// The directory is left alone.
+		entries, err := os.ReadDir(name)
+		assert.NilError(t, err)
+		assert.Equal(t, len(entries), 1)
+		assert.Equal(t, entries[0].Name(), "existing.file")
+	})
+}
+
+func TestBashTDEUnlink(t *testing.T) {
+	// execute calls the bash function with args.
+	execute := func(args ...string) (string, error) {
+		cmd := exec.Command("bash")
+		cmd.Args = append(cmd.Args, "-ceu", "--", bashTDELink+`tdeunlink "$@"`, "-")
+		cmd.Args = append(cmd.Args, args...)
+		output, err := cmd.CombinedOutput()
+		return string(output), err
+	}
+
+	t.Run("NameDoesNotExist", func(t *testing.T) {
+		root := t.TempDir()
+		name := filepath.Join(root, "pg_tde")
+
+		// The volume may never have had a link, or may not be mounted at all.
+		output, err := execute(name)
+		assert.NilError(t, err, "\n%s", output)
+	})
+
+	t.Run("NameIsSymlink", func(t *testing.T) {
+		root := t.TempDir()
+		keyring, name := filepath.Join(root, "pg18", "pg_tde"), filepath.Join(root, "pg_tde")
+		assert.NilError(t, os.MkdirAll(keyring, 0o700))
+		assert.NilError(t, os.Symlink(keyring, name))
+
+		output, err := execute(name)
+		assert.NilError(t, err, "\n%s", output)
+
+		_, err = os.Lstat(name)
+		assert.Assert(t, os.IsNotExist(err), "expected the link to be gone")
+
+		// Only the link goes; the keyring it named is left in place.
+		_, err = os.Stat(keyring)
+		assert.NilError(t, err, "expected the keyring to remain")
+	})
+
+	t.Run("NameIsDanglingSymlink", func(t *testing.T) {
+		root := t.TempDir()
+		name := filepath.Join(root, "pg_tde")
+		assert.NilError(t, os.Symlink(filepath.Join(root, "pg18", "pg_tde"), name))
+
+		output, err := execute(name)
+		assert.NilError(t, err, "\n%s", output)
+
+		_, err = os.Lstat(name)
+		assert.Assert(t, os.IsNotExist(err), "expected the link to be gone")
+	})
+
+	// Anything that is not a symbolic link belongs to something else.
+	t.Run("NameIsDirectory", func(t *testing.T) {
+		root := t.TempDir()
+		name := filepath.Join(root, "pg_tde")
+		assert.NilError(t, os.MkdirAll(name, 0o700))
+		file, err := os.Create(filepath.Join(name, "existing.file"))
+		assert.NilError(t, err)
+		assert.NilError(t, file.Close())
+
+		output, err := execute(name)
+		assert.NilError(t, err, "\n%s", output)
+
+		entries, err := os.ReadDir(name)
+		assert.NilError(t, err)
+		assert.Equal(t, len(entries), 1)
+		assert.Equal(t, entries[0].Name(), "existing.file")
+	})
+}
+
 func TestBashHalt(t *testing.T) {
 	t.Run("NoPipeline", func(t *testing.T) {
 		cmd := exec.Command("bash")

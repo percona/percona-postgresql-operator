@@ -1,0 +1,28 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # K8SPG-911: drop the marker archive_command writes, so that the check in 09-assert
+      # can only pass if pg_tde_waldump read a segment the upgraded cluster encrypted.
+      primary=$(get_pod_by_role major-upgrade-17-to-18 primary name)
+      kubectl -n "${NAMESPACE}" exec "${primary}" -- rm -f /pgdata/latest_commit_timestamp.txt
+
+      # Assign a transaction ID so the segment archived below carries a commit record for
+      # pg_tde_waldump to find, without changing the rows step 12 reads back.
+      run_psql_command \
+        "SELECT pg_current_xact_id();" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)"
+
+      run_psql_command \
+        "CHECKPOINT;" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)"
+
+      run_psql_command \
+        "SELECT pg_switch_wal();" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)"

@@ -73,12 +73,13 @@ func TestDisableInPostgreSQL(t *testing.T) {
 }
 
 func TestPostgreSQLParameters(t *testing.T) {
+	cluster := new(crunchyv1beta1.PostgresCluster)
 	parameters := postgres.Parameters{
 		Mandatory: postgres.NewParameterSet(),
 	}
 
 	// No comma when empty.
-	PostgreSQLParameters(&parameters)
+	PostgreSQLParameters(cluster, &parameters)
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -88,12 +89,22 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	// Appended when not empty.
 	parameters.Mandatory.Add("shared_preload_libraries", "some,existing")
-	PostgreSQLParameters(&parameters)
+	PostgreSQLParameters(cluster, &parameters)
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "some,existing,pg_tde",
 		"pg_tde.wal_encrypt":       "off",
+	})
+
+	// K8SPG-911
+	cluster.Spec.Extensions.PGTDE.WALEncryption = true
+	parameters = postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+	PostgreSQLParameters(cluster, &parameters)
+
+	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"shared_preload_libraries": "pg_tde",
+		"pg_tde.wal_encrypt":       "on",
 	})
 }
 

@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1394,7 +1395,16 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
 		sts.Spec.Template.Annotations = naming.Merge(
 			sts.Spec.Template.Annotations,
-			map[string]string{naming.TDEInstalledAnnotation: "true"},
+			map[string]string{
+				naming.TDEInstalledAnnotation: "true",
+				// pg_tde.wal_encrypt is read at startup, so toggling it has to
+				// recreate the Pods. It reaches PostgreSQL through Patroni's
+				// dynamic configuration, which leaves nothing else in the Pod
+				// template to change; keeping the value here is what
+				// rolloutInstances compares.
+				naming.TDEWALEncryptionAnnotation: strconv.FormatBool(
+					cluster.Spec.Extensions.PGTDE.WALEncryption),
+			},
 		)
 	}
 
