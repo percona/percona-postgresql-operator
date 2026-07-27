@@ -748,11 +748,14 @@ spec:
     image: docker.io/perconalab/fluentbit:main-logcollector
 #    imagePullPolicy: IfNotPresent
 #    # Extra fluent-bit configuration merged with the operator-managed config.
+#    # Must be in Fluent Bit's YAML configuration format.
 #    configuration: |
-#      [FILTER]
-#          Name    record_modifier
-#          Match   *
-#          Record  cluster_name cluster1
+#      pipeline:
+#        filters:
+#          - name: record_modifier
+#            match: "*"
+#            record:
+#              - cluster_name cluster1
 #    env:
 #    - name: MY_ENV
 #      value: "my-value"

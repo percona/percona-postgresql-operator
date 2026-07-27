@@ -8,8 +8,10 @@ commands:
 
       source ../../functions
 
+      set +o xtrace
       access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
       secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+      set -o xtrace
 
 
       # Download one shipped postgres object to stdout. Credentials go through
@@ -17,19 +19,22 @@ commands:
       # helper), and every aws call's stderr is dropped so the captured stdout is
       # only the object bytes (no TLS warnings or "pod deleted" noise for jq).
       dump_s3_logs() {
-        kubectl -n "${NAMESPACE}" run -i --rm "aws-cli-${RANDOM}" \
-          --image=perconalab/awscli --restart=Never \
-          --env="AWS_ACCESS_KEY_ID=${access_key}" \
-          --env="AWS_SECRET_ACCESS_KEY=${secret_key}" \
-          --env="AWS_DEFAULT_REGION=us-east-1" \
-          --command -- bash -c '
-            set -e
-            aws_cmd="/usr/bin/aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
-            key=$($aws_cmd s3 ls s3://operator-testing/ --recursive 2>/dev/null \
-              | grep postgres | head -1 | awk "{print \$NF}")
-            [ -n "$key" ] || exit 1
-            $aws_cmd s3 cp "s3://operator-testing/$key" - 2>/dev/null
-          ' 2>/dev/null
+        (
+          set +o xtrace
+          kubectl -n "${NAMESPACE}" run -i --rm "aws-cli-${RANDOM}" \
+            --image=perconalab/awscli --restart=Never \
+            --env="AWS_ACCESS_KEY_ID=${access_key}" \
+            --env="AWS_SECRET_ACCESS_KEY=${secret_key}" \
+            --env="AWS_DEFAULT_REGION=us-east-1" \
+            --command -- bash -c '
+              set -e
+              aws_cmd="/usr/bin/aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
+              key=$($aws_cmd s3 ls s3://operator-testing/ --recursive 2>/dev/null \
+                | grep postgres | head -1 | awk "{print \$NF}")
+              [ -n "$key" ] || exit 1
+              $aws_cmd s3 cp "s3://operator-testing/$key" - 2>/dev/null
+            ' 2>/dev/null
+        )
       }
 
       # The s3 objects are newline-delimited JSON records. The opentelemetry_envelope
