@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -169,8 +169,9 @@ func createOrUpdateConfigMap(ctx context.Context, c client.Client, cr *v2.Percon
 		reflect.DeepEqual(existing.OwnerReferences, desired.OwnerReferences) {
 		return nil
 	}
+	orig := existing.DeepCopy()
 	existing.Data = desired.Data
 	existing.Labels = desired.Labels
 	existing.OwnerReferences = desired.OwnerReferences
-	return c.Update(ctx, existing)
+	return c.Patch(ctx, existing, client.MergeFrom(orig))
 }

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	batchv1 "k8s.io/api/batch/v1"
@@ -40,6 +39,7 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"

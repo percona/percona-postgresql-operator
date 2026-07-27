@@ -3,7 +3,6 @@ package logcollector
 import (
 	"testing"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
