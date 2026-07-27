@@ -582,7 +582,7 @@ monitor_volume() {
       --header "Content-Type: application/merge-patch+json" \
       --request PATCH \
       --data "${patch}" \
-      "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}"
+      "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}" || true
   fi
 }
 `

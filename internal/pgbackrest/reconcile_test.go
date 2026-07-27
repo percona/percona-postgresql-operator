@@ -1011,6 +1011,8 @@ func TestRepoVolumeAutoGrowMonitoring(t *testing.T) {
 	repoHostScript := repoHost.Containers[len(repoHost.Containers)-1].Command[3]
 	assert.Assert(t, strings.Contains(repoHostScript,
 		`monitor_volume "/pgbackrest/repo1" "suggested-pgbackrest-repo1-pvc-size"`))
+	assert.Assert(t, strings.Contains(repoHostScript,
+		`"${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}" || true`))
 	assert.Assert(t, !strings.Contains(repoHostScript, "/pgbackrest/repo2"))
 	assert.Assert(t, !strings.Contains(repoHostScript, "/pgbackrest/repo3"))
 }
