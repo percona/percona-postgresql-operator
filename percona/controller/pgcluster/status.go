@@ -32,7 +32,7 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 	}
 
 	// If proxy is not configured, use the primary service as host.
-	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
+	if !cr.Spec.Proxy.PGBouncerEnabled() {
 		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
 	}
 
@@ -196,7 +196,6 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
-
 }
 
 func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
@@ -213,7 +212,6 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 }
 
 func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
-
 	if cr.Status.Patroni.Status == nil {
 		cr.Status.Patroni.Status = &v1beta1.PatroniStatus{}
 	}
@@ -233,5 +231,4 @@ func syncPgbackrestFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 	if postgresStatus.PGBackRest != nil {
 		cr.Status.PGBackRest = postgresStatus.PGBackRest.DeepCopy()
 	}
-
 }
