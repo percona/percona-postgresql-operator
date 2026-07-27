@@ -4,6 +4,7 @@ database-init-sql
 demand-backup
 finalizers
 init-deploy
+logical-replica
 one-pod
 operator-self-healing
 pgbouncer-mtls

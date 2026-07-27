@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -328,6 +329,22 @@ func DynamicConfiguration(
 
 		standby["create_replica_methods"] = methods
 		root["standby_cluster"] = standby
+	}
+
+	// K8SPG-784: keep Patroni from deleting the replication slots that back the
+	// logical replicas. Patroni drops every slot missing from its expected set,
+	// and with "use_slots" disabled above that set is empty, so without this the
+	// slots pg_createsubscriber leaves on the primary would not survive a single
+	// HA loop. User-supplied entries are preserved and ours are appended.
+	if matchers := logicalreplica.IgnoreSlotsMatchers(cluster); len(matchers) > 0 {
+		ignored := make([]any, 0, len(matchers))
+		if section, ok := root["ignore_slots"].([]any); ok {
+			ignored = append(ignored, section...)
+		}
+		for _, matcher := range matchers {
+			ignored = append(ignored, matcher)
+		}
+		root["ignore_slots"] = ignored
 	}
 
 	return root

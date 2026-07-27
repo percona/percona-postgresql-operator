@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=ready \
+        --timeout=580s pg/logical-replica

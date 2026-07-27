@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      slot_count() {
+        run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin = 'pgoutput';" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs
+      }
+
+      before=$(slot_count)
+      if [[ ${before} != "1" ]]; then
+        echo "ERROR: expected exactly one logical slot on the primary, got: ${before}"
+        exit 1
+      fi
+
+      # Regression guard for the ignore_slots wiring. Patroni drops slots it
+      # does not know about on every HA loop, and that is not gated on
+      # use_slots, which this operator pins to false. loop_wait defaults to 10s,
+      # so wait out several loops before re-checking.
+      sleep 120
+
+      after=$(slot_count)
+      if [[ ${after} != "1" ]]; then
+        echo "ERROR: Patroni deleted the logical replication slot (count=${after})"
+        exit 1
+      fi
+
+      state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+        -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].state}')
+      if [[ ${state} != "ready" ]]; then
+        echo "ERROR: logical replica is ${state}, expected ready"
+        exit 1
+      fi

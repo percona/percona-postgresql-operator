@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # pg_createsubscriber ships with PostgreSQL 17 and later.
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "PG_VER=${PG_VER} does not have pg_createsubscriber, skipping"
+        exit 0
+      fi
+
+      get_cr "logical-replica" ${RANDOM} | kubectl -n "${NAMESPACE}" apply -f -

@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      # Bootstrap runs pg_basebackup then pg_createsubscriber, so give it room.
+      retry 60 10 bash -c '
+        state=$(kubectl -n "'"${NAMESPACE}"'" get pg logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"analytics\")].state}")
+        echo "logical replica state: ${state}"
+        [[ ${state} == "ready" ]]
+      '
+
+      kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
+        -l pgv2.percona.com/logical-replica=analytics --timeout=120s

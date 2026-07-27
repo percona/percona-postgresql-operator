@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      data=$(run_psql \
+        '\c logical-replica \\\ SELECT id FROM lr_test ORDER BY id;' \
+        "postgres://postgres:${PASS}@${REPLICA}")
+
+      if [[ $(echo ${data} | xargs) != "1" ]]; then
+        echo "ERROR: expected the seeded row on the logical replica, got: ${data}"
+        exit 1
+      fi

@@ -52,6 +52,8 @@ type PerconaPGCluster struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
+// K8SPG-784: pg_createsubscriber is only available since PostgreSQL 17.
+// +kubebuilder:validation:XValidation:rule="!has(self.logicalReplicas) || size(self.logicalReplicas) == 0 || self.postgresVersion >= 17",message="spec.logicalReplicas requires spec.postgresVersion >= 17"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -199,6 +201,77 @@ type PerconaPGClusterSpec struct {
 	// files such as an LDAP CA certificate.
 	// +optional
 	Authentication *crunchyv1beta1.PostgresClusterAuthentication `json:"authentication,omitempty"`
+
+	// K8SPG-784
+	// Logical replicas are read-write PostgreSQL instances in this cluster that
+	// receive changes from the primary over logical replication. Each one is
+	// seeded with pg_basebackup and converted with pg_createsubscriber, which
+	// requires spec.postgresVersion to be 17 or higher.
+	// +optional
+	LogicalReplicas LogicalReplicas `json:"logicalReplicas,omitempty"`
+}
+
+// K8SPG-784
+type LogicalReplicas []LogicalReplicaSpec
+
+// ToCrunchy projects the logical replicas onto the Crunchy spec. Only the names
+// are carried over: the crunchy layer uses them to decide whether to render the
+// logicalrepl pg_hba rules and Patroni's ignore_slots, and needs nothing else.
+func (l LogicalReplicas) ToCrunchy() []crunchyv1beta1.LogicalReplicaSpec {
+	if len(l) == 0 {
+		return nil
+	}
+
+	out := make([]crunchyv1beta1.LogicalReplicaSpec, 0, len(l))
+	for _, replica := range l {
+		out = append(out, crunchyv1beta1.LogicalReplicaSpec{Name: replica.Name})
+	}
+	return out
+}
+
+// K8SPG-784
+type LogicalReplicaSpec struct {
+	// Name of the logical replica. It is used to name the StatefulSet, Service
+	// and PersistentVolumeClaim of the replica, as well as the publications,
+	// subscriptions and replication slots backing it.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=20
+	// +kubebuilder:validation:Pattern=`^[a-z][a-z0-9-]*[a-z0-9]$`
+	Name string `json:"name"`
+
+	// Databases to replicate. When empty, every database in the cluster except
+	// the templates and "postgres" is replicated.
+	// +optional
+	Databases []crunchyv1beta1.PostgresIdentifier `json:"databases,omitempty"`
+
+	// Defines the data volume of the logical replica.
+	// +kubebuilder:validation:Required
+	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
+
+	// +optional
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
+
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +optional
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+
+	// Specification of the service that exposes this logical replica.
+	// +optional
+	Expose *ServiceExpose `json:"expose,omitempty"`
+}
+
+// LogicalReplicasEnabled returns whether the cluster has any logical replica
+// configured. K8SPG-784
+func (cr *PerconaPGCluster) LogicalReplicasEnabled() bool {
+	return cr.CompareVersion("3.1.0") >= 0 && len(cr.Spec.LogicalReplicas) > 0
 }
 
 type ContainerOptions struct {
@@ -340,6 +413,46 @@ func (cr *PerconaPGCluster) Validate() error {
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
 	}
+	if err := cr.ValidateLogicalReplicas(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ValidateLogicalReplicas checks the invariants of spec.logicalReplicas that
+// cannot be expressed with kubebuilder markers. K8SPG-784
+func (cr *PerconaPGCluster) ValidateLogicalReplicas() error {
+	if len(cr.Spec.LogicalReplicas) == 0 {
+		return nil
+	}
+
+	// A logical replica names a StatefulSet in the same namespace as the
+	// instance sets do, so the names must not collide.
+	instanceSets := make(map[string]struct{}, len(cr.Spec.InstanceSets))
+	for _, set := range cr.Spec.InstanceSets {
+		instanceSets[set.Name] = struct{}{}
+	}
+
+	seen := make(map[string]struct{}, len(cr.Spec.LogicalReplicas))
+	for _, replica := range cr.Spec.LogicalReplicas {
+		if _, ok := seen[replica.Name]; ok {
+			return errors.Errorf("duplicate spec.logicalReplicas name %q", replica.Name)
+		}
+		seen[replica.Name] = struct{}{}
+
+		if _, ok := instanceSets[replica.Name]; ok {
+			return errors.Errorf("spec.logicalReplicas name %q conflicts with an instance set of the same name", replica.Name)
+		}
+
+		dbs := make(map[crunchyv1beta1.PostgresIdentifier]struct{}, len(replica.Databases))
+		for _, db := range replica.Databases {
+			if _, ok := dbs[db]; ok {
+				return errors.Errorf("duplicate database %q in spec.logicalReplicas %q", db, replica.Name)
+			}
+			dbs[db] = struct{}{}
+		}
+	}
+
 	return nil
 }
 
@@ -457,6 +570,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			log.Info(UserMonitoring + " user is reserved, it'll be ignored.")
 			continue
 		}
+		// K8SPG-784
+		if user.Name == UserLogicalReplication {
+			log.Info(UserLogicalReplication + " user is reserved, it'll be ignored.")
+			continue
+		}
 		users = append(users, user)
 	}
 
@@ -483,7 +601,24 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		}
 	}
 
+	// K8SPG-784: pg_createsubscriber needs a superuser connection to the primary
+	// over the network. It creates a publication FOR ALL TABLES, which plain
+	// REPLICATION roles such as _crunchyrepl cannot do.
+	if cr.LogicalReplicasEnabled() {
+		users = append(users, crunchyv1beta1.PostgresUserSpec{
+			Name:    UserLogicalReplication,
+			Options: "SUPERUSER REPLICATION",
+			Password: &crunchyv1beta1.PostgresPasswordSpec{
+				Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+			},
+		})
+	}
+
 	postgresCluster.Spec.Users = users
+
+	// K8SPG-784: the crunchy layer renders pg_hba rules, server parameters and
+	// Patroni's ignore_slots from this.
+	postgresCluster.Spec.LogicalReplicas = cr.Spec.LogicalReplicas.ToCrunchy()
 
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
@@ -627,11 +762,74 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Standby *StandbyStatus `json:"standby,omitempty"`
+
+	// K8SPG-784
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LogicalReplicas []LogicalReplicaStatus `json:"logicalReplicas,omitempty"`
 }
 
 type StandbyStatus struct {
 	LagLastComputedAt *metav1.Time `json:"lagLastComputedAt,omitempty"`
 	LagBytes          int64        `json:"lagBytes,omitempty"`
+}
+
+// LogicalReplicaState describes where a logical replica is in its lifecycle.
+// K8SPG-784
+type LogicalReplicaState string
+
+const (
+	// LogicalReplicaStateBootstrapping means the replica is being seeded and
+	// converted by the bootstrap Job.
+	LogicalReplicaStateBootstrapping LogicalReplicaState = "bootstrapping"
+
+	// LogicalReplicaStateReady means the replica is running and every
+	// subscription is enabled with its slot present on the primary.
+	LogicalReplicaStateReady LogicalReplicaState = "ready"
+
+	// LogicalReplicaStateBroken means replication has stopped and the replica
+	// needs to be recreated.
+	LogicalReplicaStateBroken LogicalReplicaState = "broken"
+)
+
+// Reasons reported in LogicalReplicaStatus.Reason. K8SPG-784
+const (
+	// LogicalReplicaReasonSourceSlotMissing means the replication slot backing
+	// this replica no longer exists on the primary. The most common cause is a
+	// failover of the source cluster: the slot lives only on the primary that
+	// created it, so it does not survive one.
+	LogicalReplicaReasonSourceSlotMissing = "SourceSlotMissing"
+
+	// LogicalReplicaReasonSubscriptionDisabled means a subscription on the
+	// replica exists but is not enabled.
+	LogicalReplicaReasonSubscriptionDisabled = "SubscriptionDisabled"
+
+	// LogicalReplicaReasonBootstrapFailed means the bootstrap Job failed.
+	LogicalReplicaReasonBootstrapFailed = "BootstrapFailed"
+)
+
+// K8SPG-784
+type LogicalReplicaStatus struct {
+	Name string `json:"name"`
+
+	// +optional
+	State LogicalReplicaState `json:"state,omitempty"`
+
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Databases replicated by this replica. It is resolved once, when the
+	// replica is bootstrapped, and does not change afterwards.
+	// +optional
+	Databases []string `json:"databases,omitempty"`
+
+	// +optional
+	ConvertedAt *metav1.Time `json:"convertedAt,omitempty"`
 }
 
 type Patroni struct {
@@ -1357,6 +1555,16 @@ const (
 
 const (
 	UserMonitoring = "monitor"
+
+	// UserLogicalReplication is the reserved superuser that pg_createsubscriber
+	// connects to the primary as. It needs SUPERUSER because it creates a
+	// publication FOR ALL TABLES, and REPLICATION because it also runs
+	// pg_basebackup and creates the replication slot. It only exists while the
+	// cluster has at least one logical replica. K8SPG-784
+	//
+	// The name must be a valid DNS label: the Secret holding its password is
+	// named after it by naming.PostgresUserSecret.
+	UserLogicalReplication = "logicalrepl"
 )
 
 // UserMonitoring constructs the monitoring user.

@@ -247,6 +247,13 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 // +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update
+// K8SPG-784: logical replicas are plain StatefulSets with their own Service,
+// ConfigMap, PVC and one-shot bootstrap Job.
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;get;watch
+// +kubebuilder:rbac:groups="",resources="services",verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources="configmaps",verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=delete;get;list;patch;watch
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
@@ -420,6 +427,12 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			}, nil
 		}
 		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
+	}
+
+	// K8SPG-784: runs after updateStatus because it needs the cluster to be
+	// Ready and reports its own status separately.
+	if err := r.reconcileLogicalReplicas(ctx, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile logical replicas")
 	}
 
 	if err := r.reconcileOwnerRefMigrationStatus(ctx, cr); err != nil {

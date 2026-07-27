@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=json \
+        --patch '[{"op": "remove", "path": "/spec/logicalReplicas"}]'
+
+      no_slots_left() {
+        local got
+        got=$(run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin = 'pgoutput';" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "logical slots left on the primary: ${got}"
+        [[ ${got} == "0" ]]
+      }
+
+      no_publications_left() {
+        local got
+        got=$(run_psql \
+          '\c logical-replica \\\ SELECT count(*) FROM pg_publication;' \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "publications left on the primary: ${got}"
+        [[ ${got} == "0" ]]
+      }
+
+      objects_gone() {
+        ! kubectl -n "${NAMESPACE}" get statefulset logical-replica-lr-analytics >/dev/null 2>&1
+      }
+
+      # An orphaned logical slot pins WAL on the primary forever, so this is the
+      # important half of the teardown.
+      retry 30 5 no_slots_left
+      retry 30 5 no_publications_left
+      retry 30 5 objects_gone

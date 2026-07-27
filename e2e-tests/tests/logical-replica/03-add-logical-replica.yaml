@@ -1,0 +1,28 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["logical-replica"],
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'

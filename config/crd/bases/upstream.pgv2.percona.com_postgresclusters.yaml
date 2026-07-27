@@ -21767,6 +21767,29 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              logicalReplicas:
+                description: |-
+                  K8SPG-784
+                  Logical replicas of this cluster, managed by the Percona layer. Only the
+                  names are mirrored here: this layer uses their presence to render the
+                  pg_hba rules for the logical replication user and Patroni's ignore_slots.
+                items:
+                  description: |-
+                    LogicalReplicaSpec is the projection of a Percona logical replica onto this
+                    spec. The Percona layer owns the full definition and the whole lifecycle of
+                    the replica; only what this layer needs to render server configuration is
+                    carried over. K8SPG-784
+                  properties:
+                    name:
+                      description: Name of the logical replica.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               metadata:
                 description: Metadata contains metadata for custom resources
                 properties:

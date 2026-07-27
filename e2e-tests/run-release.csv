@@ -11,6 +11,7 @@ finalizers
 init-deploy
 k8s-upgrade
 huge-pages
+logical-replica
 major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17

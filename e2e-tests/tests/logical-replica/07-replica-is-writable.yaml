@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      # pg_createsubscriber promotes the converted standby, so unlike
+      # spec.standby the logical replica accepts writes of its own.
+      run_psql \
+        '\c logical-replica \\\ CREATE TABLE lr_local (id int PRIMARY KEY);' \
+        "postgres://postgres:${PASS}@${REPLICA}"
+
+      run_psql \
+        '\c logical-replica \\\ INSERT INTO lr_local (id) VALUES (1);' \
+        "postgres://postgres:${PASS}@${REPLICA}"

@@ -1,0 +1,37 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      replica_row_count() {
+        local want=$1
+        local got
+
+        got=$(run_psql \
+          '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
+          "postgres://postgres:${PASS}@${REPLICA}" | xargs)
+
+        echo "rows on the logical replica: ${got} (want ${want})"
+        [[ ${got} == "${want}" ]]
+      }
+
+      # Written after the conversion, so it can only arrive over the
+      # subscription that pg_createsubscriber set up.
+      run_psql \
+        '\c logical-replica \\\ INSERT INTO lr_test (id) VALUES (2);' \
+        "postgres://postgres:${PASS}@${HOST}"
+
+      retry 30 5 replica_row_count 2

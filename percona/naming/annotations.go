@@ -63,4 +63,10 @@ const (
 	// AnnotationPVCsPreparedAt is the annotation added to the PerconaPGRestore which
 	// prepares the PVCs for a snapshot restore.
 	AnnotationPVCsPreparedAt = PrefixPerconaPGV2 + "pvcs-prepared-at"
+
+	// AnnotationLogicalReplicaDatabases records, on the objects belonging to a
+	// logical replica, the comma-separated list of databases it replicates. It
+	// lets the operator clean up the publications and replication slots on the
+	// primary even after the replica has been removed from the spec. K8SPG-784
+	AnnotationLogicalReplicaDatabases = PrefixPerconaPGV2 + "logical-replica-databases"
 )

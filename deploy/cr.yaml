@@ -367,6 +367,32 @@ spec:
 #            requests:
 #              storage: 1Gi
 
+# Logical replicas are read-write PostgreSQL instances in this cluster that
+# receive changes from the primary over logical replication. They are seeded
+# with pg_basebackup and converted with pg_createsubscriber, so they require
+# postgresVersion 17 or higher.
+#
+# A logical replica does not survive a failover of this cluster: its replication
+# slot lives only on the primary that created it. When that happens the replica
+# is reported as broken in status and has to be recreated.
+#  logicalReplicas:
+#  - name: analytics
+#    # Omit to replicate every database in the cluster.
+#    databases:
+#    - cluster1
+#    dataVolumeClaimSpec:
+#      accessModes:
+#      - ReadWriteOnce
+#      resources:
+#        requests:
+#          storage: 1Gi
+#    resources:
+#      limits:
+#        cpu: 2.0
+#        memory: 4Gi
+#    expose:
+#      type: LoadBalancer
+
   proxy:
     pgBouncer:
       replicas: 3
