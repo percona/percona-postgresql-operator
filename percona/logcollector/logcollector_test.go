@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -106,6 +107,57 @@ func TestContainers(t *testing.T) {
 			expectedContainerNames: []string{"logs", "logrotate"},
 			build:                  true,
 		},
+		"logcollector enabled with probes (instance)": {
+			builder:        instanceContainers,
+			dataMount:      dataMount,
+			logSpecificEnv: instanceLogEnv,
+			logCollector: &v2.LogCollectorSpec{
+				Enabled:         true,
+				Image:           "log-test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				LivenessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{Path: "/", Port: intstr.FromInt32(2020)},
+					},
+					InitialDelaySeconds: 10,
+				},
+				ReadinessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{Path: "/api/v1/health", Port: intstr.FromInt32(2020)},
+					},
+					InitialDelaySeconds: 10,
+				},
+			},
+			expectedContainerNames: []string{"logs", "logrotate"},
+			build:                  true,
+		},
+		"logcollector enabled with logrotate probes (instance)": {
+			builder:        instanceContainers,
+			dataMount:      dataMount,
+			logSpecificEnv: instanceLogEnv,
+			logCollector: &v2.LogCollectorSpec{
+				Enabled:         true,
+				Image:           "log-test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			},
+			logRotate: &v2.LogRotateSpec{
+				Schedule: "0 0 * * *",
+				LivenessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						Exec: &corev1.ExecAction{Command: []string{"/bin/true"}},
+					},
+					InitialDelaySeconds: 30,
+				},
+				ReadinessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						Exec: &corev1.ExecAction{Command: []string{"/bin/true"}},
+					},
+					InitialDelaySeconds: 5,
+				},
+			},
+			expectedContainerNames: []string{"logs", "logrotate"},
+			build:                  true,
+		},
 		"logcollector enabled with logrotate (instance)": {
 			builder:        instanceContainers,
 			dataMount:      dataMount,
@@ -153,7 +205,7 @@ func TestContainers(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectedContainerNames, gotNames)
 
-			expected := expectedContainers(tt.dataMount, tt.logSpecificEnv, spec.Configuration, spec.Env, spec.EnvFrom, tt.logRotate)
+			expected := expectedContainers(tt.dataMount, tt.logSpecificEnv, spec.Configuration, spec.Env, spec.EnvFrom, spec.LivenessProbe, spec.ReadinessProbe, tt.logRotate)
 			assert.Equal(t, expected, containers)
 		})
 	}
@@ -165,6 +217,8 @@ func expectedContainers(
 	configuration string,
 	extraEnv []corev1.EnvVar,
 	envFrom []corev1.EnvFromSource,
+	livenessProbe *corev1.Probe,
+	readinessProbe *corev1.Probe,
 	logrotateConfig *v2.LogRotateSpec,
 ) []corev1.Container {
 	envs := append([]corev1.EnvVar(nil), logSpecificEnv...)
@@ -193,6 +247,8 @@ func expectedContainers(
 		Image:           "log-test-image",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: expectedSecurityContext(),
+		LivenessProbe:   livenessProbe,
+		ReadinessProbe:  readinessProbe,
 		Command:         []string{"/opt/crunchy/logcollector/entrypoint.sh"},
 		Args:            []string{"fluent-bit"},
 		Env:             envs,
@@ -214,6 +270,8 @@ func expectedContainers(
 		Image:           "log-test-image",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: expectedSecurityContext(),
+		LivenessProbe:   logrotateLivenessProbe(logrotateConfig),
+		ReadinessProbe:  logrotateReadinessProbe(logrotateConfig),
 		Command:         []string{"/opt/crunchy/logcollector/entrypoint.sh"},
 		Args:            []string{"logrotate"},
 		Env: []corev1.EnvVar{
@@ -275,6 +333,20 @@ func logrotateSchedule(lr *v2.LogRotateSpec) string {
 		return lr.Schedule
 	}
 	return "0 0 * * *"
+}
+
+func logrotateLivenessProbe(lr *v2.LogRotateSpec) *corev1.Probe {
+	if lr == nil {
+		return nil
+	}
+	return lr.LivenessProbe
+}
+
+func logrotateReadinessProbe(lr *v2.LogRotateSpec) *corev1.Probe {
+	if lr == nil {
+		return nil
+	}
+	return lr.ReadinessProbe
 }
 
 func TestUserVolumeMounts(t *testing.T) {

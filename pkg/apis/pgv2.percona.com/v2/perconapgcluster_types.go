@@ -931,6 +931,16 @@ type LogCollectorSpec struct {
 	// +optional
 	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
 
+	// LivenessProbe sets the liveness probe for the fluent-bit log collector
+	// container. When not set, the container has no liveness probe.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the fluent-bit log collector
+	// container. When not set, the container has no readiness probe.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 
@@ -957,6 +967,16 @@ type LogRotateSpec struct {
 	// +kubebuilder:default="0 0 * * *"
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
+
+	// LivenessProbe sets the liveness probe for the logrotate container.
+	// When not set, the container has no liveness probe.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the logrotate container.
+	// When not set, the container has no readiness probe.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
 }
 
 func (cr *PerconaPGCluster) LogCollectorEnabled() bool {
