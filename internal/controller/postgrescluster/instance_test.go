@@ -37,7 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
