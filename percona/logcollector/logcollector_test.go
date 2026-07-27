@@ -237,7 +237,7 @@ func expectedContainers(
 				Name:  "LOGROTATE_SCHEDULE",
 				Value: logrotateSchedule(logrotateConfig),
 			},
-			{Name: "LD_PRELOAD", Value: "/usr/lib64/libnss_wrapper.so"},
+			{Name: "LD_PRELOAD", Value: "/tmp/nss_wrapper/libnss_wrapper.so"},
 			{Name: "NSS_WRAPPER_PASSWD", Value: "/tmp/nss_wrapper/postgres/passwd"},
 			{Name: "NSS_WRAPPER_GROUP", Value: "/tmp/nss_wrapper/postgres/group"},
 		},
