@@ -50,19 +50,95 @@ import (
 var testCronSchedule string = "*/15 * * * *"
 
 func TestSetRepoVolumeSize(t *testing.T) {
-	gate := feature.NewGate()
-	assert.NilError(t, gate.SetFromMap(map[string]bool{feature.AutoGrowVolumes: true}))
-	ctx := feature.NewContext(t.Context(), gate)
-
-	pvc := &corev1.PersistentVolumeClaim{Spec: corev1.PersistentVolumeClaimSpec{
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
-			Limits:   corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")},
+	tests := []struct {
+		name             string
+		request          string
+		limit            string
+		desired          string
+		existingRequest  string
+		existingCapacity string
+		expected         string
+		autogrow         bool
+	}{
+		{
+			name:     "automatic growth",
+			request:  "1Gi",
+			limit:    "5Gi",
+			desired:  "3Gi",
+			autogrow: true,
+			expected: "3Gi",
 		},
-	}}
-	new(Reconciler).setRepoVolumeSize(ctx, &v1beta1.PostgresCluster{}, pvc, "repo1", "3Gi")
+		{
+			name:             "disabled after growth",
+			request:          "1Gi",
+			limit:            "5Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "limit removed after growth",
+			request:          "1Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "limit lowered after growth",
+			request:          "1Gi",
+			limit:            "2Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "capacity is a lower bound",
+			request:          "1Gi",
+			limit:            "5Gi",
+			existingRequest:  "2Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+	}
 
-	assert.Equal(t, pvc.Spec.Resources.Requests.Storage().String(), "3Gi")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := feature.NewGate()
+			assert.NilError(t, gate.SetFromMap(map[string]bool{feature.AutoGrowVolumes: tt.autogrow}))
+			ctx := feature.NewContext(t.Context(), gate)
+
+			pvc := &corev1.PersistentVolumeClaim{Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(tt.request)},
+				},
+			}}
+			if tt.limit != "" {
+				pvc.Spec.Resources.Limits = corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(tt.limit),
+				}
+			}
+
+			var existing *corev1.PersistentVolumeClaim
+			if tt.existingRequest != "" {
+				existing = &corev1.PersistentVolumeClaim{
+					Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(tt.existingRequest),
+						},
+					}},
+				}
+				if tt.existingCapacity != "" {
+					existing.Status.Capacity = corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(tt.existingCapacity),
+					}
+				}
+			}
+
+			new(Reconciler).setRepoVolumeSize(ctx, &v1beta1.PostgresCluster{},
+				pvc, existing, "repo1", tt.desired)
+			assert.Equal(t, pvc.Spec.Resources.Requests.Storage().String(), tt.expected)
+		})
+	}
 
 	status := getRepoVolumeStatus(nil, []*corev1.PersistentVolumeClaim{{
 		ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{naming.LabelPGBackRestRepo: "repo1"}},

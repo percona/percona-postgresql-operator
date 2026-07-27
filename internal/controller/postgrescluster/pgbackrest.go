@@ -186,7 +186,14 @@ func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	r.setRepoVolumeSize(ctx, postgresCluster, repo, repoName, desiredVolume)
+	var existing *corev1.PersistentVolumeClaim
+	for _, pvc := range repoResources.pvcs {
+		if pvc.Labels[naming.LabelPGBackRestRepo] == repoName {
+			existing = pvc
+			break
+		}
+	}
+	r.setRepoVolumeSize(ctx, postgresCluster, repo, existing, repoName, desiredVolume)
 	// Clear any set limit before applying PVC. This is needed to allow the limit
 	// value to change later.
 	repo.Spec.Resources.Limits = nil
@@ -202,20 +209,17 @@ func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 // setRepoVolumeSize applies an observed automatic-growth suggestion without
 // exceeding the ceiling configured in the repository PVC resource limits.
 func (r *Reconciler) setRepoVolumeSize(ctx context.Context, cluster *v1beta1.PostgresCluster,
-	pvc *corev1.PersistentVolumeClaim, repoName, desiredVolume string,
+	pvc, existing *corev1.PersistentVolumeClaim, repoName, desiredVolume string,
 ) {
 	limit := pvc.Spec.Resources.Limits.Storage()
 	request := pvc.Spec.Resources.Requests.Storage()
-	if limit.IsZero() {
-		return
-	}
 
-	if request.Cmp(*limit) > 0 {
+	if !limit.IsZero() && request.Cmp(*limit) > 0 {
 		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "RepoVolumeRequestOverLimit",
 			"pgBackRest repository volume request (%v) for %s/%s is greater than its limit (%v); the limit will be used.",
 			request, cluster.Name, repoName, limit)
 		request = limit
-	} else if feature.Enabled(ctx, feature.AutoGrowVolumes) && desiredVolume != "" {
+	} else if !limit.IsZero() && feature.Enabled(ctx, feature.AutoGrowVolumes) && desiredVolume != "" {
 		desired, err := resource.ParseQuantity(desiredVolume)
 		if err != nil {
 			logging.FromContext(ctx).Error(err, "Unable to parse pgBackRest repository volume request",
@@ -235,6 +239,15 @@ func (r *Reconciler) setRepoVolumeSize(ctx context.Context, cluster *v1beta1.Pos
 			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "RepoVolumeLimitReached",
 				"pgBackRest repository volume for %s/%s is at its size limit (%v).",
 				cluster.Name, repoName, limit)
+		}
+	}
+
+	if existing != nil {
+		if current := existing.Spec.Resources.Requests.Storage(); current != nil && current.Cmp(*request) > 0 {
+			request = current
+		}
+		if capacity := existing.Status.Capacity.Storage(); capacity != nil && capacity.Cmp(*request) > 0 {
+			request = capacity
 		}
 	}
 
