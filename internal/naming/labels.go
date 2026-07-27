@@ -22,6 +22,10 @@ const (
 	LabelPerconaName      = appK8sPrefix + "name"
 	LabelPerconaInstance  = appK8sPrefix + "instance"
 
+	// LabelPerconaManagedByValue is the value this operator stamps onto
+	// LabelPerconaManagedBy.
+	LabelPerconaManagedByValue = "percona-postgresql-operator"
+
 	// LabelCluster et al. provides the fundamental labels for Postgres instances
 	LabelCluster     = labelPrefix + "cluster"
 	LabelInstance    = labelPrefix + "instance"
@@ -319,7 +323,7 @@ func WithPerconaLabels(set map[string]string, clusterName, component, crVersion 
 	}
 
 	ls := labels.Set{
-		LabelPerconaManagedBy: "percona-postgresql-operator",
+		LabelPerconaManagedBy: LabelPerconaManagedByValue,
 		LabelPerconaName:      "percona-postgresql",
 		LabelPerconaPartOf:    "percona-postgresql",
 	}
