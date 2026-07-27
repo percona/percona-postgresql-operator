@@ -2322,9 +2322,9 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	// Populate the pgBackRest secret from cert-manager-issued certs.
 	initialize.Map(&intent.Data)
 
-	caCert, err := rootCA.Certificate.MarshalText()
+	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal root CA certificate")
+		return err
 	}
 	intent.Data[pgbackrest.CertAuthoritySecretKey] = caCert
 	intent.Data[pgbackrest.CertClientSecretKey] = clientSecret.Data[corev1.TLSCertKey]
@@ -2333,6 +2333,22 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	intent.Data[pgbackrest.CertRepoPrivateKeySecretKey] = repoSecret.Data[corev1.TLSPrivateKeyKey]
 
 	return nil
+}
+
+func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
+	if rootCA != nil {
+		caCert, err := rootCA.Certificate.MarshalText()
+		return caCert, errors.Wrap(err, "failed to marshal root CA certificate")
+	}
+
+	if ca := clientSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	if ca := repoSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+
+	return nil, errors.New("external issuer did not return a CA certificate for pgBackRest")
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}
