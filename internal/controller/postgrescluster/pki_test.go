@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
@@ -397,30 +400,39 @@ func (m *mockCertManagerController) Check(context.Context, *rest.Config, string)
 func (m *mockCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return false, nil
 }
+
 func (m *mockCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	panic("unexpected call")
 }
+
 func (m *mockCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	panic("unexpected call")
 }
@@ -445,39 +457,49 @@ type recoveryCertManagerController struct {
 func (m *recoveryCertManagerController) Check(context.Context, *rest.Config, string) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return true, nil
 }
+
 func (m *recoveryCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyIssuerCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	m.applyClusterCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
 	m.applyInstanceCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	m.applyPGBouncerCertificateCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyReplicationCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
 	m.applyPGBackRestClientCalls++
 	return nil
 }
+
 func (m *recoveryCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
 	return nil
 }
@@ -786,4 +808,187 @@ func getCertFromSecret(
 	// parse the cert from binary encoded data
 	fromSecret := &pki.Certificate{}
 	return fromSecret, fromSecret.UnmarshalText(secretCRT)
+}
+
+// installedCertManagerController reports cert-manager as installed and lets
+// every Apply* call succeed as a no-op — used for issuer-mode
+// tests that only need isCertManagerInstalled to return true, not real
+// Issuer/Certificate object creation (envtest has no cert-manager CRDs).
+type installedCertManagerController struct{}
+
+func (installedCertManagerController) Check(context.Context, *rest.Config, string) error {
+	return nil
+}
+
+func (installedCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+
+func (installedCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	return nil
+}
+
+func (installedCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	return nil
+}
+
+func installedCertManagerCtrlFunc(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+	return installedCertManagerController{}
+}
+
+func TestIssuerModeAwareness(t *testing.T) {
+	_, tClient := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+	ctx := t.Context()
+	namespace := require.Namespace(t, tClient).Name
+
+	t.Run("reconcileRootCertificate returns nil for external issuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "external-root-cert"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		r := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: certmanager.NewController,
+		}
+
+		root, err := r.reconcileRootCertificate(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, root == nil)
+	})
+
+	t.Run("isRootCACertManagerManaged errors when cert-manager missing and issuerConf is set", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "external-no-certmanager"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		r := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: mockCertManagerCtrlFunc,
+			RestConfig:          nil, // isCertManagerInstalled short-circuits to false
+		}
+
+		_, err := r.isRootCACertManagerManaged(ctx, cluster)
+		assert.ErrorContains(t, err, "cert-manager is required")
+	})
+
+	t.Run("isRootCACertManagerManaged returns true immediately for external issuer when cert-manager installed", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "external-with-certmanager"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		r := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: installedCertManagerCtrlFunc,
+			RestConfig:          &rest.Config{},
+		}
+
+		managed, err := r.isRootCACertManagerManaged(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, managed)
+	})
+
+	t.Run("isRootCACertManagerManaged returns true immediately for managed cluster issuer when cert-manager installed", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "cluster-scoped-with-certmanager"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer", Kind: cmv1.ClusterIssuerKind},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		// certmanager.ResolveIssuerMode issues a live Get for the named
+		// ClusterIssuer. The shared envtest scheme used by setupKubernetes(t)
+		// (internal/controller/runtime.Scheme) does not register cert-manager
+		// types, and envtest has no cert-manager CRDs installed either, so
+		// tClient can't serve that Get (pre-existing gap, out of scope for
+		// this task's file set). A scheme-complete fake client stands in for
+		// tClient as this Reconciler's Client so the ClusterIssuer Get
+		// resolves to NotFound (mode ManagedCluster), matching what happens
+		// against a real cluster where the operator can read the API but the
+		// ClusterIssuer doesn't exist yet.
+		certManagerScheme := runtime.NewScheme()
+		assert.NilError(t, cmv1.AddToScheme(certManagerScheme))
+		fakeClient := fake.NewClientBuilder().WithScheme(certManagerScheme).Build()
+
+		r := &Reconciler{
+			Client:              fakeClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: installedCertManagerCtrlFunc,
+			RestConfig:          &rest.Config{},
+		}
+
+		managed, err := r.isRootCACertManagerManaged(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, managed)
+	})
+
+	t.Run("reconcileCertManagerClusterCertificate skips ApplyIssuer for external issuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "external-cluster-cert"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		recovery := &recoveryCertManagerController{}
+		r := &Reconciler{
+			Client: tClient,
+			Owner:  ControllerName,
+			CertManagerCtrlFunc: func(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+				return recovery
+			},
+		}
+
+		primaryService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "external-cluster-cert-primary"}}
+		replicaService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "external-cluster-cert-replicas"}}
+
+		_, err := r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
+		assert.NilError(t, err)
+		assert.Equal(t, recovery.applyIssuerCalls, 0)
+	})
 }

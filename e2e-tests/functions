@@ -1175,6 +1175,11 @@ deploy_cert_manager() {
 		sleep 5
 	done
 
+	echo "Waiting for cert-manager mutating webhook to be ready..."
+	until kubectl get mutatingwebhookconfiguration cert-manager-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | grep -q '[A-Za-z0-9+/=]'; do
+		sleep 5
+	done
+
 	echo "Waiting for cert-manager webhook service to have endpoints..."
 	until kubectl -n cert-manager get endpoints cert-manager-webhook -o jsonpath='{.subsets[*].addresses}' | grep -q '.'; do
 		sleep 5
