@@ -62,6 +62,10 @@ spec:
 #    certValidityDuration: 2160h
 #    caValidityDuration: 26280h
 #    pgBackRestCertValidityDuration: 2160h
+#    issuerConf:
+#      name: some-selfsigned-issuer
+#      kind: ClusterIssuer
+#      group: cert-manager.io
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"
@@ -374,6 +378,8 @@ spec:
 #      - secretRef:
 #          name: pgbouncer-env-secret
 #      exposeSuperusers: false
+#      usersSecret:
+#        name: pgbouncer-users
 #      resources:
 #        limits:
 #          cpu: 200m
@@ -400,7 +406,8 @@ spec:
 #        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
-#
+#      additionalTrustedCAs:
+#      - name: some-client-ca
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -484,6 +491,7 @@ spec:
 #          pool_mode: transaction
 
   backups:
+#    enabled: true
 #    trackLatestRestorableTime: true
 #    volumeSnapshots:
 #      mode: offline
@@ -822,6 +830,8 @@ spec:
 #      pg_audit: true
 #      pgvector: false
 #      pg_repack: false
+#      pg_cron: false
+#      set_user: false
 #    custom:
 #    - name: pg_cron
 #      version: 1.6.1

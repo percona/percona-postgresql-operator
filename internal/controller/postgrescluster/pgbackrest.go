@@ -2322,9 +2322,9 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	// Populate the pgBackRest secret from cert-manager-issued certs.
 	initialize.Map(&intent.Data)
 
-	caCert, err := rootCA.Certificate.MarshalText()
+	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal root CA certificate")
+		return err
 	}
 	intent.Data[pgbackrest.CertAuthoritySecretKey] = caCert
 	intent.Data[pgbackrest.CertClientSecretKey] = clientSecret.Data[corev1.TLSCertKey]
@@ -2333,6 +2333,22 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	intent.Data[pgbackrest.CertRepoPrivateKeySecretKey] = repoSecret.Data[corev1.TLSPrivateKeyKey]
 
 	return nil
+}
+
+func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
+	if rootCA != nil {
+		caCert, err := rootCA.Certificate.MarshalText()
+		return caCert, errors.Wrap(err, "failed to marshal root CA certificate")
+	}
+
+	if ca := clientSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	if ca := repoSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+
+	return nil, errors.New("external issuer did not return a CA certificate for pgBackRest")
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}
@@ -3036,6 +3052,21 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 	// record an event indicating successful stanza creation
 	r.Recorder.Event(postgresCluster, corev1.EventTypeNormal, EventStanzasCreated,
 		"pgBackRest stanza creation completed successfully")
+
+	// Re-push any timeline history files stranded by the async-archiver race:
+	// postgres archives 00000002.history during bootstrap promotion before the
+	// stanza exists; pgBackRest drops it silently (error 103) and postgres
+	// never retries.  Without it pg_rewind fails on replicas after PITR.
+	log := logging.FromContext(ctx)
+	historyOut, historyErr := pgbackrest.Executor(exec).ArchivePushHistoryFiles(ctx)
+	if historyErr != nil {
+		r.Recorder.Event(postgresCluster, corev1.EventTypeWarning,
+			"ArchivePushHistoryFilesFailed", historyErr.Error())
+		log.Error(historyErr, "timeline history file recovery failed",
+			"pod", writableInstanceName, "output", historyOut)
+	} else if historyOut != "" {
+		log.Info("timeline history file recovery", "output", historyOut)
+	}
 
 	// if no errors then stanza(s) created successfully
 	for i := range postgresCluster.Status.PGBackRest.Repos {

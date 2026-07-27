@@ -957,6 +957,9 @@ spec:
                 required:
                 - name
                 type: object
+              size:
+                format: int64
+                type: integer
               snapshot:
                 properties:
                   dataVolumeSnapshotRef:
@@ -1113,6 +1116,9 @@ spec:
                 description: PostgreSQL backup configuration
                 properties:
                   enabled:
+                    description: |-
+                      Enabled controls whether backups are enabled for the cluster.
+                      Defaulted to true by the operator for crVersion >= 3.1.0.
                     type: boolean
                   pgbackrest:
                     description: pgBackRest archive configuration
@@ -11280,6 +11286,9 @@ spec:
                   upgrade to apply changes to Kubernetes objects. Default is the latest
                   version.
                 type: string
+                x-kubernetes-validations:
+                - message: CRVersion must be a valid semantic version
+                  rule: self == "" || self.matches('^[0-9]+\\.[0-9]+\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')
               dataSource:
                 description: Specifies a data source for bootstrapping the PostgreSQL
                   cluster.
@@ -14685,6 +14694,8 @@ spec:
                     properties:
                       pg_audit:
                         type: boolean
+                      pg_cron:
+                        type: boolean
                       pg_repack:
                         type: boolean
                       pg_stat_monitor:
@@ -14692,6 +14703,8 @@ spec:
                       pg_stat_statements:
                         type: boolean
                       pgvector:
+                        type: boolean
+                      set_user:
                         type: boolean
                     type: object
                   custom:
@@ -25895,6 +25908,28 @@ spec:
                   pgBouncer:
                     description: Defines a PgBouncer proxy and connection pooler.
                     properties:
+                      additionalTrustedCAs:
+                        description: |-
+                          K8SPG-952
+                          Additional CA bundles that PgBouncer should trust when verifying client certificates.
+                          Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       affinity:
                         description: |-
                           Scheduling constraints of a PgBouncer pod. Changing this value causes
@@ -31924,6 +31959,22 @@ spec:
                           - whenUnsatisfiable
                           type: object
                         type: array
+                      usersSecret:
+                        description: |-
+                          Secret with users to add to PgBouncer's authentication file. Each key is
+                          a PgBouncer user name and its value is the password or verifier.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                 required:
                 - pgBouncer
@@ -32162,6 +32213,26 @@ spec:
                     type: string
                   certValidityDuration:
                     type: string
+                  issuerConf:
+                    description: IssuerReference is a reference to a certificate issuer
+                      object with a given name, kind and group.
+                    properties:
+                      group:
+                        description: |-
+                          Group of the issuer being referred to.
+                          Defaults to 'cert-manager.io'.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the issuer being referred to.
+                          Defaults to 'Issuer'.
+                        type: string
+                      name:
+                        description: Name of the issuer being referred to.
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pgBackRestCertValidityDuration:
                     type: string
                 type: object
@@ -32558,6 +32629,8 @@ spec:
                 type: object
               postgres:
                 properties:
+                  distribution:
+                    type: string
                   imageID:
                     type: string
                   instances:
@@ -54101,6 +54174,8 @@ spec:
                 properties:
                   pgAudit:
                     type: boolean
+                  pgCron:
+                    type: boolean
                   pgRepack:
                     type: boolean
                   pgStatMonitor:
@@ -54108,6 +54183,8 @@ spec:
                   pgStatStatements:
                     type: boolean
                   pgvector:
+                    type: boolean
+                  setUser:
                     type: boolean
                 type: object
               image:
@@ -63024,6 +63101,28 @@ spec:
                   pgBouncer:
                     description: Defines a PgBouncer proxy and connection pooler.
                     properties:
+                      additionalTrustedCAs:
+                        description: |-
+                          K8SPG-952
+                          Additional CA bundles that PgBouncer should trust when verifying client certificates.
+                          Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       affinity:
                         description: |-
                           Scheduling constraints of a PgBouncer pod. Changing this value causes
@@ -69040,6 +69139,22 @@ spec:
                           - whenUnsatisfiable
                           type: object
                         type: array
+                      usersSecret:
+                        description: |-
+                          Secret with users to add to PgBouncer's authentication file. Each key is
+                          a PgBouncer user name and its value is the password or verifier.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                 required:
                 - pgBouncer
@@ -69215,6 +69330,26 @@ spec:
                     type: string
                   certValidityDuration:
                     type: string
+                  issuerConf:
+                    description: IssuerReference is a reference to a certificate issuer
+                      object with a given name, kind and group.
+                    properties:
+                      group:
+                        description: |-
+                          Group of the issuer being referred to.
+                          Defaults to 'cert-manager.io'.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the issuer being referred to.
+                          Defaults to 'Issuer'.
+                        type: string
+                      name:
+                        description: Name of the issuer being referred to.
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pgBackRestCertValidityDuration:
                     type: string
                 type: object

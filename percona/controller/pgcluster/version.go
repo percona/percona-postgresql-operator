@@ -49,6 +49,7 @@ func (r *PGClusterReconciler) getVersionMeta(cr *v2.PerconaPGCluster, operatorDe
 		BackupVersion:   "",
 		PMMVersion:      "",
 		PMMEnabled:      cr.PMMEnabled(),
+		Distribution:    cr.Status.Postgres.Distribution,
 	}
 
 	if _, ok := cr.Labels["helm.sh/chart"]; ok {

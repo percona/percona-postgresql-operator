@@ -21,6 +21,7 @@ monitoring
 monitoring-pmm3
 one-pod
 operator-self-healing
+pgbouncer-mtls
 pitr
 scaling
 scheduled-backup
@@ -34,3 +35,6 @@ telemetry-transfer
 upgrade-consistency
 upgrade-minor
 users
+migration-from-crunchy-standby
+migration-from-crunchy-pv
+migration-from-crunchy-backup-restore

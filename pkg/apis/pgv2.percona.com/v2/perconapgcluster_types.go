@@ -60,6 +60,7 @@ type PerconaPGClusterSpec struct {
 	// upgrade to apply changes to Kubernetes objects. Default is the latest
 	// version.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]+\\\\.[0-9]+\\\\.[0-9]+([-+][a-zA-Z0-9.+-]+)?$')",message="CRVersion must be a valid semantic version"
 	CRVersion string `json:"crVersion,omitempty"`
 
 	InitContainer *crunchyv1beta1.InitContainerSpec `json:"initContainer,omitempty"`
@@ -307,9 +308,19 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
 		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
 	}
+	if cr.Spec.Extensions.BuiltIn.PGCron == nil {
+		cr.Spec.Extensions.BuiltIn.PGCron = new(false)
+	}
+	if cr.Spec.Extensions.BuiltIn.SetUser == nil {
+		cr.Spec.Extensions.BuiltIn.SetUser = new(false)
+	}
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = new(true)
+	}
+
+	if cr.CompareVersion("3.1.0") >= 0 && cr.Spec.Backups.Enabled == nil {
+		cr.Spec.Backups.Enabled = new(true)
 	}
 
 	if cr.CompareVersion("2.9.0") < 0 && cr.Spec.Config == nil {
@@ -497,6 +508,12 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
+	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
+		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.BuiltIn.PGCron
+	}
+	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
+		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.BuiltIn.SetUser
+	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
 	postgresCluster.Spec.TLS = cr.Spec.TLS
@@ -510,7 +527,11 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 }
 
 func (cr *PerconaPGCluster) Version() *gover.Version {
-	return gover.Must(gover.NewVersion(cr.Spec.CRVersion))
+	crVersion := cr.Spec.CRVersion
+	if crVersion == "" {
+		crVersion = version.Version()
+	}
+	return gover.Must(gover.NewVersion(crVersion))
 }
 
 func (cr *PerconaPGCluster) CompareVersion(ver string) int {
@@ -549,7 +570,16 @@ type PostgresStatus struct {
 
 	// +optional
 	ImageID string `json:"imageID"`
+
+	// +optional
+	Distribution string `json:"distribution,omitempty"`
 }
+
+// PostgreSQL distribution values reported in PostgresStatus.Distribution.
+const (
+	PostgresDistributionPercona   = "percona"
+	PostgresDistributionCommunity = "community"
+)
 
 type PGBouncerStatus struct {
 	Size int32 `json:"size"`
@@ -621,6 +651,9 @@ type Patroni struct {
 // Backups struct.
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
 type Backups struct {
+	// Enabled controls whether backups are enabled for the cluster.
+	// Defaulted to true by the operator for crVersion >= 3.1.0.
+	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// pgBackRest archive configuration
@@ -953,6 +986,8 @@ type BuiltInExtensionsSpec struct {
 	PGAudit          *bool `json:"pg_audit,omitempty"`
 	PGVector         *bool `json:"pgvector,omitempty"`
 	PGRepack         *bool `json:"pg_repack,omitempty"`
+	PGCron           *bool `json:"pg_cron,omitempty"`
+	SetUser          *bool `json:"set_user,omitempty"`
 }
 
 type ExtensionsSpec struct {
@@ -1262,6 +1297,11 @@ type PGBouncerSpec struct {
 	// +optional
 	CustomTLSSecret *corev1.SecretProjection `json:"customTLSSecret,omitempty"`
 
+	// K8SPG-952
+	// Additional CA bundles that PgBouncer should trust when verifying client certificates.
+	// Each item is a reference to a Secret that contains a PEM-encoded CA bundle in key `ca.crt`.
+	AdditionalTrustedCAs []corev1.LocalObjectReference `json:"additionalTrustedCAs,omitempty"`
+
 	// Allow SUPERUSERs to connect through PGBouncer.
 	// +optional
 	ExposeSuperusers bool `json:"exposeSuperusers,omitempty"`
@@ -1323,6 +1363,11 @@ type PGBouncerSpec struct {
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
+	// Secret with users to add to PgBouncer's authentication file. Each key is
+	// a PgBouncer user name and its value is the password or verifier.
+	// +optional
+	UsersSecret *corev1.LocalObjectReference `json:"usersSecret,omitempty"`
+
 	Env     []corev1.EnvVar        `json:"env,omitempty"`
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
@@ -1352,8 +1397,10 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Tolerations:               p.Tolerations,
 		TopologySpreadConstraints: p.TopologySpreadConstraints,
 		SecurityContext:           p.SecurityContext,
+		UsersSecret:               p.UsersSecret,
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
+		AdditionalTrustedCAs:      p.AdditionalTrustedCAs,
 	}
 
 	spec.Default()
@@ -1423,4 +1470,23 @@ var EnvFromSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []str
 		return nil
 	}
 	return cr.EnvFromSecrets()
+}
+
+func (cr *PerconaPGCluster) PGBouncerUserSecrets() []string {
+	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil ||
+		cr.Spec.Proxy.PGBouncer.UsersSecret == nil || cr.Spec.Proxy.PGBouncer.UsersSecret.Name == "" {
+		return nil
+	}
+
+	return []string{cr.Spec.Proxy.PGBouncer.UsersSecret.Name}
+}
+
+const IndexFieldPGBouncerUserSecrets = "pgCluster.pgBouncerUserSecrets" //nolint:gosec
+
+var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok {
+		return nil
+	}
+	return cr.PGBouncerUserSecrets()
 }

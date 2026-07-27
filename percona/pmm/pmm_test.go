@@ -141,6 +141,30 @@ func TestContainer(t *testing.T) {
 
 }
 
+func TestPMMConfigFile(t *testing.T) {
+	newPGC := func(crVersion string) *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			Spec: v2.PerconaPGClusterSpec{CRVersion: crVersion},
+		}
+	}
+
+	t.Run("v3.1.0 PMM2", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), false))
+	})
+	t.Run("v3.1.0 PMM3", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), true))
+	})
+	t.Run("newer than 3.1.0", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.2.0"), true))
+	})
+	t.Run("older than 3.1.0 PMM2", func(t *testing.T) {
+		assert.Equal(t, "/usr/local/percona/pmm2/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), false))
+	})
+	t.Run("older than 3.1.0 PMM3", func(t *testing.T) {
+		assert.Equal(t, "/usr/local/percona/pmm/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), true))
+	})
+}
+
 func TestSidecarContainerV2(t *testing.T) {
 	pmmSpec := &v2.PMMSpec{
 		Image:                    "percona/pmm-client:pmm2-enabled",
@@ -200,7 +224,7 @@ func TestSidecarContainerV2(t *testing.T) {
 		"PMM_AGENT_LISTEN_PORT":            "7777",
 		"PMM_AGENT_PORTS_MIN":              "30100",
 		"PMM_AGENT_PORTS_MAX":              "30105",
-		"PMM_AGENT_CONFIG_FILE":            "/usr/local/percona/pmm2/config/pmm-agent.yaml",
+		"PMM_AGENT_CONFIG_FILE":            "/tmp/pmm-agent.yaml",
 		"PMM_AGENT_LOG_LEVEL":              "info",
 		"PMM_AGENT_DEBUG":                  "false",
 		"PMM_AGENT_TRACE":                  "false",
@@ -309,7 +333,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		"PMM_AGENT_LISTEN_PORT":            "7777",
 		"PMM_AGENT_PORTS_MIN":              "30100",
 		"PMM_AGENT_PORTS_MAX":              "30105",
-		"PMM_AGENT_CONFIG_FILE":            "/usr/local/percona/pmm/config/pmm-agent.yaml",
+		"PMM_AGENT_CONFIG_FILE":            "/tmp/pmm-agent.yaml",
 		"PMM_AGENT_LOG_LEVEL":              "info",
 		"PMM_AGENT_DEBUG":                  "false",
 		"PMM_AGENT_TRACE":                  "false",

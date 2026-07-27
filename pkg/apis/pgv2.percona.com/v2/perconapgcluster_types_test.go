@@ -24,6 +24,35 @@ func TestPerconaPGCluster_Default(t *testing.T) {
 	new(PerconaPGCluster).Default()
 }
 
+func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
+	t.Run("nil is defaulted to true for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.True(t, *cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("nil is left untouched for CRVersion < 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "3.0.0"
+		cr.Default()
+
+		assert.Nil(t, cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("explicit false is preserved for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Spec.Backups.Enabled = new(false)
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.False(t, *cr.Spec.Backups.Enabled)
+	})
+}
+
 func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	trueVal := true
 	falseVal := false
@@ -62,6 +91,25 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 
 		err := cluster.Validate()
 		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
+	})
+}
+
+func TestPerconaPGCluster_Version(t *testing.T) {
+	t.Run("empty CRVersion does not crash", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		// cr.Version() should not panic when CRVersion is empty
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		// Should return the default operator version
+		assert.Equal(t, version.Version(), ver.String())
+	})
+
+	t.Run("valid CRVersion is parsed correctly", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "2.5.0"
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		assert.Equal(t, "2.5.0", ver.String())
 	})
 }
 

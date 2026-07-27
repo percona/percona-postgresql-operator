@@ -9,6 +9,7 @@
 package v1beta1
 
 import (
+	metav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1360,6 +1361,11 @@ func (in *PGBouncerPodSpec) DeepCopyInto(out *PGBouncerPodSpec) {
 		*out = new(corev1.SecretProjection)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AdditionalTrustedCAs != nil {
+		in, out := &in.AdditionalTrustedCAs, &out.AdditionalTrustedCAs
+		*out = make([]corev1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(int32)
@@ -1409,6 +1415,11 @@ func (in *PGBouncerPodSpec) DeepCopyInto(out *PGBouncerPodSpec) {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(corev1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.UsersSecret != nil {
+		in, out := &in.UsersSecret, &out.UsersSecret
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
@@ -2666,6 +2677,11 @@ func (in *TLSSpec) DeepCopyInto(out *TLSSpec) {
 	if in.PGBackRestCertValidityDuration != nil {
 		in, out := &in.PGBackRestCertValidityDuration, &out.PGBackRestCertValidityDuration
 		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.IssuerConf != nil {
+		in, out := &in.IssuerConf, &out.IssuerConf
+		*out = new(metav1.IssuerReference)
 		**out = **in
 	}
 }

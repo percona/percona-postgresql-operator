@@ -31,7 +31,9 @@ commands:
               \"pg_stat_statements\": false,
               \"pg_audit\": true,
               \"pgvector\": true,
-              \"pg_repack\": true
+              \"pg_repack\": true,
+              \"pg_cron\": true,
+              \"set_user\": true
             }
           }
         }

@@ -34,6 +34,20 @@ func Container(secret *corev1.Secret, pgc *v2.PerconaPGCluster) (corev1.Containe
 }
 
 // sidecarContainerV2 refers to the construction of the PMM2 container.
+// pmmConfigFile returns the path for the stateless pmm-agent.yaml. From v3.1.0
+// it is placed directly in the writable "/tmp" emptyDir (pmm-agent does not
+// create the config's parent dir, so a subdirectory cannot be used) so PMM
+// works with readOnlyRootFilesystem.
+func pmmConfigFile(pgc *v2.PerconaPGCluster, isPMM3 bool) string {
+	if pgc.CompareVersion("3.1.0") >= 0 {
+		return "/tmp/pmm-agent.yaml"
+	}
+	if isPMM3 {
+		return "/usr/local/percona/pmm/config/pmm-agent.yaml"
+	}
+	return "/usr/local/percona/pmm2/config/pmm-agent.yaml"
+}
+
 func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 	ports := []corev1.ContainerPort{{ContainerPort: 7777}}
 
@@ -131,7 +145,7 @@ func sidecarContainerV2(pgc *v2.PerconaPGCluster) corev1.Container {
 		},
 		{
 			Name:  "PMM_AGENT_CONFIG_FILE",
-			Value: "/usr/local/percona/pmm2/config/pmm-agent.yaml",
+			Value: pmmConfigFile(pgc, false),
 		},
 		{
 			Name:  "PMM_AGENT_LOG_LEVEL",
@@ -332,7 +346,7 @@ func sidecarContainerV3(pgc *v2.PerconaPGCluster) corev1.Container {
 		},
 		{
 			Name:  "PMM_AGENT_CONFIG_FILE",
-			Value: "/usr/local/percona/pmm/config/pmm-agent.yaml",
+			Value: pmmConfigFile(pgc, true),
 		},
 		{
 			Name:  "PMM_AGENT_LOG_LEVEL",

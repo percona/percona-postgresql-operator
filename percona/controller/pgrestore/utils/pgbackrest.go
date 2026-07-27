@@ -62,6 +62,14 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
 		}
 	}
+	if r.pgCluster.Spec.Backups.PGBackRest.Restore.PostgresClusterDataSource == nil {
+		r.pgCluster.Spec.Backups.PGBackRest.Restore.PostgresClusterDataSource = &v1beta1.PostgresClusterDataSource{}
+	}
+	if r.pgCluster.Spec.Backups.PGBackRest.Restore.Tolerations == nil {
+		if jobs := r.pgCluster.Spec.Backups.PGBackRest.Jobs; jobs != nil {
+			r.pgCluster.Spec.Backups.PGBackRest.Restore.Tolerations = jobs.Tolerations
+		}
+	}
 
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = new(true)
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(r.pgRestore.Spec.RepoName, "")
