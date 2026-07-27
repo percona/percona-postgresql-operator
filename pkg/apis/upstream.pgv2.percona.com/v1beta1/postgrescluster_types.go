@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -254,6 +255,8 @@ type TLSSpec struct {
 	// +kubebuilder:default=auto
 	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
+	// +optional
+	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }
 
 func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
