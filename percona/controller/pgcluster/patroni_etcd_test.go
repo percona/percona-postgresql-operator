@@ -146,7 +146,7 @@ func TestReconcilePatroniEtcd(t *testing.T) {
 		r := newEtcdTestReconciler(t)
 		cr := etcdCR(&v1beta1.PatroniDCS{
 			Type: v1beta1.PatroniDCSTypeEtcd,
-			Etcd: &v1beta1.PatroniEtcdSpec{
+			Etcd: &v1beta1.PatroniEtcdSpec{ //nolint:gosec
 				Endpoints:  []string{"https://etcd:2379"},
 				AuthSecret: "missing-auth-secret",
 			},

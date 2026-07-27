@@ -333,7 +333,7 @@ watchdog:
 		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
 			DCS: &v1beta1.PatroniDCS{
 				Type: v1beta1.PatroniDCSTypeEtcd,
-				Etcd: &v1beta1.PatroniEtcdSpec{
+				Etcd: &v1beta1.PatroniEtcdSpec{ //nolint:gosec
 					Endpoints: []string{"https://etcd:2379"},
 					TLSSecret: "etcd-tls",
 				},
