@@ -8,4 +8,4 @@ resources:
 images:
 - name: postgres-operator
   newName: docker.io/perconalab/percona-postgresql-operator
-  newTag: main
+  newTag: CNGTM-214-7e0766b2763adf0dc3e82e738a10a58e8f018cb8

@@ -58,7 +58,7 @@ spec:
           value: 10s
         - name: PGO_FEATURE_GATES
           value: ""
-        image: docker.io/perconalab/percona-postgresql-operator:main
+        image: docker.io/perconalab/percona-postgresql-operator:CNGTM-214-7e0766b2763adf0dc3e82e738a10a58e8f018cb8
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
