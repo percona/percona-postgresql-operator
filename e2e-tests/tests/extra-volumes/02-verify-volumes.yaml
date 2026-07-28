@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      sts=$(kubectl -n "${NAMESPACE}" get sts \
+        --selector postgres-operator.crunchydata.com/instance-set=instance1 -o json)
+
+      echo "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
+        | select(.name == "fts-dicts") | select(.configMap.name == "extra-dicts")' >/dev/null
+      echo "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
+        | select(.name == "extra-data") | select(.emptyDir != null)' >/dev/null
+
+      echo "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
+        | select(.name == "database") | .volumeMounts[]
+        | select(.mountPath == "/pgdata/extra/dicts") | select(.readOnly == true)' >/dev/null
+      echo "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
+        | select(.name == "database") | .volumeMounts[]
+        | select(.mountPath == "/pgdata/extra/data")' >/dev/null
+
+      pod=$(get_instance_set_pods instance1 | head -n1)
+
+      content=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- cat /pgdata/extra/dicts/synonyms.txt)
+      if [[ "${content}" != "postgres pg pgsql" ]]; then
+        echo "unexpected dictionary content: ${content}"
+        exit 1
+      fi
+
+      if kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        sh -c 'echo test > /pgdata/extra/dicts/should-fail' 2>/dev/null; then
+        echo "read-only extra volume /pgdata/extra/dicts is writable"
+        exit 1
+      fi
+
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        sh -c 'echo test > /pgdata/extra/data/ok && cat /pgdata/extra/data/ok'

@@ -307,6 +307,24 @@ func InstancePod(ctx context.Context,
 		outInstancePod.Volumes = append(outInstancePod.Volumes, walVolume)
 	}
 
+	// K8SPG-440: mount user-defined extra volumes into the PostgreSQL container.
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		for _, extraVolume := range inInstanceSpec.ExtraVolumes {
+			outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
+				Name:         extraVolume.Name,
+				VolumeSource: extraVolume.VolumeSource,
+			})
+			for _, mount := range extraVolume.Mounts {
+				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+					Name:      extraVolume.Name,
+					MountPath: mount.MountPath,
+					SubPath:   mount.SubPath,
+					ReadOnly:  mount.ReadOnly,
+				})
+			}
+		}
+	}
+
 	outInstancePod.Containers = []corev1.Container{container, reloader}
 
 	// If the InstanceSidecars feature gate is enabled and instance sidecars are

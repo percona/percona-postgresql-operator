@@ -493,6 +493,13 @@ func (in *PGInstanceSetSpec) DeepCopyInto(out *PGInstanceSetSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]v1beta1.ExtraVolume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
 		*out = new(v1beta1.InstanceSidecars)

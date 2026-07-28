@@ -7,6 +7,7 @@ database-init-sql
 demand-backup
 demand-backup-offline-snapshot
 dynamic-configuration
+extra-volumes
 finalizers
 init-deploy
 huge-pages

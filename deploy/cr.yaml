@@ -366,6 +366,14 @@ spec:
 #          resources:
 #            requests:
 #              storage: 1Gi
+#    extraVolumes:
+#      - name: fts-dicts
+#        volumeSource:
+#          configMap:
+#            name: my-dicts
+#        mounts:
+#          - mountPath: /pgdata/dicts
+#            readOnly: true
 
   proxy:
     pgBouncer:
