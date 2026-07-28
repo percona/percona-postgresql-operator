@@ -137,7 +137,7 @@ jobs:
           expected_postgres="${registry}/${!postgres_var}"
           expected_pgbouncer="${registry}/${!pgbouncer_var}"
           expected_backrest="${registry}/${!backrest_var}"
-          expected_pmm="${registry}/${IMAGE_PMM3_CLIENT}"
+          expected_pmm="${registry}/${IMAGE_PMM_CLIENT}"
           expected_cr_version="${IMAGE_OPERATOR##*:}"
 
           spec_image=$(yq -r '.spec.image' deploy/cr.yaml)
@@ -163,7 +163,7 @@ jobs:
           check "spec.image (IMAGE_POSTGRESQL${pg_ver})" "$spec_image" "$expected_postgres"
           check "spec.proxy.pgBouncer.image (IMAGE_PGBOUNCER${pg_ver})" "$pgbouncer_image" "$expected_pgbouncer"
           check "spec.backups.pgbackrest.image (IMAGE_BACKREST${pg_ver})" "$backrest_image" "$expected_backrest"
-          check "spec.pmm.image (IMAGE_PMM3_CLIENT)" "$pmm_image" "$expected_pmm"
+          check "spec.pmm.image (IMAGE_PMM_CLIENT)" "$pmm_image" "$expected_pmm"
           check "spec.crVersion (IMAGE_OPERATOR tag)" "$cr_version" "$expected_cr_version"
 
           if [ "$failed" -ne 0 ]; then
