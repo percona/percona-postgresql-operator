@@ -22,3 +22,20 @@ commands:
 
       kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
         -l pgv2.percona.com/logical-replica=analytics --timeout=120s
+
+      # A live slot on the primary only proves the subscription was created.
+      # The apply worker runs inside the replica's postmaster and reconnects
+      # with the connection string stored in pg_subscription, so a missing
+      # credential there leaves the slot in place while nothing replicates.
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      worker=$(run_psql \
+        '\c logical-replica \\\ SELECT count(*) FROM pg_stat_subscription WHERE pid IS NOT NULL;' \
+        "postgres://postgres:${PASS}@${REPLICA}" | xargs)
+
+      if [[ ${worker} != "1" ]]; then
+        echo "ERROR: expected a running apply worker on the logical replica, got: ${worker}"
+        kubectl -n "${NAMESPACE}" logs "statefulset/logical-replica-lr-analytics" --tail=50 || true
+        exit 1
+      fi

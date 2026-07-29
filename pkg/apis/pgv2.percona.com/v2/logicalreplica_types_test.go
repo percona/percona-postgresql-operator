@@ -56,6 +56,22 @@ func TestLogicalReplicasEnabled(t *testing.T) {
 	})
 }
 
+func TestLogicalReplicaIsReadOnly(t *testing.T) {
+	// Writing to a logical replica diverges it from the primary and the first
+	// conflicting row stops apply for good, so unset must mean read-only.
+	t.Run("defaults to read-only when unset", func(t *testing.T) {
+		assert.True(t, (&LogicalReplicaSpec{Name: "analytics"}).IsReadOnly())
+	})
+
+	t.Run("honours an explicit true", func(t *testing.T) {
+		assert.True(t, (&LogicalReplicaSpec{Name: "analytics", ReadOnly: new(true)}).IsReadOnly())
+	})
+
+	t.Run("honours an explicit false", func(t *testing.T) {
+		assert.False(t, (&LogicalReplicaSpec{Name: "analytics", ReadOnly: new(false)}).IsReadOnly())
+	})
+}
+
 func TestValidateLogicalReplicas(t *testing.T) {
 	t.Run("empty is valid", func(t *testing.T) {
 		require.NoError(t, logicalReplicaCR().ValidateLogicalReplicas())

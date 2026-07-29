@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,10 @@ const (
 
 	// logicalReplicaConfigFile is the postgresql.conf key in the ConfigMap.
 	logicalReplicaConfigFile = "postgresql.conf"
+
+	// logicalReplicaBootstrapConfigFile is the postgresql.conf that
+	// pg_createsubscriber runs the target with during the conversion.
+	logicalReplicaBootstrapConfigFile = "bootstrap.conf"
 
 	// logicalReplicaConfigVolume is the name of the config volume and mount.
 	logicalReplicaConfigVolume = "logical-replica-config"
@@ -207,6 +212,13 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 		return nil, errors.Wrap(err, "reconcile pvc")
 	}
 
+	// The ConfigMap has to exist before the bootstrap Job: pg_createsubscriber
+	// runs the target server with it, which is what keeps the inherited
+	// pgBackRest archive_command from firing during the conversion.
+	if err := r.reconcileLogicalReplicaConfigMap(ctx, cr, spec, status); err != nil {
+		return nil, errors.Wrap(err, "reconcile configmap")
+	}
+
 	if status.ConvertedAt == nil {
 		converted, err := r.reconcileLogicalReplicaBootstrap(ctx, cr, spec, status)
 		if err != nil {
@@ -221,9 +233,6 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 		log.Info("logical replica converted", "databases", status.Databases)
 	}
 
-	if err := r.reconcileLogicalReplicaConfigMap(ctx, cr, spec, status); err != nil {
-		return nil, errors.Wrap(err, "reconcile configmap")
-	}
 	if err := r.reconcileLogicalReplicaStatefulSet(ctx, cr, spec); err != nil {
 		return nil, errors.Wrap(err, "reconcile statefulset")
 	}
@@ -431,7 +440,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaBootstrap(
 		return false, nil
 	}
 
-	job, err = r.generateLogicalReplicaBootstrapJob(cr, spec, status)
+	job, err = r.generateLogicalReplicaBootstrapJob(ctx, cr, spec, status)
 	if err != nil {
 		return false, errors.Wrap(err, "generate bootstrap job")
 	}
@@ -450,13 +459,34 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaBootstrap(
 // primary_conninfo. The conversion then promotes the result into a standalone
 // primary carrying the subscriptions.
 func logicalReplicaBootstrapScript(dataDir, primaryHost string, port int32, databases []string, replica string) string {
+	// pg_createsubscriber stores the publisher connection string verbatim in
+	// pg_subscription, and the apply worker reuses it on every connect. It runs
+	// inside the replica's postmaster, which has none of this Job's
+	// environment, so the credential has to be reachable from the connection
+	// string itself or the worker fails with "no password supplied".
+	//
+	// A password file keeps the secret out of pg_subscription, out of pg_dump
+	// output, and out of the process environment, which the libpq
+	// documentation recommends against. It also keeps working if the
+	// subscription ever ends up owned by a non-superuser: libpq refuses to take
+	// a password from the environment for those, but accepts a passfile.
+	passFile := logicalReplicaPassFile(dataDir)
+
 	args := []string{
-		"pg_createsubscriber",
+		"  pg_createsubscriber",
 		"--verbose",
 		"--pgdata=" + dataDir,
 		"--publisher-server=\"${PUBLISHER_CONNINFO}\"",
 		"--socketdir=/tmp",
 		"--recovery-timeout=" + strconv.Itoa(logicalReplicaRecoveryTimeout),
+		// Without this, pg_createsubscriber starts the target with the
+		// postgresql.conf pg_basebackup copied from the primary. That file
+		// carries archive_mode=on and the pgBackRest archive_command, and the
+		// conversion promotes the target before it resets the system
+		// identifier, so the target would archive WAL into the source
+		// cluster's stanza on a diverged timeline. It is also how the target
+		// gets the slot and worker settings the conversion checks for.
+		"--config-file=" + logicalReplicaConfigMountPath + "/" + logicalReplicaBootstrapConfigFile,
 	}
 	for _, db := range databases {
 		args = append(args,
@@ -466,13 +496,18 @@ func logicalReplicaBootstrapScript(dataDir, primaryHost string, port int32, data
 			"--replication-slot="+logicalreplica.SlotName(replica, db),
 		)
 	}
+	args = append(args, `"$@"`)
 
 	return strings.Join([]string{
 		`set -euo pipefail`,
 		``,
 		`PUBLISHER_CONNINFO="host=` + primaryHost + ` port=` + strconv.Itoa(int(port)) +
 			` user=` + logicalreplica.ReplicationUser + ` dbname=postgres sslmode=verify-ca sslrootcert=` +
-			naming.CertMountPath + `/ca.crt"`,
+			naming.CertMountPath + `/ca.crt passfile=` + passFile + `"`,
+		``,
+		`createsubscriber() {`,
+		strings.Join(args, " \\\n    "),
+		`}`,
 		``,
 		`if [ -s ` + shellQuote(dataDir+"/PG_VERSION") + ` ]; then`,
 		`  echo "data directory is not empty, refusing to seed over it" >&2`,
@@ -481,17 +516,47 @@ func logicalReplicaBootstrapScript(dataDir, primaryHost string, port int32, data
 		``,
 		`install --directory --mode=0700 ` + shellQuote(dataDir),
 		``,
+		`# Lives beside the data directory rather than inside it, so that`,
+		`# pg_basebackup, pg_createsubscriber and pg_resetwal leave it alone, and`,
+		`# on the data volume so it survives restarts of the replica. libpq`,
+		`# ignores a password file that is group or world readable.`,
+		`echo "writing ` + passFile + `"`,
+		`umask 0077`,
+		`printf '%s:%s:*:%s:%s\n' ` + shellQuote(primaryHost) + ` ` + strconv.Itoa(int(port)) +
+			` ` + shellQuote(logicalreplica.ReplicationUser) + ` "${PGPASSWORD}" > ` + shellQuote(passFile),
+		`chmod 0600 ` + shellQuote(passFile),
+		``,
 		`echo "seeding from ` + primaryHost + `"`,
 		`pg_basebackup --pgdata=` + shellQuote(dataDir) +
 			` --host=` + primaryHost + ` --port=` + strconv.Itoa(int(port)) +
 			` --username=` + logicalreplica.ReplicationUser +
 			` --write-recovery-conf --wal-method=stream --checkpoint=fast --progress --no-password`,
 		``,
+		`# Everything up to the promotion is reversible, everything after it is`,
+		`# not: once pg_createsubscriber promotes the target, a failure leaves a`,
+		`# data directory that is neither a standby nor a subscriber, and the`,
+		`# only way forward is to seed it again. The dry run performs the same`,
+		`# prerequisite checks without promoting, so settings, connectivity and`,
+		`# system identifier problems cost a retry rather than a re-seed.`,
+		`#`,
+		`# It runs no DDL, so it cannot catch failures that only happen once the`,
+		`# conversion starts writing to the databases.`,
+		`echo "validating prerequisites"`,
+		`createsubscriber --dry-run`,
+		``,
 		`echo "converting to a logical replica"`,
-		strings.Join(args, " \\\n  "),
+		`createsubscriber`,
 		``,
 		`echo "done"`,
 	}, "\n")
+}
+
+// logicalReplicaPassFile returns the path of the libpq password file that the
+// apply worker authenticates to the primary with. It sits next to the data
+// directory, not inside it: pg_basebackup requires an empty target and
+// pg_createsubscriber runs pg_resetwal over what it finds there.
+func logicalReplicaPassFile(dataDir string) string {
+	return path.Join(path.Dir(dataDir), ".pgpass")
 }
 
 // shellQuote wraps s in single quotes for safe interpolation into the bootstrap
@@ -501,13 +566,20 @@ func shellQuote(s string) string {
 }
 
 func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
-	cr *v2.PerconaPGCluster, spec *v2.LogicalReplicaSpec, status *v2.LogicalReplicaStatus,
+	ctx context.Context, cr *v2.PerconaPGCluster, spec *v2.LogicalReplicaSpec, status *v2.LogicalReplicaStatus,
 ) (*batchv1.Job, error) {
 	crunchyCluster := logicalReplicaCrunchyShim(cr)
 	dataDir := postgres.DataDirectory(crunchyCluster)
 	primaryHost := naming.ClusterPrimaryService(crunchyCluster).Name + "." + cr.Namespace + ".svc"
 
 	script := logicalReplicaBootstrapScript(dataDir, primaryHost, *cr.Spec.Port, status.Databases, spec.Name)
+
+	// K8SPG-708: the operator's init container installs the shared scripts into
+	// /opt/crunchy/bin, the same way it does for instance pods.
+	initImage, err := k8s.InitImage(ctx, r.Client, crunchyCluster, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "get init image")
+	}
 
 	container := corev1.Container{
 		Name:            logicalReplicaBootstrapContainer,
@@ -528,14 +600,32 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 		Resources:       spec.Resources,
 		SecurityContext: initialize.RestrictedSecurityContext(true),
 		VolumeMounts: []corev1.VolumeMount{
-			corev1.VolumeMount{
+			{
 				Name:      "tmp",
 				MountPath: "/tmp",
 			},
 			logicalReplicaCertVolumeMount(),
 			postgres.DataVolumeMount(),
+			{
+				Name:      pNaming.CrunchyBinVolumeName,
+				MountPath: pNaming.CrunchyBinVolumePath,
+			},
+			{
+				Name:      logicalReplicaConfigVolume,
+				MountPath: logicalReplicaConfigMountPath,
+				ReadOnly:  true,
+			},
 		},
 	}
+
+	initContainer := k8s.InitContainer(
+		crunchyCluster,
+		naming.ContainerDatabase,
+		initImage,
+		cr.Spec.ImagePullPolicy,
+		initialize.RestrictedSecurityContext(true),
+		container.Resources,
+		nil)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -554,9 +644,9 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyNever,
-					InitContainers:               []corev1.Container{},
+					InitContainers:               []corev1.Container{initContainer},
 					Containers:                   []corev1.Container{container},
-					Volumes:                      logicalReplicaVolumes(cr, spec, false),
+					Volumes:                      logicalReplicaVolumes(cr, spec, true),
 					SecurityContext:              postgres.PodSecurityContext(crunchyCluster),
 					ImagePullSecrets:             cr.Spec.ImagePullSecrets,
 					Affinity:                     spec.Affinity,
@@ -586,6 +676,8 @@ func logicalReplicaCrunchyShim(cr *v2.PerconaPGCluster) *v1beta1.PostgresCluster
 		Spec: v1beta1.PostgresClusterSpec{
 			PostgresVersion: cr.Spec.PostgresVersion,
 			Port:            cr.Spec.Port,
+			// Lets k8s.InitImage honour a user-supplied init container image.
+			InitContainer: cr.Spec.InitContainer,
 		},
 	}
 }
@@ -669,15 +761,45 @@ func logicalReplicaVolumes(cr *v2.PerconaPGCluster, spec *v2.LogicalReplicaSpec,
 
 // logicalReplicaPostgresConfig renders the postgresql.conf of a logical replica.
 //
-// pg_hba.conf is intentionally left alone: pg_basebackup copies the primary's,
-// which already carries the operator's rules and the users' credentials, so
+// It starts from the configuration pg_basebackup copied out of the primary and
+// overrides only what has to differ. Rendering a self-contained file instead
+// would silently drop everything the cluster relies on: shared_preload_libraries
+// above all, without which any database carrying pgaudit or pg_stat_monitor
+// rejects statements with "must be loaded via shared_preload_libraries", but
+// also the pg-tde key command, per-extension GUCs and any custom parameters.
+//
+// pg_hba.conf is inherited the same way, straight from the data directory, so
 // clients authenticate against the replica exactly as they do against the
 // primary.
-func logicalReplicaPostgresConfig(cr *v2.PerconaPGCluster, databases int) string {
+func logicalReplicaPostgresConfig(cr *v2.PerconaPGCluster, databases int, readOnly bool, sharedPreloadLibraries string) string {
 	workers := databases + logicalReplicaWorkerHeadroom
+	inherited := path.Join(postgres.DataDirectory(logicalReplicaCrunchyShim(cr)), "postgresql.conf")
 
 	lines := []string{
 		"# Generated by percona-postgresql-operator. Do not edit.",
+		"",
+		"# The primary's own configuration, as copied by pg_basebackup. Settings",
+		"# below this line override it. Relative includes inside it, such as",
+		"# Patroni's postgresql.base.conf, resolve against the data directory.",
+		fmt.Sprintf("include_if_exists '%s'", inherited),
+		"",
+	}
+
+	if sharedPreloadLibraries != "" {
+		lines = append(lines,
+			"# Restated from the running primary. The include above normally",
+			"# carries it too, but SHOW reports what the server actually has",
+			"# loaded, including anything Patroni passes on the command line",
+			"# rather than writing to a file. Getting this wrong makes every",
+			"# database carrying pgaudit or pg_stat_monitor reject statements",
+			"# with \"must be loaded via shared_preload_libraries\", including the",
+			"# DDL that pg_createsubscriber runs to convert them.",
+			fmt.Sprintf("shared_preload_libraries = '%s'", sharedPreloadLibraries),
+			"",
+		)
+	}
+
+	lines = append(lines,
 		"listen_addresses = '*'",
 		fmt.Sprintf("port = %d", *cr.Spec.Port),
 		fmt.Sprintf("unix_socket_directories = '%s'", postgres.SocketDirectory),
@@ -687,20 +809,79 @@ func logicalReplicaPostgresConfig(cr *v2.PerconaPGCluster, databases int) string
 		fmt.Sprintf("ssl_key_file = '%s/tls.key'", naming.CertMountPath),
 		fmt.Sprintf("ssl_ca_file = '%s/ca.crt'", naming.CertMountPath),
 		"",
+		"# pg_basebackup copies the primary's data directory, so without this the",
+		"# replica would inherit the pgBackRest archive_command and push its own",
+		"# WAL into the source cluster's stanza. A logical replica has diverged",
+		"# from that timeline and must never write to that repository.",
+		"archive_mode = off",
+		"archive_command = ''",
+		"",
 		"# One apply worker and one origin per subscribed database.",
 		fmt.Sprintf("max_replication_slots = %d", databases),
 		fmt.Sprintf("max_logical_replication_workers = %d", databases),
 		fmt.Sprintf("max_worker_processes = %d", workers),
 		"",
 		"password_encryption = 'scram-sha-256'",
+	)
+
+	if readOnly {
+		lines = append(lines,
+			"",
+			"# Writing to a logical replica diverges it from the primary, and the",
+			"# first conflicting row breaks apply for good.",
+			"#",
+			"# Replication keeps working: this only disallows SQL commands, and",
+			"# the apply worker bypasses both places that enforce it. It writes",
+			"# rows through ExecSimpleRelationInsert rather than the executor,",
+			"# and syncs new tables by calling CopyFrom directly rather than",
+			"# through the utility path.",
+			"default_transaction_read_only = on",
+		)
 	}
 
 	return strings.Join(lines, "\n") + "\n"
 }
 
+// logicalReplicaBootstrapConfig renders the postgresql.conf that
+// pg_createsubscriber runs the target server with while converting it.
+//
+// It must never be read-only: the conversion creates subscriptions, advances
+// replication origins and drops publications on the target. It also has to
+// carry the slot and worker settings, because pg_createsubscriber checks those
+// on the target before it will start.
+func logicalReplicaBootstrapConfig(cr *v2.PerconaPGCluster, databases int, sharedPreloadLibraries string) string {
+	return logicalReplicaPostgresConfig(cr, databases, false, sharedPreloadLibraries)
+}
+
+// primarySharedPreloadLibraries asks the running primary which libraries it has
+// loaded.
+//
+// Patroni does write this one into $PGDATA/postgresql.conf, so the include in
+// the rendered config already carries it. Asking the server is belt and braces:
+// SHOW reports the effective value whatever its source, which matters because
+// Patroni passes part of its parameter set to postgres on the command line
+// instead of writing it to a file, and none of that survives pg_basebackup.
+//
+// Deriving the value from spec.extensions instead would mean duplicating the
+// logic spread across the internal/pgaudit, pgstatmonitor, pgstatstatements,
+// pgcron, setuser and pgmonitor packages.
+func (r *PGClusterReconciler) primarySharedPreloadLibraries(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
+	stdout, err := r.execOnPrimary(ctx, cr, "", "SHOW shared_preload_libraries;")
+	if err != nil {
+		return "", errors.Wrap(err, "read shared_preload_libraries")
+	}
+
+	return strings.TrimSpace(stdout), nil
+}
+
 func (r *PGClusterReconciler) reconcileLogicalReplicaConfigMap(
 	ctx context.Context, cr *v2.PerconaPGCluster, spec *v2.LogicalReplicaSpec, status *v2.LogicalReplicaStatus,
 ) error {
+	preload, err := r.primarySharedPreloadLibraries(ctx, cr)
+	if err != nil {
+		return err
+	}
+
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      logicalReplicaConfigMapName(cr, spec.Name),
@@ -708,10 +889,11 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaConfigMap(
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
 		cm.Labels = logicalReplicaLabels(cr, spec.Name)
 		cm.Data = map[string]string{
-			logicalReplicaConfigFile: logicalReplicaPostgresConfig(cr, len(status.Databases)),
+			logicalReplicaConfigFile:          logicalReplicaPostgresConfig(cr, len(status.Databases), spec.IsReadOnly(), preload),
+			logicalReplicaBootstrapConfigFile: logicalReplicaBootstrapConfig(cr, len(status.Databases), preload),
 		}
 
 		return controllerutil.SetControllerReference(cr, cm, r.Client.Scheme())
@@ -894,8 +1076,76 @@ func (r *PGClusterReconciler) checkLogicalReplicaHealth(
 		return status, nil
 	}
 
+	// A live slot on the primary only proves the subscription was set up, not
+	// that it is running. An apply worker that cannot connect exits and is
+	// restarted forever while the slot just sits there, so the subscriber side
+	// has to be checked too.
+	pod, err := r.logicalReplicaPod(ctx, cr, spec.Name)
+	if err != nil {
+		status.State = v2.LogicalReplicaStateBootstrapping
+		// Not a controller error: the StatefulSet was only just created, or the
+		// pod is restarting. There is nothing to retry with backoff.
+		//nolint:nilerr
+		return status, nil
+	}
+
+	for _, db := range status.Databases {
+		subscription := logicalreplica.SubscriptionName(spec.Name, db)
+
+		// pg_subscription.subenabled says it should be running,
+		// pg_stat_subscription.pid says it actually is.
+		sql := "SELECT s.subenabled, (st.pid IS NOT NULL) " +
+			"FROM pg_catalog.pg_subscription s " +
+			"LEFT JOIN pg_catalog.pg_stat_subscription st ON st.subid = s.oid AND st.relid IS NULL " +
+			"WHERE s.subname = " + quoteLiteral(subscription) + ";"
+
+		stdout, err := r.execOnPod(ctx, pod, db, sql)
+		if err != nil {
+			return nil, errors.Wrapf(err, "check subscription %q", subscription)
+		}
+
+		enabled, running, err := parseSubscriptionHealth(stdout)
+		if err != nil {
+			return nil, errors.Wrapf(err, "check subscription %q", subscription)
+		}
+
+		switch {
+		case !enabled:
+			status.State = v2.LogicalReplicaStateBroken
+			status.Reason = v2.LogicalReplicaReasonSubscriptionDisabled
+			status.Message = fmt.Sprintf("subscription %q on database %q is disabled", subscription, db)
+			return status, nil
+
+		case !running:
+			status.State = v2.LogicalReplicaStateBroken
+			status.Reason = v2.LogicalReplicaReasonApplyWorkerDown
+			status.Message = fmt.Sprintf(
+				"subscription %q on database %q is enabled but has no running apply worker; "+
+					"check the logical replica's logs for why it cannot reach the primary",
+				subscription, db)
+			return status, nil
+		}
+	}
+
 	status.State = v2.LogicalReplicaStateReady
 	return status, nil
+}
+
+// parseSubscriptionHealth reads the "enabled|running" row that
+// checkLogicalReplicaHealth queries. An empty result means the subscription is
+// gone, which counts as neither.
+func parseSubscriptionHealth(stdout string) (enabled, running bool, err error) {
+	row := strings.TrimSpace(stdout)
+	if row == "" {
+		return false, false, nil
+	}
+
+	fields := strings.Split(row, "|")
+	if len(fields) != 2 {
+		return false, false, errors.Errorf("unexpected subscription query output: %q", stdout)
+	}
+
+	return strings.TrimSpace(fields[0]) == "t", strings.TrimSpace(fields[1]) == "t", nil
 }
 
 // cleanupRemovedLogicalReplicas tears down replicas that are no longer in the
@@ -981,7 +1231,7 @@ func (r *PGClusterReconciler) dropLogicalReplicaObjects(
 				"ALTER SUBSCRIPTION %q DISABLE; ALTER SUBSCRIPTION %q SET (slot_name = NONE); DROP SUBSCRIPTION %q;",
 				subscription, subscription, subscription)
 
-			if err := r.execOnPod(ctx, pod, db, sql); err != nil {
+			if _, err := r.execOnPod(ctx, pod, db, sql); err != nil {
 				log.Info("could not drop subscription", "subscription", subscription, "error", err.Error())
 			}
 		}
@@ -1032,7 +1282,9 @@ func (r *PGClusterReconciler) logicalReplicaPod(ctx context.Context, cr *v2.Perc
 	return nil, errors.New("no running logical replica pod")
 }
 
-func (r *PGClusterReconciler) execOnPod(ctx context.Context, pod *corev1.Pod, database, sql string) error {
+// execOnPod runs sql inside a logical replica pod and returns its trimmed
+// output.
+func (r *PGClusterReconciler) execOnPod(ctx context.Context, pod *corev1.Pod, database, sql string) (string, error) {
 	exec := postgres.Executor(func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 		return r.PodExec(ctx, pod.GetNamespace(), pod.GetName(), naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	})
@@ -1042,10 +1294,13 @@ func (r *PGClusterReconciler) execOnPod(ctx context.Context, pod *corev1.Pod, da
 		options = append(options, "--dbname="+database)
 	}
 
-	_, stderr, err := exec.Exec(ctx, strings.NewReader(sql), map[string]string{
+	stdout, stderr, err := exec.Exec(ctx, strings.NewReader(sql), map[string]string{
 		"ON_ERROR_STOP": "on",
 		"QUIET":         "on",
 	}, options)
+	if err != nil {
+		return "", errors.Wrapf(err, "execute query: stderr=%s", stderr)
+	}
 
-	return errors.Wrapf(err, "execute query: stderr=%s", stderr)
+	return strings.TrimSpace(stdout), nil
 }

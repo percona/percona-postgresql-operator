@@ -240,6 +240,11 @@ func (in *LogicalReplicaSpec) DeepCopyInto(out *LogicalReplicaSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.ReadOnly != nil {
+		in, out := &in.ReadOnly, &out.ReadOnly
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Expose != nil {
 		in, out := &in.Expose, &out.Expose
 		*out = new(ServiceExpose)

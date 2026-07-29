@@ -23915,6 +23915,24 @@ spec:
                       type: string
                     priorityClassName:
                       type: string
+                    readOnly:
+                      default: true
+                      description: |-
+                        ReadOnly makes the logical replica reject writes from clients by setting
+                        default_transaction_read_only.
+
+                        Replication itself is unaffected. That setting only disallows SQL
+                        commands, and it is enforced in two places, ExecCheckXactReadOnly in the
+                        executor and PreventCommandIfReadOnly in the utility path, neither of
+                        which the apply worker goes through: it writes rows with
+                        ExecSimpleRelationInsert and friends, truncates with ExecuteTruncateGuts,
+                        and syncs new tables by calling CopyFrom directly.
+
+                        Writing to a logical replica diverges it from the primary, and the first
+                        conflicting row stops apply for good, so this defaults to true. It is a
+                        guard rail rather than a guarantee: a superuser can still opt out of it
+                        per session.
+                      type: boolean
                     resources:
                       description: ResourceRequirements describes the compute resource
                         requirements.

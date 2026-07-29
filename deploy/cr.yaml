@@ -380,6 +380,9 @@ spec:
 #    # Omit to replicate every database in the cluster.
 #    databases:
 #    - cluster1
+#    # Writes from clients are rejected by default. Set to false only if the
+#    # replica is meant to diverge: the first conflicting row stops replication.
+#    readOnly: true
 #    dataVolumeClaimSpec:
 #      accessModes:
 #      - ReadWriteOnce

@@ -263,9 +263,33 @@ type LogicalReplicaSpec struct {
 	// +optional
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 
+	// ReadOnly makes the logical replica reject writes from clients by setting
+	// default_transaction_read_only.
+	//
+	// Replication itself is unaffected. That setting only disallows SQL
+	// commands, and it is enforced in two places, ExecCheckXactReadOnly in the
+	// executor and PreventCommandIfReadOnly in the utility path, neither of
+	// which the apply worker goes through: it writes rows with
+	// ExecSimpleRelationInsert and friends, truncates with ExecuteTruncateGuts,
+	// and syncs new tables by calling CopyFrom directly.
+	//
+	// Writing to a logical replica diverges it from the primary, and the first
+	// conflicting row stops apply for good, so this defaults to true. It is a
+	// guard rail rather than a guarantee: a superuser can still opt out of it
+	// per session.
+	// +optional
+	// +kubebuilder:default=true
+	ReadOnly *bool `json:"readOnly,omitempty"`
+
 	// Specification of the service that exposes this logical replica.
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
+}
+
+// IsReadOnly reports whether clients should be prevented from writing to this
+// logical replica. K8SPG-784
+func (l *LogicalReplicaSpec) IsReadOnly() bool {
+	return l.ReadOnly == nil || *l.ReadOnly
 }
 
 // LogicalReplicasEnabled returns whether the cluster has any logical replica
@@ -805,6 +829,13 @@ const (
 	// LogicalReplicaReasonSubscriptionDisabled means a subscription on the
 	// replica exists but is not enabled.
 	LogicalReplicaReasonSubscriptionDisabled = "SubscriptionDisabled"
+
+	// LogicalReplicaReasonApplyWorkerDown means a subscription is enabled but
+	// has no running apply worker. The usual cause is that the worker cannot
+	// reach the primary, which it retries forever without disabling the
+	// subscription, so the replication slot stays put and nothing else shows
+	// that replication has stopped.
+	LogicalReplicaReasonApplyWorkerDown = "ApplyWorkerDown"
 
 	// LogicalReplicaReasonBootstrapFailed means the bootstrap Job failed.
 	LogicalReplicaReasonBootstrapFailed = "BootstrapFailed"
