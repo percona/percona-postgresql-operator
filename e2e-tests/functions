@@ -1144,6 +1144,9 @@ get_container_image() {
 
 	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
 		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	elif [[ $component == 'postgis' ]]; then
+		# the docker build job publishes postgis images as ...-ppg<V>-postgres-gis
+		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-postgres-gis"
 	else
 		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
 	fi
