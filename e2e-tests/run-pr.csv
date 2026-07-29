@@ -1,5 +1,6 @@
 backup-enable-disable
 builtin-extensions
+custom-extensions
 cert-manager-tls
 custom-envs
 custom-tls
@@ -17,10 +18,10 @@ major-upgrade-17-to-18
 ldap
 ldap-tls
 monitoring
-monitoring-pmm3
 one-pod
 operator-self-healing
 pgbouncer-mtls
+pg-tde
 pitr
 scaling
 scheduled-backup

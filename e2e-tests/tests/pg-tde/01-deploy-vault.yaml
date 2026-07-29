@@ -7,5 +7,5 @@ commands:
 
       source ../../functions
 
-      deploy_pmm3_server
-    timeout: 300
+      start_vault vault-service https
+    timeout: 600
