@@ -11,19 +11,26 @@ commands:
       sts=$(kubectl -n "${NAMESPACE}" get sts \
         --selector postgres-operator.crunchydata.com/instance-set=instance1 -o json)
 
-      echo "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
         | select(.name == "fts-dicts") | select(.configMap.name == "extra-dicts")' >/dev/null
-      echo "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
         | select(.name == "extra-data") | select(.emptyDir != null)' >/dev/null
 
-      echo "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
         | select(.name == "database") | .volumeMounts[]
         | select(.mountPath == "/pgdata/extra/dicts") | select(.readOnly == true)' >/dev/null
-      echo "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
         | select(.name == "database") | .volumeMounts[]
         | select(.mountPath == "/pgdata/extra/data")' >/dev/null
 
       pod=$(get_instance_set_pods instance1 | head -n1)
+
+      # /proc/mounts guards against a false positive where the mount silently
+      # failed and reads/writes land on the container's own filesystem instead.
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        grep -q ' /pgdata/extra/dicts ' /proc/mounts
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        grep -q ' /pgdata/extra/data ' /proc/mounts
 
       content=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- cat /pgdata/extra/dicts/synonyms.txt)
       if [[ "${content}" != "postgres pg pgsql" ]]; then
@@ -37,5 +44,11 @@ commands:
         exit 1
       fi
 
+      token="rw-$(date +%s)-${RANDOM}"
       kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
-        sh -c 'echo test > /pgdata/extra/data/ok && cat /pgdata/extra/data/ok'
+        sh -c "printf '%s' '${token}' > /pgdata/extra/data/token"
+      readback=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- cat /pgdata/extra/data/token)
+      if [[ "${readback}" != "${token}" ]]; then
+        echo "read-write extra volume /pgdata/extra/data round-trip failed: wrote '${token}', read '${readback}'"
+        exit 1
+      fi
