@@ -14,6 +14,7 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type builderFn func(cr *v2.PerconaPGCluster) ([]corev1.Container, error)
@@ -155,6 +156,64 @@ func TestContainers(t *testing.T) {
 
 			expected := expectedContainers(tt.dataMount, tt.logSpecificEnv, spec.Configuration, spec.Env, spec.EnvFrom, tt.logRotate)
 			assert.Equal(t, expected, containers)
+		})
+	}
+}
+
+func TestPostgresLogPath(t *testing.T) {
+	const pgVersion = 16
+
+	patroniWithLogDirectory := func(value any) *crunchyv1beta1.PatroniSpec {
+		return &crunchyv1beta1.PatroniSpec{
+			DynamicConfiguration: crunchyv1beta1.SchemalessObject{
+				"postgresql": map[string]any{
+					"parameters": map[string]any{
+						"log_directory": value,
+					},
+				},
+			},
+		}
+	}
+
+	tests := map[string]struct {
+		patroni  *crunchyv1beta1.PatroniSpec
+		expected string
+	}{
+		"default (no dynamicConfiguration)": {
+			patroni:  nil,
+			expected: "/pgdata/pg16/log",
+		},
+		"explicit default value": {
+			patroni:  patroniWithLogDirectory("log"),
+			expected: "/pgdata/pg16/log",
+		},
+		"safe absolute path is honored": {
+			patroni:  patroniWithLogDirectory("/pgdata/custom-logs"),
+			expected: "/pgdata/custom-logs",
+		},
+		"relative path expands under data directory": {
+			patroni:  patroniWithLogDirectory("mylogs"),
+			expected: "/pgdata/pg16/mylogs",
+		},
+		"unsafe path falls back to a safe directory": {
+			patroni:  patroniWithLogDirectory("/pgdata/pg16"),
+			expected: "/pgdata/logs/postgres",
+		},
+		"non-string value is ignored": {
+			patroni:  patroniWithLogDirectory(123),
+			expected: "/pgdata/pg16/log",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &v2.PerconaPGCluster{
+				Spec: v2.PerconaPGClusterSpec{
+					PostgresVersion: pgVersion,
+					Patroni:         tt.patroni,
+				},
+			}
+			assert.Equal(t, tt.expected, postgresLogPath(cr))
 		})
 	}
 }

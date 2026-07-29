@@ -22,12 +22,43 @@ const (
 	entrypoint                       = "/opt/crunchy/logcollector/entrypoint.sh"
 )
 
-// postgresLogPath returns the directory where Postgres' logging collector
-// writes server logs: the default "log" directory inside the versioned data
-// directory (e.g. /pgdata/pg18/log). It already exists on the persistent data
-// volume, so the collector reads logs where Postgres actually writes them.
+// postgresLogPath returns the directory where Postgres' logging collector writes
+// server logs. By default this is the "log" directory inside the versioned data
+// directory (e.g. /pgdata/pg18/log), which already exists on the persistent data
+// volume. Users may relocate it via spec.patroni.dynamicConfiguration's
+// "log_directory" parameter; we resolve that value with the same sanitization
+// Postgres applies so the collector always reads where Postgres actually writes.
 func postgresLogPath(cr *v2.PerconaPGCluster) string {
-	return fmt.Sprintf("/pgdata/pg%d/log", cr.Spec.PostgresVersion)
+	dataDir := fmt.Sprintf("/pgdata/pg%d", cr.Spec.PostgresVersion)
+
+	logDirectory := "log"
+	if dir := logDirectoryParameter(cr); dir != "" {
+		logDirectory = dir
+	}
+
+	directory, _, _ := postgres.ResolveLogDirectory(dataDir, logDirectory)
+	return directory
+}
+
+// logDirectoryParameter returns the raw "log_directory" Postgres parameter set
+// via spec.patroni.dynamicConfiguration, or "" when it is unset.
+func logDirectoryParameter(cr *v2.PerconaPGCluster) string {
+	if cr.Spec.Patroni == nil || cr.Spec.Patroni.DynamicConfiguration == nil {
+		return ""
+	}
+
+	postgresql, ok := cr.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	params, ok := postgresql["parameters"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	dir, _ := params["log_directory"].(string)
+	return dir
 }
 
 func configMapName(prefix string) string {
