@@ -1,6 +1,12 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 120
+commands:
+  - script: |
+      tmp_file=$(mktemp)
+      kubectl -n $NAMESPACE get pg major-upgrade-17-to-18 -o yaml | yq '.status.conditions.[] | select(.type == "PGTDEEnabled")' > ${tmp_file}
+      [[ $(cat ${tmp_file} | yq .reason) == "Enabled" ]]
+      [[ $(cat ${tmp_file} | yq .status) == "True" ]]
 ---
 kind: StatefulSet
 apiVersion: apps/v1

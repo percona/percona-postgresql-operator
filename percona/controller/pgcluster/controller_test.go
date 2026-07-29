@@ -2400,6 +2400,170 @@ var _ = Describe("CR Validations", Ordered, func() {
 			})
 		})
 	})
+
+	Context("pg_tde validations", Ordered, func() {
+		When("creating a CR with valid pg_tde configurations", func() {
+			It("should accept pg_tde enabled with vault on PG 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde not specified at all", func() {
+				cr, err := readDefaultCR("cr-validation-tde-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled with vault on PG < 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid pg_tde configurations", func() {
+			It("should reject pg_tde enabled on PG < 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"pg_tde is only supported for PG17 and above",
+				))
+			})
+
+			It("should reject pg_tde enabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-6", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+		})
+
+		When("updating a CR with pg_tde transition rules", func() {
+			It("should reject removing vault while pg_tde is still enabled", func() {
+				cr, err := readDefaultCR("cr-validation-tde-8", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				updated := cr.DeepCopy()
+				updated.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Update(ctx, updated)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+
+			It("should accept disabling pg_tde while keeping vault", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept removing vault after pg_tde is disabled", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+		})
+	})
 })
 
 var _ = Describe("Init Container", Ordered, func() {

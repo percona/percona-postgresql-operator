@@ -157,6 +157,14 @@ func clusterYAML(
 		},
 	}
 
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		postgresqlSection := root["postgresql"].(map[string]any)
+		postgresqlSection["bin_name"] = map[string]any{
+			"pg_basebackup": "pg_tde_basebackup",
+			"pg_rewind":     "pg_tde_rewind",
+		}
+	}
+
 	if !ClusterBootstrapped(cluster) {
 		// Patroni has not yet bootstrapped. Populate the "bootstrap.dcs" field to
 		// facilitate it. When Patroni is already bootstrapped, this field is ignored.
