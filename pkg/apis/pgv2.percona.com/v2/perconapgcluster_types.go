@@ -1191,6 +1191,10 @@ func (p *PGProxySpec) IsSet() bool {
 	return p != nil && p.PGBouncer != nil
 }
 
+func (p *PGProxySpec) PGBouncerEnabled() bool {
+	return p.IsSet() && (p.PGBouncer.Replicas == nil || *p.PGBouncer.Replicas != 0)
+}
+
 func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
 	if p == nil {
 		return nil
@@ -1363,6 +1367,11 @@ const (
 	LabelOperatorVersion = labelPrefix + "version"
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
+
+// ConditionPMMReady indicates whether the PMM sidecar is configured for the
+// cluster. It is False when PMM is enabled but misconfigured (e.g. the secret
+// is missing or doesn't contain PMM_SERVER_TOKEN).
+const ConditionPMMReady = "PMMReady"
 
 const (
 	UserMonitoring = "monitor"
