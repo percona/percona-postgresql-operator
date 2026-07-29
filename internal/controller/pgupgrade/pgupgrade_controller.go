@@ -455,7 +455,9 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// TODO: error from apply could mean that the job exists with a different spec.
 	if err == nil && !upgradeJobComplete {
 		err = errors.WithStack(r.apply(ctx,
-			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, config.FetchKeyCommand(&world.Cluster.Spec))))
+			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary,
+				config.FetchKeyCommand(&world.Cluster.Spec),
+				world.Cluster.Spec.Extensions.PGTDE.Enabled))) // K8SPG-911
 	}
 
 	// Create the jobs to remove the data from the replicas, as long as

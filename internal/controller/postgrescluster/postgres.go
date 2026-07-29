@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	gover "github.com/hashicorp/go-version"
@@ -20,6 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
@@ -36,6 +39,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgrepack"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgvector"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -191,7 +195,10 @@ func (r *Reconciler) generatePostgresUserSecret(
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
 func (r *Reconciler) reconcilePostgresDatabases(
-	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
 ) error {
 	const container = naming.ContainerDatabase
 	var podExecutor postgres.Executor
@@ -248,8 +255,15 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	// K8SPG-375, K8SPG-577, K8SPG-699
-	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, postgisInstallOK bool
+	// K8SPG-375, K8SPG-577, K8SPG-699, K8SPG-911
+	var pgAuditOK, pgStatMonitorOK, pgStatStatementsOK, pgvectorOK, pgRepackOK, pgTdeOK, postgisInstallOK bool
+
+	// K8SPG-911: create runs twice, once against a fake executor to hash the
+	// statements and once for real. Only the real run may be reported, so its
+	// result is kept separately from the flag above.
+	var pgTdeRan bool
+	var pgTdeErr error
+
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
 		_, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -336,6 +350,10 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
+		// K8SPG-911
+		pgTdeRan, pgTdeErr = true, pgtde.ReconcileExtension(ctx, exec, cluster)
+		pgTdeOK = pgTdeErr == nil
+
 		// Enabling PostGIS extensions is a one-way operation
 		// e.g., you can take a PostgresCluster and turn it into a PostGISCluster,
 		// but you cannot reverse the process, as that would potentially remove an extension
@@ -352,7 +370,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Calculate a hash of the SQL that should be executed in PostgreSQL.
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages about executing SQL.
 		return create(logging.NewContext(ctx, logging.Discard()), func(
 			_ context.Context, stdin io.Reader, _, _ io.Writer, command ...string,
@@ -375,17 +393,410 @@ func (r *Reconciler) reconcilePostgresDatabases(
 
 	// Apply the necessary SQL and record its hash in cluster.Status. Include
 	// the hash in any log messages.
-
 	if err == nil {
+		// Forget what the hash run observed; those statements were never sent
+		// to PostgreSQL.
+		pgTdeRan, pgTdeErr = false, nil
+
 		log := logging.FromContext(ctx).WithValues("revision", revision)
 		err = errors.WithStack(create(logging.NewContext(ctx, log), podExecutor))
 	}
+
+	// K8SPG-911: report pg_tde only when it really ran. The PGTDEEnabled
+	// condition gates shared_preload_libraries and the vault volume, so
+	// claiming the extension exists before CREATE EXTENSION has succeeded
+	// sends the operator on to configure a key provider that cannot work.
+	//
+	// This is deliberately outside the revision guard below. Whether pg_tde is
+	// installed is a fact about pg_tde alone, and reconcilePGTDEProviders acts
+	// on it later in this same reconcile; making it wait for every other
+	// extension to succeed would let an unrelated failure, such as a missing
+	// pgvector library, stall the key provider setup indefinitely.
+	if pgTdeRan {
+		pgtde.ReportExtension(cluster, r.Recorder, pgTdeErr)
+	}
+
 	// K8SPG-472
-	if err == nil && pgStatMonitorOK && pgAuditOK && pgvectorOK && postgisInstallOK && pgRepackOK {
+	allExtensionsOK := err == nil &&
+		pgStatMonitorOK &&
+		pgAuditOK &&
+		pgvectorOK &&
+		postgisInstallOK &&
+		pgRepackOK &&
+		pgTdeOK
+
+	if allExtensionsOK {
+		// Every statement above succeeded, so none of them need to run again.
 		cluster.Status.DatabaseRevision = revision
 	}
 
+	if pgTdeRan || allExtensionsOK {
+		if patchErr := patchStatus(); patchErr != nil {
+			// Losing this patch only costs a repeat of the SQL above, all of
+			// which is idempotent, and Reconcile patches the status again on
+			// its way out. Canceling the reconcilers that follow, including
+			// the pg_tde key provider setup, would cost more.
+			logging.FromContext(ctx).Error(patchErr, "failed to patch cluster status")
+		}
+	}
+
 	return err
+}
+
+// reconcilePGTDEProviders configures pg_tde providers using a two-phase
+// approach for vault credential changes:
+//
+//   - Phase 1: The pod still mounts the OLD vault secret. Fetch the new
+//     credentials from the Kubernetes Secret into temp files and run
+//     pg_tde_change_global_key_provider_vault_v2 with those temp paths.
+//     Store a "temp" revision (hash includes temp paths). This releases
+//     the volume hold so the StatefulSet updates and pods restart.
+//
+//   - Phase 2: After restart, the pod mounts the NEW vault secret at
+//     standard paths. Run pg_tde_change_global_key_provider_vault_v2
+//     again with the standard mount paths so pg_tde no longer references
+//     temp files. Store the "standard" revision.
+func (r *Reconciler) reconcilePGTDEProviders(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+	patchStatus func() error,
+) error {
+	const container = naming.ContainerDatabase
+
+	log := logging.FromContext(ctx).WithName("PGTDE")
+
+	if !cluster.Spec.Extensions.PGTDE.Enabled || cluster.Spec.Extensions.PGTDE.Vault == nil {
+		cluster.Status.PGTDERevision = ""
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
+
+		return nil
+	}
+
+	// Wait for all instances to match their pod templates before configuring
+	// the vault provider. This prevents running SQL on pods that are mid-rollout.
+	for _, inst := range instances.forCluster {
+		if matches, known := inst.PodMatchesPodTemplate(); !matches || !known {
+			log.V(1).Info("Waiting for instance to be updated", "instance", inst.Name)
+			return nil
+		}
+	}
+
+	pod, _ := instances.writablePod(container)
+	if pod == nil {
+		log.V(1).Info("Waiting for a writable instance")
+		return nil
+	}
+
+	pods, allRunning := instances.runningPods(container)
+
+	// We need to configure pg_tde after volumes are mounted and extension is created
+	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
+		log.V(1).Info("Waiting for pg_tde to be installed", "pod", pod.Name)
+		return nil
+	}
+
+	log = log.WithValues("pod", pod.Name)
+	ctx = logging.NewContext(ctx, log)
+	pgExecutor := func(
+		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+	}
+
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+
+	change, err := pgtde.VaultChangeFor(cluster)
+	if err == nil && change.Phase == pgtde.Configured {
+		if !allRunning {
+			log.V(1).Info("Waiting for all pods to be running")
+			return nil
+		}
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
+		if condition == nil || condition.Status != metav1.ConditionTrue {
+			r.setPGTDEVaultProviderCondition(cluster)
+
+			if err := r.cleanupTempPGTDEFiles(ctx, pods, container); err != nil {
+				log.Error(err, "failed to remove staged pg_tde vault credentials",
+					"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
+			}
+
+			return patchStatus()
+		}
+		return nil
+	}
+
+	var revision string
+	if err == nil {
+		switch change.Phase {
+		case pgtde.InitialSetup:
+			// No provider has been configured, so the Pods already mount the
+			// credentials in the spec and there is nothing to stage.
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
+			revision = change.StandardRevision
+
+		case pgtde.Finalize:
+			if !allRunning {
+				log.V(1).Info("Waiting for all pods to be running before finalizing provider change")
+				return nil
+			}
+
+			// Phase 2: pod restarted with new volume mounted at standard paths.
+			// Change provider from temp paths to persistent mount paths, then
+			// clean up the temp files from /pgdata.
+			log.Info("finalizing vault provider change with standard mount paths")
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TokenPath, change.CAPath))
+			if err == nil {
+				if err := r.cleanupTempPGTDEFiles(ctx, pods, container); err != nil {
+					log.Error(err, "failed to remove staged pg_tde vault credentials",
+						"paths", []string{pgtde.TempTokenPath, pgtde.TempCAPath})
+				}
+			}
+			revision = change.StandardRevision
+
+		default:
+			// Phase 1: vault config changed, pods still have old credentials.
+			// Stage the new credentials in temp files on /pgdata (persistent
+			// volume) and change the provider to use those paths. The temp
+			// files survive the pod restart so pg_tde can read them until
+			// phase 2 runs.
+			//
+			// Every instance needs its own copy before the provider starts
+			// naming those paths. Staging on only some of them would leave the
+			// rest unable to resolve the key, and a replica promoted before
+			// phase 2 would come up without the credentials it needs.
+			if !allRunning {
+				log.Info("waiting for all instances to be running before staging vault credentials")
+				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+					Type:               v1beta1.PGTDEVaultProviderReady,
+					Status:             metav1.ConditionFalse,
+					Reason:             "WaitingForInstances",
+					Message:            "waiting for all instances to be running to stage vault credentials",
+					ObservedGeneration: cluster.GetGeneration(),
+				})
+				return patchStatus()
+			}
+
+			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
+			if err = stagePGTDEVaultCredentials(ctx, r.Client, r.PodExec, cluster.Namespace,
+				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
+				break
+			}
+
+			err = errors.WithStack(pgtde.ReconcileVaultProvider(
+				ctx, pgExecutor, cluster, change.TempTokenPath, change.TempCAPath))
+			revision = change.TempRevision
+		}
+	}
+
+	if err != nil {
+		// reconcileInstance holds the old vault volume until the revision
+		// advances, so a change that keeps failing pins the StatefulSet to
+		// the old credentials indefinitely. Surface the cause rather than
+		// leaving the user to guess why their Pods never roll.
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, "PGTDEVaultProviderChangeFailed", err.Error())
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEVaultProviderReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "ChangeFailed",
+			Message:            err.Error(),
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+
+		// Report the failure even though the reconcile below returns an error;
+		// without this the condition is dropped along with the rest of the
+		// in-memory status changes.
+		if patchErr := patchStatus(); patchErr != nil {
+			log.Error(patchErr, "failed to report vault provider change failure")
+		}
+
+		return err
+	}
+
+	cluster.Status.PGTDERevision = revision
+
+	if revision == change.TempRevision {
+		// Phase 1 done, phase 2 still pending: the provider currently points at
+		// the staged credentials, not at the ones in the spec.
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEVaultProviderReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "ChangeInProgress",
+			Message:            "waiting for Pods to restart with the new vault credentials",
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+	} else {
+		r.setPGTDEVaultProviderCondition(cluster)
+	}
+
+	if err := patchStatus(); err != nil {
+		return errors.Wrap(err, "patch status")
+	}
+
+	return nil
+}
+
+// setPGTDEVaultProviderCondition reports a provider that matches the spec, noting
+// whether the credentials staged during the change were removed afterwards.
+func (r *Reconciler) setPGTDEVaultProviderCondition(cluster *v1beta1.PostgresCluster) {
+	condition := metav1.Condition{
+		Type:               v1beta1.PGTDEVaultProviderReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "Configured",
+		Message:            "pg_tde vault key provider matches the spec",
+		ObservedGeneration: cluster.GetGeneration(),
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+}
+
+// cleanupTempPGTDEFiles removes the vault credentials staged during a provider
+// change from every Pod's data volume. Each instance has its own volume, so
+// each has its own copy to remove. When complete is false some instance could
+// not be reached and its copy is still there, which counts as a failure so the
+// caller retries. The error is returned rather than acted on because callers
+// differ in how much they can do about it, but it is always logged and
+// recorded: a token left behind sits in plaintext on a PersistentVolume until
+// something removes it.
+func (r *Reconciler) cleanupTempPGTDEFiles(ctx context.Context, pods []*corev1.Pod, container string) error {
+	var err error
+
+	for _, pod := range pods {
+		// Both paths are removed unconditionally: the CA file may exist from
+		// an earlier configuration that used one even if the current spec
+		// does not.
+		if e := removeTempFiles(ctx, r.PodExec, pod, container,
+			pgtde.TempTokenPath, pgtde.TempCAPath); e != nil && err == nil {
+			err = errors.Wrapf(e, "pod %s", pod.Name)
+		}
+	}
+
+	return err
+}
+
+// stagePGTDEVaultCredentials copies the vault credentials out of their Secrets and
+// into temporary files on every Pod's data volume.
+//
+// pg_tde's key provider configuration is cluster-wide: whatever path it names
+// is the path every instance reads, including a replica that gets promoted
+// while the change is in flight. Each instance has its own /pgdata, so the
+// files have to exist on all of them, not just on the one running the SQL.
+func stagePGTDEVaultCredentials(
+	ctx context.Context,
+	k8sClient client.Reader,
+	podExec runtime.PodExecutor,
+	namespace string,
+	vault *v1beta1.PGTDEVaultSpec,
+	pods []*corev1.Pod,
+	container string, // nolint:unparam
+	tokenPath, caPath string,
+) error {
+	type stagedFile struct {
+		path string
+		data []byte
+	}
+
+	token, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.TokenSecret)
+	if err != nil {
+		return errors.Wrap(err, "token secret")
+	}
+	files := []stagedFile{{path: tokenPath, data: token}}
+
+	if vault.HasCA() {
+		ca, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.CASecret)
+		if err != nil {
+			return errors.Wrap(err, "CA secret")
+		}
+		files = append(files, stagedFile{path: caPath, data: ca})
+	}
+
+	for _, pod := range pods {
+		for _, file := range files {
+			if err := writeTempFile(ctx, podExec, pod, container,
+				file.path, file.data); err != nil {
+				return errors.Wrapf(err, "pod %s", pod.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// pgTDESecretValue reads one key from PGTDESecretObjectReference.
+func pgTDESecretValue(
+	ctx context.Context,
+	k8sClient client.Reader,
+	namespace string,
+	secretRef v1beta1.PGTDESecretObjectReference,
+) ([]byte, error) {
+	secret := &corev1.Secret{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretRef.Name,
+	}, secret); err != nil {
+		return nil, errors.Wrapf(err, "get secret %q", secretRef.Name)
+	}
+
+	data, ok := secret.Data[secretRef.Key]
+	if !ok {
+		return nil, errors.Errorf("key %q not found in secret %q", secretRef.Key, secretRef.Name)
+	}
+
+	return data, nil
+}
+
+// writeTempFile writes data to a file inside a pod container.
+func writeTempFile(
+	ctx context.Context,
+	podExec runtime.PodExecutor,
+	pod *corev1.Pod,
+	container string,
+	destPath string,
+	data []byte,
+) error {
+	// umask makes the file unreadable by other users from the moment it is
+	// created; chmod after the write would leave a window where it is not.
+	// The byte count is echoed back so a short write is not mistaken for a
+	// complete one: pg_tde would then authenticate with a truncated token.
+	var stdout, stderr bytes.Buffer
+	err := podExec(ctx, pod.Namespace, pod.Name, container,
+		bytes.NewReader(data), &stdout, &stderr,
+		"bash", "-ceu", fmt.Sprintf("umask 077; cat > %s; wc -c < %s", destPath, destPath))
+	if err != nil {
+		return errors.Wrapf(err, "write %s: %s", destPath, stderr.String())
+	}
+
+	written, err := strconv.Atoi(strings.TrimSpace(stdout.String()))
+	if err != nil {
+		return errors.Wrapf(err, "check size of %s", destPath)
+	}
+	if written != len(data) {
+		return errors.Errorf("wrote %d of %d bytes to %s", written, len(data), destPath)
+	}
+
+	return nil
+}
+
+// removeTempFiles removes files from a pod container. Missing files are not an
+// error; anything else is, including a file that could not be unlinked.
+func removeTempFiles(
+	ctx context.Context,
+	podExec runtime.PodExecutor,
+	pod *corev1.Pod,
+	container string,
+	paths ...string,
+) error {
+	var stdout, stderr bytes.Buffer
+	err := podExec(ctx, pod.Namespace, pod.Name, container,
+		nil, &stdout, &stderr,
+		"bash", "-ceu", fmt.Sprintf("rm -f %s", strings.Join(paths, " ")))
+	if err != nil {
+		return errors.Wrapf(err, "remove %s: %s", strings.Join(paths, ", "), stderr.String())
+	}
+	return nil
 }
 
 // reconcilePostgresUsers writes the objects necessary to manage users and their
@@ -748,7 +1159,7 @@ func (r *Reconciler) reconcilePostgresUsersInPostgreSQL(
 		return postgres.WriteUsersInPostgreSQL(ctx, cluster, exec, specUsers, verifiers)
 	}
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages about executing SQL.
 		return write(logging.NewContext(ctx, logging.Discard()), func(
 			_ context.Context, stdin io.Reader, _, _ io.Writer, command ...string,
