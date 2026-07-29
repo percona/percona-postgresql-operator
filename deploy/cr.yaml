@@ -62,6 +62,10 @@ spec:
 #    certValidityDuration: 2160h
 #    caValidityDuration: 26280h
 #    pgBackRestCertValidityDuration: 2160h
+#    issuerConf:
+#      name: some-selfsigned-issuer
+#      kind: ClusterIssuer
+#      group: cert-manager.io
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"

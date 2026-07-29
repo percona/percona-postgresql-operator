@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -251,6 +252,8 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
+	// +optional
+	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }
 
 // DataSource defines data sources for a new PostgresCluster.
@@ -701,6 +704,11 @@ func (s *PostgresProxySpec) Default() {
 	if s.PGBouncer != nil {
 		s.PGBouncer.Default()
 	}
+}
+
+// K8SPG-1062
+func (s *PostgresProxySpec) PGBouncerEnabled() bool {
+	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
 }
 
 type RegistrationRequirementStatus struct {
