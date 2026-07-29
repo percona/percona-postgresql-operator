@@ -3,6 +3,7 @@ builtin-extensions
 cert-manager-tls
 cert-management-policy
 custom-envs
+custom-extensions
 custom-tls
 database-init-sql
 demand-backup
