@@ -26,14 +26,26 @@ commands:
             }
           },
           \"extensions\": {
-            \"builtin\": {
-              \"pg_stat_monitor\": ${PG_STAT_MONITOR},
-              \"pg_stat_statements\": false,
-              \"pg_audit\": true,
-              \"pgvector\": true,
-              \"pg_repack\": true,
-              \"pg_cron\": true,
-              \"set_user\": true
+            \"pg_stat_monitor\": {
+              \"enabled\": ${PG_STAT_MONITOR}
+            },
+            \"pg_stat_statements\": {
+              \"enabled\": false
+            },
+            \"pg_audit\": {
+              \"enabled\": true
+            },
+            \"pgvector\": {
+              \"enabled\": true
+            },
+            \"pg_repack\": {
+              \"enabled\": true
+            },
+            \"pg_cron\": {
+              \"enabled\": true
+            },
+            \"set_user\": {
+              \"enabled\": true
             }
           }
         }
