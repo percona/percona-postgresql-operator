@@ -255,7 +255,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	var upgradeJob *batchv1.Job
 	for _, job := range world.Jobs {
 		if job.GetLabels()[LabelRole] == pgUpgrade &&
-			job.GetLabels()[LabelPGUpgrade] == upgrade.Name {
+			job.GetLabels()[LabelPGUpgrade] == commonLabels(pgUpgrade, upgrade)[LabelPGUpgrade] {
 			upgradeJob = job
 			break
 		}
@@ -270,7 +270,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	var removeDataJobsCompleted []*batchv1.Job
 	for _, job := range world.Jobs {
 		if job.GetLabels()[LabelRole] == removeData &&
-			job.GetLabels()[LabelPGUpgrade] == upgrade.Name {
+			job.GetLabels()[LabelPGUpgrade] == commonLabels(removeData, upgrade)[LabelPGUpgrade] {
 			if jobCompleted(job) {
 				removeDataJobsCompleted = append(removeDataJobsCompleted, job)
 			} else if jobFailed(job) {

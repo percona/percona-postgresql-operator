@@ -143,7 +143,7 @@ func (r *Reconciler) generatePostgresUserSecret(
 	}
 
 	// When PgBouncer is enabled, include values for connecting through it.
-	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+	if cluster.Spec.Proxy.PGBouncerEnabled() {
 		pgBouncer := naming.ClusterPGBouncer(cluster)
 		hostname := pgBouncer.Name + "." + pgBouncer.Namespace + ".svc"
 		port := fmt.Sprint(*cluster.Spec.Proxy.PGBouncer.Port)

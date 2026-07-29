@@ -161,8 +161,7 @@ build_redhat_related_images() {
 	add_related_image "pgbouncer" "${redhat_containers_repository}" \
 		"$(release_component_tag pgbouncer "$(image_version "${IMAGE_PGBOUNCER18}")")"
 
-	add_related_image "pmm3" "${redhat_containers_repository}" "${redhat_release}-pmm3"
-	add_related_image "pmm2" "${redhat_containers_repository}" "${redhat_release}-pmm2"
+	add_related_image "pmm" "${redhat_containers_repository}" "${redhat_release}-pmm3"
 	add_related_image "operator" "${redhat_operator_repository}" "${redhat_operator_tag}"
 	add_related_image "pgupgrade" "${redhat_containers_repository}" "${redhat_upgrade_tag}"
 
@@ -171,7 +170,7 @@ build_redhat_related_images() {
 		--arg postgres_image "$(related_image_by_name "postgres-${current_pg_major}")" \
 		--arg pgbouncer_image "$(related_image_by_name pgbouncer)" \
 		--arg pgbackrest_image "$(related_image_by_name pgbackrest)" \
-		--arg pmm_image "$(related_image_by_name pmm3)" \
+		--arg pmm_image "$(related_image_by_name pmm)" \
 		--arg upgrade_image "$(related_image_by_name pgupgrade)" \
 		--argjson related_images "${redhat_related_images}" \
 		'{
