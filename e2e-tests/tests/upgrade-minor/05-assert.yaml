@@ -139,6 +139,9 @@ status:
   - type: APIGroupMigration
     reason: APIGroupMigrationNotNeeded
     status: "True"
+  - type: PGTDEEnabled
+    reason: Disabled
+    status: "False"
   pgbouncer:
     ready: 3
     size: 3
