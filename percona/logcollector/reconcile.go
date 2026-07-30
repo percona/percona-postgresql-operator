@@ -49,6 +49,8 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 		return errors.Wrap(err, "build instance containers")
 	}
 
+	initContainers := instanceInitContainers(cr)
+
 	volumes := volumes(cr)
 
 	// The config is delivered through ConfigMaps mounted by a stable name, so a
@@ -60,6 +62,7 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 		set := &cr.Spec.InstanceSets[i]
 		set.Sidecars = append(set.Sidecars, containers...)
 		set.SidecarVolumes = append(set.SidecarVolumes, volumes...)
+		set.InitContainers = append(set.InitContainers, initContainers...)
 
 		if set.Metadata == nil {
 			set.Metadata = &crunchyv1beta1.Metadata{}

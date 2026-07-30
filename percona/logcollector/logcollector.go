@@ -162,6 +162,42 @@ func instanceContainers(cr *v2.PerconaPGCluster) ([]corev1.Container, error) {
 	return containers(cr, postgres.DataVolumeMount(), instanceEnv(cr))
 }
 
+const (
+	// nssWrapperInitName stages libnss_wrapper.so for the logrotate sidecar.
+	nssWrapperInitName = "nss-wrapper-init-logcollector"
+	// nssWrapperLibPath is where the logrotate sidecar preloads the library from;
+	// it must match logrotate's LD_PRELOAD path on the shared /tmp volume.
+	nssWrapperLibPath = "/tmp/nss_wrapper/libnss_wrapper.so"
+)
+
+// instanceInitContainers returns the init containers the log collector needs on a
+// PostgreSQL instance pod. The logrotate sidecar runs the Fluent Bit image, which
+// does not bundle libnss_wrapper.so; this init container runs the Postgres image
+// (which ships the library under /usr/lib64) and stages it onto the shared /tmp
+// volume so the sidecar can LD_PRELOAD it. It is only wired when the log collector
+// is enabled, so clusters without log collection keep their pod template unchanged
+// (and are not rolled on a minor operator upgrade).
+func instanceInitContainers(cr *v2.PerconaPGCluster) []corev1.Container {
+	if !cr.LogCollectorEnabled() {
+		return nil
+	}
+
+	return []corev1.Container{{
+		Name:            nssWrapperInitName,
+		Image:           cr.Spec.Image,
+		ImagePullPolicy: cr.Spec.ImagePullPolicy,
+		// The /tmp volume mount is added to every container by the operator; create
+		// the nss_wrapper directory defensively so ordering against the shared
+		// nss-wrapper-init container does not matter.
+		Command: []string{"bash", "-c",
+			"mkdir -p /tmp/nss_wrapper && " +
+				"{ [[ -f " + nssWrapperLibPath + " ]] || cp /usr/lib64/libnss_wrapper.so " + nssWrapperLibPath + "; }",
+		},
+		SecurityContext: securityContext(cr),
+		Resources:       cr.Spec.LogCollector.Resources,
+	}}
+}
+
 func containers(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount, env []corev1.EnvVar) ([]corev1.Container, error) {
 	if !cr.LogCollectorEnabled() {
 		return nil, nil

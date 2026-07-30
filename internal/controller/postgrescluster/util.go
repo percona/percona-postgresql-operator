@@ -48,12 +48,6 @@ const (
 mkdir -p /tmp/nss_wrapper
 chmod g+rwx /tmp/nss_wrapper
 
-# Stage the nss_wrapper library on the shared volume so sidecar containers whose
-# image does not bundle it (for example the log collector's logrotate container,
-# which runs the Fluent Bit image) can preload it via LD_PRELOAD. This init
-# container runs the Postgres image, which ships the library under /usr/lib64.
-[[ -f /tmp/nss_wrapper/libnss_wrapper.so ]] || cp /usr/lib64/libnss_wrapper.so /tmp/nss_wrapper/libnss_wrapper.so
-
 NSS_WRAPPER_DIR="/tmp/nss_wrapper/${NSS_WRAPPER_SUBDIR}"
 NSS_WRAPPER_PASSWD="${NSS_WRAPPER_DIR}/passwd"
 NSS_WRAPPER_GROUP="${NSS_WRAPPER_DIR}/group"
