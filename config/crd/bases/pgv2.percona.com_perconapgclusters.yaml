@@ -22883,7 +22883,8 @@ spec:
                       rule: self.type != 'etcd' || (has(self.etcd) && size(self.etcd.endpoints)
                         > 0)
                     - message: DCS type is immutable after cluster creation
-                      rule: '!has(oldSelf.type) || oldSelf.type == self.type'
+                      rule: '(has(oldSelf.type) ? oldSelf.type : ''kubernetes'') ==
+                        self.type'
                   dynamicConfiguration:
                     description: |-
                       Patroni dynamic configuration settings. Changes to this value will be

@@ -103,7 +103,7 @@ const (
 
 // PatroniDCS configures the Patroni distributed configuration store (DCS).
 // +kubebuilder:validation:XValidation:rule="self.type != 'etcd' || (has(self.etcd) && size(self.etcd.endpoints) > 0)",message="etcd.endpoints must be non-empty when type is etcd"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || oldSelf.type == self.type",message="DCS type is immutable after cluster creation"
+// +kubebuilder:validation:XValidation:rule="(has(oldSelf.type) ? oldSelf.type : 'kubernetes') == self.type",message="DCS type is immutable after cluster creation"
 type PatroniDCS struct {
 	// Type of DCS backend. Defaults to "kubernetes".
 	// Changing this is not allowed because it will lead to a downtime

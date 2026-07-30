@@ -74,7 +74,12 @@ func (r *Reconciler) handlePatroniRestarts(
 			return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
 		})
 		restart, err := exec.PodRequiresRestart(ctx, patroniPodHost(pod), cluster.Spec.Patroni.GetPort())
-		return err == nil && restart
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "failed to check Patroni pending_restart",
+				"namespace", pod.Namespace, "name", pod.Name)
+			return false
+		}
+		return restart
 	}
 
 	// Look for one primary and one replica that need to restart. Ignore
