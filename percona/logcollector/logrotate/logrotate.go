@@ -51,6 +51,8 @@ func Container(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount) (*corev1.C
 		ImagePullPolicy: cr.Spec.LogCollector.ImagePullPolicy,
 		SecurityContext: cr.Spec.LogCollector.ContainerSecurityContext,
 		Resources:       cr.Spec.LogCollector.Resources,
+		LivenessProbe:   livenessProbe(cr.Spec.LogCollector.LogRotate),
+		ReadinessProbe:  readinessProbe(cr.Spec.LogCollector.LogRotate),
 		Command:         []string{entrypoint},
 		Args:            []string{"logrotate"},
 		Env: []corev1.EnvVar{
@@ -107,4 +109,18 @@ func schedule(lr *v2.LogRotateSpec) string {
 		return lr.Schedule
 	}
 	return defaultSchedule
+}
+
+func livenessProbe(lr *v2.LogRotateSpec) *corev1.Probe {
+	if lr == nil {
+		return nil
+	}
+	return lr.LivenessProbe
+}
+
+func readinessProbe(lr *v2.LogRotateSpec) *corev1.Probe {
+	if lr == nil {
+		return nil
+	}
+	return lr.ReadinessProbe
 }

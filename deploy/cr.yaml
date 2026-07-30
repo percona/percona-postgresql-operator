@@ -769,6 +769,20 @@ spec:
 #      requests:
 #        memory: 150M
 #        cpu: 300m
+#    # Liveness/readiness probes for the fluent-bit "logs" container.
+#    # When not set, the container has no probes.
+#    # NOTE: a tcpSocket/httpGet probe on port 2020 requires the fluent-bit
+#    # HTTP server to be enabled via `configuration` (HTTP_Server On).
+#    livenessProbe:
+#      tcpSocket:
+#        port: 2020
+#      initialDelaySeconds: 30
+#      periodSeconds: 15
+#    readinessProbe:
+#      tcpSocket:
+#        port: 2020
+#      initialDelaySeconds: 5
+#      periodSeconds: 10
 #    # Extra volumes/mounts for the collector sidecars, e.g. a CA bundle so an
 #    # S3 output can verify TLS via tls.ca_file.
 #    volumeMounts:
@@ -796,6 +810,20 @@ spec:
 #        name: my-logrotate-config
 #      # Cron schedule for logrotate runs (default "0 0 * * *").
 #      schedule: "0 0 * * *"
+#      # Liveness/readiness probes for the "logrotate" container.
+#      # When not set, the container has no probes.
+#      livenessProbe:
+#        exec:
+#          command:
+#            - /bin/true
+#        initialDelaySeconds: 30
+#        periodSeconds: 15
+#      readinessProbe:
+#        exec:
+#          command:
+#            - /bin/true
+#        initialDelaySeconds: 5
+#        periodSeconds: 10
 #  patroni:
 #    # Some values of the Liveness/Readiness probes of the patroni container are calculated using syncPeriodSeconds by the following formulas:
 #    # - timeoutSeconds:   syncPeriodSeconds / 2;

@@ -230,6 +230,8 @@ func logContainer(cr *v2.PerconaPGCluster, dataMount corev1.VolumeMount, env []c
 		ImagePullPolicy: cr.Spec.LogCollector.ImagePullPolicy,
 		SecurityContext: securityContext(cr),
 		Resources:       cr.Spec.LogCollector.Resources,
+		LivenessProbe:   cr.Spec.LogCollector.LivenessProbe,
+		ReadinessProbe:  cr.Spec.LogCollector.ReadinessProbe,
 		Command:         []string{entrypoint},
 		Args:            []string{"fluent-bit"},
 		Env:             env,
