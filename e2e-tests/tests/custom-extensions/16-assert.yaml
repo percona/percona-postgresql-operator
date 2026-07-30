@@ -8,6 +8,6 @@ metadata:
   name: 16-check-extensions
 data:
   data: |2-
-     pg_cron
+     pg_stat_kcache
      pg_stat_monitor
      pgaudit

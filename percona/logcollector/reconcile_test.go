@@ -145,14 +145,17 @@ func TestReconcileLogRotate(t *testing.T) {
 
 			var wantSidecars []corev1.Container
 			var wantVolumes []corev1.Volume
+			var wantInitContainers []corev1.Container
 			if tt.wantAppended {
 				var err error
 				wantSidecars, err = instanceContainers(tt.cr)
 				require.NoError(t, err)
 				wantVolumes = volumes(tt.cr)
+				wantInitContainers = instanceInitContainers(tt.cr)
 			}
 			assert.Equal(t, wantSidecars, set.Sidecars)
 			assert.Equal(t, wantVolumes, set.SidecarVolumes)
+			assert.Equal(t, wantInitContainers, set.InitContainers)
 		})
 	}
 }

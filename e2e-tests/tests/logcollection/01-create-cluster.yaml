@@ -34,8 +34,8 @@ commands:
         '          - name: opentelemetry_envelope')"
 
       export logrotate_custom="$(printf '%s\n' \
-        '/pgdata/pg*/log/*.log' \
-        '/pgdata/pg*/log/*.csv {' \
+        '/pgdata/custom-log/*.log' \
+        '/pgdata/custom-log/*.csv {' \
         '    hourly' \
         '    rotate 3' \
         '    missingok' \
@@ -53,5 +53,6 @@ commands:
         | yq eval '.spec.logcollector.logRotate.configuration = strenv(logrotate_custom)' - \
         | yq eval '.spec.logcollector.logRotate.schedule = "*/5 * * * *"' - \
         | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_statement = "all"' - \
+        | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_directory = "/pgdata/custom-log"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
     timeout: 30

@@ -148,6 +148,12 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.ObservedGeneration = cluster.Generation
 
+		if cond := meta.FindStatusCondition(cr.Status.Conditions, v2.ConditionPMMReady); cond != nil {
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
+		} else {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v2.ConditionPMMReady)
+		}
+
 		updateConditions(cluster, status)
 
 		return r.Client.Status().Update(ctx, cluster)

@@ -13,9 +13,9 @@ commands:
         wait_for_generation "sts/$st" 2
       done
 
-      token=$(generate_pmm3_server_token)
+      token=$(generate_pmm_server_token)
       [[ -n ${token} && ${token} != null ]] \
-        &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm3-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_TOKEN": "'${token}'"}}' \
+        &&  kubectl -n ${NAMESPACE} patch secret monitoring-pmm-secret --type merge --patch '{"stringData": {"PMM_SERVER_TOKEN": "'${token}'"}}' \
         || true
 
       sleep 10
