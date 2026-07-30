@@ -2,6 +2,7 @@ backup-enable-disable
 builtin-extensions
 cert-manager-tls
 custom-envs
+custom-extensions
 custom-tls
 database-init-sql
 demand-backup
@@ -22,10 +23,10 @@ major-upgrade-17-to-18-postgis
 ldap
 ldap-tls
 monitoring
-monitoring-pmm3
 one-pod
 operator-self-healing
 pgbouncer-mtls
+pg-tde
 pitr
 scaling
 scheduled-backup

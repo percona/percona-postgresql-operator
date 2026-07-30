@@ -15,12 +15,129 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
+	gate := feature.NewGate()
+	require.NoError(t, gate.SetFromMap(map[string]bool{feature.BackupSnapshots: true}))
+	ctx := feature.NewContext(t.Context(), gate)
+
+	tests := []struct {
+		name          string
+		deleteCluster bool
+		snapshot      bool
+		expectedError string
+	}{
+		{
+			name:          "cluster is deleted",
+			deleteCluster: true,
+			expectedError: "PerconaPGCluster test-cluster is not found",
+		},
+		{
+			name:          "cluster is terminating",
+			expectedError: "PerconaPGCluster test-cluster is being deleted",
+		},
+		{
+			name:          "cluster is deleted during snapshot",
+			deleteCluster: true,
+			snapshot:      true,
+			expectedError: "PerconaPGCluster test-cluster is not found",
+		},
+		{
+			name:          "cluster is terminating during snapshot",
+			snapshot:      true,
+			expectedError: "PerconaPGCluster test-cluster is being deleted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := readDefaultCR("test-cluster", "test-namespace")
+			require.NoError(t, err)
+			cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			if tt.snapshot {
+				cluster.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
+					Mode:      v2.VolumeSnapshotModeOffline,
+					ClassName: "snapshot-class",
+				}
+			}
+
+			backup := &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-backup",
+					Namespace:  cluster.Namespace,
+					Finalizers: []string{pNaming.FinalizerDeleteBackup},
+				},
+				Spec: v2.PerconaPGBackupSpec{
+					PGCluster: cluster.Name,
+					RepoName:  new("repo1"),
+				},
+				Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+			}
+			if tt.snapshot {
+				backup.Spec.Method = new(v2.BackupMethodVolumeSnapshot)
+				backup.UID = "snapshot-uid"
+				backup.Finalizers = []string{pNaming.FinalizerSnapshotInProgress}
+				backup.Status.Conditions = []metav1.Condition{{
+					Type:   v2.ConditionBackupLeaseAcquired,
+					Status: metav1.ConditionTrue,
+				}}
+			}
+
+			objects := []client.Object{backup}
+			if tt.snapshot {
+				holder := backupLeaseHolder(backup)
+				objects = append(objects, &coordinationv1.Lease{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      backupLeaseName(cluster.Name),
+						Namespace: cluster.Namespace,
+						UID:       "lease-uid",
+					},
+					Spec: coordinationv1.LeaseSpec{HolderIdentity: &holder},
+				})
+			}
+
+			cl, err := buildFakeClient(ctx, cluster, objects...)
+			require.NoError(t, err)
+			require.NoError(t, cl.Delete(ctx, cluster))
+			if tt.deleteCluster {
+				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+				cluster.Finalizers = nil
+				require.NoError(t, cl.Update(ctx, cluster))
+			}
+
+			r := &PGBackupReconciler{Client: cl}
+			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+			require.NoError(t, err)
+
+			updated := new(v2.PerconaPGBackup)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.Equal(t, v2.BackupFailed, updated.Status.State)
+			assert.Equal(t, tt.expectedError, updated.Status.Error)
+
+			if tt.snapshot {
+				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerSnapshotInProgress)
+				assert.False(t, meta.IsStatusConditionTrue(updated.Status.Conditions, v2.ConditionBackupLeaseAcquired))
+
+				err = cl.Get(ctx, client.ObjectKey{
+					Name:      backupLeaseName(cluster.Name),
+					Namespace: cluster.Namespace,
+				}, new(coordinationv1.Lease))
+				assert.True(t, k8serrors.IsNotFound(err))
+			} else {
+				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+			}
+		})
+	}
+}
 
 func TestFailIfClusterIsNotReady(t *testing.T) {
 	ctx := context.Background()
@@ -624,4 +741,394 @@ func TestReleaseLeaseIfNeeded(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to release lease")
 	})
+}
+
+func TestStartBackup(t *testing.T) {
+	ctx := t.Context()
+	ns := "test-ns"
+	clusterName := "my-cluster"
+
+	s := scheme.Scheme
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, v2.AddToScheme(s))
+
+	newCluster := func() *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
+			Spec: v2.PerconaPGClusterSpec{
+				CRVersion:       "2.9.0",
+				PostgresVersion: 17,
+			},
+		}
+	}
+
+	newBackup := func() *v2.PerconaPGBackup {
+		repo := "repo1"
+		return &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: clusterName,
+				RepoName:  &repo,
+			},
+		}
+	}
+
+	t.Run("marks the cluster for backup", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		require.NoError(t, startBackup(ctx, cl, backup))
+
+		updated := &v2.PerconaPGCluster{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updated))
+
+		assert.Equal(t, backup.Name, updated.Annotations[naming.PGBackRestBackup])
+		assert.Equal(t, backup.Name, updated.Annotations[pNaming.AnnotationBackupInProgress])
+		require.NotNil(t, updated.Spec.Backups.PGBackRest.Manual)
+		assert.Equal(t, "repo1", updated.Spec.Backups.PGBackRest.Manual.RepoName)
+	})
+
+	t.Run("does not persist defaults", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		defaulted := cluster.DeepCopy()
+		defaulted.Default()
+		require.NotNil(t, defaulted.Spec.Extensions.BuiltIn.PGStatMonitor) // nolint:staticcheck
+		require.NotNil(t, defaulted.Spec.Extensions.PGStatMonitor.Enabled)
+		require.NotNil(t, defaulted.Spec.AutoCreateUserSchema)
+
+		require.NoError(t, startBackup(ctx, cl, backup))
+
+		updated := &v2.PerconaPGCluster{}
+		require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updated))
+
+		assert.Nil(t, updated.Spec.Extensions.BuiltIn.PGStatMonitor, // nolint:staticcheck
+			"a backup must not write the deprecated builtin extension fields")
+		assert.Nil(t, updated.Spec.Extensions.PGStatMonitor.Enabled,
+			"a backup must not decide which extensions the user enabled")
+		assert.Nil(t, updated.Spec.AutoCreateUserSchema,
+			"a backup must not fill in unrelated spec defaults")
+	})
+
+	t.Run("refuses when another backup is running", func(t *testing.T) {
+		cluster, backup := newCluster(), newBackup()
+		cluster.Annotations = map[string]string{
+			pNaming.AnnotationBackupInProgress: "other-backup",
+		}
+		cl := fake.NewClientBuilder().WithScheme(s).WithObjects(cluster, backup).Build()
+
+		err := startBackup(ctx, cl, backup)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "other-backup")
+	})
+}
+
+func TestFindBackupInPGBackrestInfo(t *testing.T) {
+	tests := []struct {
+		name         string
+		infoOutput   pgbackrest.InfoOutput
+		pgBackup     *v2.PerconaPGBackup
+		expectFound  bool
+		expectStanza string
+		expectLabel  string
+		expectType   v2.PGBackupType
+		expectSize   int64
+	}{
+		{
+			name: "matches backup by backup-name annotation",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-120000F",
+							Type:  v2.PGBackupTypeFull,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 1234567},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationBackupName: "my-backup",
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "backup-job-1",
+				},
+			},
+			expectFound:  true,
+			expectStanza: "db",
+			expectLabel:  "20250722-120000F",
+			expectType:   v2.PGBackupTypeFull,
+			expectSize:   1234567,
+		},
+		{
+			name: "matches backup by job type annotation for manual backup",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-130000F",
+							Type:  v2.PGBackupTypeDifferential,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 9876543},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationJobType:    string(naming.BackupManual),
+								v2.PGBackrestAnnotationBackupName: "my-manual-backup",
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-manual-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "",
+				},
+			},
+			expectFound:  true,
+			expectStanza: "db",
+			expectLabel:  "20250722-130000F",
+			expectType:   v2.PGBackupTypeDifferential,
+			expectSize:   9876543,
+		},
+		{
+			name: "skips backup with different job name annotation",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-140000F",
+							Type:  v2.PGBackupTypeFull,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 111},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationJobName:    "other-job",
+								v2.PGBackrestAnnotationBackupName: "my-backup",
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "my-job",
+				},
+			},
+			expectFound: false,
+		},
+		{
+			name: "skips backup with no annotations",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-150000F",
+							Type:  v2.PGBackupTypeFull,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 222},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "my-job",
+				},
+			},
+			expectFound: false,
+		},
+		{
+			name:       "empty info output returns not found",
+			infoOutput: pgbackrest.InfoOutput{},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-backup",
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "my-job",
+				},
+			},
+			expectFound: false,
+		},
+		{
+			name: "matches backup already annotated with same job name",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-160000F",
+							Type:  v2.PGBackupTypeIncremental,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 555},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationJobName:    "my-job",
+								v2.PGBackrestAnnotationBackupName: "my-backup",
+								v2.PGBackrestAnnotationJobType:    string(naming.BackupManual),
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "my-job",
+				},
+			},
+			expectFound:  true,
+			expectStanza: "db",
+			expectLabel:  "20250722-160000F",
+			expectType:   v2.PGBackupTypeIncremental,
+			expectSize:   555,
+		},
+		{
+			name: "matches replica-create backup by job type",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "db",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-170000F",
+							Type:  v2.PGBackupTypeFull,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 999},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationJobType:    string(naming.BackupReplicaCreate),
+								v2.PGBackrestAnnotationBackupName: "replica-backup",
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "replica-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupReplicaCreate),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "",
+				},
+			},
+			expectFound:  true,
+			expectStanza: "db",
+			expectLabel:  "20250722-170000F",
+			expectType:   v2.PGBackupTypeFull,
+			expectSize:   999,
+		},
+		{
+			name: "selects correct backup from multiple stanzas",
+			infoOutput: pgbackrest.InfoOutput{
+				{
+					Name: "stanza1",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-100000F",
+							Type:  v2.PGBackupTypeFull,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 100},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationBackupName: "other-backup",
+							},
+						},
+					},
+				},
+				{
+					Name: "stanza2",
+					Backup: []pgbackrest.InfoBackup{
+						{
+							Label: "20250722-110000F",
+							Type:  v2.PGBackupTypeDifferential,
+							Info: struct {
+								Delta int64 `json:"delta,omitempty"`
+							}{Delta: 200},
+							Annotation: map[string]string{
+								v2.PGBackrestAnnotationBackupName: "target-backup",
+								v2.PGBackrestAnnotationJobType:    string(naming.BackupManual),
+							},
+						},
+					},
+				},
+			},
+			pgBackup: &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target-backup",
+					Annotations: map[string]string{
+						pNaming.AnnotationPGBackrestBackupJobType: string(naming.BackupManual),
+					},
+				},
+				Status: v2.PerconaPGBackupStatus{
+					JobName: "",
+				},
+			},
+			expectFound:  true,
+			expectStanza: "stanza2",
+			expectLabel:  "20250722-110000F",
+			expectType:   v2.PGBackupTypeDifferential,
+			expectSize:   200,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stanza, backup, found := findBackupInPGBackrestInfo(tt.infoOutput, tt.pgBackup)
+
+			assert.Equal(t, tt.expectFound, found, "unexpected found value")
+
+			if !tt.expectFound {
+				assert.Empty(t, stanza)
+				assert.Empty(t, backup.Label)
+				return
+			}
+
+			assert.Equal(t, tt.expectStanza, stanza, "stanza name mismatch")
+			// These fields map directly to status: BackupName, BackupType, Size
+			assert.Equal(t, tt.expectLabel, backup.Label, "backup.Label populates status.BackupName")
+			assert.Equal(t, tt.expectType, backup.Type, "backup.Type populates status.BackupType")
+			assert.Equal(t, tt.expectSize, backup.Info.Delta, "backup.Info.Delta populates status.Size")
+		})
+	}
 }
