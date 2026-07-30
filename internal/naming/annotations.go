@@ -87,6 +87,9 @@ const (
 	// SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix identifies Pod annotations
 	// containing a desired size for a volume-backed pgBackRest repository.
 	SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix = "suggested-pgbackrest-"
+
+	// K8SPG-911
+	TDEInstalledAnnotation = perconaAnnotationPrefix + "tde-installed"
 )
 
 // SuggestedPGBackRestRepoVolumeSizeAnnotation returns the Pod annotation used

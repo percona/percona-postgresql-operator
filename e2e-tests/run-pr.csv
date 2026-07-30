@@ -22,6 +22,7 @@ one-pod
 repo-host-autogrow
 operator-self-healing
 pgbouncer-mtls
+pg-tde
 pitr
 scaling
 scheduled-backup
