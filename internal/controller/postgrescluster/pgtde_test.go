@@ -444,7 +444,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 		pods := newPods("pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0")
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, pods, naming.ContainerDatabase, tokenPath, caPath))
 
 		// pg_tde names one path cluster-wide, but each instance has its own
@@ -467,12 +469,13 @@ func TestStageVaultCredentials(t *testing.T) {
 	t.Run("ReadsEachSecretOnce", func(t *testing.T) {
 		var calls []execCall
 		gets := 0
-		k8s := &countingReader{
-			Reader: fake.NewClientBuilder().WithObjects(secret).Build(),
+		k8s := &countingClient{
+			Client: fake.NewClientBuilder().WithObjects(secret).Build(),
 			gets:   &gets,
 		}
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b", "c", "d"), naming.ContainerDatabase,
 			tokenPath, caPath))
 
@@ -488,7 +491,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		noCA.CASecret = v1beta1.PGTDESecretObjectReference{}
 		_, noCAPath := pgtde.TempVaultCredentialPaths(noCA)
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", noCA, newPods("a", "b"), naming.ContainerDatabase,
 			tokenPath, noCAPath))
 
@@ -498,8 +503,9 @@ func TestStageVaultCredentials(t *testing.T) {
 	t.Run("MissingSecretWritesNothing", func(t *testing.T) {
 		var calls []execCall
 		k8s := fake.NewClientBuilder().Build()
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
 
-		err := stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b"), naming.ContainerDatabase, tokenPath, caPath)
 
 		assert.ErrorContains(t, err, "token secret")
@@ -514,7 +520,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		badKey := tdeVaultSpec()
 		badKey.TokenSecret.Key = "nope"
 
-		err := stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", badKey, newPods("a"), naming.ContainerDatabase, tokenPath, caPath)
 
 		assert.ErrorContains(t, err, `key "nope" not found`)
@@ -525,13 +533,17 @@ func TestStageVaultCredentials(t *testing.T) {
 		var calls []execCall
 		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 
-		err := stagePGTDEVaultCredentials(ctx, k8s,
-			execRecorder(&calls, func(call execCall) error {
+		reconciler := &Reconciler{
+			Client: k8s,
+			PodExec: execRecorder(&calls, func(call execCall) error {
 				if call.pod == "b" {
 					return errors.New("no space left on device")
 				}
 				return nil
 			}),
+		}
+
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b", "c"), naming.ContainerDatabase,
 			tokenPath, caPath)
 
@@ -597,17 +609,17 @@ func TestWriteTempFile(t *testing.T) {
 	})
 }
 
-// countingReader counts Get calls made against the embedded reader.
-type countingReader struct {
-	client.Reader
+// countingClient counts Get calls made against the embedded client.
+type countingClient struct {
+	client.Client
 	gets *int
 }
 
-func (c *countingReader) Get(
+func (c *countingClient) Get(
 	ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
 ) error {
 	*c.gets++
-	return c.Reader.Get(ctx, key, obj, opts...)
+	return c.Client.Get(ctx, key, obj, opts...)
 }
 
 func TestReconcilePGTDEProviders(t *testing.T) {
