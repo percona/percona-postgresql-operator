@@ -25774,6 +25774,9 @@ spec:
                           Minimum number of pods that should be available at a time.
                           Defaults to one when the replicas field is greater than one.
                         x-kubernetes-int-or-string: true
+                      paused:
+                        description: If set, pauses pgbouncer connections.
+                        type: boolean
                       port:
                         default: 5432
                         description: |-

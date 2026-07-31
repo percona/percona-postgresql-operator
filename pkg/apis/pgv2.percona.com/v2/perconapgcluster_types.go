@@ -1362,6 +1362,9 @@ type PGBouncerSpec struct {
 
 	Env     []corev1.EnvVar        `json:"env,omitempty"`
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// If set, pauses pgbouncer connections.
+	Paused *bool `json:"paused,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSpec {
@@ -1393,6 +1396,7 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
 		AdditionalTrustedCAs:      p.AdditionalTrustedCAs,
+		Paused:                    p.Paused,
 	}
 
 	spec.Default()
