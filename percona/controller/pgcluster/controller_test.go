@@ -1634,16 +1634,18 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(stsList.Items).NotTo(BeEmpty())
 
 		for _, sts := range stsList.Items {
-			l := len(sts.Spec.Template.Spec.Containers)
-			sidecar := sts.Spec.Template.Spec.Containers[l-4]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar-2"))
+			containersByName := map[string]corev1.Container{}
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				containersByName[c.Name] = c
+			}
+
+			sidecar, ok := containersByName["instance-sidecar-2"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd-2"}))
 			Expect(sidecar.Image).To(Equal("instance-image-2"))
 
-			sidecar = sts.Spec.Template.Spec.Containers[l-3]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar"))
+			sidecar, ok = containersByName["instance-sidecar"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
 			Expect(sidecar.Image).To(Equal("instance-image"))
 		}
