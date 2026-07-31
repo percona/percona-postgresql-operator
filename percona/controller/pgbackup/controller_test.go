@@ -144,7 +144,7 @@ func TestReconcileNotUpdatingOldBackup(t *testing.T) {
 	cluster, err := readDefaultCR("test-cluster", "test-namespace")
 	require.NoError(t, err)
 
-	now := metav1.Now()
+	now := metav1.NewTime(time.Now().Truncate(time.Microsecond))
 	latestCompletedAt := metav1.NewTime(now.Add(time.Hour))
 	latestRestorableTime := metav1.NewTime(now.Add(30 * time.Minute))
 	newLatestRestorableTime := metav1.NewTime(now.Add(45 * time.Minute))
