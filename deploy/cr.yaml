@@ -749,6 +749,9 @@ spec:
 #    imagePullPolicy: IfNotPresent
 #    # Extra fluent-bit configuration merged with the operator-managed config.
 #    # Must be in Fluent Bit's YAML configuration format.
+#    # NOTE: the operator already ships a `service:` section (HTTP server on,
+#    # port 2020). Fluent Bit does not merge duplicate top-level sections, so do
+#    # not add your own `service:` here or the collector will fail to start.
 #    configuration: |
 #      pipeline:
 #        filters:
@@ -771,8 +774,8 @@ spec:
 #        cpu: 300m
 #    # Liveness/readiness probes for the fluent-bit "logs" container.
 #    # When not set, the container has no probes.
-#    # NOTE: a tcpSocket/httpGet probe on port 2020 requires the fluent-bit
-#    # HTTP server to be enabled via `configuration` (HTTP_Server On).
+#    # The fluent-bit HTTP server is enabled by default on port 2020, so the
+#    # tcpSocket/httpGet probes below work out of the box.
 #    livenessProbe:
 #      tcpSocket:
 #        port: 2020
