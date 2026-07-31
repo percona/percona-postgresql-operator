@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode"
 
+	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 	"github.com/kelseyhightower/envconfig"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
@@ -29,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	certmanagerscheme "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/scheme"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/pgupgrade"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -47,6 +47,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
+	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -217,8 +218,9 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	}
 
 	pb := &pgbackup.PGBackupReconciler{
-		Client:       mgr.GetClient(),
-		ExternalChan: externalEvents,
+		Client:             mgr.GetClient(),
+		ExternalChan:       externalEvents,
+		LatestCommitGetter: watcher.GetLatestCommitGetter(),
 	}
 	if err := pb.SetupWithManager(ctx, mgr); err != nil {
 		return err
@@ -520,7 +522,6 @@ func getLogLevel() zapcore.LevelEnabler {
 		return zapcore.InfoLevel
 	}
 }
-
 
 type envConfig struct {
 	LeaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`
