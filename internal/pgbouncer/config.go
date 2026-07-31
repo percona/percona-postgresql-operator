@@ -31,12 +31,17 @@ const (
 	iniFileProjectionPath   = "~postgres-operator.ini"
 	hbaFileProjectionPath   = "~postgres-operator/pgbouncer_hba.conf"
 
-	authFileSecretKey   = "pgbouncer-users.txt" // #nosec G101 this is a name, not a credential
-	passwordSecretKey   = "pgbouncer-password"  // #nosec G101 this is a name, not a credential
-	verifierSecretKey   = "pgbouncer-verifier"  // #nosec G101 this is a name, not a credential
-	emptyConfigMapKey   = "pgbouncer-empty"
-	iniFileConfigMapKey = "pgbouncer.ini"
-	hbaFileConfigMapKey = "pgbouncer-hba.conf"
+	authFileSecretKey      = "pgbouncer-users.txt"      // #nosec G101 this is a name, not a credential
+	passwordSecretKey      = "pgbouncer-password"       // #nosec G101 this is a name, not a credential
+	verifierSecretKey      = "pgbouncer-verifier"       // #nosec G101 this is a name, not a credential
+	adminPasswordSecretKey = "pgbouncer-admin-password" // #nosec G101 this is a name, not a credential
+	emptyConfigMapKey      = "pgbouncer-empty"
+	iniFileConfigMapKey    = "pgbouncer.ini"
+	hbaFileConfigMapKey    = "pgbouncer-hba.conf"
+
+	adminUser = "_crunchypgbounceradmin"
+
+	adminUsersSetting = "admin_users"
 )
 
 const (
@@ -67,7 +72,7 @@ func (vs iniValueSet) String() string {
 }
 
 // authFileContents returns a PgBouncer user database.
-func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error) {
+func authFileContents(password, adminPassword string, userSecret *corev1.Secret) ([]byte, error) {
 	// > There should be at least 2 fields, surrounded by double quotes.
 	// > Double quotes in a field value can be escaped by writing two double quotes.
 	// - https://www.pgbouncer.org/config.html#authentication-file-format
@@ -75,10 +80,17 @@ func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error
 		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 	}
 
+	// Names the operator writes itself. A user Secret must not contain them,
+	// otherwise it would replace an operator credential.
+	reserved := map[string]bool{postgresqlUser: true}
+	if len(adminPassword) > 0 {
+		reserved[adminUser] = true
+	}
+
 	users := make(map[string]string)
 	if userSecret != nil {
 		for name, password := range userSecret.Data {
-			if name == postgresqlUser {
+			if reserved[name] {
 				return nil, errors.Errorf("pgbouncer user %q in Secret %q conflicts with the reserved operator user", name, userSecret.Name)
 			}
 			if strings.ContainsAny(string(password), "\r\n") {
@@ -95,11 +107,33 @@ func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error
 
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b, "%s %s\n", quote(postgresqlUser), quote(password))
+	if len(adminPassword) > 0 {
+		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(adminUser), quote(adminPassword))
+	}
 	for _, name := range sortedUsers {
 		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(name), quote(users[name]))
 	}
 
 	return []byte(b.String()), nil
+}
+
+func ensureListed(list, user string) string {
+	empty := true
+
+	for entry := range strings.SplitSeq(list, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == user {
+			return list
+		}
+		empty = empty && len(entry) == 0
+	}
+
+	// Nothing to append to; the list has no entries at all.
+	if empty {
+		return user
+	}
+
+	return list + "," + user
 }
 
 func hasLDAPRules(cluster *v1beta1.PostgresCluster) bool {
@@ -222,8 +256,16 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 		global["auth_hba_file"] = hbaFileAbsolutePath
 	}
 
+	if cluster.CompareVersion("3.1.0") >= 0 {
+		global[adminUsersSetting] = adminUser
+	}
+
 	// Override the above with any specified settings.
 	maps.Copy(global, cluster.Spec.Proxy.PGBouncer.Config.Global)
+
+	if cluster.CompareVersion("3.1.0") >= 0 {
+		global[adminUsersSetting] = ensureListed(global[adminUsersSetting], adminUser)
+	}
 
 	// Prevent the user from bypassing the main configuration file.
 	global["conffile"] = iniFileAbsolutePath

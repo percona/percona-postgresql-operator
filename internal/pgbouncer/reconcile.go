@@ -17,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -75,12 +76,26 @@ func Secret(ctx context.Context,
 		err = errors.WithStack(err)
 	}
 
+	var adminPassword string
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		adminPassword = string(inSecret.Data[adminPasswordSecretKey])
+
+		if err == nil && len(adminPassword) == 0 {
+			adminPassword, err = util.GenerateASCIIPassword(32)
+			err = errors.WithStack(err)
+		}
+	}
+
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, adminPassword, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
+
+		if len(adminPassword) > 0 {
+			outSecret.Data[adminPasswordSecretKey] = []byte(adminPassword)
+		}
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {

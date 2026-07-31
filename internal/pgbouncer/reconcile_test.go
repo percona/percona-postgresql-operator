@@ -104,6 +104,74 @@ func TestSecret(t *testing.T) {
 	assert.DeepEqual(t, before, intent)
 }
 
+func TestSecretAdminPassword(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	service := new(corev1.Service)
+	service.Namespace = "ns1"
+	service.Name = "some-name"
+
+	root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+
+	newCluster := func(version string) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.SetLabels(map[string]string{naming.LabelVersion: version})
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		assert.NilError(t, cluster.Default(ctx, nil))
+		return cluster
+	}
+
+	t.Run("Generated", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, nil))
+
+		adminPassword := string(intent.Data["pgbouncer-admin-password"])
+		assert.Equal(t, len(adminPassword), 32)
+
+		// It is not the password of the "auth_user".
+		assert.Assert(t, adminPassword != string(intent.Data["pgbouncer-password"]))
+
+		// No SCRAM verifier is generated; there is no PostgreSQL role.
+		_, ok := intent.Data["pgbouncer-admin-verifier"]
+		assert.Assert(t, !ok)
+
+		// It goes into the authentication file.
+		assert.Assert(t, strings.Contains(string(intent.Data["pgbouncer-users.txt"]),
+			`"_crunchypgbounceradmin" "`+adminPassword+`"`))
+	})
+
+	t.Run("PreservedWhenCalledAgain", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		existing := new(corev1.Secret)
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, nil))
+		assert.Assert(t, len(intent.Data["pgbouncer-admin-password"]) != 0)
+
+		existing.Data = intent.Data
+		before := intent.DeepCopy()
+		require.NoError(t, Secret(ctx, cluster, root, existing, nil, service, intent, nil, nil))
+		assert.DeepEqual(t, before, intent)
+	})
+
+	t.Run("BelowCRVersion", func(t *testing.T) {
+		cluster := newCluster("3.0.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, nil))
+
+		_, ok := intent.Data["pgbouncer-admin-password"]
+		assert.Assert(t, !ok)
+		assert.Assert(t, !strings.Contains(string(intent.Data["pgbouncer-users.txt"]),
+			"_crunchypgbounceradmin"))
+	})
+}
+
 func TestSecretAdditionalCAs(t *testing.T) {
 	t.Parallel()
 

@@ -37,15 +37,76 @@ func TestAuthFileContents(t *testing.T) {
 	t.Parallel()
 
 	password := `very"random`
-	data, err := authFileContents(password, nil)
+	data, err := authFileContents(password, "", nil)
 	assert.NilError(t, err)
 	assert.Equal(t, string(data), `"_crunchypgbouncer" "very""random"`+"\n")
+}
+
+func TestAuthFileContentsAdminUser(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithAdminPassword", func(t *testing.T) {
+		data, err := authFileContents("pgbouncer-password", `admin"password`, nil)
+		assert.NilError(t, err)
+
+		assert.Equal(t, string(data), strings.Join([]string{
+			`"_crunchypgbouncer" "pgbouncer-password"`,
+			`"_crunchypgbounceradmin" "admin""password"`,
+			"",
+		}, "\n"))
+	})
+
+	t.Run("SortedAfterAdminUser", func(t *testing.T) {
+		data, err := authFileContents("pgbouncer-password", "admin-password", &corev1.Secret{
+			Data: map[string][]byte{
+				// Sorts before both operator users, and must still come last.
+				"Monitor": []byte("monitor-password"),
+			},
+		})
+		assert.NilError(t, err)
+
+		assert.Equal(t, string(data), strings.Join([]string{
+			`"_crunchypgbouncer" "pgbouncer-password"`,
+			`"_crunchypgbounceradmin" "admin-password"`,
+			`"Monitor" "monitor-password"`,
+			"",
+		}, "\n"))
+	})
+
+	t.Run("ReservedInUserSecret", func(t *testing.T) {
+		_, err := authFileContents("pgbouncer-password", "admin-password", &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "custom-users"},
+			Data: map[string][]byte{
+				"_crunchypgbounceradmin": []byte("hijacked"),
+			},
+		})
+		assert.ErrorContains(t, err, `"_crunchypgbounceradmin"`)
+		assert.ErrorContains(t, err, "reserved operator user")
+	})
+
+	t.Run("NotReservedWhenDisabled", func(t *testing.T) {
+		// Below the crVersion gate the operator does not write the admin user,
+		// so a user Secret containing that name does not conflict.
+		data, err := authFileContents("pgbouncer-password", "", &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "custom-users"},
+			Data: map[string][]byte{
+				"_crunchypgbounceradmin": []byte("their-password"),
+			},
+		})
+		assert.NilError(t, err)
+
+		assert.Equal(t, string(data), strings.Join([]string{
+			`"_crunchypgbouncer" "pgbouncer-password"`,
+			`"_crunchypgbounceradmin" "their-password"`,
+			"",
+		}, "\n"))
+	})
 }
 
 func TestAuthFileContentsUsers(t *testing.T) {
 	t.Parallel()
 
-	data, err := authFileContents("pgbouncer-password", &corev1.Secret{
+	data, err := authFileContents("pgbouncer-password", "", &corev1.Secret{
 		Data: map[string][]byte{
 			`stats"user`: []byte(`stats"password`),
 			"monitor":    []byte("monitor-password"),
@@ -59,6 +120,28 @@ func TestAuthFileContentsUsers(t *testing.T) {
 		`"stats""user" "stats""password"`,
 		"",
 	}, "\n"))
+}
+
+func TestEnsureListed(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		list     string
+		expected string
+	}{
+		{"Empty", "", "someone"},
+		{"OnlySeparators", " , ", "someone"},
+		{"Absent", "alice,bob", "alice,bob,someone"},
+		{"AbsentKeepsUserFormatting", " alice , bob ", " alice , bob ,someone"},
+		{"Present", "alice,someone,bob", "alice,someone,bob"},
+		{"PresentWithWhitespace", "alice, someone", "alice, someone"},
+		{"NotASubstringMatch", "someone-else", "someone-else,someone"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, ensureListed(tt.list, "someone"), tt.expected)
+		})
+	}
 }
 
 func TestClusterINI(t *testing.T) {
@@ -151,6 +234,56 @@ app = mode=rad
 		// The "conffile" setting cannot be changed.
 		cluster.Spec.Proxy.PGBouncer.Config.Global["conffile"] = "too-far"
 		assert.Assert(t, !strings.Contains(clusterINI(cluster), "too-far"))
+	})
+}
+
+func TestClusterINIAdminUsers(t *testing.T) {
+	t.Parallel()
+
+	newCluster := func(version string) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+
+		cluster.Name = "foo-baz"
+		cluster.SetLabels(map[string]string{v1beta1.LabelVersion: version})
+
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		cluster.Spec.Proxy.PGBouncer.Port = new(int32)
+		*cluster.Spec.Proxy.PGBouncer.Port = 8888
+
+		return cluster
+	}
+
+	t.Run("Default", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		assert.Assert(t, strings.Contains(clusterINI(cluster),
+			"\nadmin_users = _crunchypgbounceradmin\n"))
+	})
+
+	t.Run("UserSettingIsKept", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		cluster.Spec.Proxy.PGBouncer.Config.Global = map[string]string{
+			"admin_users": "alice, bob",
+		}
+
+		assert.Assert(t, strings.Contains(clusterINI(cluster),
+			"\nadmin_users = alice, bob,_crunchypgbounceradmin\n"))
+	})
+
+	t.Run("NoDuplicateWhenAlreadyListed", func(t *testing.T) {
+		cluster := newCluster("3.1.0")
+		cluster.Spec.Proxy.PGBouncer.Config.Global = map[string]string{
+			"admin_users": "alice,_crunchypgbounceradmin",
+		}
+
+		assert.Assert(t, strings.Contains(clusterINI(cluster),
+			"\nadmin_users = alice,_crunchypgbounceradmin\n"))
+	})
+
+	t.Run("BelowCRVersion", func(t *testing.T) {
+		cluster := newCluster("3.0.0")
+		assert.Assert(t, !strings.Contains(clusterINI(cluster), "admin_users"))
 	})
 }
 
