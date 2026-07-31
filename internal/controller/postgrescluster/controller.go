@@ -284,11 +284,8 @@ func (r *Reconciler) Reconcile(
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
 
-	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEEnabled)
-	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
 	// pg_tde should be removed from shared libraries only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+	if cluster.Spec.Extensions.PGTDE.Enabled || isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 		pgtde.PostgreSQLParameters(&pgParameters)
 	}
 
