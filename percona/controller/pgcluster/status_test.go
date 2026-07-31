@@ -357,6 +357,8 @@ func TestUpdateConditions(t *testing.T) {
 		expectedReadyForBackupStatus metav1.ConditionStatus
 		expectedReadyForBackupReason string
 		expectedSyncedConditions     []metav1.Condition
+		expectedRemovedConditions    []string
+		expectedKeptConditions       []string
 		expectedPGBackRest           *v1beta1.PGBackRestStatus
 		expectedPatroni              *v1beta1.PatroniStatus
 	}{
@@ -618,6 +620,83 @@ func TestUpdateConditions(t *testing.T) {
 				SwitchoverTimeline: &switchoverTimeline,
 			},
 		},
+		{
+			name: "mirrored condition dropped by postgres is removed from cr",
+			crConditions: []metav1.Condition{
+				{
+					Type:   v1beta1.PGTDEVaultProviderReady,
+					Status: metav1.ConditionTrue,
+					Reason: "VaultProviderConfigured",
+				},
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionTrue,
+					Reason: "other",
+				},
+			},
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+			expectedRemovedConditions: []string{v1beta1.PGTDEVaultProviderReady, "SomeOtherCondition"},
+		},
+		{
+			name: "percona owned conditions are kept when absent from postgres status",
+			crConditions: []metav1.Condition{
+				{
+					Type:   v2.ConditionPMMReady,
+					Status: metav1.ConditionTrue,
+					Reason: "PMMConfigured",
+				},
+				{
+					Type:   pNaming.ConditionAPIGroupMigration,
+					Status: metav1.ConditionTrue,
+					Reason: "APIGroupMigrationCompleted",
+				},
+				{
+					Type:   postgrescluster.ConditionStandbyLagging,
+					Status: metav1.ConditionFalse,
+					Reason: "LagNotDetected",
+				},
+			},
+			statusConditions: []metav1.Condition{
+				{
+					Type:   postgrescluster.ConditionRepoHostReady,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+				{
+					Type:   postgrescluster.ConditionReplicaCreate,
+					Status: metav1.ConditionTrue,
+					Reason: "test",
+				},
+			},
+			expectedReadyForBackupStatus: metav1.ConditionTrue,
+			expectedReadyForBackupReason: "AllConditionsAreTrue",
+			expectedSyncedConditions: []metav1.Condition{
+				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
+				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
+			},
+			expectedKeptConditions: []string{
+				v2.ConditionPMMReady,
+				pNaming.ConditionAPIGroupMigration,
+				postgrescluster.ConditionStandbyLagging,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -661,6 +740,18 @@ func TestUpdateConditions(t *testing.T) {
 				assert.Equal(t, expected.Status, synced.Status, "synced condition %s status mismatch", expected.Type)
 				assert.Equal(t, expected.Reason, synced.Reason, "synced condition %s reason mismatch", expected.Type)
 				assert.Equal(t, int64(1), synced.ObservedGeneration, "synced condition %s should have ObservedGeneration=1", expected.Type)
+			}
+
+			// Verify conditions no longer reported by postgres are removed
+			for _, condType := range tt.expectedRemovedConditions {
+				assert.Nil(t, meta.FindStatusCondition(cr.Status.Conditions, condType),
+					"condition %s should be removed", condType)
+			}
+
+			// Verify Percona owned conditions survive the sync
+			for _, condType := range tt.expectedKeptConditions {
+				assert.NotNil(t, meta.FindStatusCondition(cr.Status.Conditions, condType),
+					"condition %s should be kept", condType)
 			}
 
 			// Verify PGBackRest status sync
