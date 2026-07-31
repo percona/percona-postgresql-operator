@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-// safeHash32 runs content and returns a short alphanumeric string that
+// SafeHash32 runs content and returns a short alphanumeric string that
 // represents everything written to w. The string is unlikely to have bad words
 // and is safe to store in the Kubernetes API. This is the same algorithm used
 // by ControllerRevision's "controller.kubernetes.io/hash".

@@ -1332,7 +1332,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting,
 		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
