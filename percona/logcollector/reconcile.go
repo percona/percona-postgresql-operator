@@ -28,7 +28,11 @@ func Reconcile(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) er
 		return nil
 	}
 
-	if err := wireSidecars(cr); err != nil {
+	if err := resolveDefaultEnabled(ctx, c, cr); err != nil {
+		return errors.Wrap(err, "resolve log collector default")
+	}
+
+	if err := wireSidecars(ctx, c, cr); err != nil {
 		return errors.Wrap(err, "wire log collector sidecars")
 	}
 
@@ -39,7 +43,25 @@ func Reconcile(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) er
 	return nil
 }
 
-func wireSidecars(cr *v2.PerconaPGCluster) error {
+// resolveDefaultEnabled defaults an unset Enabled to on for new clusters and off
+// for existing ones, keyed on whether the crunchy PostgresCluster already exists.
+func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
+	if cr.Spec.LogCollector == nil || cr.Spec.LogCollector.Enabled != nil {
+		return nil
+	}
+
+	existing := &crunchyv1beta1.PostgresCluster{}
+	err := c.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, existing)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return errors.Wrap(err, "get postgres cluster")
+	}
+
+	isNewCluster := k8serrors.IsNotFound(err)
+	cr.Spec.LogCollector.Enabled = &isNewCluster
+	return nil
+}
+
+func wireSidecars(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
 	if !cr.LogCollectorEnabled() {
 		return nil
 	}
@@ -56,7 +78,10 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 	// The config is delivered through ConfigMaps mounted by a stable name, so a
 	// content change does not alter the pod template by itself. Stamping its hash
 	// onto the instance metadata rolls the pods when the config changes.
-	hash := configHash(cr)
+	hash, err := configHash(ctx, c, cr)
+	if err != nil {
+		return errors.Wrap(err, "compute config hash")
+	}
 
 	for i := range cr.Spec.InstanceSets {
 		set := &cr.Spec.InstanceSets[i]
@@ -76,21 +101,32 @@ func wireSidecars(cr *v2.PerconaPGCluster) error {
 	return nil
 }
 
-func configHash(cr *v2.PerconaPGCluster) string {
+func configHash(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) (string, error) {
 	payload := struct {
-		FluentBit   string `json:"fluentBit"`
-		LogRotate   string `json:"logRotate"`
-		ExtraConfig string `json:"extraConfig"`
+		FluentBit       string                       `json:"fluentBit"`
+		LogRotate       string                       `json:"logRotate"`
+		ExtraConfigData map[string]map[string]string `json:"extraConfigData"`
 	}{
-		FluentBit: cr.Spec.LogCollector.Configuration,
+		FluentBit:       cr.Spec.LogCollector.Configuration,
+		ExtraConfigData: make(map[string]map[string]string),
 	}
 	if lr := cr.Spec.LogCollector.LogRotate; lr != nil {
 		payload.LogRotate = lr.Configuration
-		payload.ExtraConfig = lr.ExtraConfig.Name
+	}
+
+	// Fold the referenced ConfigMaps' contents into the hash so edits to them
+	// roll the pods; the mount name alone stays stable across edits.
+	for _, name := range cr.LogRotateExtraConfigMaps() {
+		cm := &corev1.ConfigMap{}
+		err := c.Get(ctx, types.NamespacedName{Name: name, Namespace: cr.Namespace}, cm)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return "", errors.Wrapf(err, "get extra config map %s", name)
+		}
+		payload.ExtraConfigData[name] = cm.Data
 	}
 
 	data, _ := json.Marshal(payload)
-	return fmt.Sprintf("%x", sha256.Sum256(data))
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
 func reconcileConfigMaps(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {

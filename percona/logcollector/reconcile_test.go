@@ -10,11 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
@@ -29,7 +31,7 @@ func TestReconcileLogRotate(t *testing.T) {
 
 	logCollectorSpec := func(lr *v2.LogRotateSpec) *v2.LogCollectorSpec {
 		return &v2.LogCollectorSpec{
-			Enabled:   true,
+			Enabled:   ptr.To(true),
 			Image:     "log-test-image",
 			LogRotate: lr,
 		}
@@ -97,7 +99,7 @@ func TestReconcileLogRotate(t *testing.T) {
 		"deleted when log collector is disabled": {
 			initialCM: preExisting(),
 			cr: newCR(version.Version(), &v2.LogCollectorSpec{
-				Enabled:   false,
+				Enabled:   ptr.To(false),
 				Image:     "log-test-image",
 				LogRotate: &v2.LogRotateSpec{Configuration: "ignored"},
 			}, "instance1"),
@@ -111,7 +113,7 @@ func TestReconcileLogRotate(t *testing.T) {
 		},
 		"version gate skips CM and sidecars": {
 			cr: newCR("2.9.0", &v2.LogCollectorSpec{
-				Enabled:       true,
+				Enabled:       ptr.To(true),
 				Image:         "log-test-image",
 				Configuration: "cfg",
 				LogRotate:     &v2.LogRotateSpec{Configuration: "lr"},
@@ -158,4 +160,64 @@ func TestReconcileLogRotate(t *testing.T) {
 			assert.Equal(t, wantInitContainers, set.InitContainers)
 		})
 	}
+}
+
+// TestExtraConfigRollsPods checks that editing the extraConfig ConfigMap changes
+// the hash stamped on the instance sets, so the pods roll.
+func TestExtraConfigRollsPods(t *testing.T) {
+	const (
+		clusterName = "my-cluster"
+		namespace   = "default"
+		extraCMName = "my-logrotate-config"
+	)
+
+	require.NoError(t, v2.AddToScheme(scheme.Scheme))
+
+	newCR := func() *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+			Spec: v2.PerconaPGClusterSpec{
+				CRVersion: version.Version(),
+				LogCollector: &v2.LogCollectorSpec{
+					Enabled: ptr.To(true),
+					Image:   "log-test-image",
+					LogRotate: &v2.LogRotateSpec{
+						ExtraConfig: corev1.LocalObjectReference{Name: extraCMName},
+					},
+				},
+				InstanceSets: v2.PGInstanceSets{{Name: "instance1"}},
+			},
+		}
+	}
+
+	extraCM := func(data string) *corev1.ConfigMap {
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: extraCMName, Namespace: namespace},
+			Data:       map[string]string{"custom.conf": data},
+		}
+	}
+
+	hashOf := func(cr *v2.PerconaPGCluster) string {
+		require.NotEmpty(t, cr.Spec.InstanceSets)
+		set := cr.Spec.InstanceSets[0]
+		require.NotNil(t, set.Metadata)
+		return set.Metadata.Annotations[pNaming.AnnotationLogCollectorConfigHash]
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme.Scheme).
+		WithObjects(extraCM("size 10M")).Build()
+
+	cr1 := newCR()
+	require.NoError(t, Reconcile(t.Context(), c, cr1))
+	hash1 := hashOf(cr1)
+	require.NotEmpty(t, hash1)
+
+	// Edit the referenced ConfigMap; the hash must change so the pods roll.
+	require.NoError(t, c.Update(t.Context(), extraCM("size 20M")))
+
+	cr2 := newCR()
+	require.NoError(t, Reconcile(t.Context(), c, cr2))
+	hash2 := hashOf(cr2)
+
+	assert.NotEqual(t, hash1, hash2, "config hash should change when extraConfig contents change")
 }

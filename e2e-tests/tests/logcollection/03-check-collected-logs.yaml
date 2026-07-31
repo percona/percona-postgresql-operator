@@ -56,4 +56,16 @@ commands:
       kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
         cat /opt/crunchy/logcollector/logrotate/conf.d/postgres.conf | grep -q hourly
 
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
+        cat /opt/crunchy/logcollector/logrotate/conf.d/extra.conf | grep -q 'rotate 2'
+
+      errors=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \
+        sh -c 'logrotate -d /opt/crunchy/logcollector/logrotate/logrotate.conf 2>&1' \
+        | grep -v logrotate.status | grep -i error || true)
+      if [ -n "${errors}" ]; then
+        echo "FAIL: default logrotate config has errors:"
+        echo "${errors}"
+        exit 1
+      fi
+
       echo "OK: postgres and pgbackrest logs verified"

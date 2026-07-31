@@ -44,6 +44,16 @@ commands:
         '    sharedscripts' \
         '}')"
 
+      kubectl -n "${NAMESPACE}" create configmap logcollection-extra-logrotate \
+        --from-literal=extra.conf="$(printf '%s\n' \
+          '/pgdata/extra-log/*.log {' \
+          '    rotate 2' \
+          '    missingok' \
+          '    notifempty' \
+          '    copytruncate' \
+          '    sharedscripts' \
+          '}')"
+
       get_cr \
         | yq eval '.spec.logcollector.enabled = true' - \
         | yq eval '.spec.logcollector.configuration = strenv(fluentbit_custom)' - \
@@ -51,6 +61,7 @@ commands:
         | yq eval '.spec.logcollector.volumeMounts = [{"name": "s3-ca", "mountPath": "/etc/fluentbit/tls", "readOnly": true}]' - \
         | yq eval '.spec.logcollector.volumes = [{"name": "s3-ca", "secret": {"secretName": "minio-tls", "items": [{"key": "public.crt", "path": "ca.crt"}]}}]' - \
         | yq eval '.spec.logcollector.logRotate.configuration = strenv(logrotate_custom)' - \
+        | yq eval '.spec.logcollector.logRotate.extraConfig.name = "logcollection-extra-logrotate"' - \
         | yq eval '.spec.logcollector.logRotate.schedule = "*/5 * * * *"' - \
         | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_statement = "all"' - \
         | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_directory = "/pgdata/custom-log"' - \

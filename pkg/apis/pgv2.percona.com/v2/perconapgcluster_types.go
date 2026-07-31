@@ -942,8 +942,10 @@ func (cr *PerconaPGCluster) PMMEnabled() bool {
 }
 
 type LogCollectorSpec struct {
-	// +kubebuilder:validation:Required
-	Enabled bool `json:"enabled"`
+	// Enabled turns the log collector on or off. When unset, it defaults to on
+	// for new clusters and off for existing ones.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
@@ -1021,7 +1023,9 @@ type LogRotateSpec struct {
 }
 
 func (cr *PerconaPGCluster) LogCollectorEnabled() bool {
-	return cr.Spec.LogCollector != nil && cr.Spec.LogCollector.Enabled
+	return cr.Spec.LogCollector != nil &&
+		cr.Spec.LogCollector.Enabled != nil &&
+		*cr.Spec.LogCollector.Enabled
 }
 
 type CustomExtensionSpec struct {
@@ -1574,4 +1578,24 @@ var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object)
 		return nil
 	}
 	return cr.PGBouncerUserSecrets()
+}
+
+// LogRotateExtraConfigMaps returns the names of the ConfigMaps the log collector
+// references through logRotate.extraConfig.
+func (cr *PerconaPGCluster) LogRotateExtraConfigMaps() []string {
+	if cr.Spec.LogCollector == nil || cr.Spec.LogCollector.LogRotate == nil ||
+		cr.Spec.LogCollector.LogRotate.ExtraConfig.Name == "" {
+		return nil
+	}
+	return []string{cr.Spec.LogCollector.LogRotate.ExtraConfig.Name}
+}
+
+const IndexFieldLogRotateExtraConfig = "pgCluster.logRotateExtraConfig"
+
+var LogRotateExtraConfigIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok {
+		return nil
+	}
+	return cr.LogRotateExtraConfigMaps()
 }

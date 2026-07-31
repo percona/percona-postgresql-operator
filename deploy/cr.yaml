@@ -794,13 +794,28 @@ spec:
 #      secret:
 #        secretName: my-s3-ca
 #    logRotate:
-#      # Override the operator-managed logrotate config for the postgres logs.
+#      # Override the operator-managed logrotate config. The snippet below mirrors
+#      # the default the operator ships; adjust it to your needs.
 #      configuration: |
-#        /pgdata/pg*/log/*.log
-#        /pgdata/pg*/log/*.csv {
-#            daily
+#        # PostgreSQL server logs. logging_collector already rotates these daily,
+#        # so this block is a size-based safety net only.
+#        /pgdata/pg[0-9]*/log/*.log
+#        /pgdata/pg[0-9]*/log/*.csv {
+#            size 100M
 #            rotate 7
 #            missingok
+#            nocompress
+#            notifempty
+#            copytruncate
+#            sharedscripts
+#        }
+#        # pgBackRest client logs on instance pods.
+#        /pgdata/pgbackrest/log/*.log {
+#            daily
+#            maxsize 100M
+#            rotate 7
+#            missingok
+#            nocompress
 #            notifempty
 #            copytruncate
 #            sharedscripts
