@@ -744,7 +744,7 @@ spec:
 #    postgresParams: "<string>"
 #    querySource: pgstatmonitor
   logcollector:
-    enabled: false
+    enabled: true
     image: docker.io/perconalab/fluentbit:main-logcollector
 #    imagePullPolicy: IfNotPresent
 #    # Extra fluent-bit configuration merged with the operator-managed config.

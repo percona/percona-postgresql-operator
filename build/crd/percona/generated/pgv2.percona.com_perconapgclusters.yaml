@@ -22303,6 +22303,9 @@ spec:
                         type: object
                     type: object
                   enabled:
+                    description: |-
+                      Enabled turns the log collector on or off. When unset, it defaults to on
+                      for new clusters and off for existing ones.
                     type: boolean
                   env:
                     items:
@@ -25196,7 +25199,6 @@ spec:
                       type: object
                     type: array
                 required:
-                - enabled
                 - image
                 type: object
               metadata:
