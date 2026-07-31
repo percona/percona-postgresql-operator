@@ -19,6 +19,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -288,7 +289,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 ) (bool, error) {
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
-		return safeHash32(func(w io.Writer) (err error) {
+		return util.SafeHash32(func(w io.Writer) (err error) {
 			for _, o := range jobConfigs {
 				_, err = w.Write([]byte(o))
 			}

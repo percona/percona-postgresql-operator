@@ -1338,7 +1338,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
 	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
-		pgtablespaceVolumes, strings.Join(opts, " "))
+		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1380,6 +1380,11 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 		volumes = append(volumes, tablespaceVolume)
 		volumeMounts = append(volumeMounts, tablespaceVolumeMount)
+	}
+
+	if vault := cluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+		volumeMounts = append(volumeMounts, postgres.PGTDEVolumeMount())
+		volumes = append(volumes, postgres.PGTDEVolume(vault))
 	}
 
 	restoreJob := &batchv1.Job{}
@@ -2322,9 +2327,9 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	// Populate the pgBackRest secret from cert-manager-issued certs.
 	initialize.Map(&intent.Data)
 
-	caCert, err := rootCA.Certificate.MarshalText()
+	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal root CA certificate")
+		return err
 	}
 	intent.Data[pgbackrest.CertAuthoritySecretKey] = caCert
 	intent.Data[pgbackrest.CertClientSecretKey] = clientSecret.Data[corev1.TLSCertKey]
@@ -2333,6 +2338,22 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	intent.Data[pgbackrest.CertRepoPrivateKeySecretKey] = repoSecret.Data[corev1.TLSPrivateKeyKey]
 
 	return nil
+}
+
+func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
+	if rootCA != nil {
+		caCert, err := rootCA.Certificate.MarshalText()
+		return caCert, errors.Wrap(err, "failed to marshal root CA certificate")
+	}
+
+	if ca := clientSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	if ca := repoSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+
+	return nil, errors.New("external issuer did not return a CA certificate for pgBackRest")
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}

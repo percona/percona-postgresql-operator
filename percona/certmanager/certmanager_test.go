@@ -6,13 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cert-manager/cert-manager/pkg/apis/certmanager"
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cert-manager/cert-manager/pkg/util/cmapichecker"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -213,6 +218,66 @@ func TestApplyIssuer(t *testing.T) {
 		err = ctrl.ApplyIssuer(t.Context(), cluster)
 		require.NoError(t, err)
 	})
+
+	t.Run("skip when external issuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "tls-issuer-external"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+
+		list := &v1.IssuerList{}
+		require.NoError(t, client.List(t.Context(), list))
+		assert.Empty(t, list.Items)
+	})
+
+	t.Run("create cluster-scoped TLS issuer when Kind is ClusterIssuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "tls-issuer-cluster-scoped"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+
+		issuer := &v1.ClusterIssuer{}
+		err = client.Get(t.Context(), sigs.ObjectKey{Name: "shared-tls-issuer"}, issuer)
+		require.NoError(t, err)
+		require.NotNil(t, issuer.Spec.CA)
+		assert.Equal(t, naming.ClusterCACertSecret(cluster, CertManagerNamespace()).Name, issuer.Spec.CA.SecretName)
+		assert.Empty(t, issuer.OwnerReferences)
+		assert.Equal(t, naming.LabelPerconaManagedByValue, issuer.Labels[naming.LabelPerconaManagedBy])
+
+		// idempotent
+		err = ctrl.ApplyIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+	})
+
+	t.Run("managed namespaced honors issuerConf name override", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "tls-issuer-custom-name"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "my-custom-issuer-name"},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+
+		issuer := &v1.Issuer{}
+		err = client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: "my-custom-issuer-name"}, issuer)
+		require.NoError(t, err)
+		require.Len(t, issuer.OwnerReferences, 1)
+	})
 }
 
 func TestApplyCAIssuer(t *testing.T) {
@@ -242,6 +307,48 @@ func TestApplyCAIssuer(t *testing.T) {
 		assert.Equal(t, cluster.Name, issuer.OwnerReferences[0].Name)
 
 		// return nil when CA issuer already exists
+		err = ctrl.ApplyCAIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+	})
+
+	t.Run("skip when external issuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "ca-test-external"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCAIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+
+		list := &v1.IssuerList{}
+		require.NoError(t, client.List(t.Context(), list))
+		assert.Empty(t, list.Items)
+	})
+
+	t.Run("create cluster-scoped CA issuer when Kind is ClusterIssuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "ca-test-cluster-scoped"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCAIssuer(t.Context(), cluster)
+		require.NoError(t, err)
+
+		issuer := &v1.ClusterIssuer{}
+		meta := naming.ClusterCAIssuer(cluster)
+		err = client.Get(t.Context(), sigs.ObjectKey{Name: meta.Name}, issuer)
+		require.NoError(t, err)
+		assert.NotNil(t, issuer.Spec.SelfSigned)
+		assert.Empty(t, issuer.OwnerReferences)
+		assert.Equal(t, naming.LabelPerconaManagedByValue, issuer.Labels[naming.LabelPerconaManagedBy])
+
+		// idempotent
 		err = ctrl.ApplyCAIssuer(t.Context(), cluster)
 		require.NoError(t, err)
 	})
@@ -287,6 +394,50 @@ func TestApplyCACertificate(t *testing.T) {
 		assert.Equal(t, cluster.Name, cert.OwnerReferences[0].Name)
 
 		// return nil when certificate already exists
+		err = ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+	})
+
+	t.Run("skip when external issuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "ca-cert-external"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		list := &v1.CertificateList{}
+		require.NoError(t, client.List(t.Context(), list))
+		assert.Empty(t, list.Items)
+	})
+
+	t.Run("places CA certificate in cert-manager namespace when Kind is ClusterIssuer", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "ca-cert-cluster-scoped"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-tls-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		err := ctrl.ApplyCACertificate(t.Context(), cluster)
+		require.NoError(t, err)
+
+		cert := &v1.Certificate{}
+		meta := naming.ClusterCACertSecret(cluster, CertManagerNamespace())
+		err = client.Get(t.Context(), sigs.ObjectKey{Namespace: meta.Namespace, Name: meta.Name}, cert)
+		require.NoError(t, err)
+		assert.Equal(t, meta.Name, cert.Spec.SecretName)
+		assert.True(t, cert.Spec.IsCA)
+		assert.Equal(t, naming.ClusterCAIssuer(cluster).Name, cert.Spec.IssuerRef.Name)
+		assert.Equal(t, v1.ClusterIssuerKind, cert.Spec.IssuerRef.Kind)
+		assert.Empty(t, cert.OwnerReferences)
+
+		// idempotent
 		err = ctrl.ApplyCACertificate(t.Context(), cluster)
 		require.NoError(t, err)
 	})
@@ -1067,5 +1218,292 @@ func TestCustomTLSDurations(t *testing.T) {
 		}, cert)
 		require.NoError(t, err)
 		assert.Equal(t, customCertDuration, cert.Spec.Duration.Duration)
+	})
+}
+
+// forbiddenGetClient wraps a client.Client and returns a Forbidden error from
+// Get for *v1.ClusterIssuer, simulating a cluster that hasn't granted RBAC
+// for clusterissuers.cert-manager.io
+type forbiddenGetClient struct {
+	sigs.Client
+}
+
+func (f *forbiddenGetClient) Get(ctx context.Context, key sigs.ObjectKey, obj sigs.Object, opts ...sigs.GetOption) error {
+	if _, ok := obj.(*v1.ClusterIssuer); ok {
+		return k8serrors.NewForbidden(
+			schema.GroupResource{Group: "cert-manager.io", Resource: "clusterissuers"},
+			key.Name, errors.New("forbidden"))
+	}
+	return f.Client.Get(ctx, key, obj, opts...)
+}
+
+func TestCertManagerNamespace(t *testing.T) {
+	t.Run("defaults to cert-manager", func(t *testing.T) {
+		t.Setenv("CERTMANAGER_NAMESPACE", "")
+		assert.Equal(t, "cert-manager", CertManagerNamespace())
+	})
+
+	t.Run("honors CERTMANAGER_NAMESPACE", func(t *testing.T) {
+		t.Setenv("CERTMANAGER_NAMESPACE", "custom-cm-ns")
+		assert.Equal(t, "custom-cm-ns", CertManagerNamespace())
+	})
+}
+
+func TestResolveIssuerMode(t *testing.T) {
+	t.Run("nil TLS returns managed namespaced", func(t *testing.T) {
+		cluster := testCluster()
+		cl := setupFakeClient(t, cluster)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeManagedNamespaced, mode)
+	})
+
+	t.Run("nil IssuerConf returns managed namespaced", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{}
+		cl := setupFakeClient(t, cluster)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeManagedNamespaced, mode)
+	})
+
+	t.Run("Kind Issuer returns managed namespaced", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "my-issuer", Kind: v1.IssuerKind},
+		}
+		cl := setupFakeClient(t, cluster)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeManagedNamespaced, mode)
+	})
+
+	t.Run("Kind ClusterIssuer not found returns managed cluster", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		cl := setupFakeClient(t, cluster)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeManagedCluster, mode)
+	})
+
+	t.Run("Kind ClusterIssuer readable and labeled as ours returns managed cluster", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		existing := &v1.ClusterIssuer{ObjectMeta: metav1.ObjectMeta{
+			Name:   "shared-issuer",
+			Labels: map[string]string{naming.LabelPerconaManagedBy: naming.LabelPerconaManagedByValue},
+		}}
+		cl := setupFakeClient(t, cluster, existing)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeManagedCluster, mode)
+	})
+
+	t.Run("Kind ClusterIssuer readable but not labeled as ours returns external", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		// A pre-existing ClusterIssuer (e.g. ACME-backed) that this operator
+		// never created — no managed-by label.
+		existing := &v1.ClusterIssuer{ObjectMeta: metav1.ObjectMeta{Name: "shared-issuer"}}
+		cl := setupFakeClient(t, cluster, existing)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeExternal, mode)
+	})
+
+	t.Run("Kind ClusterIssuer forbidden returns external", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		cl := &forbiddenGetClient{Client: setupFakeClient(t, cluster)}
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeExternal, mode)
+	})
+
+	t.Run("third-party Kind returns external", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer", Group: "vault.example.com"},
+		}
+		cl := setupFakeClient(t, cluster)
+
+		mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+		require.NoError(t, err)
+		assert.Equal(t, IssuerModeExternal, mode)
+	})
+}
+
+func TestIssuerRef(t *testing.T) {
+	t.Run("managed namespaced without issuerConf uses generated name", func(t *testing.T) {
+		cluster := testCluster()
+		ref := issuerRef(cluster, IssuerModeManagedNamespaced)
+		assert.Equal(t, naming.TLSIssuer(cluster).Name, ref.Name)
+		assert.Equal(t, v1.IssuerKind, ref.Kind)
+		assert.Equal(t, certmanager.GroupName, ref.Group)
+	})
+
+	t.Run("managed namespaced with issuerConf name override", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "custom-tls-issuer"},
+		}
+		ref := issuerRef(cluster, IssuerModeManagedNamespaced)
+		assert.Equal(t, "custom-tls-issuer", ref.Name)
+		assert.Equal(t, v1.IssuerKind, ref.Kind)
+	})
+
+	t.Run("managed cluster uses issuerConf name with ClusterIssuer kind", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "shared-issuer", Kind: v1.ClusterIssuerKind},
+		}
+		ref := issuerRef(cluster, IssuerModeManagedCluster)
+		assert.Equal(t, "shared-issuer", ref.Name)
+		assert.Equal(t, v1.ClusterIssuerKind, ref.Kind)
+	})
+
+	t.Run("external uses issuerConf verbatim with default group", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer"},
+		}
+		ref := issuerRef(cluster, IssuerModeExternal)
+		assert.Equal(t, "vault-issuer", ref.Name)
+		assert.Equal(t, "VaultClusterIssuer", ref.Kind)
+		assert.Equal(t, "cert-manager.io", ref.Group)
+	})
+
+	t.Run("external preserves explicit group", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: "VaultClusterIssuer", Group: "vault.example.com"},
+		}
+		ref := issuerRef(cluster, IssuerModeExternal)
+		assert.Equal(t, "vault.example.com", ref.Group)
+	})
+}
+
+func TestApplyCertificateIssuerRefDrift(t *testing.T) {
+	newIssuerConf := func(kind string) *v1beta1.TLSSpec {
+		return &v1beta1.TLSSpec{IssuerConf: &cmmeta.IssuerReference{Name: "vault-issuer", Kind: kind}}
+	}
+
+	t.Run("cluster certificate switches to external issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-cluster-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"drift-cluster-cert-primary.test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames))
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresTLSSecret(cluster)
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: secretName.Name}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
+		assert.Equal(t, "VaultClusterIssuer", cert.Spec.IssuerRef.Kind)
+	})
+
+	t.Run("instance certificate switches issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-instance-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		instanceName := "drift-instance-cert-instance-0"
+		dnsNames := []string{instanceName + ".test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyInstanceCertificate(t.Context(), cluster, instanceName, dnsNames))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: instanceName + "-cert"}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
+	})
+
+	t.Run("pgbouncer certificate switches issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-pgbouncer-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"drift-pgbouncer-cert-pgbouncer.test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-pgbouncer-cert"}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
+	})
+
+	t.Run("replication certificate switches issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-replication-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		require.NoError(t, ctrl.ApplyReplicationCertificate(t.Context(), cluster))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyReplicationCertificate(t.Context(), cluster))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-replication-cert"}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
+	})
+
+	t.Run("pgbackrest client certificate switches issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-pgbr-client-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		require.NoError(t, ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyPGBackRestClientCertificate(t.Context(), cluster))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-pgbackrest-client-cert"}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
+	})
+
+	t.Run("pgbackrest repo certificate switches issuerRef on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-pgbr-repo-cert"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{cluster.Name + "-repo-host-0." + cluster.Name + "-pgbackrest.test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames))
+
+		cluster.Spec.TLS = newIssuerConf("VaultClusterIssuer")
+		require.NoError(t, ctrl.ApplyPGBackRestRepoCertificate(t.Context(), cluster, dnsNames))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-pgbackrest-repo-cert"}, cert))
+		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
 	})
 }
