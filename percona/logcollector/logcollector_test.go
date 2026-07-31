@@ -114,7 +114,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         true,
+				Enabled:         ptr.To(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				LivenessProbe: &corev1.Probe{
@@ -138,7 +138,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         true,
+				Enabled:         ptr.To(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
