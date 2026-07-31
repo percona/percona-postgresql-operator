@@ -1247,6 +1247,13 @@ func (r *Reconciler) reconcileInstance(
 			}
 		}
 
+		// we need to preserve vault secret as long as extension is enabled
+		// otherwise pods won't survive the restart failing to find the token file
+		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
+			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+		}
+
 		if backupsSpecFound {
 			addPGBackRestToInstancePodSpec(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)

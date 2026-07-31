@@ -390,10 +390,12 @@ func VaultRevision(vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath strin
 	})
 }
 
-// preserveOldTDEVolume replaces the pg-tde volume in the new pod spec with the
-// one from the StatefulSet as it exists in the cluster. This prevents pods from
-// restarting with new vault credentials before the vault provider change SQL
-// has been executed.
+// PreserveOldTDEVolume replaces the pg-tde volume and its mount on the database
+// container with the ones from the StatefulSet as it exists in the cluster,
+// adding them back when the new pod spec no longer has them. This prevents pods
+// from restarting with new vault credentials before the vault provider change
+// SQL has been executed, and from restarting with no credentials at all while
+// the extension is still installed.
 func PreserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet) {
 	var oldVolume *corev1.Volume
 	for i := range existing.Spec.Template.Spec.Volumes {
@@ -406,10 +408,52 @@ func PreserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet)
 		return
 	}
 
+	replaced := false
 	for i := range podSpec.Volumes {
 		if podSpec.Volumes[i].Name == naming.PGTDEVolume {
 			podSpec.Volumes[i] = *oldVolume
-			return
+			replaced = true
+			break
 		}
+	}
+	if !replaced {
+		podSpec.Volumes = append(podSpec.Volumes, *oldVolume)
+	}
+
+	// The volume is only ever mounted into the database container.
+	var oldMount *corev1.VolumeMount
+	for _, container := range existing.Spec.Template.Spec.Containers {
+		if container.Name == naming.ContainerDatabase {
+			for i := range container.VolumeMounts {
+				if container.VolumeMounts[i].Name == naming.PGTDEVolume {
+					oldMount = &container.VolumeMounts[i]
+					break
+				}
+			}
+			break
+		}
+	}
+	if oldMount == nil {
+		return
+	}
+
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name != naming.ContainerDatabase {
+			continue
+		}
+
+		mounts := podSpec.Containers[i].VolumeMounts
+		replaced := false
+		for j := range mounts {
+			if mounts[j].Name == naming.PGTDEVolume {
+				mounts[j] = *oldMount
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			podSpec.Containers[i].VolumeMounts = append(mounts, *oldMount)
+		}
+		break
 	}
 }
