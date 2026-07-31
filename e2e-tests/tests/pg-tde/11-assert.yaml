@@ -8,6 +8,29 @@ commands:
       [[ $(cat ${tmp} | yq .message) == "pg_tde is disabled in PerconaPGCluster" ]]
       [[ $(cat ${tmp} | yq .reason) == "Disabled" ]]
       [[ $(cat ${tmp} | yq .status) == "False" ]]
+  - script: |
+      dump_conditions() {
+        echo "PostgresCluster conditions:"
+        kubectl -n "${NAMESPACE}" get postgrescluster.postgres-operator.crunchydata.com pg-tde -o yaml | yq '.status.conditions'
+        echo "PerconaPGCluster conditions:"
+        kubectl -n "${NAMESPACE}" get pg pg-tde -o yaml | yq '.status.conditions'
+      }
+
+      # the crunchy controller drops PGTDEVaultProviderReady once pg_tde is
+      # disabled, so it must disappear from the PerconaPGCluster status too
+      crunchyCond=$(kubectl -n "${NAMESPACE}" get postgrescluster.postgres-operator.crunchydata.com pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].type}')
+      if [[ -n ${crunchyCond} ]]; then
+        echo "ERROR: PGTDEVaultProviderReady should be removed from PostgresCluster status after disabling pg_tde"
+        dump_conditions
+        exit 1
+      fi
+
+      perconaCond=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].type}')
+      if [[ -n ${perconaCond} ]]; then
+        echo "ERROR: PGTDEVaultProviderReady should be removed from PerconaPGCluster status after disabling pg_tde"
+        dump_conditions
+        exit 1
+      fi
 ---
 kind: StatefulSet
 apiVersion: apps/v1

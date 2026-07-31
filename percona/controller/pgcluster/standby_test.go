@@ -17,7 +17,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
@@ -93,7 +92,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.Nil(t, cond)
 		assert.Nil(t, cluster.Status.Standby)
 	})
@@ -113,7 +112,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.Nil(t, cond)
 		assert.Nil(t, cluster.Status.Standby)
 	})
@@ -133,7 +132,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err := r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "MainSiteNotFound", cond.Reason)
@@ -143,7 +142,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		cluster := standbyCluster.DeepCopy()
 		cluster.Status.State = v2.AppStateInit
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type: postgrescluster.ConditionStandbyLagging,
+			Type: pNaming.ConditionStandbyLagging,
 		})
 
 		r := newReconciler(
@@ -155,7 +154,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "ErrorGettingLag", cond.Reason)
@@ -181,7 +180,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionUnknown, cond.Status)
 		assert.Equal(t, "ErrorGettingLag", cond.Reason)
@@ -201,7 +200,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
 
@@ -223,7 +222,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
 		assert.Equal(t, int64(1024), cluster.Status.Standby.LagBytes)
@@ -247,7 +246,7 @@ func TestReconcileStandbyLag(t *testing.T) {
 		err = r.reconcileStandbyLag(t.Context(), cluster)
 		require.NoError(t, err)
 
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, postgrescluster.ConditionStandbyLagging)
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, pNaming.ConditionStandbyLagging)
 		assert.NotNil(t, cond)
 		assert.Equal(t, metav1.ConditionTrue, cond.Status)
 	})
