@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -31,7 +30,7 @@ func TestReconcileLogRotate(t *testing.T) {
 
 	logCollectorSpec := func(lr *v2.LogRotateSpec) *v2.LogCollectorSpec {
 		return &v2.LogCollectorSpec{
-			Enabled:   ptr.To(true),
+			Enabled:   new(true),
 			Image:     "log-test-image",
 			LogRotate: lr,
 		}
@@ -99,7 +98,7 @@ func TestReconcileLogRotate(t *testing.T) {
 		"deleted when log collector is disabled": {
 			initialCM: preExisting(),
 			cr: newCR(version.Version(), &v2.LogCollectorSpec{
-				Enabled:   ptr.To(false),
+				Enabled:   new(false),
 				Image:     "log-test-image",
 				LogRotate: &v2.LogRotateSpec{Configuration: "ignored"},
 			}, "instance1"),
@@ -113,7 +112,7 @@ func TestReconcileLogRotate(t *testing.T) {
 		},
 		"version gate skips CM and sidecars": {
 			cr: newCR("2.9.0", &v2.LogCollectorSpec{
-				Enabled:       ptr.To(true),
+				Enabled:       new(true),
 				Image:         "log-test-image",
 				Configuration: "cfg",
 				LogRotate:     &v2.LogRotateSpec{Configuration: "lr"},
@@ -179,7 +178,7 @@ func TestExtraConfigRollsPods(t *testing.T) {
 			Spec: v2.PerconaPGClusterSpec{
 				CRVersion: version.Version(),
 				LogCollector: &v2.LogCollectorSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					Image:   "log-test-image",
 					LogRotate: &v2.LogRotateSpec{
 						ExtraConfig: corev1.LocalObjectReference{Name: extraCMName},

@@ -8,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -66,7 +65,7 @@ func TestContainers(t *testing.T) {
 		"logcollector disabled (instance)": {
 			builder: instanceContainers,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled: ptr.To(false),
+				Enabled: new(false),
 			},
 		},
 		"logcollector enabled (instance)": {
@@ -74,7 +73,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
@@ -86,7 +85,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Configuration:   "my-config",
@@ -99,7 +98,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Configuration:   "my-config",
@@ -114,7 +113,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				LivenessProbe: &corev1.Probe{
@@ -138,7 +137,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
@@ -165,7 +164,7 @@ func TestContainers(t *testing.T) {
 			dataMount:      dataMount,
 			logSpecificEnv: instanceLogEnv,
 			logCollector: &v2.LogCollectorSpec{
-				Enabled:         ptr.To(true),
+				Enabled:         new(true),
 				Image:           "log-test-image",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
@@ -417,7 +416,7 @@ func TestUserVolumeMounts(t *testing.T) {
 			CRVersion:       version.Version(),
 			PostgresVersion: 16,
 			LogCollector: &v2.LogCollectorSpec{
-				Enabled:      ptr.To(true),
+				Enabled:      new(true),
 				Image:        "log-test-image",
 				VolumeMounts: []corev1.VolumeMount{mount},
 			},
@@ -481,33 +480,33 @@ func TestVolumes(t *testing.T) {
 		expected []corev1.Volume
 	}{
 		"disabled": {
-			spec: &v2.LogCollectorSpec{Enabled: ptr.To(false), Configuration: "x"},
+			spec: &v2.LogCollectorSpec{Enabled: new(false), Configuration: "x"},
 		},
 		"nil": {},
 		"enabled without configuration": {
-			spec: &v2.LogCollectorSpec{Enabled: ptr.To(true)},
+			spec: &v2.LogCollectorSpec{Enabled: new(true)},
 		},
 		"fluent-bit configuration only": {
-			spec:     &v2.LogCollectorSpec{Enabled: ptr.To(true), Configuration: "cfg"},
+			spec:     &v2.LogCollectorSpec{Enabled: new(true), Configuration: "cfg"},
 			expected: []corev1.Volume{fluentBitVol},
 		},
 		"logrotate configuration only": {
 			spec: &v2.LogCollectorSpec{
-				Enabled:   ptr.To(true),
+				Enabled:   new(true),
 				LogRotate: &v2.LogRotateSpec{Configuration: "cfg"},
 			},
 			expected: []corev1.Volume{logrotateVol(managedLogrotateSource)},
 		},
 		"logrotate extraConfig only": {
 			spec: &v2.LogCollectorSpec{
-				Enabled:   ptr.To(true),
+				Enabled:   new(true),
 				LogRotate: &v2.LogRotateSpec{ExtraConfig: corev1.LocalObjectReference{Name: "extra-cm"}},
 			},
 			expected: []corev1.Volume{logrotateVol(extraLogrotateSource)},
 		},
 		"logrotate configuration and extraConfig": {
 			spec: &v2.LogCollectorSpec{
-				Enabled: ptr.To(true),
+				Enabled: new(true),
 				LogRotate: &v2.LogRotateSpec{
 					Configuration: "cfg",
 					ExtraConfig:   corev1.LocalObjectReference{Name: "extra-cm"},
@@ -517,7 +516,7 @@ func TestVolumes(t *testing.T) {
 		},
 		"all sources": {
 			spec: &v2.LogCollectorSpec{
-				Enabled:       ptr.To(true),
+				Enabled:       new(true),
 				Configuration: "fbcfg",
 				LogRotate: &v2.LogRotateSpec{
 					Configuration: "lrcfg",
@@ -528,7 +527,7 @@ func TestVolumes(t *testing.T) {
 		},
 		"user volumes appended": {
 			spec: &v2.LogCollectorSpec{
-				Enabled:       ptr.To(true),
+				Enabled:       new(true),
 				Configuration: "fbcfg",
 				Volumes:       []corev1.Volume{caVol},
 			},

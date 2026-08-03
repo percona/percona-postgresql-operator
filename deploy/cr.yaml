@@ -774,8 +774,6 @@ spec:
 #        cpu: 300m
 #    # Liveness/readiness probes for the fluent-bit "logs" container.
 #    # When not set, the container has no probes.
-#    # The fluent-bit HTTP server is enabled by default on port 2020, so the
-#    # tcpSocket/httpGet probes below work out of the box.
 #    livenessProbe:
 #      tcpSocket:
 #        port: 2020
