@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      platform=$(detect_k8s_platform)
+      platform="${PLATFORM}"
       export platform
       get_cr "cluster-from-snapshot" ${RANDOM} \
         | yq e '

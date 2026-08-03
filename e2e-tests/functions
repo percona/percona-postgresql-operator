@@ -8,10 +8,6 @@ BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
-if oc get projects 2>/dev/null; then
-	OPENSHIFT=4
-fi
-
 init_temp_dir() {
 	rm -rf "$TEMP_DIR"
 	mkdir -p "$TEMP_DIR"
@@ -20,7 +16,7 @@ init_temp_dir() {
 create_namespace() {
 	local namespace=$1
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		set -o pipefail
 		if [[ $OPERATOR_NS ]] && (oc get project "$OPERATOR_NS" -o json >/dev/null 2>&1 | jq -r '.metadata.name' >/dev/null 2>&1); then
 			oc delete --grace-period=0 --force=true project "$namespace" && sleep 120 || :
@@ -228,7 +224,7 @@ deploy_minio() {
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	if [[ $(detect_k8s_platform) == "openshift" ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		kubectl create serviceaccount "${service_account_name}" \
 			--namespace "${NAMESPACE}"
 		oc adm policy add-scc-to-user anyuid -z "${service_account_name}" -n "${NAMESPACE}"
@@ -300,7 +296,7 @@ get_repo_auth() {
 deploy_s3_secrets() {
 	set +o xtrace
 
-	local platform=${1:-$(detect_k8s_platform)}
+	local platform=${1:-${PLATFORM}}
 	local repo_auth=""
 	local secret_args=()
 
@@ -373,7 +369,7 @@ get_cr() {
 		cr_name=${test_name}
 	fi
 
-	local platform="$(detect_k8s_platform)"
+	local platform="${PLATFORM}"
 	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
 	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
 	local aks_cr_file="$TEST_CONFIG_DIR/${cr_name}-aks.yaml"
@@ -410,7 +406,7 @@ get_cr() {
 	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
 	fi
 
@@ -614,7 +610,7 @@ deploy_pmm_server() {
 	helm repo add percona https://percona.github.io/percona-helm-charts/
 	helm repo update
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		oc create sa pmm-server -n "$NAMESPACE"
 		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
 
@@ -773,7 +769,7 @@ deploy_chaos_mesh() {
 
 	helm repo add chaos-mesh https://charts.chaos-mesh.org
 	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version ${CHAOS_MESH_VER}
-	if [[ $OPENSHIFT ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
 	fi
 	sleep 10
@@ -1294,33 +1290,8 @@ check_envs_for_component() {
   fi
 }
 
-detect_k8s_platform() {
-	local platform=""
-
-	if kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "gce://"; then
-		platform="gke"
-
-	elif oc get projects >/dev/null 2>&1; then
-		platform="openshift"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
-		platform="eks"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "digitalocean://"; then
-		platform="digitalocean"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
-		platform="aks"
-
-	else
-		platform="unknown"
-	fi
-
-	echo "${platform}"
-}
-
 ensure_ebs_gp3_storage_class() {
-	local platform=${1:-$(detect_k8s_platform)}
+	local platform=${1:-${PLATFORM}}
 
 	if [[ "$platform" != "eks" && "$platform" != "openshift" ]]; then
 		return 0
@@ -1337,6 +1308,89 @@ allowVolumeExpansion: true
 parameters:
   type: gp3
 EOF
+}
+
+setup_longhorn_backup_storage() {
+	local minio_service_name="${1:-minio-service}"
+
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+	deploy_minio "${minio_service_name}"
+
+	yq '
+			.metadata.name = "minio-secret-longhorn" |
+			.stringData.AWS_ENDPOINTS = "http://'"${minio_service_name}.${NAMESPACE}"'.svc.cluster.local:9000"
+		' "${TESTS_CONFIG_DIR}/minio-secret.yml" \
+		| kubectl apply -n longhorn-system -f -
+
+	kubectl -n longhorn-system patch backuptargets.longhorn.io default \
+		--type=merge \
+		-p '{
+			"spec": {
+				"backupTargetURL": "s3://operator-testing@us-east-1/",
+				"credentialSecret": "minio-secret-longhorn"
+			}
+		}'
+}
+
+deploy_volume_snapshot_class() {
+	local platform=${1:-${PLATFORM}}
+	local snapshot_class_file
+
+	case "$platform" in
+		aks)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-aks.yaml"
+			;;
+		digitalocean)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-do.yaml"
+			;;
+		eks)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-eks.yaml"
+			;;
+		gke)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-gke.yaml"
+			;;
+		openshift)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-openshift.yaml"
+			;;
+		rancher)
+			setup_longhorn_backup_storage
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-rancher.yaml"
+			;;
+		*)
+			echo "Unsupported Kubernetes environment for volume snapshot class: $platform"
+			return 1
+			;;
+	esac
+
+	kubectl apply -f "${snapshot_class_file}"
+}
+
+get_volume_snapshot_class() {
+	local platform=${1:-${PLATFORM}}
+
+	case "$platform" in
+		aks)
+			echo "aks-snapshot-class"
+			;;
+		digitalocean)
+			echo "do-block-storage"
+			;;
+		eks)
+			echo "eks-snapshot-class"
+			;;
+		gke)
+			echo "gke-snapshot-class"
+			;;
+		openshift)
+			echo "openshift-snapshot-class"
+			;;
+		rancher)
+			echo "longhorn-snapshot-class"
+			;;
+		*)
+			kubectl get volumesnapshotclass -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
+			;;
+	esac
 }
 
 enable_hugepages() {
@@ -1826,7 +1880,7 @@ create_k8s_cluster() {
 upgrade_k8s_cluster() {
 	local name="$1"
 	local version="$2"
-	local platform="$(detect_k8s_platform)"
+	local platform="${PLATFORM}"
 
 	case "$platform" in
 		digitalocean)
@@ -1888,7 +1942,7 @@ delete_k8s_cluster() {
 }
 
 get_k8s_cluster_name() {
-	local platform="${1:-$(detect_k8s_platform)}"
+	local platform="${1:-${PLATFORM}}"
 
 	case "$platform" in
 		digitalocean)
@@ -1910,7 +1964,7 @@ get_k8s_cluster_name() {
 
 get_k8s_cluster_version() {
 	local name="$1"
-	local platform="${2:-$(detect_k8s_platform)}"
+	local platform="${2:-${PLATFORM}}"
 
 	case "$platform" in
 		digitalocean)
@@ -1973,7 +2027,7 @@ function vault_tls() {
 	local csr_name=vault-csr-${RANDOM}
 	local csr_api_ver="v1"
 	local csr_signer
-	local platform=$(detect_k8s_platform)
+	local platform="${PLATFORM}"
 
 	echo "Detected platform: ${platform}"
 
@@ -2029,20 +2083,9 @@ EOF
 	kubectl get csr ${csr_name} -o jsonpath='{.status.certificate}' >${tmp_dir}/serverCert
 	openssl base64 -in ${tmp_dir}/serverCert -d -A -out ${tmp_dir}/vault.crt
 	kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d >${tmp_dir}/vault.ca
-	if [[ -n ${OPENSHIFT} ]]; then
-		if [[ "x$(kubectl get namespaces | awk '{print $1}' | grep openshift-kube-controller-manager-operator)" != "x" ]]; then
-			#Detecting openshift 4+
-			kubectl -n openshift-kube-controller-manager-operator get secret csr-signer -o jsonpath='{.data.tls\.crt}' \
-				| base64 -d >${tmp_dir}/vault.ca
-		else
-			local ca_secret_name=$(kubectl -n default get secrets \
-				| grep default \
-				| grep service-account-token \
-				| head -n 1 \
-				| awk {'print $1'})
-			kubectl -n default get secret ${ca_secret_name} -o jsonpath='{.data.ca\.crt}' \
-				| base64 -d >${tmp_dir}/vault.ca
-		fi
+	if [[ "${PLATFORM}" == "openshift" ]]; then
+		kubectl -n openshift-kube-controller-manager-operator get secret csr-signer -o jsonpath='{.data.tls\.crt}' \
+			| base64 -d >${tmp_dir}/vault.ca
 	fi
 	kubectl create secret generic ${secret_name} \
 		--namespace ${namespace} \
@@ -2057,7 +2100,7 @@ function start_vault() {
 	local platform=kubernetes
 	local tmp_dir=$(mktemp -d)
 
-	if [[ -n ${OPENSHIFT} ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		platform=openshift
 		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 		local extra_args="--set server.image.repository=docker.io/hashicorp/vault --set injector.image.repository=docker.io/hashicorp/vault-k8s"
@@ -2109,7 +2152,7 @@ storage \"file\" {
 			--set global.platform="${platform}"
 	fi
 
-	if [[ -n ${OPENSHIFT} ]]; then
+	if [[ "${PLATFORM}" == "openshift" ]]; then
 		oc patch clusterrole $name-agent-injector-clusterrole --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 		oc adm policy add-scc-to-user privileged $name-agent-injector
 	fi

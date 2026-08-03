@@ -23,9 +23,25 @@ export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
 export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
 export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
 
-if command -v oc &>/dev/null; then
-	if oc get projects; then
-		export OPENSHIFT=4
+if [[ -z "${PLATFORM:-}" ]]; then
+	if kubectl get namespace openshift-kube-apiserver >/dev/null 2>&1; then
+		export PLATFORM="openshift"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'eksctl.io'; then
+		export PLATFORM="eks"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'cloud.google.com/gke'; then
+		export PLATFORM="gke"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'kubernetes.azure.com'; then
+		export PLATFORM="aks"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'digitalocean://'; then
+		export PLATFORM="digitalocean"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'kind://'; then
+		export PLATFORM="kind"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'minikube'; then
+		export PLATFORM="minikube"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'rke2'; then
+		export PLATFORM="rancher"
+	else
+		export PLATFORM="unknown"
 	fi
 fi
 
