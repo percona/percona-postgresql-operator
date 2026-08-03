@@ -747,6 +747,10 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 }
 
 func (r *Reconciler) reconcilePGBouncerPause(ctx context.Context, secret *corev1.Secret, cluster *v1beta1.PostgresCluster) error {
+	if cluster.CompareVersion("3.1.0") < 0 {
+		return nil
+	}
+
 	proxy := cluster.Spec.Proxy
 	shouldPause := proxy.PGBouncerEnabled() && proxy.PGBouncerPaused()
 	isPaused := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGBouncerPaused)
@@ -780,6 +784,10 @@ func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Se
 		return errors.Wrap(err, "list pgbouncer pods")
 	}
 
+	if len(podList.Items) < int(*cluster.Spec.Proxy.PGBouncer.Replicas) {
+		return errors.Errorf("pgbouncer pods are not ready, expected %d, got %d", *cluster.Spec.Proxy.PGBouncer.Replicas, len(podList.Items))
+	}
+
 	password, ok := secret.Data[pgbouncer.AdminPasswordSecretKey]
 	if !ok {
 		return errors.New("pgbouncer admin password not found in secret")
@@ -791,6 +799,10 @@ func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Se
 	}
 
 	for _, pod := range podList.Items {
+		if pod.Status.PodIP == "" {
+			return errors.Errorf("pgbouncer pod %s has no IP yet", pod.Name)
+		}
+
 		adminClient, err := r.newPGBouncerAdmin(
 			pgbouncer.AdminUser,
 			string(password),
