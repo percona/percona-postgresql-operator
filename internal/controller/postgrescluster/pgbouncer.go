@@ -802,7 +802,7 @@ func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Se
 	}
 
 	log := logging.FromContext(ctx)
-	log.Info("pgbouncer pause state changed", "pause", pause, "cluster")
+	log.Info("pgbouncer pause state changed", "pause", pause)
 
 	if pause {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
