@@ -639,8 +639,40 @@ function deploy_pmm_server() {
 		--force
 }
 
+function execute_curl() {
+	local name="curl-${RANDOM}"
+	local image="${CURL_IMAGE:-docker.io/alpine/curl:latest}"
+	local phase=""
+	local exit_status=0
+
+	kubectl run "$name" \
+		-n "$NAMESPACE" \
+		--restart=Never \
+		--image="$image" \
+		--command -- curl -sS "$@" >/dev/null
+
+	for _ in $(seq 1 60); do
+		phase=$(kubectl get pod "$name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+		if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+			break
+		fi
+		sleep 1
+	done
+
+	kubectl logs "$name" -n "$NAMESPACE" || exit_status=$?
+	kubectl delete pod "$name" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+
+	if [[ "$phase" != "Succeeded" ]]; then
+		return 1
+	fi
+
+	return $exit_status
+}
+
 function generate_pmm_server_token() {
 	local key_name=$RANDOM
+	local endpoint
+	endpoint=$(get_service_ip monitoring-service)
 
 	local ADMIN_PASSWORD
 	ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o jsonpath="{.data.PMM_ADMIN_PASSWORD}" | base64 --decode)
@@ -651,11 +683,16 @@ function generate_pmm_server_token() {
 	fi
 
 	local create_response create_status_code create_json_response
-	create_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
-		-d "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
+	create_response=$(execute_curl \
+		--insecure \
+		--silent \
+		--request POST \
+		--header 'Content-Type: application/json' \
+		--header 'Accept: application/json' \
+		--data "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
 		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts" \
-		-w "\n%{http_code}")
+		--write-out '\n%{http_code}' \
+		"https://${endpoint}/graph/api/serviceaccounts")
 
 	create_status_code=$(echo "$create_response" | tail -n1)
 	create_json_response=$(echo "$create_response" | $sed '$ d')
@@ -675,11 +712,15 @@ function generate_pmm_server_token() {
 	fi
 
 	local token_response token_status_code token_json_response
-	token_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' \
-		-d "{\"name\":\"${key_name}\"}" \
+	token_response=$(execute_curl \
+		--insecure \
+		--silent \
+		--request POST \
+		--header 'Content-Type: application/json' \
+		--data "{\"name\":\"${key_name}\"}" \
 		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts/${service_account_id}/tokens" \
-		-w "\n%{http_code}")
+		--write-out '\n%{http_code}' \
+		"https://${endpoint}/graph/api/serviceaccounts/${service_account_id}/tokens")
 
 	token_status_code=$(echo "$token_response" | tail -n1)
 	token_json_response=$(echo "$token_response" | $sed '$ d')
@@ -703,7 +744,7 @@ function get_metric_values() {
 
 	local wait_count=20
 	local retry=0
-	until [[ $(curl -s -k -H "Authorization: Bearer ${token}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+	until [[ $(execute_curl -s -k -H "Authorization: Bearer ${token}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
 		| jq '.data.result[0].values[][1]' \
 		| grep '^"[0-9]') ]]; do
 		sleep 2
@@ -721,13 +762,16 @@ function get_qan20_values() {
 	local endpoint=$(get_service_ip monitoring-service)
 	local period_start_from=$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')
 	local period_start_to=$($date -u '+%Y-%m-%dT%H:%M:%S%:z')
+	local payload
 
-	jq \
+	payload=$(jq \
 		--arg period_start_from "${period_start_from}" \
 		--arg period_start_to "${period_start_to}" \
 		'.period_start_from = $period_start_from | .period_start_to = $period_start_to' \
-		"${TEST_CONFIG_DIR}/qan20-payload.json" \
-		| curl -s -k -H "Authorization: Bearer ${token}" -XPOST --data-binary @- "https://$endpoint/v1/qan/metrics:getReport" \
+		"${TEST_CONFIG_DIR}/qan20-payload.json")
+
+	execute_curl -s -k -H "Authorization: Bearer ${token}" -XPOST -d "${payload}" \
+		"https://$endpoint/v1/qan/metrics:getReport" \
 		| jq '.rows[].sparkline'
 }
 
