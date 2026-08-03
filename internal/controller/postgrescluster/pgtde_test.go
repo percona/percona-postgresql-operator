@@ -936,7 +936,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		// Steady state: the revision matches and the last reconcile confirmed
 		// the data volumes hold no staged credentials.
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   v1beta1.PGTDEVaultProviderReady,
+			Type:   v1beta1.PGTDEProviderReady,
 			Status: metav1.ConditionTrue,
 			Reason: "Configured",
 		})
@@ -961,7 +961,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster := newCluster()
 		cluster.Status.PGTDERevision = standardRevision
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    v1beta1.PGTDEVaultProviderReady,
+			Type:    v1beta1.PGTDEProviderReady,
 			Status:  metav1.ConditionFalse,
 			Reason:  "ChangeFailed",
 			Message: "permission denied",
@@ -1230,7 +1230,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 // when it is absent.
 func tdeCondition(cluster *v1beta1.PostgresCluster) metav1.Condition {
 	condition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEVaultProviderReady)
+		v1beta1.PGTDEProviderReady)
 	if condition == nil {
 		return metav1.Condition{Reason: "<missing>"}
 	}
@@ -1697,7 +1697,7 @@ func TestPGTDEVaultChangeFor(t *testing.T) {
 		{"StageCredentials", "a-revision-from-another-vault", pgtde.StageCredentials},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			change, err := pgtde.VaultChangeFor(clusterWith(tc.revision))
+			change, err := pgtde.ChangePhase(clusterWith(tc.revision))
 			assert.NilError(t, err)
 			assert.Equal(t, change.Phase, tc.expected)
 
@@ -1718,7 +1718,7 @@ func TestPGTDEVaultChangeFor(t *testing.T) {
 		for _, revision := range []string{
 			"", standardRevision, tempRevision, "a-revision-from-another-vault",
 		} {
-			change, err := pgtde.VaultChangeFor(clusterWith(revision))
+			change, err := pgtde.ChangePhase(clusterWith(revision))
 			assert.NilError(t, err)
 			held[change.Phase] = change.Phase == pgtde.StageCredentials
 		}

@@ -1244,14 +1244,14 @@ func (r *Reconciler) reconcileInstance(
 		// name. Rolling now would leave pg_tde reading a token the provider was
 		// never told about. Once phase 1 lands, the phase moves on and the
 		// volume updates, which is what restarts the Pods for phase 2.
-		if cluster.Spec.Extensions.PGTDE.Vault != nil {
-			change, changeErr := pgtde.VaultChangeFor(cluster)
+		if cluster.Spec.Extensions.PGTDE.Vault != nil || cluster.Spec.Extensions.PGTDE.File != nil {
+			change, changeErr := pgtde.ChangePhase(pgtde.NewProviderForCluster(cluster), cluster.Status.PGTDERevision)
 			if changeErr != nil {
 				// Without the revisions there is no way to tell a pending
 				// change from a settled one. Hold the volume: a Pod that keeps
 				// its credentials can be rolled later, one that loses them
 				// cannot get them back.
-				log.Error(changeErr, "keeping the pg_tde vault volume")
+				log.Error(changeErr, "keeping the pg_tde volume")
 			}
 			if changeErr != nil || change.Phase == pgtde.StageCredentials {
 				pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)

@@ -265,10 +265,15 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 	return s.CASecret.Name != "" && s.CASecret.Key != ""
 }
 
+type PGTDEFileSpec struct {
+	KeySecret PGTDESecretObjectReference `json:"keySecret"`
+}
+
 // +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 
+	File  *PGTDEFileSpec  `json:"file,omitempty"`
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
 
@@ -548,12 +553,12 @@ const (
 	Registered                 = "Registered"
 	PGTDEEnabled               = "PGTDEEnabled"
 
-	// PGTDEVaultProviderReady reports whether the pg_tde vault key provider
+	// PGTDEProviderReady reports whether the pg_tde key provider
 	// matches the configuration in the spec. It is false while a credential
 	// change is in progress and when one has failed. Unlike PGTDEEnabled it
 	// does not influence shared_preload_libraries or Pod contents; it exists
 	// so a stalled credential change is visible to the user.
-	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
+	PGTDEProviderReady = "PGTDEProviderReady"
 )
 
 type PostgresInstanceSetSpec struct {
