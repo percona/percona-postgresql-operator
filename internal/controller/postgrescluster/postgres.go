@@ -609,7 +609,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			}
 
 			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
-			if err = stagePGTDEVaultCredentials(ctx, r.Client, r.PodExec, cluster.Namespace,
+			if err = r.stagePGTDEVaultCredentials(ctx, cluster.Namespace,
 				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
 				break
 			}
@@ -712,10 +712,8 @@ func (r *Reconciler) cleanupTempPGTDEFiles(ctx context.Context, pods []*corev1.P
 // is the path every instance reads, including a replica that gets promoted
 // while the change is in flight. Each instance has its own /pgdata, so the
 // files have to exist on all of them, not just on the one running the SQL.
-func stagePGTDEVaultCredentials(
+func (r *Reconciler) stagePGTDEVaultCredentials(
 	ctx context.Context,
-	k8sClient client.Reader,
-	podExec runtime.PodExecutor,
 	namespace string,
 	vault *v1beta1.PGTDEVaultSpec,
 	pods []*corev1.Pod,
@@ -727,14 +725,14 @@ func stagePGTDEVaultCredentials(
 		data []byte
 	}
 
-	token, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.TokenSecret)
+	token, err := pgTDESecretValue(ctx, r.Client, namespace, vault.TokenSecret)
 	if err != nil {
 		return errors.Wrap(err, "token secret")
 	}
 	files := []stagedFile{{path: tokenPath, data: token}}
 
 	if vault.HasCA() {
-		ca, err := pgTDESecretValue(ctx, k8sClient, namespace, vault.CASecret)
+		ca, err := pgTDESecretValue(ctx, r.Client, namespace, vault.CASecret)
 		if err != nil {
 			return errors.Wrap(err, "CA secret")
 		}
@@ -743,7 +741,7 @@ func stagePGTDEVaultCredentials(
 
 	for _, pod := range pods {
 		for _, file := range files {
-			if err := writeTempFile(ctx, podExec, pod, container,
+			if err := writeTempFile(ctx, r.PodExec, pod, container,
 				file.path, file.data); err != nil {
 				return errors.Wrapf(err, "pod %s", pod.Name)
 			}
