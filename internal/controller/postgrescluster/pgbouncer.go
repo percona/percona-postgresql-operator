@@ -57,6 +57,9 @@ func (r *Reconciler) reconcilePGBouncer(
 	if err == nil {
 		err = r.reconcilePGBouncerInPostgreSQL(ctx, cluster, instances, secret)
 	}
+	if err == nil {
+		err = r.reconcilePause(ctx, cluster)
+	}
 	return err
 }
 
@@ -733,4 +736,21 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 		err = errors.WithStack(r.apply(ctx, pdb))
 	}
 	return err
+}
+
+func (r *Reconciler) reconcilePause(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	proxy := cluster.Spec.Proxy
+	shouldPause := proxy.PGBouncerEnabled() && proxy.PGBouncerPaused()
+	isPaused := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+	if shouldPause == isPaused {
+		return nil
+	}
+	if err := r.handlePGBouncerPause(ctx, cluster, shouldPause); err != nil {
+		return errors.Wrap(err, "handle pgbouncer pause")
+	}
+	return nil
+}
+
+func (r *Reconciler) handlePGBouncerPause(ctx context.Context, cluster *v1beta1.PostgresCluster, pause bool) error {
+	return nil
 }

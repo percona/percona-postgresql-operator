@@ -554,6 +554,8 @@ const (
 	// does not influence shared_preload_libraries or Pod contents; it exists
 	// so a stalled credential change is visible to the user.
 	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
+
+	PGBouncerPaused = "PGBouncerPaused"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -760,6 +762,10 @@ func (s *PostgresProxySpec) Default() {
 // K8SPG-1062
 func (s *PostgresProxySpec) PGBouncerEnabled() bool {
 	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
+}
+
+func (s *PostgresProxySpec) PGBouncerPaused() bool {
+	return s != nil && s.PGBouncer != nil && s.PGBouncer.Paused != nil && *s.PGBouncer.Paused
 }
 
 type RegistrationRequirementStatus struct {
