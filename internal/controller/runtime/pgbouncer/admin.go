@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type AdminClient interface {
@@ -19,36 +20,21 @@ type AdminClientOptions struct {
 	User     string
 	Password string
 	Host     string
-	Pod      *corev1.Pod
 }
 
-func (o *AdminClientOptions) validate() error {
-	if o.User == "" {
-		return errors.New("user is required")
+func NewAdminClient(user, password, host string) (AdminClient, error) {
+	if user == "" {
+		return nil, errors.New("user is required")
 	}
-	if o.Password == "" {
-		return errors.New("password is required")
+	if password == "" {
+		return nil, errors.New("password is required")
 	}
-	if o.Pod == nil && o.Host == "" {
-		return errors.New("either pod or host is required")
-	}
-	return nil
-}
-
-func (o *AdminClientOptions) host() string {
-	if o.Host != "" {
-		return o.Host
-	}
-	return fmt.Sprintf("%s.%s", o.Pod.Name, o.Pod.Namespace)
-}
-
-func NewAdminClient(opts AdminClientOptions) (AdminClient, error) {
-	if err := opts.validate(); err != nil {
-		return nil, err
+	if host == "" {
+		return nil, errors.New("host is required")
 	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=pgbouncer sslmode=require",
-		opts.host(), opts.User, opts.Password)
+		host, user, password)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "open pgbouncer connection")
@@ -61,20 +47,24 @@ type adminClient struct {
 }
 
 // Pause pgbouncer connections.
-// Not idempotent, must be handled by caller.
 func (c *adminClient) Pause(ctx context.Context) error {
 	_, err := c.db.ExecContext(ctx, "PAUSE")
 	if err != nil {
+		if strings.Contains(err.Error(), "already suspended/paused") {
+			return nil
+		}
 		return errors.Wrap(err, "pause pgbouncer")
 	}
 	return nil
 }
 
 // Resume pgbouncer connections.
-// Not idempotent, must be handled by caller.
 func (c *adminClient) Resume(ctx context.Context) error {
 	_, err := c.db.ExecContext(ctx, "RESUME")
 	if err != nil {
+		if strings.Contains(err.Error(), "pooler is not paused/suspended") {
+			return nil
+		}
 		return errors.Wrap(err, "resume pgbouncer")
 	}
 	return nil

@@ -78,7 +78,7 @@ func Secret(ctx context.Context,
 
 	var adminPassword string
 	if inCluster.CompareVersion("3.1.0") >= 0 {
-		adminPassword = string(inSecret.Data[adminPasswordSecretKey])
+		adminPassword = string(inSecret.Data[AdminPasswordSecretKey])
 
 		if err == nil && len(adminPassword) == 0 {
 			adminPassword, err = util.GenerateASCIIPassword(32)
@@ -94,7 +94,7 @@ func Secret(ctx context.Context,
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
 
 		if len(adminPassword) > 0 {
-			outSecret.Data[adminPasswordSecretKey] = []byte(adminPassword)
+			outSecret.Data[AdminPasswordSecretKey] = []byte(adminPassword)
 		}
 	}
 

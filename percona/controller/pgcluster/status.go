@@ -209,6 +209,11 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 			ObservedGeneration: cr.Generation,
 		})
 	}
+
+	if meta.FindStatusCondition(postgresStatus.Conditions, v1beta1.PGBouncerPaused) == nil {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, v1beta1.PGBouncerPaused)
+	}
+
 }
 
 func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {

@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -58,7 +59,7 @@ func (r *Reconciler) reconcilePGBouncer(
 		err = r.reconcilePGBouncerInPostgreSQL(ctx, cluster, instances, secret)
 	}
 	if err == nil {
-		err = r.reconcilePause(ctx, cluster)
+		err = r.reconcilePGBouncerPause(ctx, secret, cluster)
 	}
 	return err
 }
@@ -738,19 +739,80 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 	return err
 }
 
-func (r *Reconciler) reconcilePause(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+func (r *Reconciler) reconcilePGBouncerPause(ctx context.Context, secret *corev1.Secret, cluster *v1beta1.PostgresCluster) error {
 	proxy := cluster.Spec.Proxy
 	shouldPause := proxy.PGBouncerEnabled() && proxy.PGBouncerPaused()
 	isPaused := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGBouncerPaused)
 	if shouldPause == isPaused {
 		return nil
 	}
-	if err := r.handlePGBouncerPause(ctx, cluster, shouldPause); err != nil {
+	if err := r.handlePGBouncerPause(ctx, secret, cluster, shouldPause); err != nil {
 		return errors.Wrap(err, "handle pgbouncer pause")
 	}
 	return nil
 }
 
-func (r *Reconciler) handlePGBouncerPause(ctx context.Context, cluster *v1beta1.PostgresCluster, pause bool) error {
+func listPGBouncerPods(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (*corev1.PodList, error) {
+	selector, err := naming.AsSelector(naming.ClusterPGBouncerSelector(cluster))
+	if err != nil {
+		return nil, errors.Wrap(err, "pgbouncer selector")
+	}
+	podList := &corev1.PodList{}
+	if err := cl.List(ctx, podList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, errors.Wrap(err, "list pgbouncer pods")
+	}
+	return podList, nil
+}
+
+func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Secret, cluster *v1beta1.PostgresCluster, pause bool) error {
+	podList, err := listPGBouncerPods(ctx, r.Client, cluster)
+	if err != nil {
+		return errors.Wrap(err, "list pgbouncer pods")
+	}
+
+	password, ok := secret.Data[pgbouncer.AdminPasswordSecretKey]
+	if !ok {
+		return errors.New("pgbouncer admin password not found in secret")
+	}
+
+	verb, command := "resume", pgbruntime.AdminClient.Resume
+	if pause {
+		verb, command = "pause", pgbruntime.AdminClient.Pause
+	}
+
+	for _, pod := range podList.Items {
+		adminClient, err := r.newPGBouncerAdmin(
+			pgbouncer.AdminUser,
+			string(password),
+			pod.Status.PodIP,
+		)
+		if err != nil {
+			return errors.Wrapf(err, "create pgbouncer admin client for pod %s", pod.Name)
+		}
+
+		err = command(adminClient, ctx)
+		_ = adminClient.Close()
+
+		if err != nil {
+			return errors.Wrapf(err, "%s pgbouncer on pod %s", verb, pod.Name)
+		}
+	}
+
+	log := logging.FromContext(ctx)
+	log.Info("pgbouncer pause state changed", "pause", pause, "cluster")
+
+	if pause {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGBouncerPaused,
+			Status:  metav1.ConditionTrue,
+			Reason:  "Paused",
+			Message: "pgbouncer is paused",
+		})
+	} else {
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+	}
 	return nil
 }

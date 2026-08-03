@@ -34,12 +34,12 @@ const (
 	authFileSecretKey      = "pgbouncer-users.txt"      // #nosec G101 this is a name, not a credential
 	passwordSecretKey      = "pgbouncer-password"       // #nosec G101 this is a name, not a credential
 	verifierSecretKey      = "pgbouncer-verifier"       // #nosec G101 this is a name, not a credential
-	adminPasswordSecretKey = "pgbouncer-admin-password" // #nosec G101 this is a name, not a credential
+	AdminPasswordSecretKey = "pgbouncer-admin-password" // #nosec G101 this is a name, not a credential
 	emptyConfigMapKey      = "pgbouncer-empty"
 	iniFileConfigMapKey    = "pgbouncer.ini"
 	hbaFileConfigMapKey    = "pgbouncer-hba.conf"
 
-	adminUser = "_crunchypgbounceradmin"
+	AdminUser = "_crunchypgbounceradmin"
 
 	adminUsersSetting = "admin_users"
 )
@@ -84,7 +84,7 @@ func authFileContents(password, adminPassword string, userSecret *corev1.Secret)
 	// otherwise it would replace an operator credential.
 	reserved := map[string]bool{postgresqlUser: true}
 	if len(adminPassword) > 0 {
-		reserved[adminUser] = true
+		reserved[AdminUser] = true
 	}
 
 	users := make(map[string]string)
@@ -108,7 +108,7 @@ func authFileContents(password, adminPassword string, userSecret *corev1.Secret)
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b, "%s %s\n", quote(postgresqlUser), quote(password))
 	if len(adminPassword) > 0 {
-		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(adminUser), quote(adminPassword))
+		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(AdminUser), quote(adminPassword))
 	}
 	for _, name := range sortedUsers {
 		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(name), quote(users[name]))
@@ -257,14 +257,14 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 	}
 
 	if cluster.CompareVersion("3.1.0") >= 0 {
-		global[adminUsersSetting] = adminUser
+		global[adminUsersSetting] = AdminUser
 	}
 
 	// Override the above with any specified settings.
 	maps.Copy(global, cluster.Spec.Proxy.PGBouncer.Config.Global)
 
 	if cluster.CompareVersion("3.1.0") >= 0 {
-		global[adminUsersSetting] = ensureListed(global[adminUsersSetting], adminUser)
+		global[adminUsersSetting] = ensureListed(global[adminUsersSetting], AdminUser)
 	}
 
 	// Prevent the user from bypassing the main configuration file.
