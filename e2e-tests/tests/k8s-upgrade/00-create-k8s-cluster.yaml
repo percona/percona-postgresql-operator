@@ -10,7 +10,7 @@ commands:
 
       name="k8s-upgrade-$RANDOM"
 
-      if [[ "${K8S_UPGRADE_PLATFORM}" != "gke" && "${K8S_UPGRADE_PLATFORM}" != "digitalocean" ]]; then
+      if [[ "${K8S_UPGRADE_PLATFORM}" != "gke" && "${K8S_UPGRADE_PLATFORM}" != "doks" && "${K8S_UPGRADE_PLATFORM}" != "digitalocean" ]]; then
         echo "Unsupported platform: ${K8S_UPGRADE_PLATFORM}"
         exit 1
       fi

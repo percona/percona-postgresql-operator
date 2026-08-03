@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hugepages
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: hugepages
+  template:
+    metadata:
+      labels:
+        app: hugepages
+    spec:
+      nodeSelector:
+        hugepages: "enabled"
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: hugepages
+          image: docker.io/library/busybox:1.36
+          securityContext:
+            privileged: true
+          env:
+            - name: HUGEPAGE_COUNT
+              value: "1024"
+            - name: NODE_SERVICE
+              value: rke2-agent
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+
+              current_count="$(cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages)"
+              mkdir -p /host/etc/sysctl.d
+              echo "vm.nr_hugepages = ${HUGEPAGE_COUNT}" > /host/etc/sysctl.d/90-hugepages.conf
+              echo "${HUGEPAGE_COUNT}" > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+
+              if [ "${current_count}" != "${HUGEPAGE_COUNT}" ]; then
+                echo "Restarting ${NODE_SERVICE} so kubelet publishes the hugepages capacity"
+                chroot /host /bin/sh -c "systemctl restart ${NODE_SERVICE}"
+              fi
+
+              sleep infinity
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: host-sys
+              mountPath: /sys
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory

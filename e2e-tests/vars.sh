@@ -23,26 +23,46 @@ export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
 export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
 export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
 
-if [[ -z "${PLATFORM:-}" ]]; then
-	if kubectl get namespace openshift-kube-apiserver >/dev/null 2>&1; then
-		export PLATFORM="openshift"
-	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'eksctl.io'; then
-		export PLATFORM="eks"
-	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'cloud.google.com/gke'; then
-		export PLATFORM="gke"
-	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'kubernetes.azure.com'; then
-		export PLATFORM="aks"
-	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'digitalocean://'; then
-		export PLATFORM="digitalocean"
-	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'kind://'; then
-		export PLATFORM="kind"
-	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'minikube'; then
-		export PLATFORM="minikube"
-	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'rke2'; then
-		export PLATFORM="rancher"
-	else
-		export PLATFORM="unknown"
+function detect_k8s_platform() {
+	local detected_platform
+	local xtrace_enabled=false
+
+	if [[ -o xtrace ]]; then
+		xtrace_enabled=true
+		set +o xtrace
 	fi
+
+	if [[ -n "${PLATFORM:-}" ]]; then
+		detected_platform="${PLATFORM}"
+	elif kubectl get namespace openshift-kube-apiserver >/dev/null 2>&1; then
+		detected_platform="openshift"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'eksctl.io'; then
+		detected_platform="eks"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'cloud.google.com/gke'; then
+		detected_platform="gke"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'kubernetes.azure.com'; then
+		detected_platform="aks"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'digitalocean://'; then
+		detected_platform="doks"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'kind://'; then
+		detected_platform="kind"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'minikube'; then
+		detected_platform="minikube"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'rke2'; then
+		detected_platform="rancher"
+	else
+		detected_platform="unknown"
+	fi
+
+	echo "${detected_platform}"
+
+	if [[ "${xtrace_enabled}" == true ]]; then
+		set -o xtrace
+	fi
+}
+
+if [[ -z "${PLATFORM:-}" ]]; then
+	export PLATFORM="$(detect_k8s_platform)"
 fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
