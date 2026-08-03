@@ -55,8 +55,8 @@ function deploy_operator() {
 		create_namespace $OPERATOR_NS
 		cw_prefix="cw-"
 	fi
-	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
 	local disable_telemetry=true
 	if [ "${test_name}" == "telemetry-transfer" ]; then
@@ -76,8 +76,8 @@ function update_operator() {
 		cw_prefix="cw-"
 	fi
 
-	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
 	local disable_telemetry=true
 	if [ "${test_name}" == "telemetry-transfer" ]; then
@@ -206,7 +206,7 @@ function retry() {
 			echo "The command ${*} has failed after $n attempts."
 			exit 1
 		fi
-		((n++))
+		((n += 1))
 		sleep $delay
 	done
 }
@@ -639,22 +639,6 @@ function deploy_pmm_server() {
 		--force
 }
 
-function retry() {
-	local max=$1
-	local delay=$2
-	shift 2 # cut delay and max args
-	local n=1
-
-	until "$@"; do
-		if [[ $n -ge $max ]]; then
-			echo "The command '$@' has failed after $n attempts."
-			exit 1
-		fi
-		((n++))
-		sleep $delay
-	done
-}
-
 function generate_pmm_server_token() {
 	local key_name=$RANDOM
 
@@ -1080,7 +1064,15 @@ function wait_cluster_consistency() {
 }
 
 function deploy_cert_manager() {
-	destroy_cert_manager
+	local install_marker="${TEMP_DIR}/cert-manager-installed-by-test"
+
+	if kubectl get deployment cert-manager -n cert-manager >/dev/null 2>&1; then
+		echo 'cert-manager is already installed'
+		return
+	fi
+
+	mkdir -p "${TEMP_DIR}"
+	touch "${install_marker}"
 
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
@@ -1109,8 +1101,16 @@ function deploy_cert_manager() {
 }
 
 function destroy_cert_manager() {
+	local install_marker="${TEMP_DIR}/cert-manager-installed-by-test"
+
+	if [[ ! -f "${install_marker}" ]]; then
+		echo 'cert-manager was not installed by this test'
+		return
+	fi
+
 	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml >/dev/null 2>&1 || :
 	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
+	rm -f "${install_marker}"
 }
 
 function get_container_image() {

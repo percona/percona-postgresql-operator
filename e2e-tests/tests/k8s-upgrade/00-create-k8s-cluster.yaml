@@ -10,10 +10,21 @@ commands:
 
       name="k8s-upgrade-$RANDOM"
 
-      if [[ "${K8S_UPGRADE_PLATFORM}" != "gke" && "${K8S_UPGRADE_PLATFORM}" != "doks" && "${K8S_UPGRADE_PLATFORM}" != "digitalocean" ]]; then
-        echo "Unsupported platform: ${K8S_UPGRADE_PLATFORM}"
-        exit 1
-      fi
+      case "${K8S_UPGRADE_PLATFORM}" in
+        gke|doks) ;;
+        *)
+          echo "Unsupported platform: ${K8S_UPGRADE_PLATFORM}. Supported platforms: gke, doks"
+          exit 1
+          ;;
+      esac
+
+      case "${PLATFORM}" in
+        gke|doks) ;;
+        *)
+          echo "Unsupported current platform: ${PLATFORM}. Supported platforms: gke, doks"
+          exit 1
+          ;;
+      esac
 
       if [[ -n "${K8S_UPGRADE_INITIAL_VERSION}" && -z "${K8S_UPGRADE_FINAL_VERSION}" ]] ||
         [[ -z "${K8S_UPGRADE_INITIAL_VERSION}" && -n "${K8S_UPGRADE_FINAL_VERSION}" ]]; then

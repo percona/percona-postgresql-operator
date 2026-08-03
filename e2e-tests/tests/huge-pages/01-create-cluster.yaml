@@ -1,16 +1,15 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 1200
 commands:
-  - script: |-
+  - timeout: 300
+    script: |-
       set -o errexit
 
       source ../../functions
-      platform=$(detect_k8s_platform)
-      echo "Detected platform: ${platform}"
+      echo "Detected platform: ${PLATFORM}"
 
       set -o xtrace
-      enable_hugepages $platform
+      enable_hugepages $PLATFORM
       get_cr \
         | yq '.spec.instances[0].resources.limits.hugepages-2Mi = "2Gi"' \
         | yq '.spec.proxy.pgBouncer.replicas=1' \
