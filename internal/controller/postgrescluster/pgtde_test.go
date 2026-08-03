@@ -243,20 +243,68 @@ func TestPreserveOldTDEVolume(t *testing.T) {
 		},
 	}
 
+	// The mount itself does not vary in production, so the two differ only by
+	// mount path to make it visible which one the helper picked.
+	oldMount := corev1.VolumeMount{
+		Name: naming.PGTDEVolume, MountPath: "/etc/pg-tde-old", ReadOnly: true,
+	}
+	newMount := corev1.VolumeMount{
+		Name: naming.PGTDEVolume, MountPath: "/etc/pg-tde-new", ReadOnly: true,
+	}
+
+	// runnerWith builds the observed StatefulSet. Its database container mounts
+	// the TDE volume, and it has a sidecar that does not, the way an instance
+	// running with pg_tde enabled looks.
 	runnerWith := func(volumes ...corev1.Volume) *appsv1.StatefulSet {
+		hasTDE := false
+		for _, volume := range volumes {
+			hasTDE = hasTDE || volume.Name == naming.PGTDEVolume
+		}
+
+		database := corev1.Container{
+			Name:         naming.ContainerDatabase,
+			VolumeMounts: []corev1.VolumeMount{{Name: "pgdata"}},
+		}
+		if hasTDE {
+			database.VolumeMounts = append(database.VolumeMounts, oldMount)
+		}
+
 		return &appsv1.StatefulSet{
 			Spec: appsv1.StatefulSetSpec{
 				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{Volumes: volumes},
+					Spec: corev1.PodSpec{
+						Volumes: volumes,
+						Containers: []corev1.Container{
+							database,
+							{Name: naming.ContainerClientCertCopy},
+						},
+					},
 				},
 			},
 		}
 	}
 
+	// databaseMounts returns the mounts of the database container, so the
+	// assertions do not depend on where in the slice it landed.
+	databaseMounts := func(t *testing.T, podSpec *corev1.PodSpec) []corev1.VolumeMount {
+		t.Helper()
+		for _, container := range podSpec.Containers {
+			if container.Name == naming.ContainerDatabase {
+				return container.VolumeMounts
+			}
+		}
+		t.Fatalf("no %q container in %v", naming.ContainerDatabase, podSpec.Containers)
+		return nil
+	}
+
 	t.Run("Replaces", func(t *testing.T) {
-		podSpec := &corev1.PodSpec{Volumes: []corev1.Volume{
-			{Name: "pgdata"}, newVolume, {Name: "tmp"},
-		}}
+		podSpec := &corev1.PodSpec{
+			Volumes: []corev1.Volume{{Name: "pgdata"}, newVolume, {Name: "tmp"}},
+			Containers: []corev1.Container{{
+				Name:         naming.ContainerDatabase,
+				VolumeMounts: []corev1.VolumeMount{{Name: "pgdata"}, newMount},
+			}},
+		}
 
 		pgtde.PreserveOldTDEVolume(podSpec, runnerWith(oldVolume, corev1.Volume{Name: "pgdata"}))
 
@@ -266,26 +314,128 @@ func TestPreserveOldTDEVolume(t *testing.T) {
 		assert.Equal(t,
 			podSpec.Volumes[1].Projected.Sources[0].Secret.Name, "old-secret",
 			"the running Pod's TDE volume should be kept")
+
+		mounts := databaseMounts(t, podSpec)
+		assert.Equal(t, len(mounts), 2, "no mounts should be added or removed")
+		assert.Equal(t, mounts[0].Name, "pgdata", "unrelated mounts keep their order")
+		assert.DeepEqual(t, mounts[1], oldMount)
 	})
 
 	t.Run("NoVolumeInRunner", func(t *testing.T) {
-		podSpec := &corev1.PodSpec{Volumes: []corev1.Volume{newVolume}}
+		podSpec := &corev1.PodSpec{
+			Volumes: []corev1.Volume{newVolume},
+			Containers: []corev1.Container{{
+				Name:         naming.ContainerDatabase,
+				VolumeMounts: []corev1.VolumeMount{newMount},
+			}},
+		}
 
 		pgtde.PreserveOldTDEVolume(podSpec, runnerWith(corev1.Volume{Name: "pgdata"}))
 
 		assert.Equal(t,
 			podSpec.Volumes[0].Projected.Sources[0].Secret.Name, "new-secret",
 			"without an old volume to preserve the intent is left alone")
+		assert.DeepEqual(t, databaseMounts(t, podSpec), []corev1.VolumeMount{newMount})
 	})
 
-	t.Run("NoVolumeInPodSpec", func(t *testing.T) {
-		podSpec := &corev1.PodSpec{Volumes: []corev1.Volume{{Name: "pgdata"}}}
+	// Dropping pg_tde from the spec leaves the new Pod with no TDE volume at
+	// all. The extension is still installed at this point, so the credentials
+	// have to be grafted back on or Postgres comes up without its key.
+	t.Run("AddsToPodSpecWithout", func(t *testing.T) {
+		podSpec := &corev1.PodSpec{
+			Volumes: []corev1.Volume{{Name: "pgdata"}},
+			Containers: []corev1.Container{
+				{Name: naming.ContainerClientCertCopy},
+				{
+					Name:         naming.ContainerDatabase,
+					VolumeMounts: []corev1.VolumeMount{{Name: "pgdata"}},
+				},
+			},
+		}
 
 		pgtde.PreserveOldTDEVolume(podSpec, runnerWith(oldVolume))
 
-		assert.Equal(t, len(podSpec.Volumes), 1,
-			"the old volume should not be grafted onto a Pod that has none")
-		assert.Equal(t, podSpec.Volumes[0].Name, "pgdata")
+		assert.Equal(t, len(podSpec.Volumes), 2)
+		assert.Equal(t, podSpec.Volumes[0].Name, "pgdata", "unrelated volumes keep their order")
+		assert.Equal(t,
+			podSpec.Volumes[1].Projected.Sources[0].Secret.Name, "old-secret",
+			"the running Pod's TDE volume should be grafted back on")
+
+		mounts := databaseMounts(t, podSpec)
+		assert.Equal(t, len(mounts), 2)
+		assert.Equal(t, mounts[0].Name, "pgdata", "unrelated mounts keep their order")
+		assert.DeepEqual(t, mounts[1], oldMount)
+
+		assert.Equal(t, len(podSpec.Containers[0].VolumeMounts), 0,
+			"only the database container mounts the TDE volume")
+	})
+
+	// The volume survived but the mount did not, which is what a hand-edited
+	// StatefulSet or a future change to the database container can produce.
+	// Preserving the volume alone must not panic on the missing mount.
+	t.Run("NoMountInRunner", func(t *testing.T) {
+		existing := runnerWith(oldVolume)
+		existing.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+
+		podSpec := &corev1.PodSpec{
+			Volumes: []corev1.Volume{newVolume},
+			Containers: []corev1.Container{{
+				Name:         naming.ContainerDatabase,
+				VolumeMounts: []corev1.VolumeMount{newMount},
+			}},
+		}
+
+		pgtde.PreserveOldTDEVolume(podSpec, existing)
+
+		assert.Equal(t,
+			podSpec.Volumes[0].Projected.Sources[0].Secret.Name, "old-secret",
+			"the volume should still be preserved")
+		// Without an old mount to preserve the intent is left alone.
+		assert.DeepEqual(t, databaseMounts(t, podSpec), []corev1.VolumeMount{newMount})
+	})
+
+	// The mount belongs to the database container and nothing else. Reading it
+	// off a sidecar would find nothing to preserve.
+	t.Run("IgnoresOtherContainers", func(t *testing.T) {
+		existing := runnerWith(oldVolume)
+		existing.Spec.Template.Spec.Containers = append(
+			[]corev1.Container{{
+				Name:         naming.ContainerClientCertCopy,
+				VolumeMounts: []corev1.VolumeMount{{Name: naming.PGTDEVolume, MountPath: "/wrong"}},
+			}},
+			existing.Spec.Template.Spec.Containers...)
+
+		podSpec := &corev1.PodSpec{
+			Volumes: []corev1.Volume{newVolume},
+			Containers: []corev1.Container{
+				{Name: naming.ContainerClientCertCopy},
+				{
+					Name:         naming.ContainerDatabase,
+					VolumeMounts: []corev1.VolumeMount{newMount},
+				},
+			},
+		}
+
+		pgtde.PreserveOldTDEVolume(podSpec, existing)
+
+		assert.DeepEqual(t, databaseMounts(t, podSpec), []corev1.VolumeMount{oldMount})
+		assert.Equal(t, len(podSpec.Containers[0].VolumeMounts), 0,
+			"sidecars should not gain a TDE mount")
+	})
+
+	// scaleUpInstances can call this before the Pod spec has any containers,
+	// and a Pod that never runs Postgres has nothing to keep mounted.
+	t.Run("NoDatabaseContainer", func(t *testing.T) {
+		podSpec := &corev1.PodSpec{
+			Volumes:    []corev1.Volume{{Name: "pgdata"}},
+			Containers: []corev1.Container{{Name: naming.ContainerClientCertCopy}},
+		}
+
+		pgtde.PreserveOldTDEVolume(podSpec, runnerWith(oldVolume))
+
+		assert.Equal(t, len(podSpec.Volumes), 2, "the volume is still preserved")
+		assert.Equal(t, len(podSpec.Containers[0].VolumeMounts), 0,
+			"no container other than the database one should mount it")
 	})
 }
 
@@ -444,7 +594,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 		pods := newPods("pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0")
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, pods, naming.ContainerDatabase, tokenPath, caPath))
 
 		// pg_tde names one path cluster-wide, but each instance has its own
@@ -467,12 +619,13 @@ func TestStageVaultCredentials(t *testing.T) {
 	t.Run("ReadsEachSecretOnce", func(t *testing.T) {
 		var calls []execCall
 		gets := 0
-		k8s := &countingReader{
-			Reader: fake.NewClientBuilder().WithObjects(secret).Build(),
+		k8s := &countingClient{
+			Client: fake.NewClientBuilder().WithObjects(secret).Build(),
 			gets:   &gets,
 		}
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b", "c", "d"), naming.ContainerDatabase,
 			tokenPath, caPath))
 
@@ -488,7 +641,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		noCA.CASecret = v1beta1.PGTDESecretObjectReference{}
 		_, noCAPath := pgtde.TempVaultCredentialPaths(noCA)
 
-		assert.NilError(t, stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", noCA, newPods("a", "b"), naming.ContainerDatabase,
 			tokenPath, noCAPath))
 
@@ -498,8 +653,9 @@ func TestStageVaultCredentials(t *testing.T) {
 	t.Run("MissingSecretWritesNothing", func(t *testing.T) {
 		var calls []execCall
 		k8s := fake.NewClientBuilder().Build()
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
 
-		err := stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b"), naming.ContainerDatabase, tokenPath, caPath)
 
 		assert.ErrorContains(t, err, "token secret")
@@ -514,7 +670,9 @@ func TestStageVaultCredentials(t *testing.T) {
 		badKey := tdeVaultSpec()
 		badKey.TokenSecret.Key = "nope"
 
-		err := stagePGTDEVaultCredentials(ctx, k8s, execRecorder(&calls, nil),
+		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
+
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", badKey, newPods("a"), naming.ContainerDatabase, tokenPath, caPath)
 
 		assert.ErrorContains(t, err, `key "nope" not found`)
@@ -525,13 +683,17 @@ func TestStageVaultCredentials(t *testing.T) {
 		var calls []execCall
 		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
 
-		err := stagePGTDEVaultCredentials(ctx, k8s,
-			execRecorder(&calls, func(call execCall) error {
+		reconciler := &Reconciler{
+			Client: k8s,
+			PodExec: execRecorder(&calls, func(call execCall) error {
 				if call.pod == "b" {
 					return errors.New("no space left on device")
 				}
 				return nil
 			}),
+		}
+
+		err := reconciler.stagePGTDEVaultCredentials(ctx,
 			"ns1", vault, newPods("a", "b", "c"), naming.ContainerDatabase,
 			tokenPath, caPath)
 
@@ -597,17 +759,17 @@ func TestWriteTempFile(t *testing.T) {
 	})
 }
 
-// countingReader counts Get calls made against the embedded reader.
-type countingReader struct {
-	client.Reader
+// countingClient counts Get calls made against the embedded client.
+type countingClient struct {
+	client.Client
 	gets *int
 }
 
-func (c *countingReader) Get(
+func (c *countingClient) Get(
 	ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
 ) error {
 	*c.gets++
-	return c.Reader.Get(ctx, key, obj, opts...)
+	return c.Client.Get(ctx, key, obj, opts...)
 }
 
 func TestReconcilePGTDEProviders(t *testing.T) {

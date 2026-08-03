@@ -21,26 +21,6 @@ func defaultFromEnv(value, key string) string {
 	return value
 }
 
-// FetchKeyCommand returns the fetch_key_cmd value stored in the encryption_key_command
-// variable used to enable TDE.
-func FetchKeyCommand(spec *v1beta1.PostgresClusterSpec) string {
-	if spec.Patroni != nil {
-		if spec.Patroni.DynamicConfiguration != nil {
-			configuration := spec.Patroni.DynamicConfiguration
-			if configuration != nil {
-				if postgresql, ok := configuration["postgresql"].(map[string]any); ok {
-					if parameters, ok := postgresql["parameters"].(map[string]any); ok {
-						if parameters["encryption_key_command"] != nil {
-							return fmt.Sprintf("%s", parameters["encryption_key_command"])
-						}
-					}
-				}
-			}
-		}
-	}
-	return ""
-}
-
 // Red Hat Marketplace requires operators to use environment variables be used
 // for any image other than the operator itself. Those variables must start with
 // "RELATED_IMAGE_" so that OSBS can transform their tag values into digests
