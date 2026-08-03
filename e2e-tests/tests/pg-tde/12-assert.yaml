@@ -42,6 +42,7 @@ spec:
         - mountPath: /dev/shm
           name: dshm
       - name: replication-cert-copy
+      - name: logs
       - name: pgbackrest
       - name: pgbackrest-config
       volumes:
