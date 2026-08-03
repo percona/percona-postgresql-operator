@@ -61,9 +61,13 @@ func ConfigMap(
 	}
 
 	// This ConfigMap key allows us to preserve pause state across restarts.
-	// PAUSE is an in-memory operation only.
+	// PAUSE is an in-memory operation only. The key must be removed once the
+	// cluster is resumed, otherwise the marker outlives the pause and the next
+	// restart would pause a cluster the user has already resumed.
 	if inCluster.CompareVersion("3.1.0") >= 0 && inCluster.Spec.Proxy.PGBouncerPaused() {
 		outConfigMap.Data[pausedConfigMapKey] = PausedValue
+	} else {
+		delete(outConfigMap.Data, pausedConfigMapKey)
 	}
 }
 
@@ -285,6 +289,17 @@ func Pod(
 			},
 		})
 		container.VolumeMounts = append(container.VolumeMounts, logVolumeMount, crunchyBinVolumeMount)
+
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{startupBinaryPath},
+				},
+			},
+			TimeoutSeconds:   35,
+			PeriodSeconds:    10,
+			FailureThreshold: 3,
+		}
 	}
 
 	// TODO container.LivenessProbe?

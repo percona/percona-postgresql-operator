@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 )
 
 func main() {
-	f, err := os.OpenFile(pgbouncer.StartupLogAbsolutePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(startup.LogAbsolutePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -39,7 +39,7 @@ func main() {
 // Failure to pause is fatal: the container must not be considered started while
 // it is accepting connections the user asked us to hold.
 func handlePause() error {
-	wanted, err := pauseWanted(pgbouncer.PausedFileAbsolutePath)
+	wanted, err := pauseWanted(startup.PausedFileAbsolutePath)
 	if err != nil {
 		return errors.Wrap(err, "read paused marker")
 	}
@@ -47,12 +47,12 @@ func handlePause() error {
 		return nil
 	}
 
-	password := os.Getenv(pgbouncer.AdminPasswordEnvVar)
+	password := os.Getenv(startup.AdminPasswordEnvVar)
 	if password == "" {
-		return errors.Errorf("%s is not set, cannot pause", pgbouncer.AdminPasswordEnvVar)
+		return errors.Errorf("%s is not set, cannot pause", startup.AdminPasswordEnvVar)
 	}
 
-	client, err := pgbruntime.NewAdminClient(pgbouncer.AdminUser, password, adminHost)
+	client, err := pgbruntime.NewAdminClient(startup.AdminUser, password, adminHost)
 	if err != nil {
 		return errors.Wrap(err, "create pgbouncer admin client")
 	}
@@ -79,7 +79,7 @@ func pauseWanted(path string) (bool, error) {
 		return false, errors.WithStack(err)
 	}
 
-	return strings.TrimSpace(string(content)) == pgbouncer.PausedValue, nil
+	return strings.TrimSpace(string(content)) == startup.PausedValue, nil
 }
 
 func pause(ctx context.Context, client pgbruntime.AdminClient, retryInterval time.Duration) error {

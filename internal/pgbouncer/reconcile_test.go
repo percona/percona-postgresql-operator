@@ -54,6 +54,48 @@ func TestConfigMap(t *testing.T) {
 	assert.DeepEqual(t, before, config)
 }
 
+func TestConfigMapPaused(t *testing.T) {
+	t.Parallel()
+
+	newCluster := func(version string, paused bool) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.SetLabels(map[string]string{naming.LabelVersion: version})
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		cluster.Spec.Proxy.PGBouncer.Paused = &paused
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		return cluster
+	}
+
+	t.Run("BeforeVersion", func(t *testing.T) {
+		config := new(corev1.ConfigMap)
+		ConfigMap(newCluster("3.0.0", true), config)
+
+		_, ok := config.Data[pausedConfigMapKey]
+		assert.Assert(t, !ok, "expected no paused marker before 3.1.0")
+	})
+
+	t.Run("Paused", func(t *testing.T) {
+		config := new(corev1.ConfigMap)
+		ConfigMap(newCluster("3.1.0", true), config)
+
+		assert.Equal(t, config.Data[pausedConfigMapKey], PausedValue)
+	})
+
+	t.Run("Resumed", func(t *testing.T) {
+		// The marker must not outlive the pause: a leftover key would re-pause
+		// the cluster on the next PgBouncer restart.
+		config := new(corev1.ConfigMap)
+		ConfigMap(newCluster("3.1.0", true), config)
+		assert.Equal(t, config.Data[pausedConfigMapKey], PausedValue)
+
+		ConfigMap(newCluster("3.1.0", false), config)
+
+		_, ok := config.Data[pausedConfigMapKey]
+		assert.Assert(t, !ok, "expected paused marker to be removed on resume")
+	})
+}
+
 func TestSecret(t *testing.T) {
 	t.Parallel()
 
@@ -768,6 +810,48 @@ name: pgbouncer-logs
 				for _, m := range pod.Containers[1].VolumeMounts {
 					assert.Assert(t, m.Name != logVolumeName)
 				}
+			})
+		}
+	})
+
+	// The startup probe re-applies the pause across restarts. It is attached
+	// regardless of whether the cluster is currently paused: the binary exits
+	// immediately when the paused marker is absent.
+	t.Run("StartupProbe", func(t *testing.T) {
+		for _, tt := range []struct {
+			version string
+			expect  bool
+		}{
+			{version: "3.0.0", expect: false},
+			{version: "3.1.0", expect: true},
+		} {
+			t.Run(tt.version, func(t *testing.T) {
+				cluster := new(v1beta1.PostgresCluster)
+				cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+				cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+				cluster.SetLabels(map[string]string{naming.LabelVersion: tt.version})
+				assert.NilError(t, cluster.Default(context.Background(), nil))
+
+				pod := new(corev1.PodSpec)
+				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				assert.Equal(t, len(pod.Containers), 2)
+
+				if !tt.expect {
+					assert.Assert(t, pod.Containers[0].StartupProbe == nil)
+					return
+				}
+
+				assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].StartupProbe, `
+exec:
+  command:
+  - /opt/crunchy/bin/pgbouncer-startup
+failureThreshold: 3
+periodSeconds: 10
+timeoutSeconds: 35
+				`))
+
+				// Only the PgBouncer container is held back by the probe.
+				assert.Assert(t, pod.Containers[1].StartupProbe == nil)
 			})
 		}
 	})

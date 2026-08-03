@@ -14,22 +14,26 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
-	configDirectory = "/etc/pgbouncer"
+	configDirectory = startup.ConfigDirectory
 
-	logDirectory           = "/var/logs"
-	logVolumeName          = "pgbouncer-logs"
-	StartupLogAbsolutePath = logDirectory + "/startup.log"
+	logDirectory  = startup.LogDirectory
+	logVolumeName = "pgbouncer-logs"
 
-	authFileAbsolutePath   = configDirectory + "/" + authFileProjectionPath
-	emptyFileAbsolutePath  = configDirectory + "/" + emptyFileProjectionPath
-	iniFileAbsolutePath    = configDirectory + "/" + iniFileProjectionPath
-	hbaFileAbsolutePath    = configDirectory + "/" + hbaFileProjectionPath
-	PausedFileAbsolutePath = configDirectory + "/" + pausedFileProjectionPath
+	// startupBinaryPath is where the init container installs the
+	// pgbouncer-startup binary that backs the container's startup probe.
+	startupBinaryPath = pNaming.CrunchyBinVolumePath + "/bin/pgbouncer-startup"
+
+	authFileAbsolutePath  = configDirectory + "/" + authFileProjectionPath
+	emptyFileAbsolutePath = configDirectory + "/" + emptyFileProjectionPath
+	iniFileAbsolutePath   = configDirectory + "/" + iniFileProjectionPath
+	hbaFileAbsolutePath   = configDirectory + "/" + hbaFileProjectionPath
 
 	authFileProjectionPath  = "~postgres-operator/users.txt"
 	emptyFileProjectionPath = "pgbouncer.ini"
@@ -44,13 +48,13 @@ const (
 	iniFileConfigMapKey      = "pgbouncer.ini"
 	hbaFileConfigMapKey      = "pgbouncer-hba.conf"
 	pausedConfigMapKey       = "pgbouncer-paused"
-	pausedFileProjectionPath = "pgbouncer-paused"
+	pausedFileProjectionPath = startup.PausedFileProjectionPath
 
-	AdminUser = "_crunchypgbounceradmin"
-
-	AdminPasswordEnvVar = "PGBOUNCER_ADMIN_PASSWORD" // #nosec G101 this is a name, not a credential
-
-	PausedValue = "1"
+	// These are shared with the pgbouncer-startup binary, which cannot import
+	// this package: it must build without cgo. See internal/pgbouncer/startup.
+	AdminUser           = startup.AdminUser
+	AdminPasswordEnvVar = startup.AdminPasswordEnvVar
+	PausedValue         = startup.PausedValue
 
 	adminUsersSetting = "admin_users"
 )

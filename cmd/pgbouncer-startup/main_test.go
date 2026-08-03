@@ -12,7 +12,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	pgbmock "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer/mock"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
 )
 
 func TestPauseWanted(t *testing.T) {
@@ -33,13 +33,13 @@ func TestPauseWanted(t *testing.T) {
 	})
 
 	t.Run("Paused", func(t *testing.T) {
-		wanted, err := pauseWanted(write(t, pgbouncer.PausedValue))
+		wanted, err := pauseWanted(write(t, startup.PausedValue))
 		assert.NilError(t, err)
 		assert.Assert(t, wanted)
 	})
 
 	t.Run("TrailingNewline", func(t *testing.T) {
-		wanted, err := pauseWanted(write(t, pgbouncer.PausedValue+"\n"))
+		wanted, err := pauseWanted(write(t, startup.PausedValue+"\n"))
 		assert.NilError(t, err)
 		assert.Assert(t, wanted)
 	})
