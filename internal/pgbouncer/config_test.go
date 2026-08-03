@@ -290,12 +290,56 @@ func TestClusterINIAdminUsers(t *testing.T) {
 func TestPodConfigFiles(t *testing.T) {
 	t.Parallel()
 
-	config := v1beta1.PGBouncerConfiguration{}
+	newCluster := func(version string) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			Spec: v1beta1.PostgresClusterSpec{
+				Proxy: &v1beta1.PostgresProxySpec{
+					PGBouncer: &v1beta1.PGBouncerPodSpec{
+						Config: v1beta1.PGBouncerConfiguration{},
+					},
+				},
+			},
+		}
+		cluster.SetLabels(map[string]string{v1beta1.LabelVersion: version})
+
+		return cluster
+	}
 	configmap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "some-cm"}}
 	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "some-shh"}}
 
 	t.Run("Default", func(t *testing.T) {
-		projections := podConfigFiles(config, configmap, secret)
+		cluster := newCluster("3.1.0")
+		projections := podConfigFiles(cluster, configmap, secret)
+		assert.Assert(t, cmp.MarshalMatches(projections, `
+- configMap:
+    items:
+    - key: pgbouncer-empty
+      path: pgbouncer.ini
+    name: some-cm
+- configMap:
+    items:
+    - key: pgbouncer.ini
+      path: ~postgres-operator.ini
+    name: some-cm
+- secret:
+    items:
+    - key: pgbouncer-users.txt
+      path: ~postgres-operator/users.txt
+    name: some-shh
+- configMap:
+    items:
+    - key: pgbouncer-paused
+      path: pgbouncer-paused
+    name: some-cm
+    optional: true
+		`))
+	})
+
+	// The paused file preserves pause state across restarts and is only
+	// projected for clusters at or above the version that introduced it.
+	t.Run("PausedFileBelowCRVersion", func(t *testing.T) {
+		cluster := newCluster("3.0.0")
+		projections := podConfigFiles(cluster, configmap, secret)
 		assert.Assert(t, cmp.MarshalMatches(projections, `
 - configMap:
     items:
@@ -316,7 +360,8 @@ func TestPodConfigFiles(t *testing.T) {
 	})
 
 	t.Run("CustomFiles", func(t *testing.T) {
-		config.Files = []corev1.VolumeProjection{
+		cluster := newCluster("3.1.0")
+		cluster.Spec.Proxy.PGBouncer.Config.Files = []corev1.VolumeProjection{
 			{Secret: &corev1.SecretProjection{
 				LocalObjectReference: corev1.LocalObjectReference{Name: "my-thing"},
 			}},
@@ -328,7 +373,7 @@ func TestPodConfigFiles(t *testing.T) {
 			}},
 		}
 
-		projections := podConfigFiles(config, configmap, secret)
+		projections := podConfigFiles(cluster, configmap, secret)
 		assert.Assert(t, cmp.MarshalMatches(projections, `
 - configMap:
     items:
@@ -352,6 +397,12 @@ func TestPodConfigFiles(t *testing.T) {
     - key: pgbouncer-users.txt
       path: ~postgres-operator/users.txt
     name: some-shh
+- configMap:
+    items:
+    - key: pgbouncer-paused
+      path: pgbouncer-paused
+    name: some-cm
+    optional: true
 		`))
 	})
 }

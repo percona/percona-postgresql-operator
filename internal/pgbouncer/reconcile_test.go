@@ -20,6 +20,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -294,7 +295,7 @@ func TestPod(t *testing.T) {
 		naming.LabelVersion: "2.5.0",
 	})
 
-	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod) }
+	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "") }
 
 	t.Run("Disabled", func(t *testing.T) {
 		before := pod.DeepCopy()
@@ -423,7 +424,7 @@ volumes:
 		}
 
 		pod := new(corev1.PodSpec)
-		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod)
+		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: pgbouncer-config
@@ -708,6 +709,150 @@ volumes:
 			}
 			assert.Assert(t, found, "expected custom sidecar 'customsidecar1', but container not found")
 		})
+	})
+
+	// The startup script writes its log to a writable volume, which is only
+	// mounted for clusters at or above the version that introduced it.
+	t.Run("LogVolume", func(t *testing.T) {
+		for _, tt := range []struct {
+			version string
+			expect  bool
+		}{
+			{version: "3.0.0", expect: false},
+			{version: "3.1.0", expect: true},
+		} {
+			t.Run(tt.version, func(t *testing.T) {
+				cluster := new(v1beta1.PostgresCluster)
+				cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+				cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+				cluster.SetLabels(map[string]string{naming.LabelVersion: tt.version})
+				assert.NilError(t, cluster.Default(context.Background(), nil))
+
+				pod := new(corev1.PodSpec)
+				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				assert.Equal(t, len(pod.Containers), 2)
+
+				var volume *corev1.Volume
+				for i := range pod.Volumes {
+					if pod.Volumes[i].Name == logVolumeName {
+						volume = &pod.Volumes[i]
+					}
+				}
+
+				var mount *corev1.VolumeMount
+				for i := range pod.Containers[0].VolumeMounts {
+					if pod.Containers[0].VolumeMounts[i].Name == logVolumeName {
+						mount = &pod.Containers[0].VolumeMounts[i]
+					}
+				}
+
+				if !tt.expect {
+					assert.Assert(t, volume == nil)
+					assert.Assert(t, mount == nil)
+					return
+				}
+
+				assert.Assert(t, volume != nil)
+				assert.Assert(t, cmp.MarshalMatches(volume, `
+emptyDir: {}
+name: pgbouncer-logs
+				`))
+
+				assert.Assert(t, mount != nil)
+				assert.Assert(t, cmp.MarshalMatches(mount, `
+mountPath: /var/logs
+name: pgbouncer-logs
+				`))
+
+				// Only the PgBouncer container writes the startup log.
+				for _, m := range pod.Containers[1].VolumeMounts {
+					assert.Assert(t, m.Name != logVolumeName)
+				}
+			})
+		}
+	})
+
+	t.Run("InitContainer", func(t *testing.T) {
+		for _, tt := range []struct {
+			version string
+			expect  bool
+		}{
+			{version: "3.0.0", expect: false},
+			{version: "3.1.0", expect: true},
+		} {
+			t.Run(tt.version, func(t *testing.T) {
+				cluster := new(v1beta1.PostgresCluster)
+				cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+				cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+				cluster.SetLabels(map[string]string{naming.LabelVersion: tt.version})
+				assert.NilError(t, cluster.Default(context.Background(), nil))
+
+				pod := new(corev1.PodSpec)
+				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "some/init:image")
+
+				var volume *corev1.Volume
+				for i := range pod.Volumes {
+					if pod.Volumes[i].Name == pNaming.CrunchyBinVolumeName {
+						volume = &pod.Volumes[i]
+					}
+				}
+
+				var mount *corev1.VolumeMount
+				for i := range pod.Containers[0].VolumeMounts {
+					if pod.Containers[0].VolumeMounts[i].Name == pNaming.CrunchyBinVolumeName {
+						mount = &pod.Containers[0].VolumeMounts[i]
+					}
+				}
+
+				if !tt.expect {
+					assert.Equal(t, len(pod.InitContainers), 0)
+					assert.Assert(t, volume == nil)
+					assert.Assert(t, mount == nil)
+					return
+				}
+
+				assert.Equal(t, len(pod.InitContainers), 1)
+				assert.Assert(t, cmp.MarshalMatches(pod.InitContainers[0], `
+command:
+- /usr/local/bin/init-entrypoint.sh
+image: some/init:image
+name: pgbouncer-init
+resources: {}
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  privileged: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+terminationMessagePath: /dev/termination-log
+terminationMessagePolicy: File
+volumeMounts:
+- mountPath: /opt/crunchy
+  name: crunchy-bin
+				`))
+
+				assert.Assert(t, volume != nil)
+				assert.Assert(t, cmp.MarshalMatches(volume, `
+emptyDir: {}
+name: crunchy-bin
+				`))
+
+				assert.Assert(t, mount != nil)
+				assert.Assert(t, cmp.MarshalMatches(mount, `
+mountPath: /opt/crunchy
+name: crunchy-bin
+				`))
+
+				// Only the PgBouncer container runs the installed binaries.
+				for _, m := range pod.Containers[1].VolumeMounts {
+					assert.Assert(t, m.Name != pNaming.CrunchyBinVolumeName)
+				}
+			})
+		}
 	})
 }
 

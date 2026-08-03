@@ -28,6 +28,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -613,8 +614,14 @@ func (r *Reconciler) generatePGBouncerDeployment(
 
 	err := errors.WithStack(r.setControllerReference(cluster, deploy))
 
+	var initImage string
+	if err == nil && cluster.CompareVersion("3.1.0") >= 0 {
+		initImage, err = k8s.InitImage(ctx, r.Client, cluster, nil)
+		err = errors.Wrap(err, "get init image")
+	}
+
 	if err == nil {
-		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec)
+		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec, initImage)
 	}
 
 	return deploy, true, err

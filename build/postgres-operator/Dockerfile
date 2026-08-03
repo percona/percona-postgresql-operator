@@ -39,9 +39,13 @@ RUN mkdir -p build/_output/bin \
     && CGO_ENABLED=$PGBACKREST_CGO_ENABLED GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
         go build \
             -o build/_output/bin/pgbackrest ./cmd/pgbackrest \
+    && CGO_ENABLED=0 GOARCH=${TARGETARCH} GOOS=$GOOS GO_LDFLAGS=$GO_LDFLAGS \
+        go build \
+            -o build/_output/bin/pgbouncer-startup ./cmd/pgbouncer-startup \
     && cp -r build/_output/bin/postgres-operator /usr/local/bin/postgres-operator \
     && cp -r build/_output/bin/extension-installer /usr/local/bin/extension-installer \
-    && cp -r build/_output/bin/pgbackrest /usr/local/bin/pgbackrest
+    && cp -r build/_output/bin/pgbackrest /usr/local/bin/pgbackrest \
+    && cp -r build/_output/bin/pgbouncer-startup /usr/local/bin/pgbouncer-startup
 
 
 RUN ./bin/license_aggregator.sh ./cmd/...; \
@@ -62,6 +66,7 @@ COPY licenses /licenses
 COPY --from=go_builder /usr/local/bin/postgres-operator /usr/local/bin
 COPY --from=go_builder /usr/local/bin/extension-installer /usr/local/bin
 COPY --from=go_builder /usr/local/bin/pgbackrest /usr/local/bin/
+COPY --from=go_builder /usr/local/bin/pgbouncer-startup /usr/local/bin/
 COPY --from=go_builder /licenses /licenses
 COPY build/postgres-operator/install-extensions.sh /usr/local/bin
 COPY build/postgres-operator/relocate-extensions.sh /usr/local/bin

@@ -778,8 +778,6 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	})
 }
 
-// K8SPG-1115: pause and resume go through the PgBouncer admin console on every
-// Pod, so this pairs a mocked admin client with a fake Kubernetes API.
 func TestReconcilePause(t *testing.T) {
 	ctx := context.Background()
 

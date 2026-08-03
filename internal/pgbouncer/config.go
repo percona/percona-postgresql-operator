@@ -21,25 +21,36 @@ import (
 const (
 	configDirectory = "/etc/pgbouncer"
 
-	authFileAbsolutePath  = configDirectory + "/" + authFileProjectionPath
-	emptyFileAbsolutePath = configDirectory + "/" + emptyFileProjectionPath
-	iniFileAbsolutePath   = configDirectory + "/" + iniFileProjectionPath
-	hbaFileAbsolutePath   = configDirectory + "/" + hbaFileProjectionPath
+	logDirectory           = "/var/logs"
+	logVolumeName          = "pgbouncer-logs"
+	StartupLogAbsolutePath = logDirectory + "/startup.log"
+
+	authFileAbsolutePath   = configDirectory + "/" + authFileProjectionPath
+	emptyFileAbsolutePath  = configDirectory + "/" + emptyFileProjectionPath
+	iniFileAbsolutePath    = configDirectory + "/" + iniFileProjectionPath
+	hbaFileAbsolutePath    = configDirectory + "/" + hbaFileProjectionPath
+	PausedFileAbsolutePath = configDirectory + "/" + pausedFileProjectionPath
 
 	authFileProjectionPath  = "~postgres-operator/users.txt"
 	emptyFileProjectionPath = "pgbouncer.ini"
 	iniFileProjectionPath   = "~postgres-operator.ini"
 	hbaFileProjectionPath   = "~postgres-operator/pgbouncer_hba.conf"
 
-	authFileSecretKey      = "pgbouncer-users.txt"      // #nosec G101 this is a name, not a credential
-	passwordSecretKey      = "pgbouncer-password"       // #nosec G101 this is a name, not a credential
-	verifierSecretKey      = "pgbouncer-verifier"       // #nosec G101 this is a name, not a credential
-	AdminPasswordSecretKey = "pgbouncer-admin-password" // #nosec G101 this is a name, not a credential
-	emptyConfigMapKey      = "pgbouncer-empty"
-	iniFileConfigMapKey    = "pgbouncer.ini"
-	hbaFileConfigMapKey    = "pgbouncer-hba.conf"
+	authFileSecretKey        = "pgbouncer-users.txt"      // #nosec G101 this is a name, not a credential
+	passwordSecretKey        = "pgbouncer-password"       // #nosec G101 this is a name, not a credential
+	verifierSecretKey        = "pgbouncer-verifier"       // #nosec G101 this is a name, not a credential
+	AdminPasswordSecretKey   = "pgbouncer-admin-password" // #nosec G101 this is a name, not a credential
+	emptyConfigMapKey        = "pgbouncer-empty"
+	iniFileConfigMapKey      = "pgbouncer.ini"
+	hbaFileConfigMapKey      = "pgbouncer-hba.conf"
+	pausedConfigMapKey       = "pgbouncer-paused"
+	pausedFileProjectionPath = "pgbouncer-paused"
 
 	AdminUser = "_crunchypgbounceradmin"
+
+	AdminPasswordEnvVar = "PGBOUNCER_ADMIN_PASSWORD" // #nosec G101 this is a name, not a credential
+
+	PausedValue = "1"
 
 	adminUsersSetting = "admin_users"
 )
@@ -311,9 +322,11 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 // podConfigFiles returns projections of PgBouncer's configuration files to
 // include in the configuration volume.
 func podConfigFiles(
-	config v1beta1.PGBouncerConfiguration,
+	inCluster *v1beta1.PostgresCluster,
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) []corev1.VolumeProjection {
+	config := inCluster.Spec.Proxy.PGBouncer.Config
+
 	// Start with an empty file at /etc/pgbouncer/pgbouncer.ini. This file can
 	// be overridden by the user, but it must exist because our configuration
 	// file refers to it.
@@ -360,6 +373,21 @@ func podConfigFiles(
 			},
 		},
 	}...)
+
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		projections = append(projections, corev1.VolumeProjection{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configmap.Name,
+				},
+				Optional: new(true),
+				Items: []corev1.KeyToPath{{
+					Key:  pausedConfigMapKey,
+					Path: pausedFileProjectionPath,
+				}},
+			},
+		})
+	}
 
 	// Mount the PgBouncer HBA file when it has been generated (i.e. LDAP rules exist).
 	if _, ok := configmap.Data[hbaFileConfigMapKey]; ok {
