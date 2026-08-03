@@ -29,32 +29,32 @@ func main() {
 
 	log.SetOutput(io.MultiWriter(os.Stderr, f))
 
-	handlePause()
+	if err := handlePause(); err != nil {
+		log.Fatalf("ERROR: %v", err)
+	}
 }
 
 // If connections need to be paused, pause them on startup.
 // During runtime, the operator runs PAUSE, but this is not persisted across restarts.
-// This is best-effort, failure to pause should not block startup.
-func handlePause() {
+// Failure to pause is fatal: the container must not be considered started while
+// it is accepting connections the user asked us to hold.
+func handlePause() error {
 	wanted, err := pauseWanted(pgbouncer.PausedFileAbsolutePath)
 	if err != nil {
-		log.Printf("ERROR: read paused marker: %v", err)
-		return
+		return errors.Wrap(err, "read paused marker")
 	}
 	if !wanted {
-		return
+		return nil
 	}
 
 	password := os.Getenv(pgbouncer.AdminPasswordEnvVar)
 	if password == "" {
-		log.Printf("ERROR: %s is not set, cannot pause", pgbouncer.AdminPasswordEnvVar)
-		return
+		return errors.Errorf("%s is not set, cannot pause", pgbouncer.AdminPasswordEnvVar)
 	}
 
 	client, err := pgbruntime.NewAdminClient(pgbouncer.AdminUser, password, adminHost)
 	if err != nil {
-		log.Printf("ERROR: create pgbouncer admin client: %v", err)
-		return
+		return errors.Wrap(err, "create pgbouncer admin client")
 	}
 	defer func() { _ = client.Close() }()
 
@@ -62,11 +62,12 @@ func handlePause() {
 	defer cancel()
 
 	if err := pause(ctx, client, pauseRetryInterval); err != nil {
-		log.Printf("ERROR: pause pgbouncer: %v", err)
-		return
+		return errors.Wrap(err, "pause pgbouncer")
 	}
 
 	log.Print("paused pgbouncer connections")
+
+	return nil
 }
 
 func pauseWanted(path string) (bool, error) {
