@@ -10,16 +10,22 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
+	pgbmock "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer/mock"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -770,4 +776,144 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 			})
 		})
 	})
+}
+
+// K8SPG-1115: pause and resume go through the PgBouncer admin console on every
+// Pod, so this pairs a mocked admin client with a fake Kubernetes API.
+func TestReconcilePause(t *testing.T) {
+	ctx := context.Background()
+
+	const adminPassword = "some-admin-password"
+	const podIP = "10.0.0.1"
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "hippo-pgbouncer"},
+		Data: map[string][]byte{
+			pgbouncer.AdminPasswordSecretKey: []byte(adminPassword),
+		},
+	}
+
+	pgBouncerPod := func(cluster *v1beta1.PostgresCluster) client.Object {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cluster.Namespace,
+				Name:      cluster.Name + "-pgbouncer-abcd",
+				Labels: map[string]string{
+					naming.LabelCluster: cluster.Name,
+					naming.LabelRole:    naming.RolePGBouncer,
+				},
+			},
+			Status: corev1.PodStatus{PodIP: podIP},
+		}
+	}
+
+	setPausedCondition := func(cluster *v1beta1.PostgresCluster) {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGBouncerPaused,
+			Status:  metav1.ConditionTrue,
+			Reason:  "Paused",
+			Message: "pgbouncer is paused",
+		})
+	}
+
+	testCases := []struct {
+		desc     string
+		cr       func() *v1beta1.PostgresCluster
+		mocks    func(m *pgbmock.AdminClient)
+		assertPG func(t *testing.T, cluster *v1beta1.PostgresCluster)
+	}{
+		{
+			desc: "pauses",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := testCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {
+				m.On("Pause", mock.Anything).Return(nil).Once()
+				m.On("Close").Return(nil).Once()
+			},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.IsStatusConditionTrue(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused))
+			},
+		},
+		{
+			desc: "resumes",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := testCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(false)
+				setPausedCondition(cluster)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {
+				m.On("Resume", mock.Anything).Return(nil).Once()
+				m.On("Close").Return(nil).Once()
+			},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.FindStatusCondition(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused) == nil,
+					"the condition should be removed, not set to false")
+			},
+		},
+		{
+			desc: "steady state resumed",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := testCluster()
+				cluster.Namespace = "ns1"
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.FindStatusCondition(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused) == nil)
+			},
+		},
+		{
+			desc: "steady state paused",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := testCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
+				setPausedCondition(cluster)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.IsStatusConditionTrue(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			admin := pgbmock.NewAdminClient(t)
+			tc.mocks(admin)
+
+			cluster := tc.cr()
+			cl := fake.NewClientBuilder().WithObjects(pgBouncerPod(cluster)).Build()
+
+			r := &Reconciler{
+				Client: cl,
+				newPGBouncerAdmin: func(user, password, host string) (pgbruntime.AdminClient, error) {
+					assert.Equal(t, user, pgbouncer.AdminUser)
+					assert.Equal(t, password, adminPassword)
+
+					if host != podIP {
+						return nil, errors.Errorf("no pgbouncer Pod has IP %q", host)
+					}
+					return admin, nil
+				},
+			}
+
+			assert.NilError(t, r.reconcilePGBouncerPause(ctx, secret, cluster))
+
+			if tc.assertPG != nil {
+				tc.assertPG(t, cluster)
+			}
+		})
+	}
 }
