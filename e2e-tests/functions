@@ -1970,7 +1970,7 @@ function vault_tls() {
 	local service=$name
 	local namespace=$name
 	local secret_name=$name
-	local csr_name=vault-csr-${RANDOM}
+	local csr_name=vault-csr-${name}
 	local csr_api_ver="v1"
 	local csr_signer
 	local platform=$(detect_k8s_platform)
@@ -2023,6 +2023,7 @@ ${csr_signer}
   - server auth
 EOF
 
+	kubectl delete csr ${csr_name} --ignore-not-found
 	kubectl create -f ${tmp_dir}/csr.yaml
 	sleep 10
 	kubectl certificate approve ${csr_name}
