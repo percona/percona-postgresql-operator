@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name="${test_name}"
+
+      # Clean up
+      kubectl -n "${NAMESPACE}" delete perconapgcluster "${cluster_name}" --wait=false || true
+      kubectl -n "${NAMESPACE}" wait --for=delete pods \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name}" \
+        --timeout=60s 2>/dev/null || true
+      kubectl -n "${NAMESPACE}" delete pvc \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name}" \
+        --wait=false 2>/dev/null || true
+
+      destroy_operator
+

@@ -1,0 +1,9 @@
+# Assert: the recreated cluster should also become ready.
+# If the race condition reproduces consistently, this will time out.
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: replica-bootstrap-race
+status:
+  state: ready
+

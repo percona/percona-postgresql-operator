@@ -1,0 +1,40 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      init_temp_dir
+
+      # Create cluster with two instance sets AND createReplicaMethods override.
+      # This triggers the race condition where:
+      #   - pgbackrest method fails (no backup exists, Patroni uses built-in which passes --scope)
+      #   - basebackup method fails (primary hasn't created _crunchyrepl yet)
+      get_cr \
+        | yq eval '
+            .spec.instances = [
+              {
+                "name": "i1",
+                "replicas": 1,
+                "dataVolumeClaimSpec": {
+                  "accessModes": ["ReadWriteOnce"],
+                  "resources": {"requests": {"storage": "1Gi"}}
+                }
+              },
+              {
+                "name": "i2",
+                "replicas": 1,
+                "dataVolumeClaimSpec": {
+                  "accessModes": ["ReadWriteOnce"],
+                  "resources": {"requests": {"storage": "1Gi"}}
+                }
+              }
+            ] |
+            .spec.proxy.pgBouncer.replicas = 1 |
+            .spec.patroni.createReplicaMethods = ["pgbackrest", "basebackup"]
+          ' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+

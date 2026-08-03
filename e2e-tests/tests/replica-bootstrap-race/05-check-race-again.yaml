@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name="${test_name}"
+
+      echo "=== Final check for race condition indicators (attempt 2) ==="
+
+      pods=$(kubectl -n "${NAMESPACE}" get pods \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name},postgres-operator.crunchydata.com/data=postgres" \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      for pod in $pods; do
+        if kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null | grep -q 'role "_crunchyrepl" does not exist'; then
+          echo "⚠️  _crunchyrepl error detected in $pod (attempt 2)"
+          kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null \
+            | grep -B1 -A1 'crunchyrepl' | head -10
+        fi
+        if kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null | grep -q "invalid option"; then
+          echo "⚠️  --scope/invalid option error in $pod (attempt 2)"
+        fi
+      done
+
+      echo ""
+      echo "=== Pod restart counts (attempt 2) ==="
+      kubectl -n "${NAMESPACE}" get pods \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name}" \
+        -o custom-columns='NAME:.metadata.name,RESTARTS:.status.containerStatuses[*].restartCount,STATUS:.status.phase'
+

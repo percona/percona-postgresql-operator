@@ -1,0 +1,72 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster_name="${test_name}"
+
+      echo "=== Checking for _crunchyrepl race condition indicators ==="
+
+      # Get all postgres data pods for this cluster
+      pods=$(kubectl -n "${NAMESPACE}" get pods \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name},postgres-operator.crunchydata.com/data=postgres" \
+        -o jsonpath='{.items[*].metadata.name}')
+
+      crunchyrepl_error=false
+      scope_error=false
+
+      for pod in $pods; do
+        echo "--- Checking pod: $pod ---"
+
+        # Check current logs
+        if kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null | grep -q 'role "_crunchyrepl" does not exist'; then
+          echo "  ⚠️  FOUND: _crunchyrepl error in $pod"
+          kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null \
+            | grep -A2 -B2 'crunchyrepl' | head -20
+          crunchyrepl_error=true
+        fi
+
+        # Check for the --scope error (pgbackrest built-in fallback)
+        if kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null | grep -q "invalid option"; then
+          echo "  ⚠️  FOUND: --scope/invalid option error in $pod"
+          kubectl -n "${NAMESPACE}" logs "$pod" -c database 2>/dev/null \
+            | grep "invalid option" | head -5
+          scope_error=true
+        fi
+
+        # Check previous container logs (if pod was restarted)
+        if kubectl -n "${NAMESPACE}" logs "$pod" -c database --previous 2>/dev/null | grep -q 'role "_crunchyrepl" does not exist'; then
+          echo "  ⚠️  FOUND: _crunchyrepl error in PREVIOUS container of $pod"
+          crunchyrepl_error=true
+        fi
+      done
+
+      echo ""
+      echo "=== Pod restart counts ==="
+      kubectl -n "${NAMESPACE}" get pods \
+        -l "postgres-operator.crunchydata.com/cluster=${cluster_name}" \
+        -o custom-columns='NAME:.metadata.name,RESTARTS:.status.containerStatuses[*].restartCount,STATUS:.status.phase'
+
+      echo ""
+      echo "=== Results ==="
+      if $crunchyrepl_error; then
+        echo "❌ BUG REPRODUCED: _crunchyrepl role does not exist error detected"
+        echo "   This confirms the race condition between primary bootstrap and replica start"
+        # Don't exit 1 here - we want to detect the error but the test "passes" if cluster recovered
+      fi
+      if $scope_error; then
+        echo "⚠️  RELATED BUG: --scope option error detected"
+        echo "   This confirms K8SPG-704 override causes Patroni to use built-in pgbackrest"
+        echo "   integration (with removed --scope flag) instead of operator's custom command"
+      fi
+
+      if ! $crunchyrepl_error && ! $scope_error; then
+        echo "✅ No race condition errors detected in this run"
+        echo "   (The bug is intermittent; try running multiple times)"
+      fi
+

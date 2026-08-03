@@ -1,0 +1,9 @@
+# Assert: the cluster should become ready within the timeout.
+# If the _crunchyrepl race condition is triggered, this will fail.
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: replica-bootstrap-race
+status:
+  state: ready
+
