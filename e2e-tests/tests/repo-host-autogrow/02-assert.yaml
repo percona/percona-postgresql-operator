@@ -33,8 +33,8 @@ commands:
       fi
 
       suggested_mebibytes=${suggested_size%Mi}
-      if ((suggested_mebibytes <= 300)); then
-        echo "Expected repo1 PVC size suggestion greater than 300Mi, got ${suggested_size}"
+      if ((suggested_mebibytes <= 1024)); then
+        echo "Expected repo1 PVC size suggestion greater than 1Gi, got ${suggested_size}"
         exit 1
       fi
 

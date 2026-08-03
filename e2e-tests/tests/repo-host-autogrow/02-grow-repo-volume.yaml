@@ -16,8 +16,8 @@ commands:
       repo_pvc=$(kubectl -n "${NAMESPACE}" get pvc -l "${pvc_selector}" -o jsonpath='{.items[0].metadata.name}')
       storage=$(kubectl -n "${NAMESPACE}" get pvc "${repo_pvc}" -o jsonpath='{.spec.resources.requests.storage}')
 
-      if [[ "${storage}" != "256Mi" ]]; then
-        echo "Expected repo1 PVC storage request to be 256Mi, got ${storage}"
+      if [[ "${storage}" != "1Gi" ]]; then
+        echo "Expected repo1 PVC storage request to be 1Gi, got ${storage}"
         exit 1
       fi
 

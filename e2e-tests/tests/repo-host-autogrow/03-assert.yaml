@@ -10,8 +10,10 @@ commands:
 
       cluster=repo-host-autogrow
       selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-dedicated"
+      pvc_selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/pgbackrest-volume,postgres-operator.crunchydata.com/pgbackrest-repo=repo1"
 
       repo_pod=$(kubectl -n "${NAMESPACE}" get pods -l "${selector}" -o jsonpath='{.items[0].metadata.name}')
+      repo_pvc=$(kubectl -n "${NAMESPACE}" get pvc -l "${pvc_selector}" -o jsonpath='{.items[0].metadata.name}')
       suggested_size=$(kubectl -n "${NAMESPACE}" get pod "${repo_pod}" \
         -o jsonpath='{.metadata.annotations.suggested-pgbackrest-repo1-pvc-size}')
 
@@ -20,12 +22,14 @@ commands:
         exit 1
       fi
 
-      status_size=
+      status_size= storage=
       for _ in $(seq 1 60); do
         status_size=$(kubectl -n "${NAMESPACE}" get \
           postgrescluster.upstream.pgv2.percona.com/"${cluster}" \
           -o jsonpath='{.status.pgbackrest.repos[?(@.name=="repo1")].desiredRepoVolume}')
-        if [[ "${status_size}" == "${suggested_size}" ]]; then
+        storage=$(kubectl -n "${NAMESPACE}" get pvc "${repo_pvc}" \
+          -o jsonpath='{.spec.resources.requests.storage}')
+        if [[ "${status_size}" == "${suggested_size}" && "${storage}" != "1Gi" ]]; then
           break
         fi
         sleep 5
@@ -35,15 +39,7 @@ commands:
         echo "Expected desired repo volume ${suggested_size}, got ${status_size}"
         exit 1
       fi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    postgres-operator.crunchydata.com/cluster: repo-host-autogrow
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-    postgres-operator.crunchydata.com/pgbackrest-volume: ""
-spec:
-  resources:
-    requests:
-      storage: 300Mi
+      if [[ "${storage}" == "1Gi" ]]; then
+        echo "Expected repo1 PVC storage request to grow, got ${storage}"
+        exit 1
+      fi
