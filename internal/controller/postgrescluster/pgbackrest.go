@@ -1378,9 +1378,9 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		volumeMounts = append(volumeMounts, tablespaceVolumeMount)
 	}
 
-	if vault := cluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+	if pgTDE := &cluster.Spec.Extensions.PGTDE; pgTDE.HasKeyProvider() {
 		volumeMounts = append(volumeMounts, postgres.PGTDEVolumeMount())
-		volumes = append(volumes, postgres.PGTDEVolume(vault))
+		volumes = append(volumes, postgres.PGTDEVolume(pgTDE))
 	}
 
 	restoreJob := &batchv1.Job{}

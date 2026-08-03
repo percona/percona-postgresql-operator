@@ -72,7 +72,7 @@ func execRecorder(calls *[]execCall, result func(call execCall) error) func(
 			}
 		}
 
-		// Stand in for the "wc -c" that fetchSecretToTempFile appends to its
+		// Stand in for the "wc -c" that pgtde's writeTempFile appends to its
 		// write command to detect short writes.
 		if len(command) > 2 && strings.Contains(command[2], "wc -c") {
 			_, _ = io.WriteString(stdout, strconv.Itoa(len(call.stdin))+"\n")
@@ -133,86 +133,36 @@ func tdeInstance(annotations map[string]string) *Instance {
 	}
 }
 
-func TestPGTDEVaultRevision(t *testing.T) {
-	t.Parallel()
+// tdeFileSpec is the file key provider configuration shared by the tests below.
+func tdeFileSpec() *v1beta1.PGTDEFileSpec {
+	return &v1beta1.PGTDEFileSpec{
+		KeySecret: v1beta1.PGTDESecretObjectReference{
+			Name: "file-secret", Key: "principal-key",
+		},
+	}
+}
 
-	vault := tdeVaultSpec()
-	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
+// tdeVaultPaths returns the paths a vault key provider names once the Secret is
+// mounted, and the paths of the copies staged on the data volumes during a
+// credential change.
+func tdeVaultPaths(vault *v1beta1.PGTDEVaultSpec) (mounted, staged pgtde.VaultProviderCredentialPath) {
+	provider := pgtde.NewVaultProvider(vault)
+	return *provider.GetCredentialPath().VaultProvider,
+		*provider.GetStagedCredentialPath().VaultProvider
+}
 
-	base, err := pgtde.VaultRevision(vault, tokenPath, caPath)
+// tdeRevisions returns the two values reconcilePGTDEProviders stores in
+// Status.PGTDERevision: the one for the credentials named in the spec and the
+// one for their staged copies.
+func tdeRevisions(t *testing.T, provider pgtde.KeyProvider) (standard, staged string) {
+	t.Helper()
+
+	standard, err := provider.GetRevision(provider.GetCredentialPath())
 	assert.NilError(t, err)
-	assert.Assert(t, base != "")
+	staged, err = provider.GetRevision(provider.GetStagedCredentialPath())
+	assert.NilError(t, err)
 
-	t.Run("Deterministic", func(t *testing.T) {
-		again, err := pgtde.VaultRevision(tdeVaultSpec(), tokenPath, caPath)
-		assert.NilError(t, err)
-		assert.Equal(t, base, again, "same input should hash the same")
-	})
-
-	t.Run("TempPathsDiffer", func(t *testing.T) {
-		tempToken, tempCA := pgtde.TempVaultCredentialPaths(vault)
-		temp, err := pgtde.VaultRevision(vault, tempToken, tempCA)
-		assert.NilError(t, err)
-		assert.Assert(t, temp != base,
-			"temp revision must differ from standard revision; the two-phase "+
-				"provider change relies on telling them apart")
-	})
-
-	// Every field that influences how PostgreSQL reaches Vault must change the
-	// revision, otherwise a configuration change is silently never applied.
-	for _, tc := range []struct {
-		name   string
-		mutate func(*v1beta1.PGTDEVaultSpec)
-	}{
-		{"Host", func(v *v1beta1.PGTDEVaultSpec) { v.Host = "https://other:8200" }},
-		{"MountPath", func(v *v1beta1.PGTDEVaultSpec) { v.MountPath = "other" }},
-		{"TokenSecretName", func(v *v1beta1.PGTDEVaultSpec) { v.TokenSecret.Name = "other" }},
-		{"TokenSecretKey", func(v *v1beta1.PGTDEVaultSpec) { v.TokenSecret.Key = "other" }},
-		{"CASecretName", func(v *v1beta1.PGTDEVaultSpec) { v.CASecret.Name = "other" }},
-		{"CASecretKey", func(v *v1beta1.PGTDEVaultSpec) { v.CASecret.Key = "other" }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			changed := tdeVaultSpec()
-			tc.mutate(changed)
-
-			// Recompute the paths; some of the fields above feed into them.
-			token, ca := pgtde.VaultCredentialPaths(changed)
-			rev, err := pgtde.VaultRevision(changed, token, ca)
-			assert.NilError(t, err)
-			assert.Assert(t, rev != base, "changing %s should change the revision", tc.name)
-		})
-	}
-
-	// Host and MountPath are hashed one after another and neither feeds into
-	// the credential paths, so they isolate how the fields are delimited from
-	// everything else that goes into the revision.
-	hostMount := func(host, mountPath string) string {
-		t.Helper()
-		vault := tdeVaultSpec()
-		vault.Host, vault.MountPath = host, mountPath
-
-		token, ca := pgtde.VaultCredentialPaths(vault)
-		revision, err := pgtde.VaultRevision(vault, token, ca)
-		assert.NilError(t, err)
-		return revision
-	}
-
-	// Without a delimiter, moving a character across a field boundary produces
-	// the same revision, and reconcilePGTDEProviders takes its "matches the
-	// spec" early return on a Vault the cluster has never been pointed at.
-	t.Run("FieldBoundaries", func(t *testing.T) {
-		assert.Assert(t,
-			hostMount("https://vault:8200", "secret/data") !=
-				hostMount("https://vault:8200secret", "/data"),
-			"a character moved from one field to the next must change the revision")
-	})
-
-	// Delimiting with a quote is only injective when a quote appearing inside a
-	// value is escaped.
-	t.Run("QuotesInValues", func(t *testing.T) {
-		assert.Assert(t, hostMount(`a"`, `b`) != hostMount(`a`, `"b`),
-			"a quote inside a value must not fake a field boundary")
-	})
+	return standard, staged
 }
 
 func TestPreserveOldTDEVolume(t *testing.T) {
@@ -528,17 +478,15 @@ func TestScaleUpInstancesPreservesTDEVolume(t *testing.T) {
 	}
 
 	// revisionFor is the value reconcilePGTDEProviders stores in
-	// Status.PGTDERevision once the provider names the given paths.
-	revisionFor := func(vault *v1beta1.PGTDEVaultSpec, temp bool) string {
+	// Status.PGTDERevision once the provider names the mounted credentials, or
+	// the copies staged on the data volumes when staged is true.
+	revisionFor := func(vault *v1beta1.PGTDEVaultSpec, staged bool) string {
 		t.Helper()
-		paths := pgtde.VaultCredentialPaths
-		if temp {
-			paths = pgtde.TempVaultCredentialPaths
+		standardRevision, stagedRevision := tdeRevisions(t, pgtde.NewVaultProvider(vault))
+		if staged {
+			return stagedRevision
 		}
-		tokenPath, caPath := paths(vault)
-		revision, err := pgtde.VaultRevision(vault, tokenPath, caPath)
-		assert.NilError(t, err)
-		return revision
+		return standardRevision
 	}
 
 	// Initial setup: no provider has been configured, so there is nothing to
@@ -564,214 +512,6 @@ func TestScaleUpInstancesPreservesTDEVolume(t *testing.T) {
 		"the hold should be released once the provider names the staged credentials")
 }
 
-func TestStageVaultCredentials(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "vault-secret"},
-		Data: map[string][]byte{
-			"token":  []byte("hvs.sometoken"),
-			"ca.crt": []byte("-----BEGIN CERTIFICATE-----"),
-		},
-	}
-
-	newPods := func(names ...string) []*corev1.Pod {
-		pods := make([]*corev1.Pod, 0, len(names))
-		for _, name := range names {
-			pods = append(pods, &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: name},
-			})
-		}
-		return pods
-	}
-
-	vault := tdeVaultSpec()
-	tokenPath, caPath := pgtde.TempVaultCredentialPaths(vault)
-
-	t.Run("WritesToEveryPod", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-		pods := newPods("pgc1-instance1-abcd-0", "pgc1-instance2-efgh-0", "pgc1-instance3-ijkl-0")
-
-		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
-
-		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", vault, pods, naming.ContainerDatabase, tokenPath, caPath))
-
-		// pg_tde names one path cluster-wide, but each instance has its own
-		// /pgdata, so every one of them needs its own copy.
-		assert.Equal(t, len(calls), 6, "two files on each of three instances")
-
-		for i, pod := range pods {
-			token, ca := calls[i*2], calls[i*2+1]
-
-			assert.Equal(t, token.pod, pod.Name)
-			assert.Equal(t, token.stdin, "hvs.sometoken")
-			assert.Assert(t, strings.Contains(token.command[2], tokenPath))
-
-			assert.Equal(t, ca.pod, pod.Name)
-			assert.Equal(t, ca.stdin, "-----BEGIN CERTIFICATE-----")
-			assert.Assert(t, strings.Contains(ca.command[2], caPath))
-		}
-	})
-
-	t.Run("ReadsEachSecretOnce", func(t *testing.T) {
-		var calls []execCall
-		gets := 0
-		k8s := &countingClient{
-			Client: fake.NewClientBuilder().WithObjects(secret).Build(),
-			gets:   &gets,
-		}
-		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
-
-		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", vault, newPods("a", "b", "c", "d"), naming.ContainerDatabase,
-			tokenPath, caPath))
-
-		assert.Equal(t, gets, 2,
-			"the token and CA Secrets should be read once, not once per instance")
-	})
-
-	t.Run("WithoutCASecret", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-
-		noCA := tdeVaultSpec()
-		noCA.CASecret = v1beta1.PGTDESecretObjectReference{}
-		_, noCAPath := pgtde.TempVaultCredentialPaths(noCA)
-
-		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
-
-		assert.NilError(t, reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", noCA, newPods("a", "b"), naming.ContainerDatabase,
-			tokenPath, noCAPath))
-
-		assert.Equal(t, len(calls), 2, "only the token is staged")
-	})
-
-	t.Run("MissingSecretWritesNothing", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().Build()
-		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
-
-		err := reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", vault, newPods("a", "b"), naming.ContainerDatabase, tokenPath, caPath)
-
-		assert.ErrorContains(t, err, "token secret")
-		assert.Equal(t, len(calls), 0,
-			"the Secrets are read before anything is written to any Pod")
-	})
-
-	t.Run("MissingKey", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-
-		badKey := tdeVaultSpec()
-		badKey.TokenSecret.Key = "nope"
-
-		reconciler := &Reconciler{Client: k8s, PodExec: execRecorder(&calls, nil)}
-
-		err := reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", badKey, newPods("a"), naming.ContainerDatabase, tokenPath, caPath)
-
-		assert.ErrorContains(t, err, `key "nope" not found`)
-		assert.Equal(t, len(calls), 0)
-	})
-
-	t.Run("FailureNamesThePod", func(t *testing.T) {
-		var calls []execCall
-		k8s := fake.NewClientBuilder().WithObjects(secret).Build()
-
-		reconciler := &Reconciler{
-			Client: k8s,
-			PodExec: execRecorder(&calls, func(call execCall) error {
-				if call.pod == "b" {
-					return errors.New("no space left on device")
-				}
-				return nil
-			}),
-		}
-
-		err := reconciler.stagePGTDEVaultCredentials(ctx,
-			"ns1", vault, newPods("a", "b", "c"), naming.ContainerDatabase,
-			tokenPath, caPath)
-
-		assert.ErrorContains(t, err, "pod b")
-		assert.ErrorContains(t, err, "no space left on device")
-		assert.Equal(t, len(calls), 3,
-			"staging stops at the first instance it cannot write to")
-	})
-}
-
-func TestWriteTempFile(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1-instance1-abcd-0"},
-	}
-
-	t.Run("PipesDataAndSetsMode", func(t *testing.T) {
-		var calls []execCall
-
-		assert.NilError(t, writeTempFile(ctx, execRecorder(&calls, nil), pod,
-			naming.ContainerDatabase, pgtde.TempTokenPath, []byte("hvs.sometoken")))
-
-		assert.Equal(t, len(calls), 1)
-		assert.Equal(t, calls[0].namespace, "ns1")
-		assert.Equal(t, calls[0].pod, pod.Name)
-		assert.Equal(t, calls[0].container, naming.ContainerDatabase)
-		assert.Equal(t, calls[0].stdin, "hvs.sometoken",
-			"the secret value should be piped in, not interpolated into the command")
-		assert.DeepEqual(t, calls[0].command[:2], []string{"bash", "-ceu"})
-		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempTokenPath))
-		assert.Assert(t, strings.Contains(calls[0].command[2], "umask 077"),
-			"the token file must never exist in a world readable state")
-	})
-
-	t.Run("ShortWrite", func(t *testing.T) {
-		// The container reports fewer bytes on disk than were sent.
-		err := writeTempFile(ctx,
-			func(ctx context.Context, namespace, pod, container string,
-				stdin io.Reader, stdout, stderr io.Writer, command ...string,
-			) error {
-				_, _ = io.WriteString(stdout, "4\n")
-				return nil
-			},
-			pod, naming.ContainerDatabase, pgtde.TempTokenPath, []byte("hvs.sometoken"))
-
-		assert.ErrorContains(t, err, "wrote 4 of 13 bytes",
-			"a truncated token must not be accepted as written")
-	})
-
-	t.Run("ExecFails", func(t *testing.T) {
-		var calls []execCall
-
-		err := writeTempFile(ctx,
-			execRecorder(&calls, func(execCall) error {
-				return errors.New("no such file or directory")
-			}),
-			pod, naming.ContainerDatabase, pgtde.TempTokenPath, []byte("x"))
-
-		assert.ErrorContains(t, err, pgtde.TempTokenPath)
-		assert.ErrorContains(t, err, "no such file or directory")
-	})
-}
-
-// countingClient counts Get calls made against the embedded client.
-type countingClient struct {
-	client.Client
-	gets *int
-}
-
-func (c *countingClient) Get(
-	ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
-) error {
-	*c.gets++
-	return c.Client.Get(ctx, key, obj, opts...)
-}
-
 func TestReconcilePGTDEProviders(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -785,13 +525,11 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 	}
 
 	vault := tdeVaultSpec()
-	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
-	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+	mounted, staged := tdeVaultPaths(vault)
+	tokenPath, caPath := mounted.TokenPath, mounted.CAPath
+	tempTokenPath, tempCAPath := staged.TokenPath, staged.CAPath
 
-	standardRevision, err := pgtde.VaultRevision(vault, tokenPath, caPath)
-	assert.NilError(t, err)
-	tempRevision, err := pgtde.VaultRevision(vault, tempTokenPath, tempCAPath)
-	assert.NilError(t, err)
+	standardRevision, tempRevision := tdeRevisions(t, pgtde.NewVaultProvider(vault))
 
 	newCluster := func() *v1beta1.PostgresCluster {
 		cluster := &v1beta1.PostgresCluster{
@@ -835,11 +573,19 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			"the revision must be cleared so re-enabling starts from scratch")
 	})
 
-	t.Run("NoVaultSpec", func(t *testing.T) {
+	// Neither key provider is configured, so there is nothing to point pg_tde
+	// at and nothing to report about it.
+	t.Run("NoProviderSpec", func(t *testing.T) {
 		var calls []execCall
 		cluster := newCluster()
 		cluster.Spec.Extensions.PGTDE.Vault = nil
+		cluster.Spec.Extensions.PGTDE.File = nil
 		cluster.Status.PGTDERevision = standardRevision
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEProviderReady,
+			Status: metav1.ConditionTrue,
+			Reason: "Configured",
+		})
 
 		r := &Reconciler{
 			Recorder: events.NewRecorder(t, runtime.Scheme),
@@ -851,6 +597,8 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 
 		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
 		assert.Equal(t, cluster.Status.PGTDERevision, "")
+		assert.Equal(t, tdeCondition(cluster).Reason, "<missing>",
+			"a provider that is not configured must not be reported as ready")
 	})
 
 	t.Run("WaitsForRollout", func(t *testing.T) {
@@ -981,8 +729,8 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 
 		assert.Equal(t, len(calls), 1,
 			"the credentials staged for the abandoned change must be removed")
-		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempTokenPath))
-		assert.Assert(t, strings.Contains(calls[0].command[2], pgtde.TempCAPath))
+		assert.Assert(t, strings.Contains(calls[0].command[2], tempTokenPath))
+		assert.Assert(t, strings.Contains(calls[0].command[2], tempCAPath))
 
 		// The failure the user already resolved must stop being reported.
 		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
@@ -1114,7 +862,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			"the condition should name the Secret that could not be read")
 		assert.Equal(t, patched, 1,
 			"the failure condition is useless unless it is written to the API")
-		assertEvent(t, r.Recorder, "PGTDEVaultProviderChangeFailed")
+		assertEvent(t, r.Recorder, "PGTDEProviderChangeFailed")
 	})
 
 	t.Run("PhaseTwo", func(t *testing.T) {
@@ -1226,8 +974,8 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 	})
 }
 
-// tdeCondition returns the PGTDEVaultProviderReady condition, failing the test
-// when it is absent.
+// tdeCondition returns the PGTDEProviderReady condition, falling back to a
+// placeholder reason when it is absent.
 func tdeCondition(cluster *v1beta1.PostgresCluster) metav1.Condition {
 	condition := meta.FindStatusCondition(cluster.Status.Conditions,
 		v1beta1.PGTDEProviderReady)
@@ -1238,7 +986,7 @@ func tdeCondition(cluster *v1beta1.PostgresCluster) metav1.Condition {
 }
 
 // assertTDEProviderCondition checks the status and reason of the
-// PGTDEVaultProviderReady condition.
+// PGTDEProviderReady condition.
 func assertTDEProviderCondition(
 	t *testing.T, cluster *v1beta1.PostgresCluster,
 	status metav1.ConditionStatus, reason string,
@@ -1304,7 +1052,7 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 	}
 
 	// pgTDECondition reports the PGTDEEnabled condition, which decides whether
-	// pg_tde goes into shared_preload_libraries and whether the vault volume is
+	// pg_tde goes into shared_preload_libraries and whether the pg-tde volume is
 	// mounted.
 	pgTDECondition := func(cluster *v1beta1.PostgresCluster) *metav1.Condition {
 		return meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEEnabled)
@@ -1512,13 +1260,10 @@ func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
 	}
 
 	vault := tdeVaultSpec()
-	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
-	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+	_, staged := tdeVaultPaths(vault)
+	tempTokenPath, tempCAPath := staged.TokenPath, staged.CAPath
 
-	standardRevision, err := pgtde.VaultRevision(vault, tokenPath, caPath)
-	assert.NilError(t, err)
-	tempRevision, err := pgtde.VaultRevision(vault, tempTokenPath, tempCAPath)
-	assert.NilError(t, err)
+	standardRevision, tempRevision := tdeRevisions(t, pgtde.NewVaultProvider(vault))
 
 	newCluster := func(revision string) *v1beta1.PostgresCluster {
 		cluster := &v1beta1.PostgresCluster{
@@ -1664,70 +1409,139 @@ func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
 	})
 }
 
-func TestPGTDEVaultChangeFor(t *testing.T) {
+// TestReconcilePGTDEProvidersFileProvider covers the wiring of the file key
+// provider through the same two-phase credential change as the vault one: which
+// paths reach the SQL, and where the key is staged in between. The phases
+// themselves are pinned in internal/pgtde.
+func TestReconcilePGTDEProvidersFileProvider(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
-	vault := tdeVaultSpec()
-	tokenPath, caPath := pgtde.VaultCredentialPaths(vault)
-	tempTokenPath, tempCAPath := pgtde.TempVaultCredentialPaths(vault)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "file-secret"},
+		Data:       map[string][]byte{"principal-key": []byte("principal-key-bytes")},
+	}
 
-	standardRevision, err := pgtde.VaultRevision(vault, tokenPath, caPath)
-	assert.NilError(t, err)
-	tempRevision, err := pgtde.VaultRevision(vault, tempTokenPath, tempCAPath)
-	assert.NilError(t, err)
+	provider := pgtde.NewFileProvider(tdeFileSpec())
+	keyPath := provider.GetCredentialPath().FileProvider.KeyPath
+	tempKeyPath := provider.GetStagedCredentialPath().FileProvider.KeyPath
+	standardRevision, tempRevision := tdeRevisions(t, provider)
 
-	clusterWith := func(revision string) *v1beta1.PostgresCluster {
-		cluster := &v1beta1.PostgresCluster{}
+	newCluster := func(revision string) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1", UID: "the-uid"},
+		}
 		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
 			Enabled: true,
-			Vault:   tdeVaultSpec(),
+			File:    tdeFileSpec(),
 		}
 		cluster.Status.PGTDERevision = revision
 		return cluster
 	}
 
-	for _, tc := range []struct {
-		name     string
-		revision string
-		expected pgtde.Phase
-	}{
-		{"InitialSetup", "", pgtde.InitialSetup},
-		{"Configured", standardRevision, pgtde.Configured},
-		{"Finalize", tempRevision, pgtde.Finalize},
-		{"StageCredentials", "a-revision-from-another-vault", pgtde.StageCredentials},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			change, err := pgtde.ChangePhase(clusterWith(tc.revision))
-			assert.NilError(t, err)
-			assert.Equal(t, change.Phase, tc.expected)
-
-			assert.Equal(t, change.TokenPath, tokenPath)
-			assert.Equal(t, change.CAPath, caPath)
-			assert.Equal(t, change.TempTokenPath, tempTokenPath)
-			assert.Equal(t, change.TempCAPath, tempCAPath)
-			assert.Equal(t, change.StandardRevision, standardRevision)
-			assert.Equal(t, change.TempRevision, tempRevision)
-		})
+	newReconciler := func(calls *[]execCall) *Reconciler {
+		return &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(calls, nil),
+		}
 	}
 
-	// reconcileInstance holds the Pods' vault volume in exactly one phase.
-	// Holding in any other one pins the StatefulSet to credentials the provider
-	// has already moved off of, and the Pods never roll.
-	t.Run("HoldsTheVolumeInOnePhase", func(t *testing.T) {
-		held := map[pgtde.Phase]bool{}
-		for _, revision := range []string{
-			"", standardRevision, tempRevision, "a-revision-from-another-vault",
-		} {
-			change, err := pgtde.ChangePhase(clusterWith(revision))
-			assert.NilError(t, err)
-			held[change.Phase] = change.Phase == pgtde.StageCredentials
+	observed := func() *observedInstances {
+		return &observedInstances{forCluster: []*Instance{
+			tdeInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+	}
+
+	psqlCalls := func(calls []execCall) []execCall {
+		var out []execCall
+		for _, call := range calls {
+			if len(call.command) > 0 && call.command[0] == "psql" {
+				out = append(out, call)
+			}
+		}
+		return out
+	}
+
+	t.Run("InitialSetup", func(t *testing.T) {
+		var calls []execCall
+		r := newReconciler(&calls)
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, newCluster(""), observed(),
+			func() error { return nil }))
+
+		sql := psqlCalls(calls)
+		assert.Equal(t, len(sql), 3,
+			"initial setup adds the provider, creates the key and sets it as default")
+		assert.Assert(t, strings.Contains(sql[0].stdin, "pg_tde_add_global_key_provider_file"))
+		assert.Assert(t, argsContain(sql[0].command, "--set=key_path="+keyPath),
+			"initial setup uses the mounted key path, not the staged one")
+
+		assert.Equal(t, len(calls), len(sql),
+			"no temporary files are needed when there is nothing to rotate")
+	})
+
+	t.Run("PhaseOne", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster("stale")
+		r := newReconciler(&calls)
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed(),
+			func() error { return nil }))
+
+		// The new key is staged on the persistent volume first...
+		assert.Equal(t, len(calls), 2)
+		assert.Assert(t, strings.Contains(calls[0].command[2], tempKeyPath))
+		assert.Equal(t, calls[0].stdin, "principal-key-bytes")
+
+		// ...and only then is the provider pointed at it.
+		sql := psqlCalls(calls)
+		assert.Equal(t, len(sql), 1)
+		assert.Assert(t, strings.Contains(sql[0].stdin, "pg_tde_change_global_key_provider_file"))
+		assert.Assert(t, argsContain(sql[0].command, "--set=key_path="+tempKeyPath))
+
+		assert.Equal(t, cluster.Status.PGTDERevision, tempRevision,
+			"the temp revision releases the volume hold in reconcileInstance")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeInProgress")
+	})
+
+	t.Run("PhaseTwo", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster(tempRevision)
+		r := newReconciler(&calls)
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed(),
+			func() error { return nil }))
+
+		sql := psqlCalls(calls)
+		assert.Equal(t, len(sql), 1)
+		assert.Assert(t, strings.Contains(sql[0].stdin, "pg_tde_change_global_key_provider_file"))
+		assert.Assert(t, argsContain(sql[0].command, "--set=key_path="+keyPath),
+			"phase two points the provider back at the mounted path")
+
+		// The staged key is removed once nothing references it.
+		assert.Equal(t, len(calls), 2)
+		assert.Assert(t, strings.Contains(calls[1].command[2], "rm -f"))
+		assert.Assert(t, strings.Contains(calls[1].command[2], tempKeyPath))
+
+		assert.Equal(t, cluster.Status.PGTDERevision, standardRevision)
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
+	})
+
+	t.Run("MissingSecret", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster("stale")
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
 		}
 
-		assert.DeepEqual(t, held, map[pgtde.Phase]bool{
-			pgtde.InitialSetup:     false,
-			pgtde.Configured:       false,
-			pgtde.StageCredentials: true,
-			pgtde.Finalize:         false,
-		})
+		err := r.reconcilePGTDEProviders(ctx, cluster, observed(), func() error { return nil })
+		assert.ErrorContains(t, err, "file-secret")
+		assert.Equal(t, len(psqlCalls(calls)), 0,
+			"the provider must not be changed to a path that was never written")
+		assert.Equal(t, cluster.Status.PGTDERevision, "stale")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeFailed")
 	})
 }

@@ -965,7 +965,11 @@ type BuiltInExtensionSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
+// The Pods keep mounting the key provider's credentials for as long as pg_tde
+// is installed, so whichever provider is configured has to stay in the spec
+// until the extension has been dropped.
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || (has(self.pg_tde) && (!has(oldSelf.pg_tde.vault) || has(self.pg_tde.vault)) && (!has(oldSelf.pg_tde.file) || has(self.pg_tde.file)))",message="to disable pg_tde first set enabled=false without removing the key provider and wait for pod restarts"
 type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`

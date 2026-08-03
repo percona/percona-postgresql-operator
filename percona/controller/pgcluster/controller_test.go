@@ -2443,6 +2443,24 @@ var _ = Describe("CR Validations", Ordered, func() {
 
 				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
 			})
+
+			It("should accept pg_tde enabled with file on PG 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-9", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					File: &v1beta1.PGTDEFileSpec{
+						KeySecret: v1beta1.PGTDESecretObjectReference{
+							Name: "tde-key",
+							Key:  "principal-key",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
 		})
 
 		When("creating a CR with invalid pg_tde configurations", func() {
@@ -2469,7 +2487,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 				))
 			})
 
-			It("should reject pg_tde enabled without vault", func() {
+			It("should reject pg_tde enabled without a key provider", func() {
 				cr, err := readDefaultCR("cr-validation-tde-6", ns)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -2481,7 +2499,38 @@ var _ = Describe("CR Validations", Ordered, func() {
 				err = k8sClient.Create(ctx, cr)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
-					"vault is required for enabling pg_tde",
+					"a key provider (vault or file) is required for enabling pg_tde",
+				))
+			})
+
+			// pg_tde resolves one key provider cluster-wide, so a cluster naming
+			// both leaves it ambiguous which keys its data is encrypted with.
+			It("should reject pg_tde with both vault and file", func() {
+				cr, err := readDefaultCR("cr-validation-tde-7", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+					File: &v1beta1.PGTDEFileSpec{
+						KeySecret: v1beta1.PGTDESecretObjectReference{
+							Name: "tde-key",
+							Key:  "principal-key",
+						},
+					},
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault and file are mutually exclusive key providers",
 				))
 			})
 		})
@@ -2512,7 +2561,31 @@ var _ = Describe("CR Validations", Ordered, func() {
 				err = k8sClient.Update(ctx, updated)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
-					"vault is required for enabling pg_tde",
+					"a key provider (vault or file) is required for enabling pg_tde",
+				))
+			})
+
+			// Swapping one provider for another while pg_tde is installed leaves
+			// the Pods mounting credentials the extension is not configured for,
+			// so the transition rule has to hold the old provider in place.
+			It("should reject replacing vault with file while pg_tde is still enabled", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					File: &v1beta1.PGTDEFileSpec{
+						KeySecret: v1beta1.PGTDESecretObjectReference{
+							Name: "tde-key",
+							Key:  "principal-key",
+						},
+					},
+				}
+
+				err := k8sClient.Update(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"to disable pg_tde first set enabled=false without removing the key provider",
 				))
 			})
 
@@ -2541,6 +2614,57 @@ var _ = Describe("CR Validations", Ordered, func() {
 				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
 					Enabled: false,
 				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+
+			// The file provider is held in place by the same rule: the key it
+			// names is projected into the Pods for as long as pg_tde is installed.
+			It("should reject removing file while pg_tde is still enabled", func() {
+				cr, err := readDefaultCR("cr-validation-tde-10", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					File: &v1beta1.PGTDEFileSpec{
+						KeySecret: v1beta1.PGTDESecretObjectReference{
+							Name: "tde-key",
+							Key:  "principal-key",
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				updated := cr.DeepCopy()
+				updated.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Update(ctx, updated)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"a key provider (vault or file) is required for enabling pg_tde",
+				))
+			})
+
+			It("should accept removing file after pg_tde is disabled", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-10", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					File: &v1beta1.PGTDEFileSpec{
+						KeySecret: v1beta1.PGTDESecretObjectReference{
+							Name: "tde-key",
+							Key:  "principal-key",
+						},
+					},
+				}
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-10", Namespace: ns}, cr)).Should(Succeed())
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{Enabled: false}
 
 				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
 			})

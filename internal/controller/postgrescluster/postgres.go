@@ -492,7 +492,7 @@ func (r *Reconciler) reconcilePGTDEProviders(
 
 	log := logging.FromContext(ctx).WithName("PGTDE")
 
-	if !cluster.Spec.Extensions.PGTDE.Enabled || (cluster.Spec.Extensions.PGTDE.Vault == nil && cluster.Spec.Extensions.PGTDE.File == nil) {
+	if !cluster.Spec.Extensions.PGTDE.Enabled || !cluster.Spec.Extensions.PGTDE.HasKeyProvider() {
 		cluster.Status.PGTDERevision = ""
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGTDEProviderReady)
 

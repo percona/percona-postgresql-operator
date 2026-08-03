@@ -1244,7 +1244,7 @@ func (r *Reconciler) reconcileInstance(
 		// name. Rolling now would leave pg_tde reading a token the provider was
 		// never told about. Once phase 1 lands, the phase moves on and the
 		// volume updates, which is what restarts the Pods for phase 2.
-		if cluster.Spec.Extensions.PGTDE.Vault != nil || cluster.Spec.Extensions.PGTDE.File != nil {
+		if cluster.Spec.Extensions.PGTDE.HasKeyProvider() {
 			change, changeErr := pgtde.ChangePhase(pgtde.NewProviderForCluster(cluster), cluster.Status.PGTDERevision)
 			if changeErr != nil {
 				// Without the revisions there is no way to tell a pending
@@ -1258,10 +1258,11 @@ func (r *Reconciler) reconcileInstance(
 			}
 		}
 
-		// we need to preserve vault secret as long as extension is enabled
-		// otherwise pods won't survive the restart failing to find the token file
+		// we need to preserve the key provider secret as long as the extension is
+		// enabled, otherwise pods won't survive the restart failing to find the
+		// key file
 		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
-			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
+			log.Info("keeping the pg_tde volume until the extension is dropped properly")
 			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
 		}
 

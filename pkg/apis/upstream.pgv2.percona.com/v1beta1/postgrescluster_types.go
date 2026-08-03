@@ -266,10 +266,16 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 }
 
 type PGTDEFileSpec struct {
+	// Name of the secret that contains the principal key pg_tde encrypts with.
 	KeySecret PGTDESecretObjectReference `json:"keySecret"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+// pg_tde resolves one key provider cluster-wide, so exactly one has to be
+// configured to enable it. Naming both leaves the keys the cluster is encrypted
+// with ambiguous, which is not something the operator can settle on its own.
+
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault) || has(self.file)",message="a key provider (vault or file) is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.vault) || !has(self.file)",message="vault and file are mutually exclusive key providers"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 
@@ -277,7 +283,20 @@ type PGTDESpec struct {
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
+// HasKeyProvider reports whether a key provider is configured. This is the
+// single answer for whether the instance Pods carry the pg-tde volume, whether
+// the key provider SQL runs, and whether the volume is held during a credential
+// change: a Pod that mounts credentials the provider was never pointed at
+// leaves pg_tde unable to fetch its key, and so does the reverse.
+func (s *PGTDESpec) HasKeyProvider() bool {
+	return s.Vault != nil || s.File != nil
+}
+
+// The Pods keep mounting the key provider's credentials for as long as pg_tde
+// is installed, so whichever provider is configured has to stay in the spec
+// until the extension has been dropped.
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || (has(self.pg_tde) && (!has(oldSelf.pg_tde.vault) || has(self.pg_tde.vault)) && (!has(oldSelf.pg_tde.file) || has(self.pg_tde.file)))",message="to disable pg_tde first set enabled=false without removing the key provider and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`

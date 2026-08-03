@@ -145,7 +145,7 @@ const (
 	// PGTDEVaultProvider is the name of the Vault provider
 	PGTDEVaultProvider = "vault-provider"
 
-	// PGTDEVaultProvider is the name of the Vault provider
+	// PGTDEFileProvider is the name of the file provider
 	PGTDEFileProvider = "file-provider"
 
 	// PGTDEGlobalKey is the name of the global key

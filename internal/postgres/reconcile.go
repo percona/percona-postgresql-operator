@@ -55,7 +55,8 @@ func AdditionalConfigVolumeMount() corev1.VolumeMount {
 	}
 }
 
-// PGTDEVolumeMount returns the name and mount path of the token and certificates for KMS.
+// PGTDEVolumeMount returns the name and mount path of the credentials of the
+// pg_tde key provider.
 func PGTDEVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      naming.PGTDEVolume,
@@ -64,45 +65,55 @@ func PGTDEVolumeMount() corev1.VolumeMount {
 	}
 }
 
-// PGTDEVolume returns the projected volume for pg_tde Vault secrets (token and optional CA cert).
-func PGTDEVolume(vault *v1beta1.PGTDEVaultSpec) corev1.Volume {
+// PGTDEVolume returns the projected volume holding the credentials of the
+// configured pg_tde key provider: the Vault token and its optional CA
+// certificate, or the principal key of the file provider.
+//
+// Each Secret key is projected under its own name, which is what makes the
+// paths the key provider is pointed at resolve; internal/pgtde derives those
+// from the same field, and the two have to agree because pg_tde reading a path
+// nothing was projected to fails every request for the key.
+//
+// A spec that names both providers takes the Vault one, the same way
+// pgtde.NewProviderForCluster does. The two must not disagree: whichever
+// provider the SQL configures is the one whose credentials have to be mounted.
+func PGTDEVolume(pgTDE *v1beta1.PGTDESpec) corev1.Volume {
 	volume := corev1.Volume{
 		Name: naming.PGTDEVolume,
 		VolumeSource: corev1.VolumeSource{
 			Projected: &corev1.ProjectedVolumeSource{
 				DefaultMode: new(int32(0o600)),
-				Sources: []corev1.VolumeProjection{
-					{Secret: &corev1.SecretProjection{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: vault.TokenSecret.Name,
-						},
-						Items: []corev1.KeyToPath{
-							{
-								Key:  vault.TokenSecret.Key,
-								Path: vault.TokenSecret.Key,
-							},
-						},
-					}},
-				},
 			},
 		},
 	}
 
-	if vault.HasCA() {
+	project := func(secret v1beta1.PGTDESecretObjectReference) {
 		volume.Projected.Sources = append(
 			volume.Projected.Sources, corev1.VolumeProjection{
 				Secret: &corev1.SecretProjection{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: vault.CASecret.Name,
+						Name: secret.Name,
 					},
 					Items: []corev1.KeyToPath{
 						{
-							Key:  vault.CASecret.Key,
-							Path: vault.CASecret.Key,
+							Key:  secret.Key,
+							Path: secret.Key,
 						},
 					},
 				},
 			})
+	}
+
+	switch {
+	case pgTDE.Vault != nil:
+		project(pgTDE.Vault.TokenSecret)
+
+		if pgTDE.Vault.HasCA() {
+			project(pgTDE.Vault.CASecret)
+		}
+
+	case pgTDE.File != nil:
+		project(pgTDE.File.KeySecret)
 	}
 
 	return volume
@@ -212,7 +223,7 @@ func InstancePod(ctx context.Context,
 	}
 
 	pgTDEVolumeMount := PGTDEVolumeMount()
-	if inCluster.Spec.Extensions.PGTDE.Vault != nil {
+	if inCluster.Spec.Extensions.PGTDE.HasKeyProvider() {
 		dbContainerMounts = append(dbContainerMounts, pgTDEVolumeMount)
 	}
 
@@ -294,8 +305,8 @@ func InstancePod(ctx context.Context,
 		dataVolume,
 		downwardAPIVolume,
 	}
-	if vault := inCluster.Spec.Extensions.PGTDE.Vault; vault != nil {
-		outInstancePod.Volumes = append(outInstancePod.Volumes, PGTDEVolume(vault))
+	if pgTDE := &inCluster.Spec.Extensions.PGTDE; pgTDE.HasKeyProvider() {
+		outInstancePod.Volumes = append(outInstancePod.Volumes, PGTDEVolume(pgTDE))
 	}
 
 	if HugePages2MiRequested(inCluster) {

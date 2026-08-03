@@ -9,13 +9,13 @@ commands:
       [[ $(cat ${tmp} | yq .reason) == "Enabled" ]]
       [[ $(cat ${tmp} | yq .status) == "True" ]]
   - script: |
-      # PGTDEVaultProviderReady is owned by the crunchy controller and mirrored
+      # PGTDEProviderReady is owned by the crunchy controller and mirrored
       # to the PerconaPGCluster status
-      condStatus=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
-      condReason=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
+      condStatus=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEProviderReady")].status}')
+      condReason=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEProviderReady")].reason}')
 
       if [[ ${condStatus} != "True" || ${condReason} != "Configured" ]]; then
-        echo "ERROR: PGTDEVaultProviderReady in PerconaPGCluster status should be True/Configured, got '${condStatus}'/'${condReason}'"
+        echo "ERROR: PGTDEProviderReady in PerconaPGCluster status should be True/Configured, got '${condStatus}'/'${condReason}'"
         kubectl -n "${NAMESPACE}" get pg pg-tde -o yaml | yq '.status.conditions'
         exit 1
       fi

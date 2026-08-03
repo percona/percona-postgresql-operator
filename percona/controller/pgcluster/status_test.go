@@ -624,9 +624,9 @@ func TestUpdateConditions(t *testing.T) {
 			name: "mirrored condition dropped by postgres is removed from cr",
 			crConditions: []metav1.Condition{
 				{
-					Type:   v1beta1.PGTDEVaultProviderReady,
+					Type:   v1beta1.PGTDEProviderReady,
 					Status: metav1.ConditionTrue,
-					Reason: "VaultProviderConfigured",
+					Reason: "ProviderConfigured",
 				},
 				{
 					Type:   "SomeOtherCondition",
@@ -652,7 +652,7 @@ func TestUpdateConditions(t *testing.T) {
 				{Type: postgrescluster.ConditionRepoHostReady, Status: metav1.ConditionTrue, Reason: "test"},
 				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
 			},
-			expectedRemovedConditions: []string{v1beta1.PGTDEVaultProviderReady, "SomeOtherCondition"},
+			expectedRemovedConditions: []string{v1beta1.PGTDEProviderReady, "SomeOtherCondition"},
 		},
 		{
 			name: "percona owned conditions are kept when absent from postgres status",

@@ -59,6 +59,188 @@ func TestTablespaceVolumeMount(t *testing.T) {
 	})
 }
 
+func TestPGTDEVolumeMount(t *testing.T) {
+	mount := PGTDEVolumeMount()
+
+	assert.DeepEqual(t, mount, corev1.VolumeMount{
+		Name:      naming.PGTDEVolume,
+		MountPath: "/pgconf/tde",
+		ReadOnly:  true,
+	})
+}
+
+func TestPGTDEVolume(t *testing.T) {
+	t.Parallel()
+
+	vault := func() *v1beta1.PGTDEVaultSpec {
+		return &v1beta1.PGTDEVaultSpec{
+			Host:        "https://vault.example.com:8200",
+			MountPath:   "secret/data",
+			TokenSecret: v1beta1.PGTDESecretObjectReference{Name: "vault", Key: "token"},
+		}
+	}
+	file := func() *v1beta1.PGTDEFileSpec {
+		return &v1beta1.PGTDEFileSpec{
+			KeySecret: v1beta1.PGTDESecretObjectReference{
+				Name: "tde-key", Key: "principal-key",
+			},
+		}
+	}
+
+	t.Run("Vault", func(t *testing.T) {
+		spec := &v1beta1.PGTDESpec{Enabled: true, Vault: vault()}
+		spec.Vault.CASecret = v1beta1.PGTDESecretObjectReference{
+			Name: "vault-ca", Key: "ca.crt",
+		}
+
+		assert.Assert(t, cmp.MarshalMatches(PGTDEVolume(spec), `
+name: pg-tde
+projected:
+  defaultMode: 384
+  sources:
+  - secret:
+      items:
+      - key: token
+        path: token
+      name: vault
+  - secret:
+      items:
+      - key: ca.crt
+        path: ca.crt
+      name: vault-ca
+		`))
+	})
+
+	// The key file is what pg_tde reads its principal key from, so the Pod has
+	// to carry it wherever the file provider is pointed at.
+	t.Run("File", func(t *testing.T) {
+		assert.Assert(t, cmp.MarshalMatches(
+			PGTDEVolume(&v1beta1.PGTDESpec{Enabled: true, File: file()}), `
+name: pg-tde
+projected:
+  defaultMode: 384
+  sources:
+  - secret:
+      items:
+      - key: principal-key
+        path: principal-key
+      name: tde-key
+		`))
+	})
+
+	// The CRD rejects naming both, but the volume still has to agree with
+	// pgtde.NewProviderForCluster rather than mount credentials the key
+	// provider was never configured with.
+	t.Run("BothPrefersVault", func(t *testing.T) {
+		sources := PGTDEVolume(&v1beta1.PGTDESpec{
+			Enabled: true, Vault: vault(), File: file(),
+		}).Projected.Sources
+
+		assert.Equal(t, len(sources), 1)
+		assert.Equal(t, sources[0].Secret.Name, "vault")
+	})
+}
+
+func TestInstancePodPGTDEVolume(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// tdeVolume returns the pg-tde volume of the Pod built for spec, and the
+	// mounts of the database container, so the two can be checked together: a
+	// volume nothing mounts is as useless as a mount with no volume.
+	tdeVolume := func(t *testing.T, pgTDE v1beta1.PGTDESpec) (*corev1.Volume, []corev1.VolumeMount) {
+		t.Helper()
+
+		cluster := new(v1beta1.PostgresCluster)
+		assert.NilError(t, cluster.Default(ctx, nil))
+		cluster.Spec.PostgresVersion = 17
+		cluster.SetLabels(map[string]string{naming.LabelVersion: version.Version()})
+		cluster.Spec.Extensions.PGTDE = pgTDE
+
+		dataVolume := new(corev1.PersistentVolumeClaim)
+		dataVolume.Name = "datavol"
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, cluster, new(v1beta1.PostgresInstanceSetSpec),
+			new(corev1.SecretProjection), new(corev1.SecretProjection),
+			dataVolume, nil, nil, pod)
+
+		var volume *corev1.Volume
+		for i := range pod.Volumes {
+			if pod.Volumes[i].Name == naming.PGTDEVolume {
+				volume = &pod.Volumes[i]
+				break
+			}
+		}
+
+		var mounts []corev1.VolumeMount
+		for _, container := range pod.Containers {
+			if container.Name == naming.ContainerDatabase {
+				mounts = container.VolumeMounts
+			} else {
+				for _, mount := range container.VolumeMounts {
+					assert.Assert(t, mount.Name != naming.PGTDEVolume,
+						"only the database container should mount the key provider credentials")
+				}
+			}
+		}
+
+		return volume, mounts
+	}
+
+	// mountsTDE reports whether the database container mounts the volume where
+	// the key provider expects to read its credentials.
+	mountsTDE := func(mounts []corev1.VolumeMount) bool {
+		for _, mount := range mounts {
+			if mount.Name == naming.PGTDEVolume {
+				return mount == PGTDEVolumeMount()
+			}
+		}
+		return false
+	}
+
+	t.Run("Vault", func(t *testing.T) {
+		volume, mounts := tdeVolume(t, v1beta1.PGTDESpec{
+			Enabled: true,
+			Vault: &v1beta1.PGTDEVaultSpec{
+				Host:        "https://vault.example.com:8200",
+				MountPath:   "secret/data",
+				TokenSecret: v1beta1.PGTDESecretObjectReference{Name: "vault", Key: "token"},
+			},
+		})
+
+		assert.Assert(t, volume != nil)
+		assert.Equal(t, volume.Projected.Sources[0].Secret.Name, "vault")
+		assert.Assert(t, mountsTDE(mounts))
+	})
+
+	t.Run("File", func(t *testing.T) {
+		volume, mounts := tdeVolume(t, v1beta1.PGTDESpec{
+			Enabled: true,
+			File: &v1beta1.PGTDEFileSpec{
+				KeySecret: v1beta1.PGTDESecretObjectReference{
+					Name: "tde-key", Key: "principal-key",
+				},
+			},
+		})
+
+		assert.Assert(t, volume != nil,
+			"the file provider's key has to be projected into the Pod")
+		assert.Equal(t, volume.Projected.Sources[0].Secret.Name, "tde-key")
+		assert.Assert(t, mountsTDE(mounts))
+	})
+
+	// Without a key provider there are no credentials to project, and a Pod
+	// that mounts a volume with no sources cannot start.
+	t.Run("NoProvider", func(t *testing.T) {
+		volume, mounts := tdeVolume(t, v1beta1.PGTDESpec{})
+
+		assert.Assert(t, volume == nil)
+		assert.Assert(t, !mountsTDE(mounts))
+	})
+}
+
 func TestInstancePod(t *testing.T) {
 	t.Parallel()
 

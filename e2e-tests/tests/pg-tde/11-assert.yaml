@@ -16,18 +16,18 @@ commands:
         kubectl -n "${NAMESPACE}" get pg pg-tde -o yaml | yq '.status.conditions'
       }
 
-      # the crunchy controller drops PGTDEVaultProviderReady once pg_tde is
+      # the crunchy controller drops PGTDEProviderReady once pg_tde is
       # disabled, so it must disappear from the PerconaPGCluster status too
-      crunchyCond=$(kubectl -n "${NAMESPACE}" get postgrescluster.upstream.pgv2.percona.com pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].type}')
+      crunchyCond=$(kubectl -n "${NAMESPACE}" get postgrescluster.upstream.pgv2.percona.com pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEProviderReady")].type}')
       if [[ -n ${crunchyCond} ]]; then
-        echo "ERROR: PGTDEVaultProviderReady should be removed from PostgresCluster status after disabling pg_tde"
+        echo "ERROR: PGTDEProviderReady should be removed from PostgresCluster status after disabling pg_tde"
         dump_conditions
         exit 1
       fi
 
-      perconaCond=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].type}')
+      perconaCond=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEProviderReady")].type}')
       if [[ -n ${perconaCond} ]]; then
-        echo "ERROR: PGTDEVaultProviderReady should be removed from PerconaPGCluster status after disabling pg_tde"
+        echo "ERROR: PGTDEProviderReady should be removed from PerconaPGCluster status after disabling pg_tde"
         dump_conditions
         exit 1
       fi

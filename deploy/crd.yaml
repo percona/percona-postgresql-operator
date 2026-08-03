@@ -14751,6 +14751,23 @@ spec:
                     properties:
                       enabled:
                         type: boolean
+                      file:
+                        properties:
+                          keySecret:
+                            description: Name of the secret that contains the principal
+                              key pg_tde encrypts with.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - keySecret
+                        type: object
                       vault:
                         properties:
                           caSecret:
@@ -14791,9 +14808,12 @@ spec:
                         type: object
                     type: object
                     x-kubernetes-validations:
-                    - message: vault is required for enabling pg_tde
+                    - message: a key provider (vault or file) is required for enabling
+                        pg_tde
                       rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
-                        == false) || has(self.vault)'
+                        == false) || has(self.vault) || has(self.file)'
+                    - message: vault and file are mutually exclusive key providers
+                      rule: '!has(self.vault) || !has(self.file)'
                   pgvector:
                     properties:
                       enabled:
@@ -14888,9 +14908,10 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: to disable pg_tde first set enabled=false without removing
-                    vault and wait for pod restarts
-                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
-                    || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
+                    the key provider and wait for pod restarts
+                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled
+                    || (has(self.pg_tde) && (!has(oldSelf.pg_tde.vault) || has(self.pg_tde.vault))
+                    && (!has(oldSelf.pg_tde.file) || has(self.pg_tde.file)))'
               image:
                 description: The image name to use for PostgreSQL containers.
                 type: string
@@ -51780,6 +51801,23 @@ spec:
                     properties:
                       enabled:
                         type: boolean
+                      file:
+                        properties:
+                          keySecret:
+                            description: Name of the secret that contains the principal
+                              key pg_tde encrypts with.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - keySecret
+                        type: object
                       vault:
                         properties:
                           caSecret:
@@ -51820,9 +51858,12 @@ spec:
                         type: object
                     type: object
                     x-kubernetes-validations:
-                    - message: vault is required for enabling pg_tde
+                    - message: a key provider (vault or file) is required for enabling
+                        pg_tde
                       rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
-                        == false) || has(self.vault)'
+                        == false) || has(self.vault) || has(self.file)'
+                    - message: vault and file are mutually exclusive key providers
+                      rule: '!has(self.vault) || !has(self.file)'
                   pgAudit:
                     type: boolean
                   pgCron:
@@ -51840,9 +51881,10 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: to disable pg_tde first set enabled=false without removing
-                    vault and wait for pod restarts
-                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
-                    || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
+                    the key provider and wait for pod restarts
+                  rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled
+                    || (has(self.pg_tde) && (!has(oldSelf.pg_tde.vault) || has(self.pg_tde.vault))
+                    && (!has(oldSelf.pg_tde.file) || has(self.pg_tde.file)))'
               image:
                 description: |-
                   The image name to use for PostgreSQL containers. When omitted, the value
