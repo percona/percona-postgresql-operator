@@ -599,6 +599,14 @@ type PostgresInstanceSetSpec struct {
 	// K8SPG-864
 	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
 
+	// K8SPG-440
+	// Additional volumes to mount into the PostgreSQL instance container.
+	// Changing this value causes PostgreSQL to restart.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ExtraVolumes []ExtraVolume `json:"extraVolumes,omitempty"`
+
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
 	// +optional
@@ -1028,4 +1036,38 @@ type SidecarPVC struct {
 	Name string `json:"name"`
 
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec"`
+}
+
+// ExtraVolume defines an additional volume and where it is mounted within the
+// PostgreSQL instance container. K8SPG-440
+type ExtraVolume struct {
+	// Name of the volume. Must be unique within the instance pod.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// VolumeSource represents the location and type of the mounted volume,
+	// e.g. an existing PersistentVolumeClaim, ConfigMap, Secret or emptyDir.
+	// +kubebuilder:validation:Required
+	VolumeSource corev1.VolumeSource `json:"volumeSource"`
+
+	// Mounts describes where the volume is mounted inside the PostgreSQL
+	// instance container.
+	// +kubebuilder:validation:MinItems=1
+	Mounts []ExtraVolumeMount `json:"mounts"`
+}
+
+// ExtraVolumeMount describes a mount point of an ExtraVolume. K8SPG-440
+type ExtraVolumeMount struct {
+	// Path within the container at which the volume is mounted.
+	// +kubebuilder:validation:Required
+	MountPath string `json:"mountPath"`
+
+	// Path within the volume from which the container's volume is mounted.
+	// Defaults to the volume's root.
+	// +optional
+	SubPath string `json:"subPath,omitempty"`
+
+	// Mounted read-only if true, read-write otherwise (false or unspecified).
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty"`
 }

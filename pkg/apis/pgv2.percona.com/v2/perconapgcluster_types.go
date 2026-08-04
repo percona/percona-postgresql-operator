@@ -1164,6 +1164,14 @@ type PGInstanceSetSpec struct {
 	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
 	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
 
+	// K8SPG-440
+	// Additional volumes to mount into the PostgreSQL instance container.
+	// Changing this value causes PostgreSQL to restart.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ExtraVolumes []crunchyv1beta1.ExtraVolume `json:"extraVolumes,omitempty"`
+
 	// Configuration for instance default sidecar containers.
 	// +optional
 	Containers *crunchyv1beta1.InstanceSidecars `json:"containers,omitempty"`
@@ -1249,6 +1257,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Sidecars:                  p.Containers,
 		SidecarVolumes:            p.SidecarVolumes,
 		SidecarPVCs:               p.SidecarPVCs,
+		ExtraVolumes:              p.ExtraVolumes,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
