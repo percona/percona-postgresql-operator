@@ -115,10 +115,6 @@ func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T,
 		log.Info("Removing finalizer", "name", finalizer)
 		if err := cl.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
 			if k8serrors.IsNotFound(err) {
-				// K8SPG-713: The object can sometimes be gone by the time we
-				// patch to remove the finalizer, even though finalizers should
-				// prevent deletion. The same race is handled in the Crunchy
-				// controller's handleDelete (internal/controller/postgrescluster/delete.go).
 				log.Info("Object not found when removing finalizer, skipping", "name", finalizer)
 				return true, nil
 			}
