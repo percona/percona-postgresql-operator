@@ -22,6 +22,7 @@ spec:
       - command:
         - /usr/local/bin/init-entrypoint.sh
       - name: postgres-startup
+      - name: nss-wrapper-init-logcollector
       - command:
         - /opt/crunchy/bin/relocate-extensions.sh
         env:

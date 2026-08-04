@@ -8,6 +8,7 @@ database-init-sql
 demand-backup
 demand-backup-offline-snapshot
 dynamic-configuration
+extra-volumes
 finalizers
 init-deploy
 k8s-upgrade
@@ -22,6 +23,7 @@ major-upgrade-16-to-17-postgis
 major-upgrade-17-to-18-postgis
 ldap
 ldap-tls
+logcollection
 monitoring
 one-pod
 operator-self-healing
