@@ -22,7 +22,7 @@ logcollection
 monitoring
 one-pod
 operator-self-healing
-pgbouncer-mtls
+pgbouncer
 pg-tde
 pitr
 scaling
