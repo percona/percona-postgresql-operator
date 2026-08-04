@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr "cert-management-policy" \
+        | yq '.spec.tls.certManagementPolicy = "auto"' \
+        | yq '.spec.proxy.pgBouncer.replicas = 1' \
+        | yq '.spec.instances[].replicas = 1' \
+        | kubectl -n "$NAMESPACE" apply -f -
