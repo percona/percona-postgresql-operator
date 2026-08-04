@@ -51,7 +51,7 @@ type PerconaPGRestoreSpec struct {
 	// The name of the pgBackRest repo within the source PostgresCluster that contains the backups
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="repoName is an immutable field"
 	RepoName *string `json:"repoName,omitempty"`
 
