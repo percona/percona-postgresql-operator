@@ -205,7 +205,7 @@ type BackupJobs struct {
 type PGBackRestManualBackup struct {
 	// The name of the pgBackRest repo to run the backup command against.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest backup command.
@@ -347,7 +347,7 @@ type PGBackRestRepo struct {
 
 	// The name of the repository
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	Name string `json:"name"`
 
 	// Defines the schedules for the pgBackRest backups
