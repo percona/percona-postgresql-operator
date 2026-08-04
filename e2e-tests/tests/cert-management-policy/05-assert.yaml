@@ -1,0 +1,36 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: cert-management-policy
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: cert-management-policy
+status:
+  conditions:
+  - reason: PGBackRestRepoHostReady
+    status: "False"
+    type: ReadyForBackup
+  - reason: TLSSecretsMissing
+    status: "False"
+    type: TLSSecretsReady
+  - reason: Paused
+    status: "False"
+    type: Progressing
+  - reason: RepoHostNotReady
+    status: "False"
+    type: PGBackRestRepoHostReady
+  - reason: StanzaNotCreated
+    status: "False"
+    type: PGBackRestReplicaRepoReady
+  - reason: RepoBackupNotComplete
+    status: "False"
+    type: PGBackRestReplicaCreate
