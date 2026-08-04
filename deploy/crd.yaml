@@ -35182,6 +35182,10 @@ spec:
                           description: Whether or not the pgBackRest repository PersistentVolumeClaim
                             is bound to a volume
                           type: boolean
+                        desiredRepoVolume:
+                          description: Desired size of the PersistentVolumeClaim containing
+                            the repository.
+                          type: string
                         name:
                           description: The name of the pgBackRest repository
                           type: string
@@ -76350,6 +76354,10 @@ spec:
                           description: Whether or not the pgBackRest repository PersistentVolumeClaim
                             is bound to a volume
                           type: boolean
+                        desiredRepoVolume:
+                          description: Desired size of the PersistentVolumeClaim containing
+                            the repository.
+                          type: string
                         name:
                           description: The name of the pgBackRest repository
                           type: string
