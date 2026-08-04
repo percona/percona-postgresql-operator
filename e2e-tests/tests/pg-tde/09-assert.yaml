@@ -8,6 +8,17 @@ commands:
       [[ $(cat ${tmp} | yq .message) == "pg_tde is enabled in PerconaPGCluster" ]]
       [[ $(cat ${tmp} | yq .reason) == "Enabled" ]]
       [[ $(cat ${tmp} | yq .status) == "True" ]]
+  - script: |
+      # PGTDEVaultProviderReady is owned by the crunchy controller and mirrored
+      # to the PerconaPGCluster status
+      condStatus=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
+      condReason=$(kubectl -n "${NAMESPACE}" get pg pg-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
+
+      if [[ ${condStatus} != "True" || ${condReason} != "Configured" ]]; then
+        echo "ERROR: PGTDEVaultProviderReady in PerconaPGCluster status should be True/Configured, got '${condStatus}'/'${condReason}'"
+        kubectl -n "${NAMESPACE}" get pg pg-tde -o yaml | yq '.status.conditions'
+        exit 1
+      fi
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -52,6 +63,8 @@ spec:
         - mountPath: /dev/shm
           name: dshm
       - name: replication-cert-copy
+      - name: logs
+      - name: logrotate
       - name: pgbackrest
       - name: pgbackrest-config
       volumes:

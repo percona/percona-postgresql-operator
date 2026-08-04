@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: logcollection
+status:
+  postgres:
+    ready: 3
+    size: 3
+  state: ready
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logcollection-log-collector-config
+  labels:
+    postgres-operator.crunchydata.com/cluster: logcollection
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logcollection-log-collector-logrotate-config
+  labels:
+    postgres-operator.crunchydata.com/cluster: logcollection
