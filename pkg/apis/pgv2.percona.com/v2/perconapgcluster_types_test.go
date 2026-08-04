@@ -574,6 +574,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 	}
 }
 
+// K8SPG-440
+func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
+	extraVolumes := []crunchyv1beta1.ExtraVolume{
+		{
+			Name: "fts-dicts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+				},
+			},
+			Mounts: []crunchyv1beta1.ExtraVolumeMount{
+				{MountPath: "/pgdata/dicts", ReadOnly: true},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		spec PGInstanceSetSpec
+		want []crunchyv1beta1.ExtraVolume
+	}{
+		"forwards extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1", ExtraVolumes: extraVolumes},
+			want: extraVolumes,
+		},
+		"no extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1"},
+			want: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.spec.ToCrunchy()
+			assert.Equal(t, tc.want, got.ExtraVolumes)
+		})
+	}
+}
+
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
 	return slices.Contains(slice, item)

@@ -1258,6 +1258,13 @@ func (r *Reconciler) reconcileInstance(
 			}
 		}
 
+		// we need to preserve vault secret as long as extension is enabled
+		// otherwise pods won't survive the restart failing to find the token file
+		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
+			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+		}
+
 		if backupsSpecFound {
 			addPGBackRestToInstancePodSpec(
 				ctx, cluster, instanceCertificates, &instance.Spec.Template.Spec)
@@ -1551,13 +1558,28 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 // managed, it creates a Certificate CR and augments the resulting secret with
 // Patroni and pgBackRest keys. Otherwise, it uses internal PKI — first
 // reconciling any stale Certificate CR left by K8SPG-1017 to update its
-// ownerRef (K8SPG-1007 recovery).
+// ownerRef (K8SPG-1007 recovery). When userProvidedOnly is specified, it
+// returns the existing user-provided Secret, or a placeholder containing its
+// name and namespace if it does not exist.
 func (r *Reconciler) reconcileInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
 	if cluster.Spec.CustomTLSSecret == nil {
+		if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+			existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+			// Allow the StatefulSet to be created so its generated name is visible
+			// to the user. The next reconciliation checks its certificate Secret
+			// and pauses until the user provides it.
+			if err := client.IgnoreNotFound(
+				r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+			); err != nil {
+				return nil, errors.Wrapf(err, "get user-provided instance TLS secret %s", existing.Name)
+			}
+			return existing, nil
+		}
+
 		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")

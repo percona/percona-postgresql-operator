@@ -1,0 +1,48 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 600
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster=logcollection
+      cm=logcollection-extra-logrotate
+
+      before_uids=$(kubectl -n "${NAMESPACE}" get pods \
+        --selector "postgres-operator.crunchydata.com/instance-set=instance1" \
+        -o 'jsonpath={.items[*].metadata.uid}')
+
+      kubectl -n "${NAMESPACE}" create configmap "${cm}" \
+        --from-literal=extra.conf="$(printf '%s\n' \
+          '/pgdata/extra-log/*.log {' \
+          '    rotate 9' \
+          '    missingok' \
+          '    notifempty' \
+          '    copytruncate' \
+          '    sharedscripts' \
+          '}')" \
+        --dry-run=client -o yaml | kubectl -n "${NAMESPACE}" apply -f -
+
+      pods_rolled() {
+        local now
+        now=$(kubectl -n "${NAMESPACE}" get pods \
+          --selector "postgres-operator.crunchydata.com/instance-set=instance1" \
+          -o 'jsonpath={.items[*].metadata.uid}')
+        local uid
+        for uid in ${before_uids}; do
+          echo " ${now} " | grep -q " ${uid} " && return 1
+        done
+        return 0
+      }
+      retry 90 5 pods_rolled
+
+      wait_cluster_consistency "${cluster}"
+
+      primary=$(get_pod_by_role "${cluster}" primary name)
+      retry 24 5 bash -c "kubectl -n '${NAMESPACE}' exec '${primary}' -c logrotate -- \
+        cat /opt/crunchy/logcollector/logrotate/conf.d/extra.conf | grep -q 'rotate 9'"
+
+      echo "OK: extraConfig change rolled the instance pods and applied new config"

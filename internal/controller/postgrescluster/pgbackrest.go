@@ -72,10 +72,6 @@ const (
 	// and in-place pgBackRest restore is in progress
 	ConditionPGBackRestRestoreProgressing = "PGBackRestoreProgressing"
 
-	// ConditionStandbyLagging is the type used in a condition to indicate whether or not
-	// the standby cluster is lagging behind the main site
-	ConditionStandbyLagging = "StandbyLagging"
-
 	// EventRepoHostNotFound is used to indicate that a pgBackRest repository was not
 	// found when reconciling
 	EventRepoHostNotFound = "RepoDeploymentNotFound"
@@ -1337,7 +1333,7 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting,
 		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
@@ -2224,7 +2220,15 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 
 	existing := &corev1.Secret{}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing),
+	))
+
+	if err == nil && cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if repoHost != nil && len(existing.Name) == 0 {
+			return errors.Errorf("user-provided pgBackRest secret %q is missing", intent.Name)
+		}
+		return nil
+	}
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.

@@ -281,7 +281,7 @@ spec:
                   The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                   that should be utilized to perform a pgBackRest restore when initializing the data source
                   for the new PostgresCluster.
-                pattern: ^repo[1-4]
+                pattern: ^repo[1-4]$
                 type: string
                 x-kubernetes-validations:
                 - message: repoName is an immutable field

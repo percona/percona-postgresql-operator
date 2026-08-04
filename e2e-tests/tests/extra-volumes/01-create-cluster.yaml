@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" create configmap extra-dicts \
+        --from-literal=synonyms.txt="postgres pg pgsql"
+
+      get_cr \
+        | yq eval '.spec.instances[0].replicas = 1' - \
+        | yq eval '.spec.proxy.pgBouncer.replicas = 1' - \
+        | yq eval '.spec.instances[0].extraVolumes = [
+            {"name": "fts-dicts",
+             "volumeSource": {"configMap": {"name": "extra-dicts"}},
+             "mounts": [{"mountPath": "/pgdata/extra/dicts", "readOnly": true}]},
+            {"name": "extra-data",
+             "volumeSource": {"emptyDir": {}},
+             "mounts": [{"mountPath": "/pgdata/extra/data"}]}
+          ]' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
