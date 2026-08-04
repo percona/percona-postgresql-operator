@@ -17,6 +17,7 @@ major-upgrade-16-to-17
 major-upgrade-17-to-18
 ldap
 ldap-tls
+logcollection
 monitoring
 one-pod
 operator-self-healing
