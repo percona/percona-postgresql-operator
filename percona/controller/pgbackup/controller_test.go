@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
@@ -80,7 +82,10 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 					PGCluster: cluster.Name,
 					RepoName:  new("repo1"),
 				},
-				Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+				Status: v2.PerconaPGBackupStatus{
+					State:   v2.BackupRunning,
+					JobName: "test-backup-job",
+				},
 			}
 			if tt.snapshot {
 				backup.Spec.Method = new(v2.BackupMethodVolumeSnapshot)
@@ -93,6 +98,13 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 			}
 
 			objects := []client.Object{backup}
+			if !tt.snapshot {
+				objects = append(objects, &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Name:       backup.Status.JobName,
+					Namespace:  backup.Namespace,
+					Finalizers: []string{pNaming.FinalizerKeepJob},
+				}})
+			}
 			if tt.snapshot {
 				holder := backupLeaseHolder(backup)
 				objects = append(objects, &coordinationv1.Lease{
@@ -134,6 +146,12 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 				assert.True(t, k8serrors.IsNotFound(err))
 			} else {
 				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+
+				job := new(batchv1.Job)
+				require.NoError(t, cl.Get(ctx, client.ObjectKey{
+					Name: backup.Status.JobName, Namespace: backup.Namespace,
+				}, job))
+				assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
 			}
 		})
 	}

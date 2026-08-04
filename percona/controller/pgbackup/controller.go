@@ -403,6 +403,33 @@ func ensureFinalizers(ctx context.Context, cl client.Client, pgBackup *v2.Percon
 func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
 	return func(ctx context.Context, pgBackup *v2.PerconaPGBackup) error {
 		if pg == nil {
+			// If the cluster was previously deleted, we cannot call finishBackup to remove
+			// annotations from the PGCluster. In that case, we no longer need the job to
+			// exist and we can remove the keep-job finalizer.
+			job, err := findBackupJob(ctx, c, pgBackup)
+			if errors.Is(err, ErrBackupJobNotFound) || k8serrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return errors.Wrap(err, "find backup job")
+			}
+
+			if !controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob) {
+				return nil
+			}
+
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				j := new(batchv1.Job)
+				if err := c.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+
+				controllerutil.RemoveFinalizer(j, pNaming.FinalizerKeepJob)
+				return c.Update(ctx, j)
+			}); err != nil {
+				return errors.Wrap(err, "remove keep-job finalizer")
+			}
+
 			return nil
 		}
 
