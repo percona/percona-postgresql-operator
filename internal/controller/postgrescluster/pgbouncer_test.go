@@ -814,6 +814,15 @@ func TestReconcilePause(t *testing.T) {
 		})
 	}
 
+	newCluster := func() *v1beta1.PostgresCluster {
+		cluster := testCluster()
+		cluster.SetLabels(map[string]string{
+			v1beta1.LabelVersion: "3.1.0",
+		})
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		return cluster
+	}
+
 	testCases := []struct {
 		desc     string
 		cr       func() *v1beta1.PostgresCluster
@@ -823,7 +832,7 @@ func TestReconcilePause(t *testing.T) {
 		{
 			desc: "pauses",
 			cr: func() *v1beta1.PostgresCluster {
-				cluster := testCluster()
+				cluster := newCluster()
 				cluster.Namespace = "ns1"
 				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
 				return cluster
@@ -840,7 +849,7 @@ func TestReconcilePause(t *testing.T) {
 		{
 			desc: "resumes",
 			cr: func() *v1beta1.PostgresCluster {
-				cluster := testCluster()
+				cluster := newCluster()
 				cluster.Namespace = "ns1"
 				cluster.Spec.Proxy.PGBouncer.Paused = new(false)
 				setPausedCondition(cluster)
@@ -859,7 +868,7 @@ func TestReconcilePause(t *testing.T) {
 		{
 			desc: "steady state resumed",
 			cr: func() *v1beta1.PostgresCluster {
-				cluster := testCluster()
+				cluster := newCluster()
 				cluster.Namespace = "ns1"
 				return cluster
 			},
@@ -872,7 +881,7 @@ func TestReconcilePause(t *testing.T) {
 		{
 			desc: "steady state paused",
 			cr: func() *v1beta1.PostgresCluster {
-				cluster := testCluster()
+				cluster := newCluster()
 				cluster.Namespace = "ns1"
 				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
 				setPausedCondition(cluster)
