@@ -1,0 +1,78 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 420
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # Provisioning a bound PVC depends on the platform's default storage class;
+      # skip where the CSI setup is unreliable, mirroring the PXC extra-PVC test.
+      platform=$(detect_k8s_platform)
+      if [[ "${platform}" == "eks" || "${platform}" == "openshift" ]]; then
+        echo "platform ${platform} detected, skipping PVC extra-volume test"
+        exit 0
+      fi
+
+      kubectl -n "${NAMESPACE}" apply -f - <<'EOF'
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: extra-pvc
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      EOF
+
+      kubectl -n "${NAMESPACE}" patch pg extra-volumes --type=json -p='[
+        {
+          "op": "add",
+          "path": "/spec/instances/0/extraVolumes/-",
+          "value": {
+            "name": "extra-pvc",
+            "volumeSource": {"persistentVolumeClaim": {"claimName": "extra-pvc"}},
+            "mounts": [{"mountPath": "/pgdata/extra/pvc"}]
+          }
+        }
+      ]'
+
+      wait_cluster_consistency extra-volumes
+
+      sts=$(kubectl -n "${NAMESPACE}" get sts \
+        --selector postgres-operator.crunchydata.com/instance-set=instance1 -o json)
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.volumes[]
+        | select(.name == "extra-pvc")
+        | select(.persistentVolumeClaim.claimName == "extra-pvc")' >/dev/null
+      printf '%s\n' "${sts}" | jq -e '.items[0].spec.template.spec.containers[]
+        | select(.name == "database") | .volumeMounts[]
+        | select(.mountPath == "/pgdata/extra/pvc")' >/dev/null
+
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.phase}'=Bound \
+        pvc/extra-pvc --timeout=120s
+
+      pod=$(get_instance_set_pods instance1 | head -n1)
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        grep -q ' /pgdata/extra/pvc ' /proc/mounts
+
+      token="pvc-$(date +%s)-${RANDOM}"
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        sh -c "printf '%s' '${token}' > /pgdata/extra/pvc/token"
+
+      # Surviving a pod restart is the definitive proof the data lives on the
+      # PVC and not on the pod's ephemeral filesystem.
+      restart_pg_pods extra-volumes instance1
+      wait_cluster_consistency extra-volumes
+
+      pod=$(get_instance_set_pods instance1 | head -n1)
+      kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+        grep -q ' /pgdata/extra/pvc ' /proc/mounts
+      readback=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- cat /pgdata/extra/pvc/token)
+      if [[ "${readback}" != "${token}" ]]; then
+        echo "PVC extra-volume did not persist across restart: wrote '${token}', read '${readback}'"
+        exit 1
+      fi
