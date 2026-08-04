@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role logcollection primary name)
+
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- \
+        psql -c "SELECT 'e2e-postgres-log-marker';" \
+             -c "CREATE TABLE IF NOT EXISTS e2e_logs (id int);" \
+             -c "INSERT INTO e2e_logs VALUES (1);" \
+             -c "DROP TABLE e2e_logs;"
+  # An on-demand backup makes pgBackRest write log files on both pod types.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      metadata:
+        name: logcollection-backup-repo1
+      spec:
+        pgCluster: logcollection
+        repoName: repo1
+        options:
+          - --type=full
+      EOF
