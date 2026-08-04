@@ -18,6 +18,7 @@ import (
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,113 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+func TestReconcileTLSCondition(t *testing.T) {
+	condition := func(t *testing.T, cluster *v1beta1.PostgresCluster, status metav1.ConditionStatus) *metav1.Condition {
+		t.Helper()
+		assert.Assert(t, meta.IsStatusConditionPresentAndEqual(
+			cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady, status,
+		))
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady)
+		assert.Assert(t, condition != nil)
+		return condition
+	}
+
+	t.Run("automatic certificate management", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Generation = 7
+		cluster.Spec.TLS = nil
+		cluster.Status.Conditions = []metav1.Condition{{
+			Type:   v1beta1.ConditionTypeTLSSecretsReady,
+			Status: metav1.ConditionFalse,
+		}}
+
+		r := &Reconciler{}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionTrue)
+		assert.Equal(t, condition.Reason, "TLSSecretsFound")
+		assert.Equal(t, condition.Message, "certManagementPolicy is auto")
+		assert.Equal(t, condition.ObservedGeneration, int64(7))
+	})
+
+	t.Run("missing user-provided secrets", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Namespace = "postgres-operator"
+		cluster.Generation = 11
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		cluster.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-root-ca"},
+		}
+		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
+		}
+
+		instance := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Name:      "hippo-instance1-abcd",
+			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				naming.LabelCluster: cluster.Name,
+				naming.LabelData:    naming.DataPostgres,
+			},
+		}}
+		instanceWithoutMatchingLabels := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Name:      "unrelated-instance",
+			Namespace: cluster.Namespace,
+		}}
+
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(instance, instanceWithoutMatchingLabels).Build()}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionFalse)
+		assert.Equal(t, condition.Reason, "TLSSecretsMissing")
+		assert.Equal(t, condition.ObservedGeneration, int64(11))
+		assert.Equal(t, condition.Message, "Missing user-provided TLS secrets: "+strings.Join([]string{
+			"custom-root-ca",
+			naming.PostgresTLSSecret(cluster).Name,
+			"custom-replication",
+			naming.PGBackRestSecret(cluster).Name,
+			naming.ClusterPGBouncer(cluster).Name,
+			naming.InstanceCertificates(instance).Name,
+		}, ", ")+". certManagementPolicy is userProvidedOnly")
+	})
+
+	t.Run("user-provided secrets found", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Namespace = "postgres-operator"
+		cluster.Generation = 13
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		cluster.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-root-ca"},
+		}
+		cluster.Spec.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-postgres-tls"},
+		}
+		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
+		}
+
+		objects := []client.Object{
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-root-ca", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
+			&corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)},
+		}
+
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionTrue)
+		assert.Equal(t, condition.Reason, "TLSSecretsFound")
+		assert.Equal(t, condition.Message, "")
+		assert.Equal(t, condition.ObservedGeneration, int64(13))
+	})
+}
 
 // TestReconcileCerts tests the proper reconciliation of the root ca certificate
 // secret, leaf certificate secrets and the updates that occur when updates are

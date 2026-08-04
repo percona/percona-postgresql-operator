@@ -63,6 +63,8 @@ spec:
         - mountPath: /dev/shm
           name: dshm
       - name: replication-cert-copy
+      - name: logs
+      - name: logrotate
       - name: pgbackrest
       - name: pgbackrest-config
       volumes:
