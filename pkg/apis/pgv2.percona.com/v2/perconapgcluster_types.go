@@ -503,11 +503,31 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
-	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
-		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.BuiltIn.PGCron
-	}
-	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
-		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.BuiltIn.SetUser
+	postgresCluster.Spec.Extensions.PGCron = cr.Spec.Extensions.BuiltIn.PGCron
+	postgresCluster.Spec.Extensions.SetUser = cr.Spec.Extensions.BuiltIn.SetUser
+
+	// An extension installed via spec.extensions.custom must never be dropped
+	// by the builtin reconcile loop (its disabled builtin flag would otherwise
+	// trigger DROP EXTENSION and destroy user objects, e.g. cron.job entries).
+	// Forcing the matching builtin flag also keeps the required
+	// shared_preload_libraries entry in place.
+	for _, ext := range cr.Spec.Extensions.Custom {
+		switch ext.Name {
+		case "pg_stat_monitor":
+			postgresCluster.Spec.Extensions.PGStatMonitor = true
+		case "pg_stat_statements":
+			postgresCluster.Spec.Extensions.PGStatStatements = true
+		case "pgaudit", "pg_audit":
+			postgresCluster.Spec.Extensions.PGAudit = true
+		case "pgvector", "vector":
+			postgresCluster.Spec.Extensions.PGVector = true
+		case "pg_repack":
+			postgresCluster.Spec.Extensions.PGRepack = true
+		case "pg_cron":
+			postgresCluster.Spec.Extensions.PGCron = ptr.To(true)
+		case "set_user":
+			postgresCluster.Spec.Extensions.SetUser = ptr.To(true)
+		}
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly

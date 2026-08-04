@@ -1,0 +1,40 @@
+# Overlay merged onto the RELEASED deploy/cr.yaml (see 01-create-cluster.yaml).
+# All builtin extensions that can coexist are enabled (pg_stat_monitor is chosen
+# over pg_stat_statements — they are mutually exclusive). pg_cron comes later as
+# a CUSTOM extension (02-add-custom-pg-cron.yaml), so builtin pg_cron stays off.
+spec:
+  # pin the database-init image: without it InitImage() derives the image from
+  # the RUNNING operator's repo + the crVersion tag, so an operator under test
+  # from a non-release org changes the STS template and causes a spurious
+  # rollout right after the upgrade (and the release tag may not exist there)
+  initContainer:
+    image: <extensions-image>
+  # pg_cron by default executes jobs via a libpq connection to localhost,
+  # which pg_hba in the operator images rejects ("cron job N connection
+  # failed") — background workers need no connection
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          cron.use_background_workers: "on"
+  users:
+    - name: postgres
+      password:
+        type: AlphaNumeric
+  extensions:
+    image: <extensions-image>
+    imagePullPolicy: Always
+    storage:
+      type: s3
+      bucket: operator-testing
+      region: us-east-1
+      endpoint: http://minio-service:9000
+      forcePathStyle: true
+      disableSSL: true
+      secret:
+        name: minio-secret
+    builtin:
+      pg_stat_monitor: true
+      pg_audit: true
+      pgvector: true
+      pg_repack: true

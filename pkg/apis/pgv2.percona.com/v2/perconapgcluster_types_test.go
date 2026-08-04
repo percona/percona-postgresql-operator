@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -549,6 +550,42 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
 				assert.Nil(t, actual.Spec.Proxy)
+			},
+		},
+		"custom extension is not dropped by builtin reconcile": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.True(t, ptr.Deref(actual.Spec.Extensions.PGCron, false))
+				require.NotNil(t, actual.Spec.Extensions.SetUser)
+				assert.False(t, *actual.Spec.Extensions.SetUser)
 			},
 		},
 	}

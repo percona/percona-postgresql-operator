@@ -236,13 +236,13 @@ type InitContainerSpec struct {
 }
 
 type ExtensionsSpec struct {
-	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
-	PGAudit          bool `json:"pgAudit,omitempty"`
-	PGStatStatements bool `json:"pgStatStatements,omitempty"`
-	PGVector         bool `json:"pgvector,omitempty"`
-	PGRepack         bool `json:"pgRepack,omitempty"`
-	PGCron           bool `json:"pgCron,omitempty"`
-	SetUser          bool `json:"setUser,omitempty"`
+	PGStatMonitor    bool  `json:"pgStatMonitor,omitempty"`
+	PGAudit          bool  `json:"pgAudit,omitempty"`
+	PGStatStatements bool  `json:"pgStatStatements,omitempty"`
+	PGVector         bool  `json:"pgvector,omitempty"`
+	PGRepack         bool  `json:"pgRepack,omitempty"`
+	PGCron           *bool `json:"pgCron,omitempty"`
+	SetUser          *bool `json:"setUser,omitempty"`
 }
 
 type TLSSpec struct {

@@ -22,7 +22,6 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
@@ -32,7 +31,6 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  generation: 2
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -64,7 +62,6 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
-  observedGeneration: 2
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
@@ -88,7 +85,6 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 2
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
@@ -112,7 +108,6 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  generation: 2
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -130,7 +125,6 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 2
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -141,6 +135,8 @@ status:
         name: repo1
         replicaCreateBackupComplete: true
         stanzaCreated: true
+      - name: repo2
+        stanzaCreated: true
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -149,7 +145,6 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  generation: 2
   name: upgrade-minor
 status:
   pgbouncer:

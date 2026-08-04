@@ -85,7 +85,6 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  generation: 1
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -103,7 +102,6 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 1
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -114,6 +112,8 @@ status:
         name: repo1
         replicaCreateBackupComplete: true
         stanzaCreated: true
+      - name: repo2
+        stanzaCreated: true
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -123,7 +123,6 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: upgrade-minor
-  generation: 1
 status:
   conditions:
   - type: ReadyForBackup

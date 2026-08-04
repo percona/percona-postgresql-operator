@@ -338,7 +338,10 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
-		if cluster.Spec.Extensions.PGCron {
+		// nil means the spec predates the field: don't touch the extension
+		if cluster.Spec.Extensions.PGCron == nil {
+			pgCronOK = true
+		} else if *cluster.Spec.Extensions.PGCron {
 			if pgCronOK = pgcron.EnableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",
 					"Unable to install pg_cron")
@@ -350,7 +353,9 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
-		if cluster.Spec.Extensions.SetUser {
+		if cluster.Spec.Extensions.SetUser == nil {
+			setUserOK = true
+		} else if *cluster.Spec.Extensions.SetUser {
 			if setUserOK = setuser.EnableInPostgreSQL(ctx, exec) == nil; !setUserOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserDisabled",
 					"Unable to install set_user")

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -284,10 +285,10 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
-	if cluster.Spec.Extensions.PGCron {
+	if ptr.Deref(cluster.Spec.Extensions.PGCron, false) {
 		pgcron.PostgreSQLParameters(&pgParameters)
 	}
-	if cluster.Spec.Extensions.SetUser {
+	if ptr.Deref(cluster.Spec.Extensions.SetUser, false) {
 		setuser.PostgreSQLParameters(&pgParameters)
 	}
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)

@@ -18,6 +18,8 @@ ldap
 ldap-tls
 monitoring
 monitoring-pmm3
+operator-upgrade-cert-manager
+operator-upgrade-extensions
 one-pod
 operator-self-healing
 pgbouncer-mtls
