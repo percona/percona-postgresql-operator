@@ -1,0 +1,69 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      export fluentbit_custom="$(printf '%s\n' \
+        'pipeline:' \
+        '  filters:' \
+        '    - name: record_modifier' \
+        '      match: "*"' \
+        '      record:' \
+        '        - e2e_marker present' \
+        '  outputs:' \
+        '    - name: s3' \
+        '      match: "*.postgres"' \
+        '      bucket: operator-testing' \
+        '      endpoint: https://minio-service:9000' \
+        '      tls: on' \
+        '      tls.ca_file: /etc/fluentbit/tls/ca.crt' \
+        '      region: us-east-1' \
+        '      store_dir: /tmp/fluent-bit/s3' \
+        '      total_file_size: 1M' \
+        '      upload_timeout: 15s' \
+        '      use_put_object: on' \
+        '      s3_key_format: /$TAG/%Y/%m/%d/%H-%M-%S-$UUID' \
+        '      s3_key_format_tag_delimiters: .' \
+        '      processors:' \
+        '        logs:' \
+        '          - name: opentelemetry_envelope')"
+
+      export logrotate_custom="$(printf '%s\n' \
+        '/pgdata/custom-log/*.log' \
+        '/pgdata/custom-log/*.csv {' \
+        '    hourly' \
+        '    rotate 3' \
+        '    missingok' \
+        '    notifempty' \
+        '    copytruncate' \
+        '    sharedscripts' \
+        '}')"
+
+      kubectl -n "${NAMESPACE}" create configmap logcollection-extra-logrotate \
+        --from-literal=extra.conf="$(printf '%s\n' \
+          '/pgdata/extra-log/*.log {' \
+          '    rotate 2' \
+          '    missingok' \
+          '    notifempty' \
+          '    copytruncate' \
+          '    sharedscripts' \
+          '}')"
+
+      get_cr \
+        | yq eval '.spec.logcollector.enabled = true' - \
+        | yq eval '.spec.logcollector.configuration = strenv(fluentbit_custom)' - \
+        | yq eval '.spec.logcollector.envFrom = [{"secretRef": {"name": "minio-secret"}}]' - \
+        | yq eval '.spec.logcollector.volumeMounts = [{"name": "s3-ca", "mountPath": "/etc/fluentbit/tls", "readOnly": true}]' - \
+        | yq eval '.spec.logcollector.volumes = [{"name": "s3-ca", "secret": {"secretName": "minio-tls", "items": [{"key": "public.crt", "path": "ca.crt"}]}}]' - \
+        | yq eval '.spec.logcollector.logRotate.configuration = strenv(logrotate_custom)' - \
+        | yq eval '.spec.logcollector.logRotate.extraConfig.name = "logcollection-extra-logrotate"' - \
+        | yq eval '.spec.logcollector.logRotate.schedule = "*/5 * * * *"' - \
+        | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_statement = "all"' - \
+        | yq eval '.spec.patroni.dynamicConfiguration.postgresql.parameters.log_directory = "/pgdata/custom-log"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 30

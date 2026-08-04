@@ -13,9 +13,9 @@ import (
 
 // createBootstrapRestoreObject creates a PerconaPGRestore object for the bootstrap restore
 func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.DataSource == nil || (cr.Spec.DataSource.PGBackRest == nil &&
-		cr.Spec.DataSource.PostgresCluster == nil &&
-		cr.Spec.DataSource.Volumes == nil) {
+	// Note that we ignore volumes here because volume restores are not handled by the PerconaPGRestore, so it would
+	// not make sense to create the bootstrap restore object.
+	if cr.Spec.DataSource == nil || (cr.Spec.DataSource.PGBackRest == nil && cr.Spec.DataSource.PostgresCluster == nil) {
 		return nil
 	}
 
