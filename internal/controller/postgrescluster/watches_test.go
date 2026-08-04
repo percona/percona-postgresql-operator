@@ -214,4 +214,19 @@ func TestWatchPodsUpdate(t *testing.T) {
 		},
 	}, queue)
 	assert.Equal(t, queue.Len(), 1)
+	item, _ = queue.Get()
+	queue.Done(item)
+
+	// A repo-host volume suggestion also triggers reconciliation.
+	update(ctx, event.UpdateEvent{
+		ObjectOld: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{"suggested-pgbackrest-repo1-pvc-size": "5Gi"},
+			Labels:      map[string]string{"postgres-operator.crunchydata.com/cluster": "starfish"},
+		}},
+		ObjectNew: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{"suggested-pgbackrest-repo1-pvc-size": "8Gi"},
+			Labels:      map[string]string{"postgres-operator.crunchydata.com/cluster": "starfish"},
+		}},
+	}, queue)
+	assert.Equal(t, queue.Len(), 1)
 }
