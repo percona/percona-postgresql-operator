@@ -249,15 +249,54 @@ kind: Service
 		})
 	}
 
-	t.Run("NodePortWithClusterIP", func(t *testing.T) {
-		cluster := cluster.DeepCopy()
-		cluster.Spec.Service = &v1beta1.ServiceSpec{Type: "ClusterIP", NodePort: new(int32(32000))}
+	typesAndPort := []struct {
+		Description string
+		Type        string
+		NodePort    *int32
+		Expect      func(testing.TB, *corev1.Service, error)
+	}{
+		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
+			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
+				assert.ErrorContains(t, err, `NodePort cannot be set with type ClusterIP on Service "pg2-ha"`)
+				assert.Assert(t, service == nil)
+			}},
+		{Description: "NodePort with Port 32001", Type: "NodePort",
+			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
+				assert.NilError(t, err)
+				alwaysExpect(t, service)
+				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
+- name: postgres
+  nodePort: 32001
+  port: 9876
+  protocol: TCP
+  targetPort: postgres
+`))
+			}},
+		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
+			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
+				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
+				assert.NilError(t, err)
+				alwaysExpect(t, service)
+				assert.Assert(t, cmp.MarshalMatches(service.Spec.Ports, `
+- name: postgres
+  nodePort: 32002
+  port: 9876
+  protocol: TCP
+  targetPort: postgres
+`))
+			}},
+	}
 
-		recorder := new(record.FakeRecorder)
-		service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, recorder)
-		assert.ErrorContains(t, err, `NodePort cannot be set with type ClusterIP on Service "pg2-ha"`)
-		assert.Assert(t, service == nil)
-	})
+	for _, test := range typesAndPort {
+		t.Run(test.Description, func(t *testing.T) {
+			cluster := cluster.DeepCopy()
+			cluster.Spec.Service = &v1beta1.ServiceSpec{Type: test.Type, NodePort: test.NodePort}
+
+			service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
+			test.Expect(t, service, err)
+		})
+	}
 }
 
 func TestKubernetesEndpointsPrimaryService(t *testing.T) {
@@ -266,7 +305,7 @@ func TestKubernetesEndpointsPrimaryService(t *testing.T) {
 
 	t.Run("NoLeader", func(t *testing.T) {
 		spec, subset, err := (kubernetesEndpointsBackend{}).PrimaryService(cluster, nil)
-		assert.ErrorContains(t, err, "not implemented")
+		assert.ErrorContains(t, err, "not available yet")
 		assert.DeepEqual(t, spec, corev1.ServiceSpec{})
 		assert.Assert(t, subset == nil)
 	})

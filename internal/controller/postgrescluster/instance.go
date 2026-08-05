@@ -1272,7 +1272,8 @@ func (r *Reconciler) reconcileInstance(
 		}
 
 		// K8SPG-708
-		initImage, err := k8s.InitImage(ctx, r.Client, cluster, spec)
+		var initImage string
+		initImage, err = k8s.InitImage(ctx, r.Client, cluster, spec)
 		if err != nil {
 			return errors.Wrap(err, "failed to determine initial init image")
 		}

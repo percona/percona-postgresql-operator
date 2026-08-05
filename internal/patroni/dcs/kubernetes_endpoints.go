@@ -251,8 +251,7 @@ func (kubernetesEndpointsBackend) PrimaryService(
 	// ClusterIP of the Service created in Reconciler.reconcilePatroniLeaderLease
 	// when Patroni is using Endpoints.
 	if leader == nil {
-		// TODO(cbandy): We need to build a different kind of Service here.
-		return corev1.ServiceSpec{}, nil, errors.New("Patroni DCS other than Kubernetes Endpoints is not implemented")
+		return corev1.ServiceSpec{}, nil, errors.New("Patroni leader Service is not available yet")
 	}
 
 	// Allocate no IP address (headless) and manage the Endpoints ourselves.
