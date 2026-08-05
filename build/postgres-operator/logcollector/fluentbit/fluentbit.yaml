@@ -1,0 +1,3 @@
+includes:
+  - fluentbit_pg.yaml
+  - /tmp/fluentbit/custom/*.yaml
