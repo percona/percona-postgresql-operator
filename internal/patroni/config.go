@@ -42,37 +42,19 @@ func quoteShellWord(s string) string {
 }
 
 // clusterYAML returns Patroni settings that apply to the entire cluster.
+// dcsYAML contains the DCS backend's config additions (see internal/patroni/dcs);
+// its top-level keys are merged into the result, except "postgresql" which is
+// shallow-merged into the "postgresql" section below instead of replacing it.
 func clusterYAML(
 	cluster *v1beta1.PostgresCluster,
 	pgHBAs postgres.HBAs, pgParameters postgres.Parameters,
+	dcsYAML map[string]any,
 ) (string, error) {
-
-	labels := map[string]string{naming.LabelCluster: cluster.Name}
-	if cluster.CompareVersion("2.9.0") >= 0 {
-		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
-	}
 
 	root := map[string]any{
 		// The cluster identifier. This value cannot change during the cluster's
 		// lifetime.
 		"scope": naming.PatroniScope(cluster),
-
-		// Use Kubernetes Endpoints for the distributed configuration store (DCS).
-		// These values cannot change during the cluster's lifetime.
-		//
-		// NOTE(cbandy): It *might* be possible to *carefully* change the role and
-		// scope labels, but there is no way to reconfigure all instances at once.
-		"kubernetes": map[string]any{
-			"namespace":     cluster.Namespace,
-			"role_label":    naming.LabelRole,
-			"scope_label":   naming.LabelPatroni,
-			"use_endpoints": true,
-
-			// In addition to "scope_label" above, Patroni will add the following to
-			// every object it creates. It will also use these as filters when doing
-			// any lookups.
-			"labels": labels,
-		},
 
 		"postgresql": map[string]any{
 			// TODO(cbandy): "callbacks"
@@ -187,8 +169,28 @@ func clusterYAML(
 		root["postgresql"].(map[string]any)["remove_data_directory_on_diverged_timelines"] = cluster.Spec.Patroni.RemoveDataDirectoryOnDivergedTimelines
 	}
 
+	mergeDCSYAML(root, dcsYAML)
+
 	b, err := yaml.Marshal(root)
 	return string(append([]byte(yamlGeneratedWarning), b...)), err
+}
+
+// mergeDCSYAML merges dcsYAML's top-level keys into root. A "postgresql" key
+// is shallow-merged into root's existing "postgresql" section instead of
+// replacing it, so a DCS backend can contribute settings (e.g. callbacks)
+// without clobbering what's already there. Every other key is set directly.
+func mergeDCSYAML(root, dcsYAML map[string]any) {
+	for k, v := range dcsYAML {
+		if k == "postgresql" {
+			if addition, ok := v.(map[string]any); ok {
+				if postgresql, ok := root["postgresql"].(map[string]any); ok {
+					maps.Copy(postgresql, addition)
+					continue
+				}
+			}
+		}
+		root[k] = v
+	}
 }
 
 // DynamicConfiguration combines configuration with some PostgreSQL settings
@@ -333,12 +335,12 @@ func DynamicConfiguration(
 }
 
 // instanceEnvironment returns the environment variables needed by Patroni's
-// instance container.
+// instance container. dcsEnvVars are the DCS backend's additions (see
+// internal/patroni/dcs), e.g. PATRONI_KUBERNETES_*.
 func instanceEnvironment(
 	cluster *v1beta1.PostgresCluster,
 	clusterPodService *corev1.Service,
-	leaderService *corev1.Service,
-	podContainers []corev1.Container,
+	dcsEnvVars []corev1.EnvVar,
 ) []corev1.EnvVar {
 	var (
 		patroniPort  = *cluster.Spec.Patroni.Port
@@ -346,31 +348,13 @@ func instanceEnvironment(
 		podSubdomain = clusterPodService.Name
 	)
 
-	// Gather Endpoint ports for any Container ports that match the leader
-	// Service definition.
-	ports := []corev1.EndpointPort{}
-	for _, sp := range leaderService.Spec.Ports {
-		for i := range podContainers {
-			for _, cp := range podContainers[i].Ports {
-				if sp.TargetPort.StrVal == cp.Name {
-					ports = append(ports, corev1.EndpointPort{
-						Name:     sp.Name,
-						Port:     cp.ContainerPort,
-						Protocol: cp.Protocol,
-					})
-				}
-			}
-		}
-	}
-	portsYAML, _ := yaml.Marshal(ports)
-
 	// NOTE(cbandy): Patroni consumes and then removes environment variables
 	// starting with "PATRONI_".
 	// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/config.py#L247
 	// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/postgresql/postmaster.py#L215-L216
 
 	variables := []corev1.EnvVar{
-		// Set "name" to the v1.Pod's name. Required when using Kubernetes for DCS.
+		// Set "name" to the v1.Pod's name. Required for Patroni's node identity.
 		// Patroni must be restarted when changing this value.
 		{
 			Name: "PATRONI_NAME",
@@ -378,27 +362,6 @@ func instanceEnvironment(
 				APIVersion: "v1",
 				FieldPath:  "metadata.name",
 			}},
-		},
-
-		// Set "kubernetes.pod_ip" to the v1.Pod's primary IP address.
-		// Patroni must be restarted when changing this value.
-		{
-			Name: "PATRONI_KUBERNETES_POD_IP",
-			ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "status.podIP",
-			}},
-		},
-
-		// When using Endpoints for DCS, Patroni needs to replicate the leader
-		// ServicePort definitions. Set "kubernetes.ports" to the YAML of this
-		// Pod's equivalent EndpointPort definitions.
-		//
-		// This is connascent with PATRONI_POSTGRESQL_CONNECT_ADDRESS below.
-		// Patroni must be restarted when changing this value.
-		{
-			Name:  "PATRONI_KUBERNETES_PORTS",
-			Value: string(portsYAML),
 		},
 
 		// Set "postgresql.connect_address" using the Pod's stable DNS name.
@@ -454,7 +417,7 @@ func instanceEnvironment(
 		},
 	}
 
-	return variables
+	return append(variables, dcsEnvVars...)
 }
 
 // instanceConfigFiles returns projections of Patroni's configuration files
@@ -486,24 +449,17 @@ func instanceConfigFiles(cluster, instance *corev1.ConfigMap) []corev1.VolumePro
 	}
 }
 
-// instanceYAML returns Patroni settings that apply to instance.
+// instanceYAML returns Patroni settings that apply to instance. dcsYAML
+// contains the DCS backend's config additions (see internal/patroni/dcs).
 func instanceYAML(
 	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
 	pgbackrestReplicaCreateCommand []string,
+	dcsYAML map[string]any,
 ) (string, error) {
 	root := map[string]any{
 		// Missing here is "name" which cannot be known until the instance Pod is
 		// created. That value should be injected using the downward API and the
 		// PATRONI_NAME environment variable.
-
-		"kubernetes": map[string]any{
-			// Missing here is "pod_ip" which cannot be known until the instance Pod is
-			// created. That value should be injected using the downward API and the
-			// PATRONI_KUBERNETES_POD_IP environment variable.
-
-			// Missing here is "ports" which is is connascent with "postgresql.connect_address".
-			// See the PATRONI_KUBERNETES_PORTS env variable.
-		},
 
 		"restapi": map[string]any{
 			// Missing here is "connect_address" which cannot be known until the
@@ -664,6 +620,8 @@ func instanceYAML(
 			}
 		}
 	}
+
+	mergeDCSYAML(root, dcsYAML)
 
 	b, err := yaml.Marshal(root)
 	return string(append([]byte(yamlGeneratedWarning), b...)), err
