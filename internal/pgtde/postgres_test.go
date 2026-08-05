@@ -97,14 +97,71 @@ func TestPostgreSQLParameters(t *testing.T) {
 		"pg_tde.wal_encrypt":       "off",
 	})
 
-	// K8SPG-911
+	// K8SPG-911: asking for WAL encryption is not enough to turn it on. Postgres
+	// refuses to start when pg_tde cannot decrypt the WAL it is told to read, so
+	// the parameter follows the state pg_tde actually reached: the extension is
+	// installed and the vault key provider matches the spec.
 	cluster.Spec.Extensions.PGTDE.WALEncryption = true
+
+	condition := func(conditionType string, status metav1.ConditionStatus) metav1.Condition {
+		return metav1.Condition{Type: conditionType, Status: status, Reason: "Testing"}
+	}
+
+	for _, tc := range []struct {
+		name       string
+		conditions []metav1.Condition
+		expected   string
+	}{
+		{
+			// Nothing has been reconciled yet.
+			"NoConditions", nil, "off",
+		},
+		{
+			"ExtensionOnly", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+			}, "off",
+		},
+		{
+			"Both", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+				condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionTrue),
+			}, "on",
+		},
+		{
+			// A credential change is in progress or has failed. Leaving the
+			// parameter on here is what prevents the Pods from restarting into
+			// a Postgres that cannot start.
+			"ProviderNotReady", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+				condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionFalse),
+			}, "off",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster.Status.Conditions = tc.conditions
+			parameters := postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+			PostgreSQLParameters(cluster, &parameters)
+
+			assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+				"shared_preload_libraries": "pg_tde",
+				"pg_tde.wal_encrypt":       tc.expected,
+			})
+		})
+	}
+
+	// Turning WAL encryption off in the spec turns the parameter off even when
+	// pg_tde is in the one state that would allow it on.
+	cluster.Spec.Extensions.PGTDE.WALEncryption = false
+	cluster.Status.Conditions = []metav1.Condition{
+		condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+		condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionTrue),
+	}
 	parameters = postgres.Parameters{Mandatory: postgres.NewParameterSet()}
 	PostgreSQLParameters(cluster, &parameters)
 
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "pg_tde",
-		"pg_tde.wal_encrypt":       "on",
+		"pg_tde.wal_encrypt":       "off",
 	})
 }
 
