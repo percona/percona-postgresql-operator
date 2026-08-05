@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -113,6 +114,10 @@ func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T,
 	if controllerutil.RemoveFinalizer(obj, finalizer) {
 		log.Info("Removing finalizer", "name", finalizer)
 		if err := cl.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
+			if k8serrors.IsNotFound(err) {
+				log.Info("Object not found when removing finalizer, skipping", "name", finalizer)
+				return true, nil
+			}
 			return false, errors.Wrap(err, "remove finalizers")
 		}
 	}
