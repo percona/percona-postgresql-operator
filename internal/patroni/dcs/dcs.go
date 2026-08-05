@@ -94,8 +94,9 @@ type Observation struct {
 	RequeueAfter time.Duration
 }
 
-// For selects the DCS backend for cluster. Only Kubernetes is implemented
-// today.
+// For selects the DCS backend for cluster. Only Kubernetes Endpoints is
+// implemented today; a future backend (e.g. Kubernetes ConfigMaps, etcd)
+// adds a case here.
 func For(cluster *v1beta1.PostgresCluster) Backend {
-	return kubernetesBackend{}
+	return kubernetesEndpointsBackend{}
 }

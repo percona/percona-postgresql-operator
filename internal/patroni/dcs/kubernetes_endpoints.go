@@ -22,10 +22,12 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-// kubernetesBackend uses Kubernetes Endpoints as Patroni's DCS.
-type kubernetesBackend struct{}
+// kubernetesEndpointsBackend uses Kubernetes Endpoints as Patroni's DCS.
+// This is distinct from a future ConfigMaps-based Kubernetes backend, which
+// Patroni also supports.
+type kubernetesEndpointsBackend struct{}
 
-func (kubernetesBackend) ClusterYAML(cluster *v1beta1.PostgresCluster) map[string]any {
+func (kubernetesEndpointsBackend) ClusterYAML(cluster *v1beta1.PostgresCluster) map[string]any {
 	labels := map[string]string{naming.LabelCluster: cluster.Name}
 	if cluster.CompareVersion("2.9.0") >= 0 {
 		labels = naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(), labels)
@@ -51,11 +53,11 @@ func (kubernetesBackend) ClusterYAML(cluster *v1beta1.PostgresCluster) map[strin
 	}
 }
 
-func (kubernetesBackend) InstanceYAML(*v1beta1.PostgresCluster) map[string]any {
+func (kubernetesEndpointsBackend) InstanceYAML(*v1beta1.PostgresCluster) map[string]any {
 	return nil
 }
 
-func (kubernetesBackend) InstanceEnvVars(
+func (kubernetesEndpointsBackend) InstanceEnvVars(
 	_ *v1beta1.PostgresCluster, leaderService *corev1.Service, podContainers []corev1.Container,
 ) []corev1.EnvVar {
 	// "kubernetes.pod_ip" and "kubernetes.ports" cannot be known until the
@@ -104,8 +106,6 @@ func (kubernetesBackend) InstanceEnvVars(
 	}
 }
 
-// TODO(cbandy): Separate these so that one can choose ConfigMap over Endpoints.
-
 // When using Endpoints for DCS, "create", "list", "patch", and "watch" are
 // required. Include "get" for good measure. The `patronictl scaffold` and
 // `patronictl remove` commands require "deletecollection".
@@ -120,7 +120,7 @@ func (kubernetesBackend) InstanceEnvVars(
 // - https://github.com/openshift/origin/pull/9383
 // +kubebuilder:rbac:namespace=patroni,groups="",resources="endpoints/restricted",verbs={create}
 
-func (kubernetesBackend) Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
+func (kubernetesEndpointsBackend) Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.PolicyRule {
 	rules := make([]rbacv1.PolicyRule, 0, 3)
 
 	rules = append(rules, rbacv1.PolicyRule{
@@ -150,7 +150,7 @@ func (kubernetesBackend) Permissions(cluster *v1beta1.PostgresCluster) []rbacv1.
 	return rules
 }
 
-func (kubernetesBackend) DistributedConfigurationService(cluster *v1beta1.PostgresCluster) *corev1.Service {
+func (kubernetesEndpointsBackend) DistributedConfigurationService(cluster *v1beta1.PostgresCluster) *corev1.Service {
 	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
 	// Endpoints object is not removed by Kubernetes at startup. Patroni will
 	// create this object if it has permission to do so, but it won't set any
@@ -169,7 +169,7 @@ func (kubernetesBackend) DistributedConfigurationService(cluster *v1beta1.Postgr
 	return service
 }
 
-func (kubernetesBackend) LeaderLeaseService(
+func (kubernetesEndpointsBackend) LeaderLeaseService(
 	cluster *v1beta1.PostgresCluster, recorder record.EventRecorder,
 ) (*corev1.Service, error) {
 	service := &corev1.Service{ObjectMeta: naming.PatroniLeaderEndpoints(cluster)}
@@ -240,7 +240,7 @@ func (kubernetesBackend) LeaderLeaseService(
 	return service, nil
 }
 
-func (kubernetesBackend) PrimaryService(
+func (kubernetesEndpointsBackend) PrimaryService(
 	cluster *v1beta1.PostgresCluster, leader *corev1.Service,
 ) (corev1.ServiceSpec, *corev1.EndpointSubset, error) {
 	// We want to name and label our primary Service consistently. When Patroni is
@@ -286,7 +286,7 @@ func (kubernetesBackend) PrimaryService(
 	return spec, subset, nil
 }
 
-func (kubernetesBackend) Observe(
+func (kubernetesEndpointsBackend) Observe(
 	ctx context.Context, cli client.Client, cluster *v1beta1.PostgresCluster, readyInstance bool,
 ) (Observation, error) {
 	var observation Observation
@@ -316,7 +316,7 @@ func (kubernetesBackend) Observe(
 	return observation, err
 }
 
-func (kubernetesBackend) Delete(ctx context.Context, cli client.Client, cluster *v1beta1.PostgresCluster) error {
+func (kubernetesEndpointsBackend) Delete(ctx context.Context, cli client.Client, cluster *v1beta1.PostgresCluster) error {
 	// TODO(cbandy): This could also be accomplished by adopting the Endpoints
 	// as Patroni creates them. Would their events cause too many reconciles?
 	// Foreground deletion may force us to adopt and set finalizers anyway.
