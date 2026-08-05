@@ -1,8 +1,3 @@
-# Overlay merged onto the RELEASED deploy/cr.yaml via:
-#   yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)'
-# yq map-merge REPLACES arrays wholesale, so instances/users/repos are given in full.
-# Only fields supported by the released (N-1) operator may appear here — this file
-# doubles as an old-CRD compatibility canary.
 spec:
   instances:
     - name: instance1

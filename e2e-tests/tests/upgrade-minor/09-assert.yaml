@@ -22,6 +22,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   currentReplicas: 1
@@ -31,6 +32,10 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
+  # 3 = create + restore shutdown/startup (step 08) + image change (step 09);
+  # the restore-target instance is recreated from scratch and ends up at 2,
+  # kuttl only needs one of the three instance STS to match this entry
+  generation: 3
   labels:
     app.kubernetes.io/component: pg
     app.kubernetes.io/instance: upgrade-minor
@@ -62,6 +67,7 @@ spec:
 status:
   availableReplicas: 1
   collisionCount: 0
+  observedGeneration: 3
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
@@ -85,6 +91,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
+  observedGeneration: 2
   replicas: 3
   updatedReplicas: 3
   readyReplicas: 3
@@ -108,6 +115,10 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
+  # 7 = create + 2 manual-backup options writes (steps 02, 07)
+  #   + setUser added by the upgraded operator (step 04)
+  #   + restore spec write and cleanup (step 08) + cluster upgrade (step 09)
+  generation: 7
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -125,6 +136,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
+  observedGeneration: 7
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -146,6 +158,10 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: upgrade-minor
+  # 6 = create + 2 manual-backup options writes (steps 02, 07)
+  #   + restore patch (step 08) + the operator resetting restore.enabled
+  #   after it finishes + cluster upgrade apply (step 09)
+  generation: 6
 status:
   pgbouncer:
     ready: 3

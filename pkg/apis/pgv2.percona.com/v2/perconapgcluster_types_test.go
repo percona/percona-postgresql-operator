@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -583,7 +582,12 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				assert.True(t, ptr.Deref(actual.Spec.Extensions.PGCron, false))
+				// pg_cron comes via spec.extensions.custom: the flag must be
+				// cleared (nil = leave alone), so the builtin loop neither
+				// drops it nor takes over CREATE EXTENSION
+				assert.Nil(t, actual.Spec.Extensions.PGCron)
+				// set_user is not requested anywhere: explicit false stays,
+				// so disabling keeps working for new specs
 				require.NotNil(t, actual.Spec.Extensions.SetUser)
 				assert.False(t, *actual.Spec.Extensions.SetUser)
 			},

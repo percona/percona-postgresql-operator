@@ -8,6 +8,17 @@ commands:
 
       source ../../functions
 
-      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres) -c "\c postgres" -c "select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name")
+      uri="postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
+
+      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://${uri} -c "\c postgres" -c "select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name")
 
       kubectl create configmap -n "${NAMESPACE}" 13-check-extensions --from-literal=data="${data}"
+
+      # the postgres image bundles its own pg_cron and upstream pg_cron keeps
+      # default_version at 1.6 for every 1.6.x patch release, so neither the
+      # name nor the version in pg_available_extensions can prove the custom
+      # build was installed - check the installer marker on every instance pod
+      for pod in $(kubectl get pods -n ${NAMESPACE} -l postgres-operator.crunchydata.com/data=postgres -o name); do
+          kubectl -n ${NAMESPACE} exec ${pod} -c database -- test -f /pgdata/extension/${PG_VER}/pg_cron-pg${PG_VER}-1.6.6.installed \
+              || { echo "ERROR: custom pg_cron 1.6.6 is not installed in ${pod}"; exit 1; }
+      done

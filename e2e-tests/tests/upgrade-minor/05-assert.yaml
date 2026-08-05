@@ -85,6 +85,9 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
+  # 3 = create + manual-backup options written by the operator (step 02)
+  #   + setUser field added by the upgraded operator's remap (step 04)
+  generation: 3
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -102,6 +105,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
+  observedGeneration: 3
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
@@ -123,6 +127,8 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: upgrade-minor
+  # 2 = create + manual-backup options written by the operator (step 02)
+  generation: 2
 status:
   conditions:
   - type: ReadyForBackup

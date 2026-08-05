@@ -6,7 +6,11 @@ kind: ConfigMap
 apiVersion: v1
 metadata:
   name: 10-check-extensions
+# pg_cron stays in the list: the postgres image bundles it as a builtin
+# extension and relocate-extensions.sh re-copies it on every pod start.
+# The uninstall of the custom build is verified by version in the step script.
 data:
   data: |2-
+     pg_cron
      pg_stat_monitor
      pgaudit

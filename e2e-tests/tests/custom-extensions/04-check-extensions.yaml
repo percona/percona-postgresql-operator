@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
+timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -8,6 +8,43 @@ commands:
 
       source ../../functions
 
-      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres) -c "\c postgres" -c "select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name")
+      uri="postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
+
+      data=$(kubectl -n ${NAMESPACE} exec $(get_client_pod) -- psql -v ON_ERROR_STOP=1 -t -q postgres://${uri} -c "\c postgres" -c "select name from pg_available_extensions where name in ('pg_cron','pg_stat_monitor','pgaudit') order by name")
 
       kubectl create configmap -n "${NAMESPACE}" 04-check-extensions --from-literal=data="${data}"
+
+      # pg_cron must be not only available on disk but actually installed
+      installed=$(run_psql_local '\c postgres \\\ SELECT extname FROM pg_extension WHERE extname = $$pg_cron$$' "$uri" | tr -d '[:space:]')
+      [[ "$installed" == "pg_cron" ]] || { echo "ERROR: pg_cron is not installed"; exit 1; }
+
+      # regression: a custom-installed extension must survive a re-run of the
+      # builtin extensions SQL. Enabling builtin pg_repack changes the SQL set
+      # and forces the re-run; with the bug present the reconcile would DROP
+      # pg_cron (its builtin flag is false and the builtin loop knows nothing
+      # about the custom list)
+      kubectl -n "${NAMESPACE}" patch perconapgcluster custom-extensions --type merge \
+        -p '{"spec":{"extensions":{"builtin":{"pg_repack":true}}}}'
+
+      repack=""
+      for i in $(seq 1 12); do
+          repack=$(run_psql_local '\c postgres \\\ SELECT extname FROM pg_extension WHERE extname = $$pg_repack$$' "$uri" | tr -d '[:space:]')
+          [[ "$repack" == "pg_repack" ]] && break
+          sleep 10
+      done
+      [[ "$repack" == "pg_repack" ]] || { echo "ERROR: builtin pg_repack was not installed - extensions SQL did not re-run"; exit 1; }
+
+      installed=$(run_psql_local '\c postgres \\\ SELECT extname FROM pg_extension WHERE extname = $$pg_cron$$' "$uri" | tr -d '[:space:]')
+      [[ "$installed" == "pg_cron" ]] || { echo "ERROR: pg_cron was dropped by the builtin extensions reconcile"; exit 1; }
+
+      # restore the baseline: disable builtin pg_repack again and wait until the
+      # reconcile drops it, so the later steps see the original extension set
+      kubectl -n "${NAMESPACE}" patch perconapgcluster custom-extensions --type merge \
+        -p '{"spec":{"extensions":{"builtin":{"pg_repack":false}}}}'
+
+      for i in $(seq 1 12); do
+          repack=$(run_psql_local '\c postgres \\\ SELECT extname FROM pg_extension WHERE extname = $$pg_repack$$' "$uri" | tr -d '[:space:]')
+          [[ -z "$repack" ]] && break
+          sleep 10
+      done
+      [[ -z "$repack" ]] || { echo "ERROR: builtin pg_repack was not dropped after disabling"; exit 1; }

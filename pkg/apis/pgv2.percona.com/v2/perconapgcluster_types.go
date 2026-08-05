@@ -509,8 +509,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	// An extension installed via spec.extensions.custom must never be dropped
 	// by the builtin reconcile loop (its disabled builtin flag would otherwise
 	// trigger DROP EXTENSION and destroy user objects, e.g. cron.job entries).
-	// Forcing the matching builtin flag also keeps the required
-	// shared_preload_libraries entry in place.
+	// For the plain-bool flags the only way to prevent that is forcing true;
+	// for the tri-state flags (pg_cron, set_user) the flag is cleared instead:
+	// a custom extension is user-managed (CREATE EXTENSION and preload config
+	// are on the user), so the builtin loop must not touch it at all.
 	for _, ext := range cr.Spec.Extensions.Custom {
 		switch ext.Name {
 		case "pg_stat_monitor":
@@ -524,9 +526,17 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		case "pg_repack":
 			postgresCluster.Spec.Extensions.PGRepack = true
 		case "pg_cron":
-			postgresCluster.Spec.Extensions.PGCron = ptr.To(true)
+			// the lifecycle of a custom-installed extension is user-managed:
+			// clear the flag (nil = leave alone) so the builtin loop neither
+			// drops it nor takes over CREATE/ALTER; an explicit builtin true
+			// stays in force
+			if !ptr.Deref(postgresCluster.Spec.Extensions.PGCron, false) {
+				postgresCluster.Spec.Extensions.PGCron = nil
+			}
 		case "set_user":
-			postgresCluster.Spec.Extensions.SetUser = ptr.To(true)
+			if !ptr.Deref(postgresCluster.Spec.Extensions.SetUser, false) {
+				postgresCluster.Spec.Extensions.SetUser = nil
+			}
 		}
 	}
 
