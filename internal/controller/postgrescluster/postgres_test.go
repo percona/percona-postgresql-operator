@@ -25,14 +25,13 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePostgresUserSecret(t *testing.T) {
@@ -44,7 +43,7 @@ func TestGeneratePostgresUserSecret(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "hippo2"
-	cluster.Spec.Port = initialize.Int32(9999)
+	cluster.Spec.Port = new(int32(9999))
 
 	cluster.Labels = map[string]string{
 		naming.LabelVersion: "2.3.0",
@@ -336,8 +335,8 @@ volumeMode: Filesystem
 				},
 			},
 		}
-		snapshot.Spec.Source.PersistentVolumeClaimName = initialize.String("some-pvc-name")
-		snapshot.Spec.VolumeSnapshotClassName = initialize.String("some-class-name")
+		snapshot.Spec.Source.PersistentVolumeClaimName = new("some-pvc-name")
+		snapshot.Spec.VolumeSnapshotClassName = new("some-class-name")
 		err := reconciler.apply(ctx, snapshot)
 		assert.NilError(t, err)
 
@@ -347,7 +346,7 @@ volumeMode: Filesystem
 
 		currentTime := metav1.Now()
 		snapshot.Status = &volumesnapshotv1.VolumeSnapshotStatus{
-			ReadyToUse:   initialize.Bool(true),
+			ReadyToUse:   new(true),
 			CreationTime: &currentTime,
 		}
 		err = reconciler.Client.Status().Update(ctx, snapshot)
@@ -620,7 +619,7 @@ func TestSetVolumeSize(t *testing.T) {
 		Spec: v1beta1.PostgresClusterSpec{
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name:     "some-instance",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 			}},
 		},
 	}

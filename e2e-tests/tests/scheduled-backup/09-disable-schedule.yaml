@@ -1,19 +1,22 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: scheduled-backup
-spec:
-  backups:
-    pgbackrest:
-      repos:
-        - name: repo1
-          s3:
-            bucket: pg-operator-testing
-            endpoint: s3.amazonaws.com
-            region: us-east-1
-        - gcs:
-            bucket: pg-operator-testing
-          name: repo2
-        - azure:
-            container: pg-operator-testing
-          name: repo3
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |
+      patch=$(
+        kubectl get pg scheduled-backup -n "$NAMESPACE" -o json |
+        jq -c '
+          .spec.backups.pgbackrest.repos as $repos |
+          [
+            {
+              op: "remove",
+              path: "/spec/backups/pgbackrest/repos/\($repos | map(.name=="repo3") | index(true))/schedules"
+            }
+          ]
+        '
+      )
+
+      kubectl patch pg scheduled-backup \
+        -n "$NAMESPACE" \
+        --type=json \
+        -p "$patch"

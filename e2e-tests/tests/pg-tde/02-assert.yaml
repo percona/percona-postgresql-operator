@@ -1,6 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 300
+commands:
+  - script: |
+      tmp_file=$(mktemp)
+      kubectl -n $NAMESPACE get pg pg-tde -o yaml | yq '.status.conditions.[] | select(.type == "PGTDEEnabled")' > ${tmp_file}
+      [[ $(cat ${tmp_file} | yq .message) == "pg_tde is enabled in PerconaPGCluster" ]]
+      [[ $(cat ${tmp_file} | yq .observedGeneration) == "1" ]]
+      [[ $(cat ${tmp_file} | yq .reason) == "Enabled" ]]
+      [[ $(cat ${tmp_file} | yq .status) == "True" ]]
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -10,7 +18,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: pg-tde
       controller: true
@@ -48,6 +56,8 @@ spec:
         - mountPath: /dev/shm
           name: dshm
       - name: replication-cert-copy
+      - name: logs
+      - name: logrotate
       - name: pgbackrest
       - name: pgbackrest-config
       volumes:
@@ -85,22 +95,13 @@ metadata:
   name: pg-tde
 status:
   state: ready
-  conditions:
-  - type: ReadyForBackup
-    status: "True"
-  - type: PGBackRestRepoHostReady
-    status: "True"
-  - type: PGBackRestReplicaRepoReady
-    status: "True"
-  - type: PGBackRestReplicaCreate
-    status: "True"
-  - type: ProxyAvailable
-    status: "True"
-  - message: pg_tde is enabled in PerconaPGCluster
-    observedGeneration: 1
-    reason: Enabled
-    status: "True"
-    type: PGTDEEnabled
+---
+apiVersion: upstream.pgv2.percona.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: pg-tde
+status:
+  pgTDERevision: 58dc94b68c
 ---
 kind: Job
 apiVersion: batch/v1

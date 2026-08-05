@@ -6,14 +6,16 @@ package pgbouncer
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -65,7 +67,7 @@ func (vs iniValueSet) String() string {
 }
 
 // authFileContents returns a PgBouncer user database.
-func authFileContents(password string) []byte {
+func authFileContents(password string, userSecret *corev1.Secret) ([]byte, error) {
 	// > There should be at least 2 fields, surrounded by double quotes.
 	// > Double quotes in a field value can be escaped by writing two double quotes.
 	// - https://www.pgbouncer.org/config.html#authentication-file-format
@@ -73,9 +75,31 @@ func authFileContents(password string) []byte {
 		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 	}
 
-	user1 := quote(postgresqlUser) + " " + quote(password) + "\n"
+	users := make(map[string]string)
+	if userSecret != nil {
+		for name, password := range userSecret.Data {
+			if name == postgresqlUser {
+				return nil, errors.Errorf("pgbouncer user %q in Secret %q conflicts with the reserved operator user", name, userSecret.Name)
+			}
+			if strings.ContainsAny(string(password), "\r\n") {
+				return nil, errors.Errorf("pgbouncer user %q in Secret %q contains a newline", name, userSecret.Name)
+			}
+			users[name] = string(password)
+		}
+	}
+	sortedUsers := make([]string, 0, len(users))
+	for name := range users {
+		sortedUsers = append(sortedUsers, name)
+	}
+	sort.Strings(sortedUsers)
 
-	return []byte(user1)
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "%s %s\n", quote(postgresqlUser), quote(password))
+	for _, name := range sortedUsers {
+		_, _ = fmt.Fprintf(&b, "%s %s\n", quote(name), quote(users[name]))
+	}
+
+	return []byte(b.String()), nil
 }
 
 func hasLDAPRules(cluster *v1beta1.PostgresCluster) bool {
@@ -199,9 +223,7 @@ func clusterINI(cluster *v1beta1.PostgresCluster) string {
 	}
 
 	// Override the above with any specified settings.
-	for k, v := range cluster.Spec.Proxy.PGBouncer.Config.Global {
-		global[k] = v
-	}
+	maps.Copy(global, cluster.Spec.Proxy.PGBouncer.Config.Global)
 
 	// Prevent the user from bypassing the main configuration file.
 	global["conffile"] = iniFileAbsolutePath

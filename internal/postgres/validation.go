@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // truncateAt returns s truncated to n bytes, or s unchanged when len(s) <= n.
@@ -64,7 +64,32 @@ var sensitiveRelativePath = regexp.MustCompile(
 //
 // https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-DIRECTORY
 func sanitizeLogDirectory(cluster *v1beta1.PostgresCluster, input string, recorder record.EventRecorder) string {
-	directory := path.Clean(input)
+	directory, unsafe, relative := ResolveLogDirectory(DataDirectory(cluster), input)
+
+	switch {
+	case unsafe && recorder != nil:
+		recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidParameter",
+			"Ignoring unsafe Postgres parameter value %q = %q", "log_directory", truncateAt(input, 128))
+
+	case relative && recorder != nil:
+		recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidParameter",
+			"Postgres parameter %q should be %q or an absolute path", "log_directory", "log")
+	}
+
+	return directory
+}
+
+// ResolveLogDirectory returns the absolute path Postgres uses for "log_directory"
+// when its "data_directory" is dataDir and "log_directory" is set to input. When
+// input is not a safe value, it returns the absolute path to a good one instead
+// and reports why: unsafe when input names a path Postgres controls, relative
+// when input is a non-default relative path. Callers that derive paths which must
+// agree with the running Postgres configuration (e.g. the log collector) should
+// use this rather than duplicating the resolution.
+//
+// https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-DIRECTORY
+func ResolveLogDirectory(dataDir, input string) (directory string, unsafe, relative bool) {
+	directory = path.Clean(input)
 
 	// [path.Clean] leaves leading parent directories. Eliminate these as a security measure.
 	for strings.HasPrefix(directory, "../") {
@@ -75,40 +100,30 @@ func sanitizeLogDirectory(cluster *v1beta1.PostgresCluster, input string, record
 	case directory == "log":
 		// This the Postgres default and the only relative path allowed in v1 of PostgresCluster.
 		// Expand it relative to the data directory like Postgres does.
-		return path.Join(DataDirectory(cluster), "log")
+		return path.Join(dataDir, "log"), false, false
 
 	case directory == "", directory == ".", directory == "/",
 		sensitiveAbsolutePath.MatchString(directory),
 		sensitiveRelativePath.MatchString(directory):
-		if recorder != nil {
-			recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidParameter",
-				"Ignoring unsafe Postgres parameter value %q = %q", "log_directory", truncateAt(input, 128))
-		}
-
 		// When the value is empty after cleaning or disallowed, choose one instead.
 		// Keep it on the same volume, if possible.
 		if strings.HasPrefix(directory, tmpMountPath) {
-			return path.Join(tmpMountPath, "logs/postgres")
+			return path.Join(tmpMountPath, "logs/postgres"), true, false
 		}
 		if strings.HasPrefix(directory, walMountPath) {
-			return path.Join(walMountPath, "logs/postgres")
+			return path.Join(walMountPath, "logs/postgres"), true, false
 		}
 
 		// There is always a data volume, so use that.
-		return path.Join(dataMountPath, "logs/postgres")
+		return path.Join(dataMountPath, "logs/postgres"), true, false
 
 	case !path.IsAbs(directory):
-		if recorder != nil {
-			recorder.Eventf(cluster, corev1.EventTypeWarning, "InvalidParameter",
-				"Postgres parameter %q should be %q or an absolute path", "log_directory", "log")
-		}
-
 		// Directory is relative. This is disallowed since v1 of PostgresCluster.
 		// Expand it relative to the data directory like Postgres does.
-		return path.Join(DataDirectory(cluster), directory)
+		return path.Join(dataDir, directory), false, true
 
 	default:
 		// Directory is absolute and considered safe; use it.
-		return directory
+		return directory, false, false
 	}
 }

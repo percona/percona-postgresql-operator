@@ -3,9 +3,11 @@ package pgtde
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +17,19 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+)
+
+const (
+	// TempTokenPath is where the new vault token is written inside the pod
+	// during a vault provider change (before the volume is updated).
+	// Stored under /pgdata so it survives pod restarts (persistent volume).
+	TempTokenPath = "/pgdata/tde-new-token" // nolint:gosec
+	// TempCAPath is where the new CA certificate is written inside the pod
+	// during a vault provider change (before the volume is updated).
+	// Stored under /pgdata so it survives pod restarts (persistent volume).
+	TempCAPath = "/pgdata/tde-new-ca.crt"
 )
 
 // enableInPostgreSQL installs pg_tde extension in every database.
@@ -56,55 +70,77 @@ func disableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-func ReconcileExtension(ctx context.Context, exec postgres.Executor, record record.EventRecorder, cluster *crunchyv1beta1.PostgresCluster) error {
+// ReconcileExtension installs or drops the pg_tde extension according to the spec.
+func ReconcileExtension(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
 	if !cluster.Spec.Extensions.PGTDE.Enabled {
-		err := disableInPostgreSQL(ctx, exec)
-		if err != nil {
-			record.Event(cluster, corev1.EventTypeWarning, "pgTdeEnabled", "Unable to disable pg_tde")
-			return err
-		}
-
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:               crunchyv1beta1.PGTDEEnabled,
-			Status:             metav1.ConditionFalse,
-			Reason:             "Disabled",
-			Message:            "pg_tde is disabled in PerconaPGCluster",
-			ObservedGeneration: cluster.GetGeneration(),
-		})
-
-		return nil
+		return disableInPostgreSQL(ctx, exec)
 	}
 
-	err := enableInPostgreSQL(ctx, exec)
+	return enableInPostgreSQL(ctx, exec)
+}
+
+// ReportExtension records the outcome of a ReconcileExtension.
+// The PGTDEEnabled condition decides whether pg_tde is in shared_preload_libraries
+// and whether instance Pods carry the vault volume.
+func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.EventRecorder, err error) {
+	enabled := cluster.Spec.Extensions.PGTDE.Enabled
+
 	if err != nil {
-		record.Event(cluster, corev1.EventTypeWarning, "pgTdeDisabled", "Unable to install pg_tde")
-		return err
+		// Leave the condition alone: a failed DROP means the extension is
+		// still installed, and a failed CREATE means whatever was there
+		// before still is.
+		if enabled {
+			record.Event(cluster, corev1.EventTypeWarning,
+				"PGTDEInstallFailed", "Unable to install pg_tde")
+		} else {
+			record.Event(cluster, corev1.EventTypeWarning,
+				"PGTDEDisableFailed", "Unable to disable pg_tde")
+		}
+		return
 	}
 
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+	condition := metav1.Condition{
 		Type:               crunchyv1beta1.PGTDEEnabled,
 		Status:             metav1.ConditionTrue,
 		Reason:             "Enabled",
 		Message:            "pg_tde is enabled in PerconaPGCluster",
 		ObservedGeneration: cluster.GetGeneration(),
-	})
-
-	return nil
+	}
+	if !enabled {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "Disabled"
+		condition.Message = "pg_tde is disabled in PerconaPGCluster"
+	}
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
+	outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
 }
 
-var errAlreadyExists = errors.New("already exists")
-
-func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
-	log := logging.FromContext(ctx)
-
-	caSecretPath := ""
-	if vault.CASecret.Key != "" {
-		caSecretPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
+// VaultCredentialPaths returns the standard volume mount paths for the vault
+// token and CA certificate based on the vault spec's secret key names.
+func VaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
+	tokenPath = naming.PGTDEMountPath + "/" + vault.TokenSecret.Key
+	if vault.HasCA() {
+		caPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
 	}
+	return tokenPath, caPath
+}
+
+// TempVaultCredentialPaths returns the temporary file paths used during a vault
+// provider change, before the pod volume is updated with new credentials.
+func TempVaultCredentialPaths(vault *crunchyv1beta1.PGTDEVaultSpec) (tokenPath, caPath string) {
+	tokenPath = TempTokenPath
+	if vault.HasCA() {
+		caPath = TempCAPath
+	}
+	return tokenPath, caPath
+}
+
+func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) error {
+	log := logging.FromContext(ctx)
 
 	stdout, stderr, err := exec.Exec(ctx,
 		strings.NewReader(strings.Join([]string{
@@ -121,18 +157,14 @@ func addVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunch
 			"provider_name":    naming.PGTDEVaultProvider,
 			"vault_host":       vault.Host,
 			"vault_mount_path": vault.MountPath,
-			"token_path":       naming.PGTDEMountPath + "/" + vault.TokenSecret.Key,
-			"ca_path":          caSecretPath,
+			"token_path":       tokenPath,
+			"ca_path":          caPath,
 		}, nil)
 
 	if err != nil {
 		log.Info("failed to add pg_tde vault provider", "stdout", stdout, "stderr", stderr)
 	} else {
 		log.Info("added pg_tde vault provider", "stdout", stdout, "stderr", stderr)
-	}
-
-	if strings.Contains(stderr, "already exists") {
-		return errAlreadyExists
 	}
 
 	return err
@@ -161,10 +193,6 @@ func createGlobalKey(ctx context.Context, exec postgres.Executor, clusterID type
 		log.Info("failed to create global key", "globalKey", globalKey, "stdout", stdout, "stderr", stderr)
 	} else {
 		log.Info("created global key", "globalKey", globalKey, "stdout", stdout, "stderr", stderr)
-	}
-
-	if strings.Contains(stderr, "already exists") {
-		return errAlreadyExists
 	}
 
 	return err
@@ -198,13 +226,8 @@ func setDefaultKey(ctx context.Context, exec postgres.Executor, clusterID types.
 	return err
 }
 
-func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec) error {
+func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) error {
 	log := logging.FromContext(ctx)
-
-	caSecretPath := ""
-	if vault.CASecret.Key != "" {
-		caSecretPath = naming.PGTDEMountPath + "/" + vault.CASecret.Key
-	}
 
 	stdout, stderr, err := exec.Exec(ctx,
 		strings.NewReader(strings.Join([]string{
@@ -221,8 +244,8 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 			"provider_name":    naming.PGTDEVaultProvider,
 			"vault_host":       vault.Host,
 			"vault_mount_path": vault.MountPath,
-			"token_path":       naming.PGTDEMountPath + "/" + vault.TokenSecret.Key,
-			"ca_path":          caSecretPath,
+			"token_path":       tokenPath,
+			"ca_path":          caPath,
 		}, nil)
 
 	if err != nil {
@@ -234,22 +257,203 @@ func changeVaultProvider(ctx context.Context, exec postgres.Executor, vault *cru
 	return err
 }
 
-func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster) error {
+// ReconcileVaultProvider configures or updates the pg_tde vault key provider.
+// tokenPath and caPath are the file paths inside the pod where the vault
+// credentials can be read. For initial setup these are the standard volume
+// mount paths; for provider changes they may be temporary file paths.
+//
+// The provider and the global key may already exist even on the initial setup
+// path: a cluster that is deleted and recreated with its PVCs retained, or one
+// where pg_tde was disabled and re-enabled, starts with an empty PGTDERevision
+// but a populated pg_tde state. Rather than interpreting the error text to
+// recognize those cases, each step recovers from a failure by driving the state
+// towards the spec and lets the following step decide whether that worked.
+func ReconcileVaultProvider(ctx context.Context, exec postgres.Executor, cluster *crunchyv1beta1.PostgresCluster, tokenPath, caPath string) error {
+	log := logging.FromContext(ctx)
 	vault := cluster.Spec.Extensions.PGTDE.Vault
 
-	if cluster.Status.PGTDERevision == "" {
-		err := addVaultProvider(ctx, exec, vault)
-
-		if err == nil || errors.Is(err, errAlreadyExists) {
-			err = createGlobalKey(ctx, exec, cluster.UID)
-		}
-
-		if err == nil || errors.Is(err, errAlreadyExists) {
-			err = setDefaultKey(ctx, exec, cluster.UID)
-		}
-
-		return err
+	if cluster.Status.PGTDERevision != "" {
+		return changeVaultProvider(ctx, exec, vault, tokenPath, caPath)
 	}
 
-	return changeVaultProvider(ctx, exec, vault)
+	if addErr := addVaultProvider(ctx, exec, vault, tokenPath, caPath); addErr != nil {
+		// The provider probably exists already. Its configuration belongs to
+		// whatever created it, which may be an older incarnation of this
+		// cluster pointing at a different Vault; overwrite it so it matches
+		// the spec instead of assuming it already does.
+		log.V(1).Info("could not add pg_tde vault provider, rewriting the existing one", "error", addErr.Error())
+
+		if err := changeVaultProvider(ctx, exec, vault, tokenPath, caPath); err != nil {
+			// Neither statement worked, so the provider is not usable. The
+			// failure to add it is the more useful of the two to report.
+			return errors.Wrap(addErr, "add vault provider")
+		}
+	}
+
+	// Creating the key fails when it already exists, which is expected for a
+	// recreated cluster. Setting it as the default is the real test of whether
+	// the provider and the key are usable, so defer to that result.
+	createErr := createGlobalKey(ctx, exec, cluster.UID)
+
+	if err := setDefaultKey(ctx, exec, cluster.UID); err != nil {
+		if createErr != nil {
+			return errors.Wrap(createErr, "create global key")
+		}
+		return errors.Wrap(err, "set default key")
+	}
+
+	return nil
+}
+
+// Phase is where a cluster stands in the two-phase vault credential change
+// described on reconcilePGTDEProviders.
+type Phase int
+
+const (
+	// InitialSetup means no key provider has been configured yet, so the
+	// credentials in the spec are the only ones there have ever been.
+	InitialSetup Phase = iota
+
+	// Configured means the key provider names the credentials in the spec.
+	Configured
+
+	// StageCredentials means the spec names credentials the key provider
+	// has not been pointed at yet. Phase 1 has to copy them onto the data
+	// volumes and repoint the provider before the Pods may mount them.
+	StageCredentials
+
+	// Finalize means the key provider names the staged copies on the data
+	// volumes. Phase 2 repoints it at the mount paths and removes them.
+	Finalize
+)
+
+// vaultChange is the state of a vault credential change. reconcileInstance
+// decides whether to hold the Pods' vault volume from it and
+// reconcilePGTDEProviders decides which SQL to run; the two have to agree,
+// because releasing the volume in a phase that still expects the old
+// credentials mounted is what leaves pg_tde unable to fetch its key.
+type vaultChange struct {
+	Phase Phase
+
+	// Paths inside the Pod. The standard pair are the projected Secret's mount
+	// paths; the temp pair are the copies staged on the data volume.
+	TokenPath, CAPath         string
+	TempTokenPath, TempCAPath string
+
+	// Revisions matching each pair of paths, to compare with
+	// cluster.Status.PGTDERevision.
+	StandardRevision, TempRevision string
+}
+
+// VaultChangeFor derives the change from the spec and the stored revision.
+func VaultChangeFor(cluster *crunchyv1beta1.PostgresCluster) (vaultChange, error) {
+	var change vaultChange
+	var err error
+
+	vault := cluster.Spec.Extensions.PGTDE.Vault
+	change.TokenPath, change.CAPath = VaultCredentialPaths(vault)
+	change.TempTokenPath, change.TempCAPath = TempVaultCredentialPaths(vault)
+
+	if change.StandardRevision, err = VaultRevision(
+		vault, change.TokenPath, change.CAPath); err != nil {
+		return change, err
+	}
+	if change.TempRevision, err = VaultRevision(
+		vault, change.TempTokenPath, change.TempCAPath); err != nil {
+		return change, err
+	}
+
+	switch cluster.Status.PGTDERevision {
+	case "":
+		change.Phase = InitialSetup
+	case change.StandardRevision:
+		change.Phase = Configured
+	case change.TempRevision:
+		change.Phase = Finalize
+	default:
+		change.Phase = StageCredentials
+	}
+
+	return change, nil
+}
+
+// VaultRevision computes a hash of the vault configuration and credential
+// paths for comparing with cluster.Status.PGTDERevision.
+func VaultRevision(vault *crunchyv1beta1.PGTDEVaultSpec, tokenPath, caPath string) (string, error) {
+	return util.SafeHash32(func(hasher io.Writer) error {
+		_, err := fmt.Fprintf(hasher, "%q%q%q%q%q%q%q%q",
+			vault.Host, vault.MountPath,
+			vault.TokenSecret.Name, vault.TokenSecret.Key,
+			vault.CASecret.Name, vault.CASecret.Key,
+			tokenPath, caPath)
+		return err
+	})
+}
+
+// PreserveOldTDEVolume replaces the pg-tde volume and its mount on the database
+// container with the ones from the StatefulSet as it exists in the cluster,
+// adding them back when the new pod spec no longer has them. This prevents pods
+// from restarting with new vault credentials before the vault provider change
+// SQL has been executed, and from restarting with no credentials at all while
+// the extension is still installed.
+func PreserveOldTDEVolume(podSpec *corev1.PodSpec, existing *appsv1.StatefulSet) {
+	var oldVolume *corev1.Volume
+	for i := range existing.Spec.Template.Spec.Volumes {
+		if existing.Spec.Template.Spec.Volumes[i].Name == naming.PGTDEVolume {
+			oldVolume = &existing.Spec.Template.Spec.Volumes[i]
+			break
+		}
+	}
+	if oldVolume == nil {
+		return
+	}
+
+	replaced := false
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name == naming.PGTDEVolume {
+			podSpec.Volumes[i] = *oldVolume
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		podSpec.Volumes = append(podSpec.Volumes, *oldVolume)
+	}
+
+	// The volume is only ever mounted into the database container.
+	var oldMount *corev1.VolumeMount
+	for _, container := range existing.Spec.Template.Spec.Containers {
+		if container.Name == naming.ContainerDatabase {
+			for i := range container.VolumeMounts {
+				if container.VolumeMounts[i].Name == naming.PGTDEVolume {
+					oldMount = &container.VolumeMounts[i]
+					break
+				}
+			}
+			break
+		}
+	}
+	if oldMount == nil {
+		return
+	}
+
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name != naming.ContainerDatabase {
+			continue
+		}
+
+		mounts := podSpec.Containers[i].VolumeMounts
+		replaced := false
+		for j := range mounts {
+			if mounts[j].Name == naming.PGTDEVolume {
+				mounts[j] = *oldMount
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			podSpec.Containers[i].VolumeMounts = append(mounts, *oldMount)
+		}
+		break
+	}
 }

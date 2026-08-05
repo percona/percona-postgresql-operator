@@ -1,0 +1,53 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      # Retrieve the S3 repo path set when the Crunchy cluster was created
+      REPO_PATH=$(kubectl get configmap crunchy-migration-config -n "${NAMESPACE}" \
+        -o jsonpath='{.data.repo-path}')
+      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+
+      # -----------------------------------------------------------------------
+      # Copy TLS certificates from the Crunchy namespace to the Percona namespace.
+      # The cluster-cert provides the shared CA so each side can verify the other.
+      # The replication-cert (CN=_crunchyreplication) is presented by the Percona
+      # standby when opening a streaming replication connection to the Crunchy primary.
+      # -----------------------------------------------------------------------
+      for secret in crunchy-source-cluster-cert crunchy-source-replication-cert; do
+        kubectl get secret "${secret}" -n "${CRUNCHY_NS}" -o json | \
+          yq '{"apiVersion": .apiVersion, "kind": .kind, "data": .data,
+               "metadata": {"name": .metadata.name}, "type": .type}' -o yaml | \
+          kubectl apply -n "${NAMESPACE}" -f -
+      done
+
+      # Use the Crunchy HA service DNS as the streaming replication host.
+      # In-cluster cross-namespace DNS avoids the need for a LoadBalancer IP.
+      CRUNCHY_HOST="crunchy-source-ha.${CRUNCHY_NS}.svc.cluster.local"
+
+      # -----------------------------------------------------------------------
+      # Create the Percona standby cluster:
+      #   - repoName: repo1  → initial restore from the shared S3 backup
+      #   - host/port        → ongoing streaming replication from the Crunchy primary
+      #   - customTLSSecret  → lets Percona verify Crunchy's TLS and vice-versa
+      #   - customReplicationTLSSecret → cert Percona presents as _crunchyreplication
+      # -----------------------------------------------------------------------
+      get_cr "percona-standby" "${REPO_PATH}" | \
+        yq eval 'del(.spec.users)' | \
+        yq eval ".spec.backups.pgbackrest.global.\"repo1-s3-uri-style\" = \"path\"" | \
+        yq eval ".spec.backups.pgbackrest.global.\"repo1-s3-verify-tls\" = \"n\"" | \
+        yq eval ".spec.backups.pgbackrest.repos[0].s3.endpoint = \"${MINIO_ENDPOINT}\"" | \
+        yq eval ".spec.standby.enabled = true" | \
+        yq eval ".spec.standby.repoName = \"repo1\"" | \
+        yq eval ".spec.standby.host = \"${CRUNCHY_HOST}\"" | \
+        yq eval ".spec.standby.port = 5432" | \
+        yq eval ".spec.secrets.customTLSSecret.name = \"crunchy-source-cluster-cert\"" | \
+        yq eval ".spec.secrets.customReplicationTLSSecret.name = \"crunchy-source-replication-cert\"" | \
+        kubectl -n "${NAMESPACE}" apply -f -

@@ -29,32 +29,57 @@ var (
 	_ encoding.TextUnmarshaler = (*Certificate)(nil)
 )
 
-// MarshalText returns a PEM encoding of c that OpenSSL understands.
+// MarshalText returns a PEM encoding of c that OpenSSL understands. When c
+// was unmarshaled from a bundle containing more than one certificate, e.g. an
+// intermediate certificate authority followed by its root, the additional
+// certificates are included after the first so the full bundle round-trips.
 func (c Certificate) MarshalText() ([]byte, error) {
 	if c.x509 == nil || len(c.x509.Raw) == 0 {
 		_, err := x509.ParseCertificate(nil)
 		return nil, err
 	}
 
-	return pem.EncodeToMemory(&pem.Block{
+	out := pem.EncodeToMemory(&pem.Block{
 		Type:  pemLabelCertificate,
 		Bytes: c.x509.Raw,
-	}), nil
+	})
+
+	return append(out, c.chain...), nil
 }
 
-// UnmarshalText populates c from its PEM encoding.
+// UnmarshalText populates c from its PEM encoding. When data contains more
+// than one PEM-encoded certificate, e.g. a CA bundle made up of an
+// intermediate certificate authority followed by its root, the first is
+// parsed for cryptographic use and every certificate is kept so the full
+// bundle round-trips through MarshalText. Any other kind of PEM block
+// (a private key, for example) is ignored rather than carried along.
 func (c *Certificate) UnmarshalText(data []byte) error {
-	block, _ := pem.Decode(data)
+	block, rest := pem.Decode(data)
 
 	if block == nil || block.Type != pemLabelCertificate {
 		return errors.New("not a PEM-encoded certificate")
 	}
 
 	parsed, err := x509.ParseCertificate(block.Bytes)
-	if err == nil {
-		c.x509 = parsed
+	if err != nil {
+		return err
 	}
-	return err
+
+	c.x509 = parsed
+	c.chain = nil
+
+	for {
+		var next *pem.Block
+		next, rest = pem.Decode(rest)
+		if next == nil {
+			break
+		}
+		if next.Type == pemLabelCertificate {
+			c.chain = append(c.chain, pem.EncodeToMemory(next)...)
+		}
+	}
+
+	return nil
 }
 
 var (

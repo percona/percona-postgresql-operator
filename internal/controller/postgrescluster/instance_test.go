@@ -35,13 +35,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestInstanceIsRunning(t *testing.T) {
@@ -281,7 +281,7 @@ func TestStoreDesiredRequest(t *testing.T) {
 		Spec: v1beta1.PostgresClusterSpec{
 			InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 				Name:     "red",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 				DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 					Resources: corev1.VolumeResourceRequirements{
@@ -290,7 +290,7 @@ func TestStoreDesiredRequest(t *testing.T) {
 						}}},
 			}, {
 				Name:     "blue",
-				Replicas: initialize.Int32(1),
+				Replicas: new(int32(1)),
 			}}}}
 
 	t.Run("BadRequestNoBackup", func(t *testing.T) {
@@ -1562,7 +1562,7 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 		name: "check pod priority",
 		ip: intentParams{
 			spec: &v1beta1.PostgresInstanceSetSpec{
-				PriorityClassName: initialize.String("some-priority-class"),
+				PriorityClassName: new("some-priority-class"),
 			},
 		},
 		run: func(t *testing.T, ss *appsv1.StatefulSet) {
@@ -1667,10 +1667,10 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 				},
 				Spec: v1beta1.PostgresClusterSpec{
 					PostgresVersion:             13,
-					DisableDefaultPodScheduling: initialize.Bool(true),
+					DisableDefaultPodScheduling: new(true),
 					InstanceSets: []v1beta1.PostgresInstanceSetSpec{{
 						Name:                "instance1",
-						Replicas:            initialize.Int32(1),
+						Replicas:            new(int32(1)),
 						DataVolumeClaimSpec: testVolumeClaimSpec(),
 						TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
 							MaxSkew:           int32(1),
@@ -1718,7 +1718,6 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 `))
 		},
 	}} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 
 			cluster := test.ip.cluster
@@ -1982,7 +1981,7 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		spec := &cluster.Spec.InstanceSets[0]
-		spec.MinAvailable = initialize.Pointer(intstr.FromInt32(0))
+		spec.MinAvailable = new(intstr.FromInt32(0))
 		assert.NilError(t, r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, spec))
 		assert.Assert(t, !foundPDB(cluster, spec))
 	})
@@ -1991,7 +1990,7 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		spec := &cluster.Spec.InstanceSets[0]
-		spec.MinAvailable = initialize.Pointer(intstr.FromInt32(1))
+		spec.MinAvailable = new(intstr.FromInt32(1))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
@@ -2000,7 +1999,7 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		assert.Assert(t, foundPDB(cluster, spec))
 
 		t.Run("deleted", func(t *testing.T) {
-			spec.MinAvailable = initialize.Pointer(intstr.FromInt32(0))
+			spec.MinAvailable = new(intstr.FromInt32(0))
 			err := r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, spec)
 			if apierrors.IsConflict(err) {
 				// When running in an existing environment another controller will sometimes update
@@ -2018,7 +2017,7 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		spec := &cluster.Spec.InstanceSets[0]
-		spec.MinAvailable = initialize.Pointer(intstr.FromString("50%"))
+		spec.MinAvailable = new(intstr.FromString("50%"))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
@@ -2027,7 +2026,7 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		assert.Assert(t, foundPDB(cluster, spec))
 
 		t.Run("deleted", func(t *testing.T) {
-			spec.MinAvailable = initialize.Pointer(intstr.FromString("0%"))
+			spec.MinAvailable = new(intstr.FromString("0%"))
 			err := r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, spec)
 			if apierrors.IsConflict(err) {
 				// When running in an existing environment another controller will sometimes update
@@ -2041,13 +2040,13 @@ func TestReconcileInstanceSetPodDisruptionBudget(t *testing.T) {
 		})
 
 		t.Run("delete with 00%", func(t *testing.T) {
-			spec.MinAvailable = initialize.Pointer(intstr.FromString("50%"))
+			spec.MinAvailable = new(intstr.FromString("50%"))
 
 			assert.NilError(t, r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, spec))
 			assert.Assert(t, foundPDB(cluster, spec))
 
 			t.Run("deleted", func(t *testing.T) {
-				spec.MinAvailable = initialize.Pointer(intstr.FromString("00%"))
+				spec.MinAvailable = new(intstr.FromString("00%"))
 				err := r.reconcileInstanceSetPodDisruptionBudget(ctx, cluster, spec)
 				if apierrors.IsConflict(err) {
 					// When running in an existing environment another controller will sometimes update
@@ -2120,13 +2119,13 @@ func TestCleanupDisruptionBudgets(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
 		spec := &cluster.Spec.InstanceSets[0]
-		spec.MinAvailable = initialize.Pointer(intstr.FromInt32(1))
+		spec.MinAvailable = new(intstr.FromInt32(1))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
 		expectedPDB := generatePDB(t, cluster, spec,
-			initialize.Pointer(intstr.FromInt32(1)))
+			new(intstr.FromInt32(1)))
 		assert.NilError(t, createPDB(expectedPDB))
 
 		t.Run("no instances were removed", func(t *testing.T) {
@@ -2138,8 +2137,8 @@ func TestCleanupDisruptionBudgets(t *testing.T) {
 		t.Run("cleanup leftover pdb", func(t *testing.T) {
 			leftoverPDB := generatePDB(t, cluster, &v1beta1.PostgresInstanceSetSpec{
 				Name:     "old-instance",
-				Replicas: initialize.Int32(1),
-			}, initialize.Pointer(intstr.FromInt32(1)))
+				Replicas: new(int32(1)),
+			}, new(intstr.FromInt32(1)))
 			assert.NilError(t, createPDB(leftoverPDB))
 
 			assert.Assert(t, foundPDB(expectedPDB))
@@ -2158,5 +2157,47 @@ func TestCleanupDisruptionBudgets(t *testing.T) {
 			assert.Assert(t, foundPDB(expectedPDB))
 			assert.Assert(t, !foundPDB(leftoverPDB))
 		})
+	})
+}
+
+func TestInstanceCACert(t *testing.T) {
+	t.Run("uses rootCertificateAuth when present", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+
+		caCert, err := instanceCACert(root, &corev1.Secret{})
+		assert.NilError(t, err)
+
+		want, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		got, err := caCert.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, want, got)
+	})
+
+	t.Run("parses ca.crt from issued secret when rootCertificateAuth is nil", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		caBytes, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+
+		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: caBytes}}
+
+		caCert, err := instanceCACert(nil, issuedSecret)
+		assert.NilError(t, err)
+		got, err := caCert.MarshalText()
+		assert.NilError(t, err)
+		assert.DeepEqual(t, caBytes, got)
+	})
+
+	t.Run("errors when issued secret has no ca.crt", func(t *testing.T) {
+		_, err := instanceCACert(nil, &corev1.Secret{})
+		assert.ErrorContains(t, err, "did not return a CA certificate")
+	})
+
+	t.Run("errors when ca.crt is not a valid certificate", func(t *testing.T) {
+		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("not a cert")}}
+		_, err := instanceCACert(nil, issuedSecret)
+		assert.ErrorContains(t, err, "failed to parse CA certificate")
 	})
 }

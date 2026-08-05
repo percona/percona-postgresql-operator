@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func GetQueriesConfigDir(ctx context.Context) string {

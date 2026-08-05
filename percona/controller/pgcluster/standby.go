@@ -8,21 +8,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -50,7 +49,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 		mainSiteNN, ok := cr.GetAnnotations()[pNaming.AnnotationReplicationMainSite]
 		if !ok || mainSiteNN == "" {
 			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-				Type:    postgrescluster.ConditionStandbyLagging,
+				Type:    pNaming.ConditionStandbyLagging,
 				Status:  metav1.ConditionUnknown,
 				Reason:  "MainSiteNotFound",
 				Message: "Cannot find main site for replication lag calculation",
@@ -60,7 +59,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	}
 
 	// Do not try to calculate if the cluster is still initializing. We do not know the primary.
-	isCondPresent := meta.FindStatusCondition(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) != nil
+	isCondPresent := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionStandbyLagging) != nil
 	if cr.Status.State != v2.AppStateReady && !isCondPresent {
 		return nil
 	}
@@ -73,31 +72,35 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	lagBytes, err := r.getStandbyLag(ctx, cr)
 	if err != nil {
 		cond := metav1.Condition{
-			Type:    postgrescluster.ConditionStandbyLagging,
+			Type:    pNaming.ConditionStandbyLagging,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "ErrorGettingLag",
 			Message: err.Error(),
 		}
-		defer func() {
-			meta.SetStatusCondition(&cr.Status.Conditions, cond)
-		}()
 
 		if errors.Is(err, ErrPrimaryPodNotFound) {
 			cond.Message = "Cannot find primary for replication lag calculation"
-			return nil
 		}
 		if errors.Is(err, ErrInvalidLagQueryOutput) {
-			cond.Message = "Invalid output from lag query. The WAL receiver is probably not active"
-			return nil
+			cond.Message = "Invalid output from lag query. The WAL receiver may not be active"
 		}
-		return errors.Wrap(err, "calculate replication lag bytes")
+
+		// If the standby was previously lagging, we should mark the pod as ready again since now
+		// we do not know the actual state of lag.
+		if meta.IsStatusConditionTrue(cr.Status.Conditions, pNaming.ConditionStandbyLagging) {
+			if err := r.setPodReplicationLagSignal(ctx, cr, true); err != nil {
+				return errors.Wrap(err, "set pod replication readiness signal")
+			}
+		}
+		meta.SetStatusCondition(&cr.Status.Conditions, cond)
+		return nil
 	}
 
 	maxLag := cr.Spec.Standby.MaxAcceptableLag.AsDec().UnscaledBig().Int64()
 	lagDetected := lagBytes > maxLag
 
 	cond := metav1.Condition{
-		Type:   postgrescluster.ConditionStandbyLagging,
+		Type:   pNaming.ConditionStandbyLagging,
 		Reason: "LagNotDetected",
 		Status: metav1.ConditionFalse,
 	}
@@ -109,7 +112,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 	}
 
 	// Set pod readiness only when the lag state transitions.
-	if !meta.IsStatusConditionPresentAndEqual(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging, cond.Status) {
+	if !meta.IsStatusConditionPresentAndEqual(cr.Status.Conditions, pNaming.ConditionStandbyLagging, cond.Status) {
 		if err := r.setPodReplicationLagSignal(ctx, cr, !lagDetected); err != nil {
 			return errors.Wrap(err, "set pod replication readiness signal")
 		}
@@ -117,7 +120,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 
 	meta.SetStatusCondition(&cr.Status.Conditions, cond)
 	cr.Status.Standby.LagBytes = lagBytes
-	cr.Status.Standby.LagLastComputedAt = ptr.To(metav1.Now())
+	cr.Status.Standby.LagLastComputedAt = new(metav1.Now())
 	return nil
 }
 
@@ -125,7 +128,7 @@ func (r *PGClusterReconciler) reconcileStandbyLag(ctx context.Context, cr *v2.Pe
 // We compute the lag at intervals because this is an expensive operation (requires pod execs and database queries).
 func shouldSkipLagCheck(cr *v2.PerconaPGCluster) bool {
 	interval := defaultReplicationLagDetectionInterval
-	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionStandbyLagging) {
+	if meta.IsStatusConditionTrue(cr.Status.Conditions, pNaming.ConditionStandbyLagging) {
 		interval = laggedReplicationInterval
 	}
 
@@ -158,10 +161,30 @@ func (r *PGClusterReconciler) setPodReplicationLagSignal(
 }
 
 func (r *PGClusterReconciler) getStandbyLag(ctx context.Context, standby *v2.PerconaPGCluster) (int64, error) {
+	var errs error
+	log := logging.FromContext(ctx)
 	if standby.Spec.Standby.Host != "" {
-		return r.getLagFromStreamingHost(ctx, standby)
+		lag, err := r.getLagFromStreamingHost(ctx, standby)
+		if err == nil {
+			return lag, nil
+		}
+		log.Error(err, "Failed to get lag from streaming host")
+
+		// Fallthrough to pgbackrest repo only if configured
+		if standby.Spec.Standby.RepoName == "" {
+			return 0, err
+		}
+
+		errs = multierror.Append(errs, errors.Wrap(err, "get lag from streaming host"))
+		log.Info("Falling back to using pgbackrest repo for lag calculation")
 	}
-	return r.getLagFromMainSite(ctx, standby)
+
+	lag, err := r.getLagFromMainSite(ctx, standby)
+	if err != nil {
+		log.Error(err, "Failed to get lag from main site")
+		return 0, multierror.Append(errs, errors.Wrap(err, "get lag from main site"))
+	}
+	return lag, nil
 }
 
 var (

@@ -21,10 +21,14 @@ type InfoBackup struct {
 	Annotation map[string]string `json:"annotation,omitempty"`
 	Label      string            `json:"label,omitempty"`
 	Type       v2.PGBackupType   `json:"type,omitempty"`
-	Timestamp  struct {
+	Info       struct {
+		// For full backups, delta equals backup size
+		Delta int64 `json:"delta,omitempty"`
+	} `json:"info"`
+	Timestamp struct {
 		Start int64 `json:"start,omitempty"`
 		Stop  int64 `json:"stop,omitempty"`
-	} `json:"timestamp,omitempty"`
+	} `json:"timestamp"`
 }
 
 type InfoStanza struct {
@@ -36,17 +40,23 @@ type InfoStanza struct {
 		Lock    struct {
 			Backup struct {
 				Held bool `json:"held,omitempty"`
-			} `json:"backup,omitempty"`
-		} `json:"lock,omitempty"`
-	} `json:"status,omitempty"`
+			} `json:"backup"`
+		} `json:"lock"`
+	} `json:"status"`
 }
 
-var ErrNoValidBackups = errors.New("no valid backups")
+var (
+	ErrNoValidBackups   = errors.New("no valid backups")
+	ErrStanzaNotCreated = errors.New("pgBackRest stanza not created")
+)
 
 const (
 	statusOK = 0
 	// statusNoValidBackups means that there are no backups in pgbackrest
 	statusNoValidBackups = 2
+	// statusOther indicates a transient issue, e.g. stanza not yet created
+	// or temporarily unavailable during pod restarts
+	statusOther = 99
 )
 
 func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput, error) {
@@ -77,6 +87,8 @@ func GetInfo(ctx context.Context, pod *corev1.Pod, repoName string) (InfoOutput,
 		switch elem.Status.Code {
 		case statusNoValidBackups:
 			return InfoOutput{}, ErrNoValidBackups
+		case statusOther:
+			return InfoOutput{}, ErrStanzaNotCreated
 		case statusOK:
 			continue
 		default:

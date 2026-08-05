@@ -20,7 +20,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPrettyYAML(t *testing.T) {
@@ -37,8 +37,28 @@ func TestAuthFileContents(t *testing.T) {
 	t.Parallel()
 
 	password := `very"random`
-	data := authFileContents(password)
+	data, err := authFileContents(password, nil)
+	assert.NilError(t, err)
 	assert.Equal(t, string(data), `"_crunchypgbouncer" "very""random"`+"\n")
+}
+
+func TestAuthFileContentsUsers(t *testing.T) {
+	t.Parallel()
+
+	data, err := authFileContents("pgbouncer-password", &corev1.Secret{
+		Data: map[string][]byte{
+			`stats"user`: []byte(`stats"password`),
+			"monitor":    []byte("monitor-password"),
+		},
+	})
+	assert.NilError(t, err)
+
+	assert.Equal(t, string(data), strings.Join([]string{
+		`"_crunchypgbouncer" "pgbouncer-password"`,
+		`"monitor" "monitor-password"`,
+		`"stats""user" "stats""password"`,
+		"",
+	}, "\n"))
 }
 
 func TestClusterINI(t *testing.T) {

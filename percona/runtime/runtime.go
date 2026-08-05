@@ -5,13 +5,14 @@ import (
 	"strings"
 	"time"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	r "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 )
 
@@ -19,6 +20,12 @@ import (
 const refreshInterval time.Duration = 60 * time.Minute
 
 const ElectionID string = "08db3feb.percona.com"
+
+func ClientCacheOptions() *client.CacheOptions {
+	return &client.CacheOptions{
+		DisableFor: []client.Object{&cmv1.ClusterIssuer{}},
+	}
+}
 
 // CreateRuntimeManager wraps internal/controller/runtime.NewManager and modifies the given options:
 //   - Fully overwrites the Cache field
@@ -32,7 +39,7 @@ func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, opt
 	}
 
 	options.Cache = cache.Options{
-		SyncPeriod: initialize.Pointer(refreshInterval),
+		SyncPeriod: new(refreshInterval),
 	}
 	nn := strings.Split(namespaces, ",")
 	if len(nn) > 0 && nn[0] != "" {
@@ -42,6 +49,8 @@ func CreateRuntimeManager(config *rest.Config, features feature.MutableGate, opt
 		}
 		options.Cache.DefaultNamespaces = namespaces
 	}
+
+	options.Client.Cache = ClientCacheOptions()
 
 	options.BaseContext = func() context.Context {
 		ctx := context.Background()

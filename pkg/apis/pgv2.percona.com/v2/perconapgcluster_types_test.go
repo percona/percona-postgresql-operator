@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,16 +13,44 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sptr "k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPerconaPGCluster_Default(t *testing.T) {
 	// cr.Default() should not panic on PerconaPGCluster with empty fields
 	new(PerconaPGCluster).Default()
+}
+
+func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
+	t.Run("nil is defaulted to true for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.True(t, *cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("nil is left untouched for CRVersion < 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "3.0.0"
+		cr.Default()
+
+		assert.Nil(t, cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("explicit false is preserved for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Spec.Backups.Enabled = new(false)
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.False(t, *cr.Spec.Backups.Enabled)
+	})
 }
 
 func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
@@ -32,7 +61,6 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 		spec     PerconaPGClusterSpec
 		expected bool
 	}{
-
 		"Enabled is nil, should return true because default is true": {
 			spec:     PerconaPGClusterSpec{Backups: Backups{Enabled: nil}},
 			expected: true,
@@ -53,6 +81,36 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestPerconaPGCluster_Validate(t *testing.T) {
+	t.Run("rejects pg_stat_monitor and pg_stat_statements together", func(t *testing.T) {
+		cluster := new(PerconaPGCluster)
+		cluster.Spec.Extensions.BuiltIn.PGStatMonitor = new(true)
+		cluster.Spec.Extensions.BuiltIn.PGStatStatements = new(true)
+
+		err := cluster.Validate()
+		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
+	})
+}
+
+func TestPerconaPGCluster_Version(t *testing.T) {
+	t.Run("empty CRVersion does not crash", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		// cr.Version() should not panic when CRVersion is empty
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		// Should return the default operator version
+		assert.Equal(t, version.Version(), ver.String())
+	})
+
+	t.Run("valid CRVersion is parsed correctly", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "2.5.0"
+		ver := cr.Version()
+		require.NotNil(t, ver)
+		assert.Equal(t, "2.5.0", ver.String())
+	})
 }
 
 func TestPerconaPGCluster_Proxy(t *testing.T) {
@@ -85,6 +143,46 @@ func TestPerconaPGCluster_Proxy(t *testing.T) {
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
 		assert.Equal(t, cr.Spec.CRVersion, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion])
 	})
+}
+
+func TestPGProxySpec_PGBouncerEnabled(t *testing.T) {
+	tests := map[string]struct {
+		spec     *PGProxySpec
+		expected bool
+	}{
+		"nil proxy": {
+			spec:     nil,
+			expected: false,
+		},
+		"nil PgBouncer": {
+			spec:     &PGProxySpec{},
+			expected: false,
+		},
+		"replicas unspecified": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{},
+			},
+			expected: true,
+		},
+		"zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(0))},
+			},
+			expected: false,
+		},
+		"non-zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(1))},
+			},
+			expected: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.spec.PGBouncerEnabled())
+		})
+	}
 }
 
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
@@ -122,12 +220,10 @@ func TestPerconaPGCluster_PostgresImage(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			cluster.Spec.Image = tt.setImage
 
 			if tt.envImage != "" {
 				err := os.Setenv(testEnv, tt.envImage)
-
 				if err != nil {
 					t.Fatalf("Failed to set %s env variable: %v", testEnv, err)
 				}
@@ -275,7 +371,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: PerconaPGClusterSpec{
-					CRVersion:       "2.5.0",
+					CRVersion:       "2.9.0",
 					PostgresVersion: 15,
 					PMM: &PMMSpec{
 						Enabled:     true,
@@ -308,6 +404,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					}
 				}
 				assert.True(t, hasMonitoringUser)
+				require.True(t, actual.Spec.Extensions.PGStatStatements)
+				assert.False(t, actual.Spec.Extensions.PGStatMonitor)
+			},
+		},
+		"handles PMM pg_stat_monitor query source": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       "2.9.0",
+					PostgresVersion: 15,
+					PMM: &PMMSpec{
+						Enabled:     true,
+						QuerySource: PgStatMonitor,
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{
+								{Name: "repo1"},
+							},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				require.True(t, actual.Spec.Extensions.PGStatMonitor)
+				assert.False(t, actual.Spec.Extensions.PGStatStatements)
 			},
 		},
 		"handles AutoCreateUserSchema annotation": {
@@ -440,14 +574,200 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 	}
 }
 
+// K8SPG-440
+func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
+	extraVolumes := []crunchyv1beta1.ExtraVolume{
+		{
+			Name: "fts-dicts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+				},
+			},
+			Mounts: []crunchyv1beta1.ExtraVolumeMount{
+				{MountPath: "/pgdata/dicts", ReadOnly: true},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		spec PGInstanceSetSpec
+		want []crunchyv1beta1.ExtraVolume
+	}{
+		"forwards extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1", ExtraVolumes: extraVolumes},
+			want: extraVolumes,
+		},
+		"no extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1"},
+			want: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.spec.ToCrunchy()
+			assert.Equal(t, tc.want, got.ExtraVolumes)
+		})
+	}
+}
+
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
+	return slices.Contains(slice, item)
+}
+
+func TestValidateDynamicConfiguration(t *testing.T) {
+	tests := map[string]struct {
+		cr      *PerconaPGCluster
+		wantErr string
+	}{
+		"nil patroni": {
+			cr: &PerconaPGCluster{},
+		},
+		"nil dynamic configuration": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{},
+				},
+			},
+		},
+		"no postgresql key": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"ttl": 30,
+						},
+					},
+				},
+			},
+		},
+		"postgresql is not a map": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": "invalid",
+						},
+					},
+				},
+			},
+		},
+		"no parameters key": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"use_slots": true,
+							},
+						},
+					},
+				},
+			},
+		},
+		"parameters is not a map": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": "invalid",
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is not set": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"max_connections": "100",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is replica": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "replica",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is logical": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "logical",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"wal_level is minimal": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": "minimal",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "invalid value for spec.patroni.dynamicConfiguration.postgresql.parameters.wal_level: \"minimal\"; must be 'logical' or 'replica'",
+		},
+		"wal_level is not a string": {
+			cr: &PerconaPGCluster{
+				Spec: PerconaPGClusterSpec{
+					Patroni: &crunchyv1beta1.PatroniSpec{
+						DynamicConfiguration: map[string]any{
+							"postgresql": map[string]any{
+								"parameters": map[string]any{
+									"wal_level": 123,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-	return false
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tt.cr.ValidateDynamicConfiguration()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestShouldCheckStandbyLag(t *testing.T) {
@@ -539,7 +859,7 @@ func TestShouldCheckStandbyLag(t *testing.T) {
 						PostgresStandbySpec: &crunchyv1beta1.PostgresStandbySpec{
 							Enabled: true,
 						},
-						MaxAcceptableLag: k8sptr.To(resource.MustParse("0")),
+						MaxAcceptableLag: new(resource.MustParse("0")),
 					},
 				},
 			},

@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      data=$(kubectl get configmap 06-standby-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+      echo "${data}" | grep -q "initial-data-before-standby" || {
+        echo "ERROR: row 1 missing from standby. Got: ${data}"
+        exit 1
+      }
+      echo "${data}" | grep -q "data-added-while-standby-syncing" || {
+        echo "ERROR: row 2 missing from standby. Got: ${data}"
+        exit 1
+      }
+      echo "${data}" | grep -q "more-data-for-replication-test" || {
+        echo "ERROR: row 3 missing from standby. Got: ${data}"
+        exit 1
+      }

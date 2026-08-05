@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -16,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestClusterConfigMap(t *testing.T) {
@@ -90,6 +91,44 @@ func TestReconcileInstanceCertificates(t *testing.T) {
 	assert.NilError(t, InstanceCertificates(ctx,
 		root.Certificate, leaf.Certificate, leaf.PrivateKey, secret))
 	assert.DeepEqual(t, secret, before)
+}
+
+// TestReconcileInstanceCertificatesWithCABundle covers a custom root CA
+// secret whose certificate file is a bundle of an intermediate CA followed
+// by its root, as produced by cert-manager when leaf certificates are issued
+// through a sub-CA. Every certificate in the bundle must reach
+// patroni.ca-roots, or the leaf presented by peers (signed by the
+// intermediate) cannot be chained to a trusted root and TLS verification
+// fails at bootstrap.
+func TestReconcileInstanceCertificatesWithCABundle(t *testing.T) {
+	t.Parallel()
+
+	root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err, "bug in test")
+	intermediate, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err, "bug in test")
+
+	rootText, err := root.Certificate.MarshalText()
+	assert.NilError(t, err, "bug in test")
+	intermediateText, err := intermediate.Certificate.MarshalText()
+	assert.NilError(t, err, "bug in test")
+
+	bundle := append(append([]byte{}, intermediateText...), rootText...)
+
+	var bundledCA pki.Certificate
+	assert.NilError(t, bundledCA.UnmarshalText(bundle))
+
+	leaf, err := intermediate.GenerateLeafCertificate("any", nil)
+	assert.NilError(t, err, "bug in test")
+
+	ctx := context.Background()
+	secret := new(corev1.Secret)
+	assert.NilError(t, InstanceCertificates(ctx,
+		bundledCA, leaf.Certificate, leaf.PrivateKey, secret))
+
+	assert.DeepEqual(t, secret.Data["patroni.ca-roots"], bundle)
+	assert.Equal(t,
+		strings.Count(string(secret.Data["patroni.ca-roots"]), "-----BEGIN CERTIFICATE-----"), 2)
 }
 
 func TestInstanceConfigMap(t *testing.T) {

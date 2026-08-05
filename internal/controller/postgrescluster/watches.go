@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -15,7 +16,69 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+// watchClusterSecrets returns a handler.EventHandler for Secrets that are
+// labeled with a PostgresCluster name but intentionally have no owner reference.
+func (*Reconciler) watchClusterSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		cluster := obj.GetLabels()[naming.LabelCluster]
+		if len(cluster) > 0 {
+			return []reconcile.Request{
+				{NamespacedName: client.ObjectKey{
+					Namespace: obj.GetNamespace(),
+					Name:      cluster,
+				}},
+			}
+		}
+		return nil
+	})
+}
+
+// watchCertManagerSecrets returns a handler.EventHandler for cert-manager-issued
+// Secrets. These Secrets are owned by Certificate resources (not PostgresCluster),
+// so they are not covered by Owns(&corev1.Secret{}).
+func (*Reconciler) watchCertManagerSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		cluster := obj.GetLabels()[naming.LabelCluster]
+		if len(cluster) > 0 {
+			return []reconcile.Request{
+				{NamespacedName: client.ObjectKey{
+					Namespace: obj.GetNamespace(),
+					Name:      cluster,
+				}},
+			}
+		}
+		return nil
+	})
+}
+
+// watchPGBouncerUserSecrets returns a handler.EventHandler for Secrets
+// referenced by spec.proxy.pgBouncer.usersSecret.
+func (r *Reconciler) watchPGBouncerUserSecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v1beta1.PostgresClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v1beta1.IndexFieldPGBouncerUserSecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for i := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&clusters.Items[i]),
+			})
+		}
+		return reqs
+	})
+}
 
 // watchPods returns a handler.EventHandler for Pods.
 func (*Reconciler) watchPods() handler.Funcs {
@@ -70,6 +133,20 @@ func (*Reconciler) watchPods() handler.Funcs {
 					Name:      cluster,
 				}})
 				return
+			}
+
+			// Reconcile when any pgBackRest repository volume suggestion changes.
+			if len(cluster) != 0 {
+				for annotation := range newAnnotations {
+					if _, ok := naming.PGBackRestRepoFromVolumeSizeAnnotation(annotation); ok &&
+						oldAnnotations[annotation] != newAnnotations[annotation] {
+						q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+							Namespace: e.ObjectNew.GetNamespace(),
+							Name:      cluster,
+						}})
+						return
+					}
+				}
 			}
 		},
 	}

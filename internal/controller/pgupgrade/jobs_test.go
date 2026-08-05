@@ -7,6 +7,7 @@ package pgupgrade
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,9 +18,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestLargestWholeCPU(t *testing.T) {
@@ -83,7 +83,7 @@ func TestUpgradeCommand(t *testing.T) {
 			{CPUs: 3, Jobs: "--jobs=2"},
 			{CPUs: 10, Jobs: "--jobs=9"},
 		} {
-			command := upgradeCommand(10, 11, "", tt.CPUs)
+			command := upgradeCommand(10, 11, tt.CPUs, false)
 			assert.Assert(t, len(command) > 3)
 			assert.DeepEqual(t, []string{"bash", "-ceu", "--"}, command[:3])
 
@@ -92,6 +92,17 @@ func TestUpgradeCommand(t *testing.T) {
 
 			expectScript(t, script)
 		}
+	})
+
+	// K8SPG-911: pg_tde_upgrade replaces pg_upgrade when pg_tde is enabled.
+	t.Run("PGTDE", func(t *testing.T) {
+		script := upgradeCommand(17, 18, 0, true)[3]
+		assert.Assert(t, cmp.Contains(script,
+			`/usr/pgsql-"${new_version}"/bin/pg_tde_upgrade --old-bindir`))
+		assert.Assert(t, !strings.Contains(script, `bin/pg_upgrade `),
+			"expected no pg_upgrade invocation, got:\n%s", script)
+
+		expectScript(t, script)
 	})
 }
 
@@ -103,7 +114,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 	upgrade.Namespace = "ns1"
 	upgrade.Name = "pgu2"
 	upgrade.UID = "uid3"
-	upgrade.Spec.Image = initialize.Pointer("img4")
+	upgrade.Spec.Image = new("img4")
 	upgrade.Spec.PostgresClusterName = "pg5"
 	upgrade.Spec.FromPostgresVersion = 19
 	upgrade.Spec.ToPostgresVersion = 25
@@ -141,7 +152,7 @@ func TestGenerateUpgradeJob(t *testing.T) {
 		},
 	}
 
-	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+	job := reconciler.generateUpgradeJob(ctx, upgrade, startup, false)
 	assert.Assert(t, cmp.MarshalMatches(job, `
 apiVersion: batch/v1
 kind: Job
@@ -156,7 +167,7 @@ metadata:
   name: pgu2-pgdata
   namespace: ns1
   ownerReferences:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PGUpgrade
@@ -241,6 +252,33 @@ spec:
 status: {}
 	`))
 
+	t.Run("LongName", func(t *testing.T) {
+		// Test with an intentionally long name that exceeds 63 characters
+		longNameUpgrade := &v1beta1.PGUpgrade{}
+		longNameUpgrade.Name = "very-long-upgrade-name-that-will-exceed-the-maximum-dns-label-limit"
+		longNameUpgrade.Namespace = "ns1"
+		longNameUpgrade.Spec.PostgresClusterName = "very-long-cluster-name-that-also-exceeds-limits"
+		longNameUpgrade.Spec.FromPostgresVersion = 14
+		longNameUpgrade.Spec.ToPostgresVersion = 15
+
+		longJob := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, false)
+
+		// Verify the job name fits within DNS limits and has the correct format
+		assert.Assert(t, len(longJob.Name) <= 63, "job name %q exceeds 63 characters", longJob.Name)
+		assert.Assert(t, len(longJob.Name) == 63, "truncated job name %q should be exactly 63 characters", longJob.Name)
+		// Verify the name ends with a dash followed by 4 alphanumeric characters (the deterministic suffix)
+		// Pattern: <prefix>-<4 alphanumeric chars>
+		assert.Assert(t, regexp.MustCompile(`-[a-zA-Z0-9]{4}$`).MatchString(longJob.Name),
+			"job name %q should end with -<4 alphanumeric chars>", longJob.Name)
+		// Verify the suffix is deterministic (same input always produces same output)
+		longJob2 := reconciler.generateUpgradeJob(ctx, longNameUpgrade, startup, false)
+		assert.Assert(t, longJob.Name == longJob2.Name, "job name should be deterministic: %q vs %q", longJob.Name, longJob2.Name)
+
+		labelValue := longJob.Labels[LabelPGUpgrade]
+		assert.Equal(t, labelValue, longJob.Spec.Template.Labels[LabelPGUpgrade])
+		assert.Assert(t, len(labelValue) <= 63, "label value %q exceeds 63 characters", labelValue)
+	})
+
 	t.Run(feature.PGUpgradeCPUConcurrency+"Enabled", func(t *testing.T) {
 		gate := feature.NewGate()
 		assert.NilError(t, gate.SetFromMap(map[string]bool{
@@ -248,13 +286,9 @@ status: {}
 		}))
 		ctx := feature.NewContext(context.Background(), gate)
 
-		job := reconciler.generateUpgradeJob(ctx, upgrade, startup, "")
+		job := reconciler.generateUpgradeJob(ctx, upgrade, startup, false)
 		assert.Assert(t, cmp.MarshalContains(job, `--jobs=2`))
 	})
-
-	tdeJob := reconciler.generateUpgradeJob(ctx, upgrade, startup, "echo testKey")
-	assert.Assert(t, cmp.MarshalContains(tdeJob,
-		`/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}" --encryption-key-command "echo testKey"`))
 }
 
 func TestGenerateRemoveDataJob(t *testing.T) {
@@ -265,7 +299,7 @@ func TestGenerateRemoveDataJob(t *testing.T) {
 	upgrade.Namespace = "ns1"
 	upgrade.Name = "pgu2"
 	upgrade.UID = "uid3"
-	upgrade.Spec.Image = initialize.Pointer("img4")
+	upgrade.Spec.Image = new("img4")
 	upgrade.Spec.PostgresClusterName = "pg5"
 	upgrade.Spec.FromPostgresVersion = 19
 	upgrade.Spec.ToPostgresVersion = 25
@@ -308,7 +342,7 @@ metadata:
   name: pgu2-sts
   namespace: ns1
   ownerReferences:
-  - apiVersion: postgres-operator.crunchydata.com/v1beta1
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PGUpgrade
@@ -374,7 +408,8 @@ func TestPGUpgradeContainerImage(t *testing.T) {
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "env-var-pgbackrest")
 
 	assert.NilError(t, yaml.Unmarshal(
-		[]byte(`{ image: spec-image }`), &upgrade.Spec))
+		[]byte(`{ image: spec-image }`), &upgrade.Spec,
+	))
 	assert.Equal(t, pgUpgradeContainerImage(upgrade), "spec-image")
 }
 
@@ -387,5 +422,4 @@ func TestVerifyUpgradeImageValue(t *testing.T) {
 		err := verifyUpgradeImageValue(upgrade)
 		assert.ErrorContains(t, err, "crunchy-upgrade")
 	})
-
 }

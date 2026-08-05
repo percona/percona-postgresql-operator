@@ -17,7 +17,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // reconcilePGAdminStatefulSet writes the StatefulSet that runs pgAdmin.
@@ -86,7 +86,7 @@ func statefulset(
 	)
 
 	// Don't clutter the namespace with extra ControllerRevisions.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
 	// out changes to pods even when not Running or not Ready.
@@ -107,10 +107,10 @@ func statefulset(
 
 	// pgAdmin does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	sts.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	sts.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// set the image pull secrets, if any exist
 	sts.Spec.Template.Spec.ImagePullSecrets = pgadmin.Spec.ImagePullSecrets

@@ -7,7 +7,6 @@ package pgbackrest
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -98,8 +97,6 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	cm.Data[CMInstanceKey] = iniGeneratedWarning +
 		populatePGInstanceConfigurationMap(
 			serviceName, serviceNamespace, repoHostName, pgdataDir,
-			config.FetchKeyCommand(&postgresCluster.Spec),
-			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
 			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
 			postgresCluster.Spec.ClusterServiceDNSSuffix).String()
@@ -117,9 +114,7 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 
 		cm.Data[CMRepoKey] = iniGeneratedWarning +
 			populateRepoHostConfigurationMap(
-				serviceName, serviceNamespace,
-				pgdataDir, config.FetchKeyCommand(&postgresCluster.Spec),
-				strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+				serviceName, serviceNamespace, pgdataDir,
 				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,
@@ -173,7 +168,7 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev1.PersistentVolumeClaim, args ...string) []string {
+func RestoreCommand(pgdata, hugePagesSetting string, _ []*corev1.PersistentVolumeClaim, tdeEnabled bool, args ...string) []string {
 	ps := postgres.NewParameterSet()
 	ps.Add("data_directory", pgdata)
 	ps.Add("huge_pages", hugePagesSetting)
@@ -187,8 +182,8 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 	// progress during recovery.
 	ps.Add("hot_standby", "on")
 
-	if fetchKeyCommand != "" {
-		ps.Add("encryption_key_command", fetchKeyCommand)
+	if tdeEnabled {
+		ps.Add("shared_preload_libraries", "pg_tde")
 	}
 
 	configure := strings.Join([]string{
@@ -328,8 +323,7 @@ exit 1`
 // populatePGInstanceConfigurationMap returns options representing the pgBackRest configuration for
 // a PostgreSQL instance
 func populatePGInstanceConfigurationMap(
-	serviceName, serviceNamespace, repoHostName, pgdataDir,
-	fetchKeyCommand, postgresVersion string,
+	serviceName, serviceNamespace, repoHostName, pgdataDir string,
 	pgPort int32, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
 ) iniSectionSet {
@@ -382,12 +376,6 @@ func populatePGInstanceConfigurationMap(
 	stanza.Set("pg1-port", fmt.Sprint(pgPort))
 	stanza.Set("pg1-socket-path", postgres.SocketDirectory)
 
-	if fetchKeyCommand != "" {
-		stanza.Set("archive-header-check", "n")
-		stanza.Set("page-header-check", "n")
-		stanza.Set("pg-version-force", postgresVersion)
-	}
-
 	return iniSectionSet{
 		"global":          global,
 		DefaultStanzaName: stanza,
@@ -397,8 +385,7 @@ func populatePGInstanceConfigurationMap(
 // populateRepoHostConfigurationMap returns options representing the pgBackRest configuration for
 // a pgBackRest dedicated repository host
 func populateRepoHostConfigurationMap(
-	serviceName, serviceNamespace, pgdataDir,
-	fetchKeyCommand, postgresVersion string,
+	serviceName, serviceNamespace, pgdataDir string,
 	pgPort int32, pgHosts []string, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
 ) iniSectionSet {
@@ -453,12 +440,6 @@ func populateRepoHostConfigurationMap(
 		stanza.Set(fmt.Sprintf("pg%d-path", i+1), pgdataDir)
 		stanza.Set(fmt.Sprintf("pg%d-port", i+1), fmt.Sprint(pgPort))
 		stanza.Set(fmt.Sprintf("pg%d-socket-path", i+1), postgres.SocketDirectory)
-
-		if fetchKeyCommand != "" {
-			stanza.Set("archive-header-check", "n")
-			stanza.Set("page-header-check", "n")
-			stanza.Set("pg-version-force", postgresVersion)
-		}
 	}
 
 	return iniSectionSet{
@@ -491,7 +472,7 @@ func getExternalRepoConfigs(repo v1beta1.PGBackRestRepo) map[string]string {
 // reloadCommand returns an entrypoint that convinces the pgBackRest TLS server
 // to reload its options and certificate files when they change. The process
 // will appear as name in `ps` and `top`.
-func reloadCommand(name string, post250 bool) []string {
+func reloadCommand(name string, post250 bool, autoGrowRepos []string) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted server
 	// volume and configuration file. When either changes, signal pgBackRest
 	// and print the observed timestamp.
@@ -549,6 +530,47 @@ until read -r -t 5 -u "${fd}"; do
   fi
 done
 `
+	}
+
+	if len(autoGrowRepos) > 0 {
+		var monitorCalls strings.Builder
+		for _, repoName := range autoGrowRepos {
+			fmt.Fprintf(&monitorCalls, "  monitor_volume %q %q\n",
+				repoMountPath+"/"+repoName,
+				naming.SuggestedPGBackRestRepoVolumeSizeAnnotation(repoName))
+		}
+
+		autoGrowScript := `
+# Parameters for updating automatic volume-growth annotations.
+APISERVER="https://kubernetes.default.svc"
+SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+NAMESPACE=$(<"${SERVICEACCOUNT}/namespace")
+TOKEN=$(<"${SERVICEACCOUNT}/token")
+CACERT="${SERVICEACCOUNT}/ca.crt"
+
+monitor_volume() {
+  local path="$1" annotation="$2" df_output size use size_int use_int new_size patch
+  df_output=$(df --human-readable --block-size=M "${path}")
+  size=$(awk 'FNR == 2 {print $2}' <<<"${df_output}")
+  use=$(awk 'FNR == 2 {print $5}' <<<"${df_output}")
+  size_int="${size//M/}"
+  use_int="${use//[[:punct:]]/}"
+  if ((use_int > 75)); then
+    new_size="$((size_int + size_int / 2))Mi"
+    patch='{"metadata":{"annotations":{"'"${annotation}"'":"'"${new_size}"'"}}}'
+    curl --fail --silent --show-error --cacert "${CACERT}" \
+      --header "Authorization: Bearer ${TOKEN}" \
+      --header "Content-Type: application/merge-patch+json" \
+      --request PATCH \
+      --data "${patch}" \
+      "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}" || true
+  fi
+}
+`
+
+		// Run each repository check from the existing five-second reload loop.
+		script = strings.Replace(script, "done\n", monitorCalls.String()+"done\n", 1)
+		script = autoGrowScript + script
 	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function

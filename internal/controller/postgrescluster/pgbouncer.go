@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -24,7 +25,9 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // reconcilePGBouncer writes the objects necessary to run a PgBouncer Pod.
@@ -67,7 +70,7 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 	configmap := &corev1.ConfigMap{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	configmap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; delete the ConfigMap if it exists. Check the
 		// client cache first using Get.
 		key := client.ObjectKeyFromObject(configmap)
@@ -82,14 +85,16 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 
 	configmap.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	configmap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
 	if err == nil {
 		pgbouncer.ConfigMap(cluster, configmap)
@@ -132,7 +137,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	// K8SPG-345
 	var exposeSuperusers bool
-	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+	if cluster.Spec.Proxy.PGBouncerEnabled() {
 		exposeSuperusers = cluster.Spec.Proxy.PGBouncer.ExposeSuperusers
 		if exposeSuperusers {
 			log.Info("Superusers are exposed through PGBouncer")
@@ -142,7 +147,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 	action := func(ctx context.Context, exec postgres.Executor) error {
 		return errors.WithStack(pgbouncer.EnableInPostgreSQL(ctx, exec, clusterSecret, exposeSuperusers))
 	}
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled.
 		action = func(ctx context.Context, exec postgres.Executor) error {
 			return errors.WithStack(pgbouncer.DisableInPostgreSQL(ctx, exec))
@@ -151,7 +156,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	// First, calculate a hash of the SQL that should be executed in PostgreSQL.
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages from the pgbouncer package about executing SQL.
 		// Nothing is being "executed" yet.
 		return action(logging.NewContext(ctx, logging.Discard()), func(
@@ -195,23 +200,66 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,delete,patch}
 
+// reconcileCertManagerPGBouncerSecret applies the cert-manager Certificate CR
+// for the PgBouncer frontend and returns the resulting -frontend-tls Secret,
+// which the caller uses to populate the main pgbouncer secret with the
+// cert-manager-issued material. Returns (nil, nil) when the Certificate has
+// been applied but cert-manager has not yet issued the Secret, so callers can
+// continue reconciling with internal-PKI material during the transition.
+func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cluster *v1beta1.PostgresCluster, service *corev1.Service) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
+	if dnsErr != nil {
+		return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+	}
+
+	err := c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply pgbouncer certificate")
+	}
+
+	log.V(1).Info("cert-manager pgbouncer certificate applied")
+
+	// Fetch the cert-manager-managed frontend TLS secret to populate
+	// the main pgbouncer secret with cert-manager-issued certs.
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name:      naming.ClusterPGBouncer(cluster).Name + "-frontend-tls",
+		Namespace: cluster.Namespace,
+	}}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+	if k8serrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get pgbouncer frontend TLS secret")
+	}
+
+	return secret, nil
+}
+
 // reconcilePGBouncerSecret writes the Secret for a PgBouncer Pod.
-// When cert-manager is installed and no custom TLS secret is provided,
-// it creates a Certificate CR for PgBouncer frontend TLS.
+// When the root CA is cert-manager-managed and no custom TLS secret is
+// provided, it creates a Certificate CR for PgBouncer frontend TLS.
+// When the root CA is internal but a stale Certificate CR was left by
+// K8SPG-1017, the CR is reconciled to update its ownerRef (K8SPG-1007
+// recovery) before populating the secret from the internal PKI.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
 ) (*corev1.Secret, error) {
-	log := logging.FromContext(ctx)
-
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	)
 	if client.IgnoreNotFound(err) != nil {
 		return nil, err
 	}
+	secretFound := err == nil
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; delete the Secret if it exists.
 		if err == nil {
 			err = errors.WithStack(r.deleteControlled(ctx, cluster, existing))
@@ -221,26 +269,45 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if !secretFound {
+			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
+		}
+		return existing, nil
+	}
+	var userSecret *corev1.Secret
+	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil && ref.Name != "" {
+		userSecret = &corev1.Secret{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: ref.Name}, userSecret); err != nil {
+			return nil, errors.Wrapf(err, "get PgBouncer users Secret %q", ref.Name)
+		}
+	}
+
+	var frontendCertManagerSecret *corev1.Secret
 	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		certManagerInstalled, certErr := r.isCertManagerInstalled(ctx, cluster.Namespace)
+		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
-			return nil, errors.Wrap(certErr, "failed to check if cert-manager is installed")
+			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
 		}
 
-		if certManagerInstalled {
-			c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
-
-			dnsNames, dnsErr := naming.ServiceDNSNames(ctx, service, cluster.Spec.ClusterServiceDNSSuffix)
-			if dnsErr != nil {
-				return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
+		if certManagerManaged {
+			s, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
+			if err != nil {
+				return nil, errors.Wrap(err, "reconcile cert-manager Certificate for pgbouncer frontend")
 			}
-
-			certErr = c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
-			if certErr != nil {
-				return nil, errors.Wrap(certErr, "failed to apply pgbouncer certificate")
+			// s is nil when cert-manager has not yet issued the frontend TLS secret;
+			// the caller will fall through to internal PKI material during that window.
+			frontendCertManagerSecret = s
+		} else {
+			// cluster certificates are not managed by cert-manager
+			// but Certificate object exists due to the bug described in K8SPG-1017
+			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+				_, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
+				if err != nil {
+					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+				}
 			}
-
-			log.V(1).Info("cert-manager pgbouncer certificate applied")
 		}
 	}
 
@@ -256,23 +323,83 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	intent.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
+	var additionalTrustedCAs [][]byte
 	if err == nil {
-		err = pgbouncer.Secret(ctx, cluster, root, existing, service, intent)
+		additionalTrustedCAs, err = r.getAdditionalTrustedCAs(ctx, cluster)
+	}
+	if err == nil {
+		err = pgbouncer.Secret(ctx, cluster, root, existing, userSecret, service, intent, frontendCertManagerSecret, additionalTrustedCAs)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
 
 	return intent, err
+}
+
+func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
+	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
+		return nil, nil
+	}
+
+	result := [][]byte{}
+
+	// K8SPG-952: in manual TLS mode the frontend CA file is built solely from
+	// this list, so it must begin with the authority of the custom TLS Secret.
+	if projection := pgBouncer.CustomTLSSecret; projection != nil {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      projection.Name,
+				Namespace: cluster.GetNamespace(),
+			},
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			return nil, errors.Wrapf(err, "failed to get custom TLS secret '%s'", projection.Name)
+		}
+
+		key := pgbouncer.CustomTLSAuthorityKey(projection)
+		ca, ok := secret.Data[key]
+		if !ok {
+			return nil, errors.Errorf("custom TLS secret '%s' does not contain key '%s'", projection.Name, key)
+		}
+		result = append(result, ca)
+	}
+
+	for _, ref := range pgBouncer.AdditionalTrustedCAs {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ref.Name,
+				Namespace: cluster.GetNamespace(),
+			},
+		}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); k8serrors.IsNotFound(err) {
+			logging.FromContext(ctx).Info("additional CA secret not found, skipping", "name", ref.Name)
+			continue
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "failed to get additional CA secret '%s'", ref.Name)
+		}
+		if ca, ok := secret.Data["ca.crt"]; !ok {
+			return nil, errors.Errorf("additional CA Secret '%s' does not contain key 'ca.crt'", ref.Name)
+		} else {
+			result = append(result, ca)
+		}
+	}
+
+	return result, nil
 }
 
 // generatePGBouncerService returns a v1.Service that exposes PgBouncer pods.
@@ -283,16 +410,18 @@ func (r *Reconciler) generatePGBouncerService(
 	service := &corev1.Service{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return service, false, nil
 	}
 
 	service.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
+	)
 
 	if spec := cluster.Spec.Proxy.PGBouncer.Service; spec != nil {
 		service.Annotations = naming.Merge(service.Annotations,
@@ -390,20 +519,22 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	deploy := &appsv1.Deployment{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	deploy.SetGroupVersionKind(appsv1.SchemeGroupVersion.WithKind("Deployment"))
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return deploy, false, nil
 	}
 
 	deploy.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	deploy.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 	deploy.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -429,17 +560,18 @@ func (r *Reconciler) generatePGBouncerDeployment(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
-		deploy.Spec.Replicas = initialize.Int32(0)
+		deploy.Spec.Replicas = new(int32(0))
 	} else {
 		deploy.Spec.Replicas = cluster.Spec.Proxy.PGBouncer.Replicas
 	}
 
 	// Don't clutter the namespace with extra ReplicaSets.
-	deploy.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	deploy.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Ensure that the number of Ready pods is never less than the specified
 	// Replicas by starting new pods while old pods are still running.
@@ -460,7 +592,8 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	if !initialize.FromPointer(cluster.Spec.DisableDefaultPodScheduling) {
 		deploy.Spec.Template.Spec.TopologySpreadConstraints = append(
 			deploy.Spec.Template.Spec.TopologySpreadConstraints,
-			defaultTopologySpreadConstraints(*deploy.Spec.Selector)...)
+			defaultTopologySpreadConstraints(*deploy.Spec.Selector)...,
+		)
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.
@@ -470,17 +603,17 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	deploy.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	deploy.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// There's no need for individual DNS names of PgBouncer pods.
 	deploy.Spec.Template.Spec.Subdomain = ""
 
 	// PgBouncer does not make any Kubernetes API calls. Use the default
 	// ServiceAccount and do not mount its credentials.
-	deploy.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	deploy.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 
 	// Do not add environment variables describing services in this namespace.
-	deploy.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	deploy.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if cluster.Spec.Proxy.PGBouncer.SecurityContext != nil {
@@ -511,7 +644,8 @@ func (r *Reconciler) reconcilePGBouncerDeployment(
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) error {
 	deploy, specified, err := r.generatePGBouncerDeployment(
-		ctx, cluster, primaryCertificate, configmap, secret)
+		ctx, cluster, primaryCertificate, configmap, secret,
+	)
 
 	// Set observations whether the deployment exists or not.
 	defer func() {
@@ -579,7 +713,7 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 		return client.IgnoreNotFound(err)
 	}
 
-	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
+	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		return deleteExistingPDB(cluster)
 	}
 

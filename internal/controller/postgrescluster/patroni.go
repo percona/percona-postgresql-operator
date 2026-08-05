@@ -21,7 +21,8 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="endpoints",verbs={deletecollection}
@@ -36,10 +37,12 @@ func (r *Reconciler) deletePatroniArtifacts(
 	selector, err := naming.AsSelector(naming.ClusterPatronis(cluster))
 	if err == nil {
 		err = errors.WithStack(
-			r.Client.DeleteAllOf(ctx, &corev1.Endpoints{},
+			r.Client.DeleteAllOf(
+				ctx, &corev1.Endpoints{},
 				client.InNamespace(cluster.Namespace),
 				client.MatchingLabelsSelector{Selector: selector},
-			))
+			),
+		)
 	}
 
 	return err
@@ -157,13 +160,15 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	err := errors.WithStack(r.setControllerReference(cluster, dcsService))
 
 	dcsService.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	dcsService.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
 			naming.LabelCluster: cluster.Name,
 			naming.LabelPatroni: naming.PatroniScope(cluster),
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// Allocate no IP address (headless) and create no Endpoints.
 	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
@@ -224,7 +229,8 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	logging.FromContext(ctx).V(1).Info("Replacing patroni dynamic configuration")
 
 	return errors.WithStack(
-		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration))
+		patroni.Executor(exec).ReplaceConfiguration(ctx, configuration),
+	)
 }
 
 // generatePatroniLeaderLeaseService returns a v1.Service that exposes the
@@ -236,9 +242,11 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
 	service.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	service.Labels = naming.Merge(
-		cluster.Spec.Metadata.GetLabelsOrNil())
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+	)
 
 	if spec := cluster.Spec.Service; spec != nil {
 		service.Annotations = naming.Merge(service.Annotations,
@@ -337,7 +345,8 @@ func (r *Reconciler) reconcilePatroniStatus(
 
 	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs),
+	))
 
 	if err == nil {
 		if dcs.Annotations["initialize"] != "" {
@@ -379,9 +388,45 @@ func (r *Reconciler) reconcileReplicationSecret(
 		return custom, err
 	}
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		secret := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			return nil, errors.Wrapf(err, "get user-provided replication TLS secret %s", secret.Name)
+		}
+		return secret, nil
+	}
+
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
+	}
+
+	if certManagerManaged {
+		return r.reconcileCertManagerReplicationSecret(ctx, cluster)
+	}
+
+	// cluster certificates are not managed by cert-manager
+	// but Certificate object exists due to the bug described in K8SPG-1017
+	// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+	if cert := certmanager.ReplicationCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+		_, err := r.reconcileCertManagerReplicationSecret(ctx, cluster)
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+		}
+	}
+
+	return r.reconcileInternalReplicationSecret(ctx, cluster, root)
+}
+
+// reconcileInternalReplicationSecret creates a replication certificate using internal PKI.
+func (r *Reconciler) reconcileInternalReplicationSecret(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	root *pki.RootCertificateAuthority,
+) (*corev1.Secret, error) {
 	existing := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	))
 
 	leaf := &pki.LeafCertificate{}
 	commonName := postgres.ReplicationUser
@@ -404,14 +449,16 @@ func (r *Reconciler) reconcileReplicationSecret(
 
 	// set labels and annotations
 	intent.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+	)
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "replication-client-tls",
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
@@ -434,6 +481,20 @@ func (r *Reconciler) reconcileReplicationSecret(
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
 	return intent, err
+}
+
+// reconcileCertManagerReplicationSecret creates the replication certificate using cert-manager.
+func (r *Reconciler) reconcileCertManagerReplicationSecret(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.Secret, error) {
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	if err := c.ApplyReplicationCertificate(ctx, cluster); err != nil {
+		return nil, errors.Wrap(err, "failed to apply replication certificate")
+	}
+
+	secret := &corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)}
+	return secret, nil
 }
 
 // replicationCertSecretProjection returns a secret projection of the postgrescluster's
@@ -522,7 +583,8 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 		if len(targetInstance.Pods) != 1 {
 			// We expect that a target instance should have one associated pod.
 			return errors.Errorf(
-				"TargetInstance should have one pod. Pods (%d)", len(targetInstance.Pods))
+				"TargetInstance should have one pod. Pods (%d)", len(targetInstance.Pods),
+			)
 		}
 	} else {
 		log.V(1).Info("TargetInstance not provided")
@@ -580,7 +642,7 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// cache does not yet have the updated `cluster.Status.Patroni.Switchover` field.
 	if statusTimeline != nil && *statusTimeline != timeline {
 		log.V(1).Info("SwitchoverTimeline does not match current timeline, assuming already completed switchover")
-		cluster.Status.Patroni.Switchover = initialize.String(annotation)
+		cluster.Status.Patroni.Switchover = new(annotation)
 		cluster.Status.Patroni.SwitchoverTimeline = nil
 		return nil
 	}
@@ -615,7 +677,7 @@ func (r *Reconciler) reconcilePatroniSwitchover(ctx context.Context,
 	// If we've reached this point, a switchover has successfully been triggered
 	// and we set the status accordingly.
 	if err == nil {
-		cluster.Status.Patroni.Switchover = initialize.String(annotation)
+		cluster.Status.Patroni.Switchover = new(annotation)
 		cluster.Status.Patroni.SwitchoverTimeline = nil
 	}
 

@@ -15,14 +15,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // The client used by the controller sets up a cache and an informer for any GVK
 // that it GETs. That informer needs the "watch" permission.
 // - https://github.com/kubernetes-sigs/controller-runtime/issues/1249
 // - https://github.com/kubernetes-sigs/controller-runtime/issues/1454
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get,watch}
 //+kubebuilder:rbac:groups="",resources="endpoints",verbs={list,watch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list,watch}
 //+kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list,watch}

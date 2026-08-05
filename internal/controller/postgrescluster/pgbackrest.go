@@ -23,6 +23,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -40,10 +41,11 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -70,10 +72,6 @@ const (
 	// ConditionPGBackRestRestoreProgressing is the type used in a condition to indicate that
 	// and in-place pgBackRest restore is in progress
 	ConditionPGBackRestRestoreProgressing = "PGBackRestoreProgressing"
-
-	// ConditionStandbyLagging is the type used in a condition to indicate whether or not
-	// the standby cluster is lagging behind the main site
-	ConditionStandbyLagging = "StandbyLagging"
 
 	// EventRepoHostNotFound is used to indicate that a pgBackRest repository was not
 	// found when reconciling
@@ -178,12 +176,23 @@ func (r *Reconciler) applyRepoHostIntent(ctx context.Context, postgresCluster *v
 // representing a repository.
 func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 	postgresCluster *v1beta1.PostgresCluster, spec corev1.PersistentVolumeClaimSpec,
-	repoName string, repoResources *RepoResources,
+	repoName string, repoResources *RepoResources, desiredVolume string,
 ) (*corev1.PersistentVolumeClaim, error) {
 	repo, err := r.generateRepoVolumeIntent(postgresCluster, spec, repoName, repoResources)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+	var existing *corev1.PersistentVolumeClaim
+	for _, pvc := range repoResources.pvcs {
+		if pvc.Labels[naming.LabelPGBackRestRepo] == repoName {
+			existing = pvc
+			break
+		}
+	}
+	r.setRepoVolumeSize(ctx, postgresCluster, repo, existing, repoName, desiredVolume)
+	// Clear any set limit before applying PVC. This is needed to allow the limit
+	// value to change later.
+	repo.Spec.Resources.Limits = nil
 
 	if err := r.apply(ctx, repo); err != nil {
 		return nil, r.handlePersistentVolumeClaimError(postgresCluster,
@@ -191,6 +200,56 @@ func (r *Reconciler) applyRepoVolumeIntent(ctx context.Context,
 	}
 
 	return repo, nil
+}
+
+// setRepoVolumeSize applies an observed automatic-growth suggestion without
+// exceeding the ceiling configured in the repository PVC resource limits.
+func (r *Reconciler) setRepoVolumeSize(ctx context.Context, cluster *v1beta1.PostgresCluster,
+	pvc, existing *corev1.PersistentVolumeClaim, repoName, desiredVolume string,
+) {
+	limit := pvc.Spec.Resources.Limits.Storage()
+	request := pvc.Spec.Resources.Requests.Storage()
+
+	if !limit.IsZero() && request.Cmp(*limit) > 0 {
+		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "RepoVolumeRequestOverLimit",
+			"pgBackRest repository volume request (%v) for %s/%s is greater than its limit (%v); the limit will be used.",
+			request, cluster.Name, repoName, limit)
+		request = limit
+	} else if !limit.IsZero() && feature.Enabled(ctx, feature.AutoGrowVolumes) && desiredVolume != "" {
+		desired, err := resource.ParseQuantity(desiredVolume)
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "Unable to parse pgBackRest repository volume request",
+				"repo", repoName, "value", desiredVolume)
+			return
+		}
+		if desired.Cmp(*request) > 0 {
+			request = &desired
+		}
+		if request.Cmp(*limit) >= 0 {
+			if request.Cmp(*limit) > 0 {
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "DesiredRepoVolumeAboveLimit",
+					"The desired size (%v) for the %s/%s pgBackRest repository volume is greater than its limit (%v).",
+					request, cluster.Name, repoName, limit)
+			}
+			request = limit
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "RepoVolumeLimitReached",
+				"pgBackRest repository volume for %s/%s is at its size limit (%v).",
+				cluster.Name, repoName, limit)
+		}
+	}
+
+	if existing != nil {
+		if current := existing.Spec.Resources.Requests.Storage(); current != nil && current.Cmp(*request) > 0 {
+			request = current
+		}
+		if capacity := existing.Status.Capacity.Storage(); capacity != nil && capacity.Cmp(*request) > 0 {
+			request = capacity
+		}
+	}
+
+	pvc.Spec.Resources.Requests = corev1.ResourceList{
+		corev1.ResourceStorage: *resource.NewQuantity(request.Value(), resource.BinarySI),
+	}
 }
 
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
@@ -659,10 +718,10 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// if the cluster is set to be shutdown and no instance Pods remain, stop the repohost pod
 	if postgresCluster.Spec.Shutdown != nil && *postgresCluster.Spec.Shutdown &&
 		!instancePodExists {
-		repo.Spec.Replicas = initialize.Int32(0)
+		repo.Spec.Replicas = new(int32(0))
 	} else {
 		// the cluster should not be shutdown, set this value to 1
-		repo.Spec.Replicas = initialize.Int32(1)
+		repo.Spec.Replicas = new(int32(1))
 	}
 
 	// Use StatefulSet's "RollingUpdate" strategy and "Parallel" policy to roll
@@ -684,20 +743,22 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 	// The pgBackRest TLS server must be signaled when its configuration or
 	// certificates change. Let containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	repo.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	repo.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
-	// pgBackRest does not make any Kubernetes API calls. Use the default
-	// ServiceAccount and do not mount its credentials.
-	repo.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	// The repo host only needs Kubernetes credentials when it reports automatic
+	// volume-growth suggestions through Pod annotations.
+	autoGrowRepoVolumes := len(pgbackrest.AutoGrowRepoNames(ctx, postgresCluster)) > 0
+	repo.Spec.Template.Spec.AutomountServiceAccountToken = new(autoGrowRepoVolumes)
 
 	// K8SPG-138
 	currVersion, err := gover.NewVersion(postgresCluster.Labels[naming.LabelVersion])
-	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0"))) {
+	if autoGrowRepoVolumes ||
+		(err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.4.0")))) {
 		repo.Spec.Template.Spec.ServiceAccountName = naming.PGBackRestRBAC(postgresCluster).Name
 	}
 
 	// Do not add environment variables describing services in this namespace.
-	repo.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	repo.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	if pgbackrest := postgresCluster.Spec.Backups.PGBackRest; pgbackrest.RepoHost != nil && pgbackrest.RepoHost.SecurityContext != nil {
 		repo.Spec.Template.Spec.SecurityContext = postgresCluster.Spec.Backups.PGBackRest.RepoHost.SecurityContext
@@ -712,9 +773,12 @@ func (r *Reconciler) generateRepoHostIntent(ctx context.Context, postgresCluster
 		pgbackrest.MakePGBackrestLogDir(&repo.Spec.Template, postgresCluster)
 
 		// add pgBackRest repo volumes to pod
+		containerNames := []string{naming.PGBackRestRepoContainerName}
+		if autoGrowRepoVolumes {
+			containerNames = append(containerNames, naming.ContainerPGBackRestConfig)
+		}
 		if err := pgbackrest.AddRepoVolumesToPod(postgresCluster, &repo.Spec.Template,
-			getRepoPVCNames(postgresCluster, repoResources.pvcs),
-			naming.PGBackRestRepoContainerName); err != nil {
+			getRepoPVCNames(postgresCluster, repoResources.pvcs), containerNames...); err != nil {
 			return nil, errors.WithStack(err)
 		}
 	}
@@ -923,7 +987,7 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 				// Disable environment variables for services other than the Kubernetes API.
 				// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 				// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-				EnableServiceLinks: initialize.Bool(false),
+				EnableServiceLinks: new(false),
 
 				// Set RestartPolicy to "Never" since we want a new Pod to be created by the Job
 				// controller when there is a failure (instead of the container simply restarting).
@@ -1336,8 +1400,8 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting, config.FetchKeyCommand(&cluster.Spec),
-		pgtablespaceVolumes, strings.Join(opts, " "))
+	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting,
+		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -1379,6 +1443,11 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		}
 		volumes = append(volumes, tablespaceVolume)
 		volumeMounts = append(volumeMounts, tablespaceVolumeMount)
+	}
+
+	if vault := cluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+		volumeMounts = append(volumeMounts, postgres.PGTDEVolumeMount())
+		volumes = append(volumes, postgres.PGTDEVolume(vault))
 	}
 
 	restoreJob := &batchv1.Job{}
@@ -1472,11 +1541,11 @@ func (r *Reconciler) generateRestoreJobIntent(cluster *v1beta1.PostgresCluster,
 	// possible cloud identity without mounting its Kubernetes API credentials.
 	// - https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity
 	// - https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
-	job.Spec.Template.Spec.AutomountServiceAccountToken = initialize.Bool(false)
+	job.Spec.Template.Spec.AutomountServiceAccountToken = new(false)
 	job.Spec.Template.Spec.ServiceAccountName = naming.ClusterInstanceRBAC(cluster).Name
 
 	// Do not add environment variables describing services in this namespace.
-	job.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	job.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if pgbackrest := cluster.Spec.Backups.PGBackRest; pgbackrest.Jobs != nil && pgbackrest.Jobs.SecurityContext != nil {
@@ -2218,14 +2287,48 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 
 	existing := &corev1.Secret{}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(intent), existing),
+	))
+
+	if err == nil && cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if repoHost != nil && len(existing.Name) == 0 {
+			return errors.Errorf("user-provided pgBackRest secret %q is missing", intent.Name)
+		}
+		return nil
+	}
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
 	// if err == nil {
 	// 	err = r.setControllerReference(cluster, intent)
 	// }
-	if err == nil {
+
+	if err == nil && repoHost != nil {
+		certManagerManaged := false
+		if cluster.Spec.CustomTLSSecret == nil {
+			var certErr error
+			certManagerManaged, certErr = r.isRootCACertManagerManaged(ctx, cluster)
+			if certErr != nil {
+				return errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
+			}
+		}
+
+		if certManagerManaged {
+			err = r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
+		} else {
+			// cluster certificates are not managed by cert-manager
+			// but Certificate object exists due to the bug described in K8SPG-1017
+			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+			if cert := certmanager.PGBackRestClientCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+				err := r.reconcileCertManagerPGBackRestSecret(ctx, cluster, repoHost, rootCA, existing, intent)
+				if err != nil {
+					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+				}
+			}
+
+			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+		}
+	} else if err == nil {
 		err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
 	}
 
@@ -2239,7 +2342,89 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	if err == nil && len(intent.Data) != 0 {
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
+
 	return err
+}
+
+// reconcileCertManagerPGBackRestSecret populates the pgBackRest secret using
+// cert-manager-issued certificates instead of the internal PKI.
+func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	repoHost *appsv1.StatefulSet,
+	rootCA *pki.RootCertificateAuthority,
+	existing, intent *corev1.Secret,
+) error {
+	log := logging.FromContext(ctx)
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
+
+	// Apply the pgBackRest client Certificate CR (shared by all instances).
+	if err := c.ApplyPGBackRestClientCertificate(ctx, cluster); err != nil {
+		return errors.Wrap(err, "failed to apply pgbackrest client certificate")
+	}
+
+	// Apply the pgBackRest repo host Certificate CR.
+	repoDNSNames, err := naming.RepoHostPodDNSNames(ctx, repoHost, cluster.Spec.ClusterServiceDNSSuffix)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve repo host pod DNS names")
+	}
+	if err := c.ApplyPGBackRestRepoCertificate(ctx, cluster, repoDNSNames); err != nil {
+		return errors.Wrap(err, "failed to apply pgbackrest repo certificate")
+	}
+
+	log.V(1).Info("cert-manager pgbackrest certificates applied")
+
+	// Fetch the cert-manager-issued client TLS secret.
+	clientSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestClientCertSecret(cluster)}
+	clientErr := r.Client.Get(ctx, client.ObjectKeyFromObject(clientSecret), clientSecret)
+	if clientErr != nil && client.IgnoreNotFound(clientErr) != nil {
+		return errors.Wrap(clientErr, "failed to get pgbackrest client TLS secret")
+	}
+
+	// Fetch the cert-manager-issued repo host TLS secret.
+	repoSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestRepoCertSecret(cluster)}
+	repoErr := r.Client.Get(ctx, client.ObjectKeyFromObject(repoSecret), repoSecret)
+	if repoErr != nil && client.IgnoreNotFound(repoErr) != nil {
+		return errors.Wrap(repoErr, "failed to get pgbackrest repo TLS secret")
+	}
+
+	// If cert-manager hasn't issued the secrets yet, fall back to internal PKI
+	// so pgBackRest remains functional during the transition.
+	if clientErr != nil || repoErr != nil {
+		log.V(1).Info("cert-manager pgbackrest secrets not yet available, using internal PKI")
+		return pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+	}
+
+	// Populate the pgBackRest secret from cert-manager-issued certs.
+	initialize.Map(&intent.Data)
+
+	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret)
+	if err != nil {
+		return err
+	}
+	intent.Data[pgbackrest.CertAuthoritySecretKey] = caCert
+	intent.Data[pgbackrest.CertClientSecretKey] = clientSecret.Data[corev1.TLSCertKey]
+	intent.Data[pgbackrest.CertClientPrivateKeySecretKey] = clientSecret.Data[corev1.TLSPrivateKeyKey]
+	intent.Data[pgbackrest.CertRepoSecretKey] = repoSecret.Data[corev1.TLSCertKey]
+	intent.Data[pgbackrest.CertRepoPrivateKeySecretKey] = repoSecret.Data[corev1.TLSPrivateKeyKey]
+
+	return nil
+}
+
+func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
+	if rootCA != nil {
+		caCert, err := rootCA.Certificate.MarshalText()
+		return caCert, errors.Wrap(err, "failed to marshal root CA certificate")
+	}
+
+	if ca := clientSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	if ca := repoSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
+		return ca, nil
+	}
+
+	return nil, errors.New("external issuer did not return a CA certificate for pgBackRest")
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}
@@ -2561,9 +2746,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupOpts := postgresCluster.Spec.Backups.PGBackRest.Manual.Options
 	for _, opt := range backupOpts {
 		if strings.Contains(opt, "--repo=") || strings.Contains(opt, "--repo ") {
-			r.Recorder.Eventf(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
-				"Option '--repo' is not allowed: please use the 'repoName' field instead.",
-				repoName)
+			r.Recorder.Event(postgresCluster, corev1.EventTypeWarning, "InvalidManualBackup",
+				"Option '--repo' is not allowed: please use the 'repoName' field instead.")
 			return nil
 		}
 	}
@@ -2802,6 +2986,10 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 	errMsg := "reconciling repository volume"
 	repoVols := []*corev1.PersistentVolumeClaim{}
 	var replicaCreateRepo v1beta1.PGBackRestRepo
+	desiredVolumes, err := r.observeDesiredRepoVolumes(ctx, postgresCluster)
+	if err != nil {
+		return replicaCreateRepo, err
+	}
 	for i, repo := range postgresCluster.Spec.Backups.PGBackRest.Repos {
 		// the repo at index 0 is the replica creation repo
 		if i == 0 {
@@ -2812,7 +3000,7 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 			continue
 		}
 		repo, err := r.applyRepoVolumeIntent(ctx, postgresCluster, repo.Volume.VolumeClaimSpec,
-			repo.Name, repoResources)
+			repo.Name, repoResources, desiredVolumes[repo.Name])
 		if err != nil {
 			log.Error(err, errMsg)
 			errors = append(errors, err)
@@ -2823,10 +3011,69 @@ func (r *Reconciler) reconcileRepos(ctx context.Context,
 		}
 	}
 
-	postgresCluster.Status.PGBackRest.Repos = getRepoVolumeStatus(postgresCluster.Status.PGBackRest.Repos, repoVols, extConfigHashes,
-		replicaCreateRepo.Name)
+	postgresCluster.Status.PGBackRest.Repos = getRepoVolumeStatus(postgresCluster.Status.PGBackRest.Repos,
+		repoVols, extConfigHashes, replicaCreateRepo.Name, desiredVolumes)
 
 	return replicaCreateRepo, utilerrors.NewAggregate(errors)
+}
+
+// observeDesiredRepoVolumes reads automatic-growth suggestions from the
+// dedicated repo-host Pod and retains the latest values through Pod restarts.
+func (r *Reconciler) observeDesiredRepoVolumes(ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+) (map[string]string, error) {
+	desired := make(map[string]string)
+	if !feature.Enabled(ctx, feature.AutoGrowVolumes) {
+		return desired, nil
+	}
+
+	if cluster.Status.PGBackRest != nil {
+		for _, status := range cluster.Status.PGBackRest.Repos {
+			if status.DesiredRepoVolume != "" {
+				desired[status.Name] = status.DesiredRepoVolume
+			}
+		}
+	}
+
+	pods := &corev1.PodList{}
+	if err := r.Client.List(
+		ctx, pods,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabelsSelector{Selector: naming.PGBackRestDedicatedSelector(cluster.Name)},
+	); err != nil {
+		return nil, errors.Wrap(err, "list pods")
+	}
+
+	limits := make(map[string]bool)
+	for _, repo := range cluster.Spec.Backups.PGBackRest.Repos {
+		limits[repo.Name] = repo.Volume != nil &&
+			!repo.Volume.VolumeClaimSpec.Resources.Limits.Storage().IsZero()
+	}
+	for _, pod := range pods.Items {
+		for annotation, value := range pod.Annotations {
+			repoName, ok := naming.PGBackRestRepoFromVolumeSizeAnnotation(annotation)
+			if !ok || !limits[repoName] || value == "" {
+				continue
+			}
+
+			current, err := resource.ParseQuantity(value)
+			if err != nil {
+				return nil, errors.Wrap(err, "parse quantity")
+			}
+			previous, err := resource.ParseQuantity(desired[repoName])
+			if err != nil {
+				previous = resource.Quantity{}
+			}
+			if current.Cmp(previous) > 0 {
+				desired[repoName] = value
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, "RepoVolumeAutoGrow",
+					"pgBackRest repository volume expansion to %v requested for %s/%s.",
+					current.String(), cluster.Name, repoName)
+			}
+		}
+	}
+
+	return desired, nil
 }
 
 // +kubebuilder:rbac:groups="",resources="pods",verbs={get,list}
@@ -2945,6 +3192,21 @@ func (r *Reconciler) reconcileStanzaCreate(ctx context.Context,
 	r.Recorder.Event(postgresCluster, corev1.EventTypeNormal, EventStanzasCreated,
 		"pgBackRest stanza creation completed successfully")
 
+	// Re-push any timeline history files stranded by the async-archiver race:
+	// postgres archives 00000002.history during bootstrap promotion before the
+	// stanza exists; pgBackRest drops it silently (error 103) and postgres
+	// never retries.  Without it pg_rewind fails on replicas after PITR.
+	log := logging.FromContext(ctx)
+	historyOut, historyErr := pgbackrest.Executor(exec).ArchivePushHistoryFiles(ctx)
+	if historyErr != nil {
+		r.Recorder.Event(postgresCluster, corev1.EventTypeWarning,
+			"ArchivePushHistoryFilesFailed", historyErr.Error())
+		log.Error(historyErr, "timeline history file recovery failed",
+			"pod", writableInstanceName, "output", historyOut)
+	} else if historyOut != "" {
+		log.Info("timeline history file recovery", "output", historyOut)
+	}
+
 	// if no errors then stanza(s) created successfully
 	for i := range postgresCluster.Status.PGBackRest.Repos {
 		postgresCluster.Status.PGBackRest.Repos[i].StanzaCreated = true
@@ -2974,7 +3236,7 @@ func getRepoHostStatus(repoHost *appsv1.StatefulSet) *v1beta1.RepoHostStatus {
 // (i.e. PVCs) reconciled  for the cluster, and the hashes calculated for the configuration for any
 // external repositories defined for the cluster.
 func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.PersistentVolumeClaim,
-	configHashes map[string]string, replicaCreateRepoName string,
+	configHashes map[string]string, replicaCreateRepoName string, desiredVolumes map[string]string,
 ) []v1beta1.RepoStatus {
 	// the new repository status that will be generated and returned
 	updatedRepoStatus := []v1beta1.RepoStatus{}
@@ -3011,6 +3273,7 @@ func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.
 					rs.ReplicaCreateBackupComplete = false
 				}
 				rs.VolumeName = rv.Spec.VolumeName
+				rs.DesiredRepoVolume = desiredVolumes[repoName]
 
 				updatedRepoStatus = append(updatedRepoStatus, rs)
 				break
@@ -3018,9 +3281,10 @@ func getRepoVolumeStatus(repoStatus []v1beta1.RepoStatus, repoVolumes []*corev1.
 		}
 		if newRepoVolStatus {
 			updatedRepoStatus = append(updatedRepoStatus, v1beta1.RepoStatus{
-				Bound:      (rv.Status.Phase == corev1.ClaimBound),
-				Name:       repoName,
-				VolumeName: rv.Spec.VolumeName,
+				Bound:             (rv.Status.Phase == corev1.ClaimBound),
+				Name:              repoName,
+				VolumeName:        rv.Spec.VolumeName,
+				DesiredRepoVolume: desiredVolumes[repoName],
 			})
 		}
 	}

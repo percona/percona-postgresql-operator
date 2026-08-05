@@ -9,11 +9,10 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPostgreSQLParameters(t *testing.T) {
@@ -71,7 +70,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 		cluster.Spec.Standby = nil
 		cluster.Spec.Patroni.DynamicConfiguration = nil
-		cluster.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
+		cluster.Spec.Backups.TrackLatestRestorableTime = new(true)
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -88,6 +87,59 @@ func TestPostgreSQLParameters(t *testing.T) {
 			}, ""),
 			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
+		})
+	})
+
+	t.Run("backups disabled", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		parameters := new(postgres.Parameters)
+
+		if cluster.Labels == nil {
+			cluster.Labels = make(map[string]string)
+		}
+		cluster.Labels["pgv2.percona.com/version"] = version.Version()
+
+		// No restore_command override: the key is omitted entirely, since a
+		// pgBackRest command would fail with no repository configured.
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+		})
+
+		// An explicit user override is still respected even with backups disabled.
+		dynamic := map[string]any{
+			"postgresql": map[string]any{
+				"parameters": map[string]any{
+					"restore_command": "/bin/true",
+				},
+			},
+		}
+		if cluster.Spec.Patroni == nil {
+			cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+		}
+		cluster.Spec.Patroni.DynamicConfiguration = dynamic
+
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+			"restore_command": "/bin/true",
+		})
+
+		// A standby cluster following an external repo needs restore_command
+		// regardless of this cluster's own backups.enabled setting.
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{
+			Enabled:  true,
+			RepoName: "repo99",
+		}
+		cluster.Spec.Patroni.DynamicConfiguration = nil
+
+		PostgreSQL(cluster, parameters, false)
+		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+			"archive_mode":    "on",
+			"archive_command": "true",
+			"restore_command": `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
 		})
 	})
 
@@ -113,7 +165,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
 		})
 
@@ -169,13 +221,13 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
+			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p" --repo=99`,
 			"track_commit_timestamp": "true",
 		})
 
 		cluster.Spec.Standby = nil
 		cluster.Spec.Patroni.DynamicConfiguration = nil
-		cluster.Spec.Backups.TrackLatestRestorableTime = ptr.To(true)
+		cluster.Spec.Backups.TrackLatestRestorableTime = new(true)
 
 		PostgreSQL(cluster, parameters, true)
 		assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -190,7 +242,7 @@ func TestPostgreSQLParameters(t *testing.T) {
 				`grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"); `,
 				"if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi",
 			}, ""),
-			"restore_command":        `/opt/crunchy/bin/restore-command-wrapper.sh pgbackrest --stanza=db archive-get %f "%p"`,
+			"restore_command":        `pgbackrest --stanza=db archive-get %f "%p"`,
 			"track_commit_timestamp": "true",
 		})
 	})

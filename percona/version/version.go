@@ -39,6 +39,7 @@ type Meta struct {
 	PMMVersion         string
 	BackupVersion      string
 	CRUID              string
+	Distribution       string
 	PMMEnabled         bool
 	HelmDeployCR       bool
 	HelmDeployOperator bool
@@ -87,6 +88,7 @@ func fetchVersions(ctx context.Context, endpoint string, vm Meta) error {
 		BackupVersion:      &vm.BackupVersion,
 		CustomResourceUID:  &vm.CRUID,
 		DatabaseVersion:    &vm.PGVersion,
+		Distribution:       &vm.Distribution,
 		KubeVersion:        &vm.KubeVersion,
 		NamespaceUID:       new(string),
 		OperatorVersion:    vm.OperatorVersion,

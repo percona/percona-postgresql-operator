@@ -14,7 +14,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestConfigMap(t *testing.T) {
@@ -50,7 +50,7 @@ pgadmin-settings.json: |
 	t.Run("Customizations", func(t *testing.T) {
 		cluster.Spec.UserInterface = new(v1beta1.UserInterfaceSpec)
 		cluster.Spec.UserInterface.PGAdmin = new(v1beta1.PGAdminPodSpec)
-		cluster.Spec.UserInterface.PGAdmin.Config.Settings = map[string]interface{}{
+		cluster.Spec.UserInterface.PGAdmin.Config.Settings = map[string]any{
 			"some":       "thing",
 			"UPPER_CASE": false,
 		}

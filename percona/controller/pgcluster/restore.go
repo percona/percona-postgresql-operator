@@ -5,7 +5,6 @@ import (
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
@@ -14,9 +13,9 @@ import (
 
 // createBootstrapRestoreObject creates a PerconaPGRestore object for the bootstrap restore
 func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if cr.Spec.DataSource == nil || (cr.Spec.DataSource.PGBackRest == nil &&
-		cr.Spec.DataSource.PostgresCluster == nil &&
-		cr.Spec.DataSource.Volumes == nil) {
+	// Note that we ignore volumes here because volume restores are not handled by the PerconaPGRestore, so it would
+	// not make sense to create the bootstrap restore object.
+	if cr.Spec.DataSource == nil || (cr.Spec.DataSource.PGBackRest == nil && cr.Spec.DataSource.PostgresCluster == nil) {
 		return nil
 	}
 
@@ -40,7 +39,7 @@ func (r *PGClusterReconciler) createBootstrapRestoreObject(ctx context.Context, 
 		},
 		Spec: v2.PerconaPGRestoreSpec{
 			PGCluster: cr.Name,
-			RepoName:  ptr.To(repoName),
+			RepoName:  new(repoName),
 		},
 	}
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {

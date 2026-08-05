@@ -1,0 +1,36 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: start-from-backup
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: start-from-backup-pgbackrest-secrets
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      global:
+        repo1-path: /backrestrepo/postgres-operator/<repo-path>/repo1
+      repos:
+        - name: repo1
+          s3:
+            bucket: <bucket>
+            endpoint: ams3.digitaloceanspaces.com
+            region: ams3
+  dataSource:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: start-from-backup-pgbackrest-secrets
+      stanza: db
+      global:
+        repo1-path: <source-path>
+      repo:
+        name: repo1
+        s3:
+          bucket: <bucket>
+          endpoint: ams3.digitaloceanspaces.com
+          region: ams3

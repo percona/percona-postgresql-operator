@@ -54,12 +54,25 @@ func backendAuthority(postgres *corev1.SecretProjection) corev1.VolumeProjection
 	return corev1.VolumeProjection{Secret: result}
 }
 
-// frontendCertificate creates a volume projection of the PgBouncer certificate.
+// CustomTLSAuthorityKey returns the key within the custom PgBouncer TLS
+// Secret that holds its certificate authority, honoring any remapping in
+// the projection items.
+func CustomTLSAuthorityKey(projection *corev1.SecretProjection) string {
+	for _, item := range projection.Items {
+		// The custom projection expects Path to match typical Keys.
+		if item.Path == tlsAuthoritySecretKey {
+			return item.Key
+		}
+	}
+	return tlsAuthoritySecretKey
+}
+
+// frontendCertificate creates volume projections of the PgBouncer certificate.
 func frontendCertificate(
-	custom *corev1.SecretProjection, secret *corev1.Secret,
-) corev1.VolumeProjection {
+	custom *corev1.SecretProjection, secret *corev1.Secret, additionalCAs bool,
+) []corev1.VolumeProjection {
 	if custom == nil {
-		return corev1.VolumeProjection{Secret: &corev1.SecretProjection{
+		return []corev1.VolumeProjection{{Secret: &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{
 				Name: secret.Name,
 			},
@@ -77,7 +90,7 @@ func frontendCertificate(
 					Path: certFrontendProjectionPath,
 				},
 			},
-		}}
+		}}}
 	}
 
 	// The custom projection may have more or less than the three items we need
@@ -94,6 +107,11 @@ func frontendCertificate(
 		// The custom projection expects Path to match typical Keys.
 		switch result.Items[i].Path {
 		case tlsAuthoritySecretKey:
+			// K8SPG-952: with additional CAs, the authority is mounted from
+			// the operator Secret below where the merged bundle is stored.
+			if additionalCAs {
+				continue
+			}
 			result.Items[i].Path = certFrontendAuthorityProjectionPath
 			items = append(items, result.Items[i])
 
@@ -108,22 +126,41 @@ func frontendCertificate(
 	}
 
 	if len(items) == 0 {
-		items = []corev1.KeyToPath{
-			{
+		if !additionalCAs {
+			items = append(items, corev1.KeyToPath{
 				Key:  tlsAuthoritySecretKey,
 				Path: certFrontendAuthorityProjectionPath,
-			},
-			{
+			})
+		}
+		items = append(items,
+			corev1.KeyToPath{
 				Key:  tlsPrivateKeySecretKey,
 				Path: certFrontendPrivateKeyProjectionPath,
 			},
-			{
+			corev1.KeyToPath{
 				Key:  tlsCertificateSecretKey,
 				Path: certFrontendProjectionPath,
 			},
-		}
+		)
 	}
 
 	result.Items = items
-	return corev1.VolumeProjection{Secret: result}
+	projections := []corev1.VolumeProjection{{Secret: result}}
+
+	// K8SPG-952: mount the merged CA bundle from the operator Secret so
+	// PgBouncer also trusts the additional authorities.
+	if additionalCAs {
+		projections = append(projections, corev1.VolumeProjection{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secret.Name,
+				},
+				Items: []corev1.KeyToPath{{
+					Key:  certFrontendAuthoritySecretKey,
+					Path: certFrontendAuthorityProjectionPath,
+				}},
+			},
+		})
+	}
+	return projections
 }

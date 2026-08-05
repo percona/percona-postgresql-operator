@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -169,7 +168,7 @@ var _ = Describe("patroni version check", Ordered, func() {
 			}
 
 			Expect(pod.Spec.SecurityContext).To(Equal(expectedSecurityContext))
-			Expect(pod.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(5))))
+			Expect(pod.Spec.TerminationGracePeriodSeconds).To(Equal(new(int64(5))))
 			Expect(pod.Spec.ImagePullSecrets).To(Equal(expectedImagePullSecrets))
 			Expect(pod.Spec.Affinity).To(Equal(expectedAffinity))
 		})

@@ -11,8 +11,6 @@ spec:
           pgaudit.log_level: 'warning'
           logging_collector: 'off'
   extensions:
-    pg_stat_monitor:
-      enabled: true
     pg_stat_statements:
       enabled: true
     pg_audit:
@@ -20,4 +18,8 @@ spec:
     pgvector:
       enabled: true
     pg_repack:
+      enabled: true
+    pg_cron:
+      enabled: true
+    set_user:
       enabled: true

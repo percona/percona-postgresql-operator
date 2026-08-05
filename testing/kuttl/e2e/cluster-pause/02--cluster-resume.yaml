@@ -1,6 +1,0 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-apply:
-- files/02-resume-cluster.yaml
-assert:
-- files/02-cluster-resumed.yaml

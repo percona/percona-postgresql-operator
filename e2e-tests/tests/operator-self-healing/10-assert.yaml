@@ -12,7 +12,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: '1'
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: operator-self-healing
       controller: true

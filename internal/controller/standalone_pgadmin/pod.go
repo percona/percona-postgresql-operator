@@ -15,7 +15,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -455,7 +455,7 @@ func podSecurityContext(r *PGAdminReconciler) *corev1.PodSecurityContext {
 	// - https://docs.k8s.io/tasks/configure-pod-container/security-context/
 	// - https://docs.openshift.com/container-platform/4.14/authentication/managing-security-context-constraints.html
 	if !r.IsOpenShift {
-		podSecurityContext.FSGroup = initialize.Int64(2)
+		podSecurityContext.FSGroup = new(int64(2))
 	}
 
 	return podSecurityContext

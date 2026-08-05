@@ -3,7 +3,7 @@ package registry
 import "github.com/pkg/errors"
 
 // Objects defines a list of objects.
-type Objects map[string]interface{}
+type Objects map[string]any
 
 // Registry defines a registry object that can register objects.
 type Registry struct {
@@ -18,7 +18,7 @@ func New() *Registry {
 }
 
 // Add adds an object with a given unique id to registry.
-func (r *Registry) Add(name string, object interface{}) error {
+func (r *Registry) Add(name string, object any) error {
 	if r.IsExist(name) {
 		return errors.Errorf("object with %s was already registered", name)
 	}

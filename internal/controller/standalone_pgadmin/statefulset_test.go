@@ -12,14 +12,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcilePGAdminStatefulSet(t *testing.T) {
@@ -36,7 +34,7 @@ func TestReconcilePGAdminStatefulSet(t *testing.T) {
 	pgadmin := new(v1beta1.PGAdmin)
 	pgadmin.Name = "test-standalone-pgadmin"
 	pgadmin.Namespace = ns.Name
-	pgadmin.Spec.Image = ptr.To("some-image")
+	pgadmin.Spec.Image = new("some-image")
 
 	assert.NilError(t, cc.Create(ctx, pgadmin))
 	t.Cleanup(func() { assert.Check(t, cc.Delete(ctx, pgadmin)) })
@@ -134,10 +132,10 @@ terminationGracePeriodSeconds: 30
 		}
 
 		if pgadmin.Spec.PriorityClassName != nil {
-			custompgadmin.Spec.PriorityClassName = initialize.String("testpriorityclass")
+			custompgadmin.Spec.PriorityClassName = new("testpriorityclass")
 		}
 
-		custompgadmin.Spec.Image = ptr.To("someimage")
+		custompgadmin.Spec.Image = new("someimage")
 		// set an image pull secret
 		custompgadmin.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{
 			Name: "myImagePullSecret",

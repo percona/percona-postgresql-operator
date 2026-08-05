@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      # Shut down the Crunchy source cluster (optional step — frees resources
+      # and ensures no split-brain once Percona is promoted).
+      kubectl patch postgrescluster crunchy-source \
+        -n "${CRUNCHY_NS}" \
+        --type=merge \
+        -p '{"spec": {"shutdown": true}}'
+
+      # Wait for all Crunchy pods to terminate
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source \
+        -n "${CRUNCHY_NS}" \
+        --for=delete \
+        --timeout=120s || true
+
+      echo "Crunchy source cluster shut down"

@@ -10,10 +10,9 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func init() {
@@ -65,7 +64,7 @@ type PerconaPGBackupSpec struct {
 	// +optional
 	// The name of the pgBackRest repo to run the backup command against.
 	// This is required when method is 'pgbackrest'.
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName *string `json:"repoName,omitempty"`
 
 	// Method with which to perform the backup
@@ -104,6 +103,14 @@ const (
 	BackupSucceeded PGBackupState = "Succeeded"
 )
 
+func (s PGBackupState) IsTerminal() bool {
+	return s == BackupFailed || s == BackupSucceeded
+}
+
+const (
+	ConditionBackupLeaseAcquired = "BackupLeaseAcquired"
+)
+
 type PerconaPGBackupStatus struct {
 	JobName              string                         `json:"jobName,omitempty"`
 	State                PGBackupState                  `json:"state,omitempty"`
@@ -115,9 +122,11 @@ type PerconaPGBackupStatus struct {
 	Repo                 *crunchyv1beta1.PGBackRestRepo `json:"repo,omitempty"`
 	Image                string                         `json:"image,omitempty"`
 	BackupName           string                         `json:"backupName,omitempty"`
+	Size                 int64                          `json:"size,omitempty"`
 	CRVersion            string                         `json:"crVersion,omitempty"`
 	LatestRestorableTime PITRestoreDateTime             `json:"latestRestorableTime,omitempty"`
 	Snapshot             *SnapshotStatus                `json:"snapshot,omitempty"`
+	Conditions           []metav1.Condition             `json:"conditions,omitempty"`
 }
 
 type SnapshotStatus struct {
@@ -204,7 +213,7 @@ const (
 
 func (b *PerconaPGBackup) Default() {
 	if b.Spec.Method == nil {
-		b.Spec.Method = ptr.To(BackupMethodPGBackrest)
+		b.Spec.Method = new(BackupMethodPGBackrest)
 	}
 
 	if *b.Spec.Method == BackupMethodPGBackrest {

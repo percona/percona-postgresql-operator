@@ -72,8 +72,9 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"pg_stat_monitor.pgsm_query_max_len": "2048",
-		"shared_preload_libraries":           "pg_stat_monitor",
+		"pg_stat_monitor.pgsm_enable_overflow": "off",
+		"pg_stat_monitor.pgsm_query_max_len":   "2048",
+		"shared_preload_libraries":             "pg_stat_monitor",
 	})
 
 	// Appended when not empty.
@@ -82,7 +83,8 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
-		"pg_stat_monitor.pgsm_query_max_len": "2048",
-		"shared_preload_libraries":           "some,existing,pg_stat_monitor",
+		"pg_stat_monitor.pgsm_enable_overflow": "off",
+		"pg_stat_monitor.pgsm_query_max_len":   "2048",
+		"shared_preload_libraries":             "some,existing,pg_stat_monitor",
 	})
 }

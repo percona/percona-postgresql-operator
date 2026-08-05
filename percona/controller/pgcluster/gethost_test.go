@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGetHost(t *testing.T) {
@@ -39,6 +39,13 @@ func TestGetHost(t *testing.T) {
 		{
 			name:         "proxy set but PGBouncer is nil",
 			proxy:        &v2.PGProxySpec{PGBouncer: nil},
+			expectedHost: clusterName + "-primary." + ns + ".svc",
+		},
+		{
+			name: "PGBouncer configured with zero replicas",
+			proxy: &v2.PGProxySpec{PGBouncer: &v2.PGBouncerSpec{
+				Replicas: new(int32),
+			}},
 			expectedHost: clusterName + "-primary." + ns + ".svc",
 		},
 		{

@@ -16,7 +16,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPodConfigFiles(t *testing.T) {
@@ -106,8 +106,8 @@ func TestSystemSettings(t *testing.T) {
 SERVER_MODE: true
 	`))
 
-	spec.Config.Settings = map[string]interface{}{
-		"ALLOWED_HOSTS": []interface{}{"225.0.0.0/8", "226.0.0.0/7", "228.0.0.0/6"},
+	spec.Config.Settings = map[string]any{
+		"ALLOWED_HOSTS": []any{"225.0.0.0/8", "226.0.0.0/7", "228.0.0.0/6"},
 	}
 	assert.Assert(t, cmp.MarshalMatches(systemSettings(spec), `
 ALLOWED_HOSTS:

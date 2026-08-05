@@ -1,0 +1,45 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source \
+        -n "${CRUNCHY_NS}" \
+        --for=delete \
+        --timeout=120s || true
+
+      # Poll until the Percona standby WAL replay LSN stabilises.
+      # Once Crunchy is shut down, no new WAL is produced; the standby will
+      # finish replaying from S3 and then stop advancing.  Two consecutive
+      # identical LSNs mean replay is complete and it is safe to promote.
+      standby_pod=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-standby,postgres-operator.crunchydata.com/data=postgres \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      prev_lsn=""
+      stable_count=0
+      for i in $(seq 20); do
+        curr_lsn=$(kubectl exec -n "${NAMESPACE}" "${standby_pod}" -c database -- \
+          psql -q -t -c "SELECT pg_last_wal_replay_lsn();" | tr -d ' ')
+        echo "WAL replay LSN check ${i}/20: ${curr_lsn}"
+        if [ "${curr_lsn}" = "${prev_lsn}" ] && [ -n "${curr_lsn}" ]; then
+          stable_count=$((stable_count + 1))
+          # Two consecutive matching LSNs = replay has stopped
+          if [ "${stable_count}" -ge 2 ]; then
+            echo "WAL replay stable at ${curr_lsn} — safe to promote"
+            exit 0
+          fi
+        else
+          stable_count=0
+        fi
+        prev_lsn="${curr_lsn}"
+        sleep 5
+      done
+
+      echo "ERROR: WAL replay LSN did not stabilise within 100 seconds"
+      exit 1

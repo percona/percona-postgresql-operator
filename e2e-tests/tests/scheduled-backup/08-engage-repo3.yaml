@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |
+      patch=$(
+        kubectl get pg scheduled-backup -n "$NAMESPACE" -o json |
+        jq -c '
+          .spec.backups.pgbackrest.repos as $repos |
+          [
+            {
+              op: "remove",
+              path: "/spec/backups/pgbackrest/repos/\($repos | map(.name=="repo2") | index(true))/schedules"
+            },
+            {
+              op: "add",
+              path: "/spec/backups/pgbackrest/repos/\($repos | map(.name=="repo3") | index(true))/schedules",
+              value: { full: "*/1 * * * *" }
+            }
+          ]
+        '
+      )
+
+      kubectl patch pg scheduled-backup \
+        -n "$NAMESPACE" \
+        --type=json \
+        -p "$patch"

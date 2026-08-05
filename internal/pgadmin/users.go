@@ -14,7 +14,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type Executor func(
@@ -237,7 +237,7 @@ with create_app().app_context():`,
 		spec := users[i]
 
 		if err == nil {
-			err = encoder.Encode(map[string]interface{}{
+			err = encoder.Encode(map[string]any{
 				"username": spec.Name,
 				"password": passwords[string(spec.Name)],
 			})

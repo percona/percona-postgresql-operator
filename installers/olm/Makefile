@@ -1,102 +1,142 @@
+# ==============================================================================
+# Percona PostgreSQL Operator - OLM Bundle Generation
+# ==============================================================================
+
+# Default target
 .DEFAULT_GOAL := help
 .SUFFIXES:
-
-CONTAINER ?= docker
-OPENSHIFT_VERSIONS ?= v4.10-v4.12
-PACKAGE_CHANNEL ?= preview
-MIN_KUBE_VERSION ?= 1.23.0
-DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 SHELL := /bin/bash
 
-IMAGE_TAG_BASE ?= perconalab/percona-postgresql-operator
+# ==============================================================================
+# Configuration Variables
+# ==============================================================================
+
+# Project configuration
+NAME ?= percona-postgresql-operator
+COMMUNITY_REGISTRY ?= docker.io
+IMAGE_TAG_OWNER ?= percona
+IMAGE_TAG_BASE ?= $(IMAGE_TAG_OWNER)/$(NAME)
+CONTAINER ?= docker
+
+# Bundle configuration
+OPENSHIFT_VERSIONS ?= v4.18-v4.21
+DOCKER_DEFAULT_PLATFORM ?= linux/amd64
+
+# Image configuration
+IMAGE ?= $(COMMUNITY_REGISTRY)/$(IMAGE_TAG_BASE):$(VERSION)
 BUNDLE_REPO ?= $(IMAGE_TAG_BASE)
+BUNDLE_DISTRO ?= community
+BUNDLE_IMG ?= $(BUNDLE_REPO):$(VERSION)-$(BUNDLE_DISTRO)-bundle
+REDHAT_OPERATOR_IMAGE ?= registry.connect.redhat.com/percona/percona-postgresql-operator:$(VERSION)
 
-IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
+# Paths
+REPO_ROOT := $(shell git rev-parse --show-toplevel)
+KUSTOMIZE := $(REPO_ROOT)/bin/kustomize
 
-ifeq ($(shell bash -c 'echo $$BASH_VERSION | cut -d "." -f1'), 5)
-else
-    $(error You need to use bash 5.x+ for this Makefile)
-endif
+# Tool versions
+JQ_VERSION := 1.7.1
+OPERATOR_SDK_VERSION := v1.42.2
+OPM_VERSION := v1.66.0
 
-OS_KERNEL  ?= $(shell bash -c 'echo $${1,,}' - `uname -s`)
-OS_MACHINE ?= $(shell bash -c 'echo $${1/x86_/amd}' - `uname -m`)
-SYSTEM = $(OS_KERNEL)-$(OS_MACHINE)
+
+OS_KERNEL  ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+OS_MACHINE ?= $(shell uname -m | sed 's/^x86_/amd/')
+SYSTEM := $(OS_KERNEL)-$(OS_MACHINE)
 
 export PATH := $(CURDIR)/tools/$(SYSTEM):$(PATH)
 
-export VERSION
-export BUNDLE_REPO
-export OPENSHIFT_VERSIONS
-export PACKAGE_CHANNEL
-export MIN_KUBE_VERSION
-export DOCKER_DEFAULT_PLATFORM
+# Display colors
+GREEN := $(shell tput setaf 2)
+RESET := $(shell tput sgr0)
 
-REPO_ROOT = $(shell git rev-parse --show-toplevel)
+# Export variables for generate.sh
+export VERSION IMAGE REDHAT_OPERATOR_IMAGE BUNDLE_REPO OPENSHIFT_VERSIONS DOCKER_DEFAULT_PLATFORM
 
-distros = community redhat marketplace
+# ==============================================================================
+# Bundle Targets
+# ==============================================================================
 
+DISTROS := community redhat
+
+.PHONY: bundles
+bundles: ## Build all OLM bundles (community, redhat)
+bundles: check-prereqs $(DISTROS:%=bundles/%)
+
+# https://olm.operatorframework.io/docs/tasks/creating-operator-bundle/#validating-your-bundle
+.PHONY: bundles/community
+bundles/community: tools $(KUSTOMIZE)
+	@echo "$(GREEN)Building community bundle...$(RESET)"
+	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image 'postgres-operator=$(IMAGE)'
+	./generate.sh community
+	operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
+	@echo "$(GREEN)Bundle stored in installers/olm/bundles/community$(RESET)"
+
+# https://redhat-connect.gitbook.io/certified-operator-guide/ocp-deployment/operator-metadata/reviewing-your-metadata-bundle
+.PHONY: bundles/redhat
+bundles/redhat: tools $(KUSTOMIZE)
+	@echo "$(GREEN)Building redhat bundle...$(RESET)"
+	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image 'postgres-operator=$(REDHAT_OPERATOR_IMAGE)'
+	./generate.sh redhat
+	operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
+	@echo "$(GREEN)Bundle stored in installers/olm/bundles/redhat$(RESET)"
+
+# ==============================================================================
+# Docker Build & Push Targets
+# ==============================================================================
+
+.PHONY: build
+build: ## Build bundle image (set BUNDLE_DISTRO=community|redhat)
+build: check-version bundles/$(BUNDLE_DISTRO)
+	@echo "$(GREEN)Building bundle image...$(RESET)"
+	$(CONTAINER) build -t $(BUNDLE_IMG) --platform=$(DOCKER_DEFAULT_PLATFORM) bundles/$(BUNDLE_DISTRO)
+	@echo "$(GREEN)Bundle image built: $(BUNDLE_IMG)$(RESET)"
+
+.PHONY: push
+push: ## Push bundle image to registry
+push: check-version
+	@echo "$(GREEN)Pushing bundle image to registry...$(RESET)"
+	$(CONTAINER) push $(BUNDLE_IMG)
+	@echo "$(GREEN)Bundle image pushed: $(BUNDLE_IMG)$(RESET)"
+
+# ==============================================================================
+# Utility Targets
+# ==============================================================================
+
+.PHONY: check-prereqs
+check-prereqs: check-version tools $(KUSTOMIZE)
+
+.PHONY: check-version
 check-version:
 ifndef VERSION
 	$(error VERSION is not set)
 endif
 
-KUSTOMIZE = $(REPO_ROOT)/bin/kustomize
-kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
-
-.PHONY: bundles
-bundles: ## Build OLM bundles
-bundles: check-version $(distros:%=bundles/%)
-
-# https://olm.operatorframework.io/docs/tasks/creating-operator-bundle/#validating-your-bundle
-# https://github.com/operator-framework/community-operators/blob/8a36a33/docs/packaging-required-criteria-ocp.md
-.PHONY: bundles/community
-bundles/community:
-	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	./generate.sh community
-	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
-	env operator-sdk bundle validate $@ --select-optional='name=community' --optional-values='index-path=$@/Dockerfile'
-
-# https://redhat-connect.gitbook.io/certified-operator-guide/ocp-deployment/operator-metadata/reviewing-your-metadata-bundle
-.PHONY: bundles/redhat
-bundles/redhat:
-	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	./generate.sh redhat
-	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
-
-# The 'marketplace' configuration is currently identical to the 'redhat', so we just copy it here.
-.PHONY: bundles/marketplace
-bundles/marketplace:
-	cd ../../config/manager/default/ && $(KUSTOMIZE) edit set image postgres-operator=$(IMAGE)
-	cp -r ./config/redhat/ ./config/marketplace
-	./generate.sh marketplace
-	env operator-sdk bundle validate $@ --select-optional='suite=operatorframework'
-
-.PHONY: clean
-clean: clean-deprecated
-clean: ## Remove generated files and downloaded tools
-	rm -rf ./bundles ./projects ./tools ./config/marketplace
-
-.PHONY: clean-deprecated
-clean-deprecated:
-	rm -rf ./package
-
-.PHONY: help
-help: ALIGN=18
-help: ## Print this message
-	@awk -F ': ## ' -- "/^[^':]+: ## /"' { printf "'$$(tput bold)'%-$(ALIGN)s'$$(tput sgr0)' %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+$(KUSTOMIZE):
+	$(MAKE) -C '$(REPO_ROOT)' kustomize
 
 .PHONY: install-olm
 install-olm: ## Install OLM in Kubernetes
-	env operator-sdk olm install
+install-olm: tools
+	operator-sdk olm install
+
+.PHONY: clean
+clean: ## Remove generated files and downloaded tools
+	rm -rf ./bundles ./projects ./tools
+
+.PHONY: help
+help: ## Show this help message
+	@awk 'BEGIN {FS = ": ## "; printf "\n$(GREEN)Usage:$(RESET)\n  make [target]\n\n$(GREEN)Targets:$(RESET)\n"} /^[a-zA-Z_-]+: ## / {printf "  %-24s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# ==============================================================================
+# Tool Management
+# ==============================================================================
 
 .PHONY: tools
-tools: ## Download tools needed to build bundles
-
+tools: ## Download required tools
 tools: tools/$(SYSTEM)/jq
 tools/$(SYSTEM)/jq:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' "https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-$$(SYSTEM='$(SYSTEM)'; \
+	curl -fSL -o '$@' "https://github.com/stedolan/jq/releases/download/jq-$(JQ_VERSION)/jq-$$(SYSTEM='$(SYSTEM)'; \
 		case "$$SYSTEM" in \
 			(linux-*) echo "$${SYSTEM/-amd/}";; (darwin-*) echo "$${SYSTEM/darwin-*/osx-amd64}";; (*) echo '$(SYSTEM)';; \
 		esac)"
@@ -105,20 +145,20 @@ tools/$(SYSTEM)/jq:
 tools: tools/$(SYSTEM)/kubectl
 tools/$(SYSTEM)/kubectl:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://dl.k8s.io/release/$(shell curl -Ls https://dl.k8s.io/release/stable-1.21.txt)/bin/$(OS_KERNEL)/$(OS_MACHINE)/kubectl'
+	curl -fSL -o '$@' 'https://dl.k8s.io/release/$(shell curl -Ls https://dl.k8s.io/release/stable.txt)/bin/$(OS_KERNEL)/$(OS_MACHINE)/kubectl'
 	chmod u+x '$@'
 
 # quay.io/operator-framework/operator-sdk
 tools: tools/$(SYSTEM)/operator-sdk
 tools/$(SYSTEM)/operator-sdk:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/v1.19.1/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
+	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$(OS_KERNEL)_$(OS_MACHINE)'
 	chmod u+x '$@'
 
 tools: tools/$(SYSTEM)/opm
 tools/$(SYSTEM)/opm:
 	install -d '$(dir $@)'
-	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$(OS_KERNEL)-$(OS_MACHINE)-opm'
+	curl -fSL -o '$@' 'https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$(OS_KERNEL)-$(OS_MACHINE)-opm'
 	chmod u+x '$@'
 
 tools/$(SYSTEM)/venv:
@@ -130,10 +170,15 @@ tools/$(SYSTEM)/yq: | tools/$(SYSTEM)/venv
 	'tools/$(SYSTEM)/venv/bin/python' -m pip install yq
 	cd '$(dir $@)' && ln -s venv/bin/yq
 
+# ==============================================================================
+# Development Targets
+# ==============================================================================
+
 .PHONY: validate-bundles
 validate-bundles: ## Build temporary bundle images and run scorecard tests in Kubernetes
-validate-bundles: $(distros:%=validate-%-image)
-validate-bundles: $(distros:%=validate-%-directory)
+validate-bundles: tools
+validate-bundles: $(DISTROS:%=validate-%-image)
+validate-bundles: $(DISTROS:%=validate-%-directory)
 
 validate-%-directory:
 	./validate-directory.sh 'bundles/$*'
@@ -142,7 +187,7 @@ validate-%-image:
 	./validate-image.sh '$(CONTAINER)' 'bundles/$*'
 
 .PHONY: build-bundle-images
-build-bundle-images: check-version $(distros:%=build-%-image)
+build-bundle-images: check-version $(DISTROS:%=build-%-image)
 
 build-%-image:
 	./build-image.sh '$(CONTAINER)' 'bundles/$*' '$*' '$(VERSION)'

@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 1000
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      name=$(kubectl get configmap cluster-name -o jsonpath='{.data.name}' -n ${NAMESPACE})
+      version=$(kubectl get configmap final-cluster-version -o jsonpath='{.data.version}' -n ${NAMESPACE})
+      upgrade_k8s_cluster "$name" "$version"

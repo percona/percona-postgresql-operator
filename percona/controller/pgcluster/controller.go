@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +40,7 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
@@ -47,7 +48,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/percona/percona-postgresql-operator/v2/percona/watcher"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -108,6 +109,8 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		Owns(&v1beta1.PostgresCluster{}).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
+		Watches(&corev1.ConfigMap{}, r.watchLogRotateExtraConfig()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -195,6 +198,60 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 	})
 }
 
+func (r *PGClusterReconciler) watchLogRotateExtraConfig() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchLogRotateExtraConfig")
+
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldLogRotateExtraConfig: cm.Name,
+		}, client.InNamespace(cm.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by logRotate extra config index", "key", client.ObjectKeyFromObject(cm).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
+func (r *PGClusterReconciler) watchPGBouncerUserSecrets() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchPGBouncerUserSecrets")
+
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldPGBouncerUserSecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by PgBouncer user secrets index", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
 func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, reconcile.Request] {
 	return handler.TypedFuncs[*corev1.Secret, reconcile.Request]{
 		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Secret], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -214,7 +271,7 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/status,verbs=patch;update
-// +kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
+// +kubebuilder:rbac:groups=upstream.pgv2.percona.com,resources=postgresclusters,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=create;delete;get;list;patch;watch
 // +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
@@ -257,8 +314,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	if cr.DeletionTimestamp != nil {
 		log.Info("Deleting PerconaPGCluster", "deletionTimestamp", cr.DeletionTimestamp)
 
-		if err := r.runFinalizers(ctx, cr); err != nil {
-			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run finalizers")
+		// Run pre-deletion finalizers before deleting PostgresCluster,
+		// because they may need to exec into pods (e.g. deleteBackups).
+		if err := r.runPrePostgresClusterDeletionFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run pre-postgrescluster finalizers")
 		}
 
 		// We're deleting PostgresCluster explicitly to let Crunchy controller run its finalizers and not mess with us.
@@ -267,8 +326,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err == nil {
+
 			log.Info("Waiting for PostgresCluster to be deleted")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		} else if client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "get postgres cluster")
+		}
+
+		if err := r.runPostPostgresClusterDeletionFinalizers(ctx, cr); err != nil {
+			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run post-postgrescluster finalizers")
 		}
 
 		return reconcile.Result{}, nil
@@ -309,6 +375,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := logcollector.Reconcile(ctx, r.Client, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile log collector")
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
@@ -384,6 +454,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			}, nil
 		}
 		return reconcile.Result{}, errors.Wrap(err, "check patroni version from instance pods")
+	}
+
+	if err := r.reconcileOwnerRefMigrationStatus(ctx, cr); err != nil {
+		if errors.Is(err, errOwnerRefMigrationInProgress) {
+			return reconcile.Result{
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		return reconcile.Result{}, errors.Wrap(err, "reconcile owner ref migration status")
 	}
 
 	return ctrl.Result{}, nil
@@ -526,15 +605,30 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 	return nil
 }
 
+// reportPMMMisconfiguration surfaces a PMM misconfiguration to the user: PMM
+// stays disabled, but the cluster keeps running, so the problem is reported
+// via a warning event and the PMMReady status condition instead of an error.
+func (r *PGClusterReconciler) reportPMMMisconfiguration(ctx context.Context, cr *v2.PerconaPGCluster, reason, message string) {
+	logging.FromContext(ctx).Info(fmt.Sprintf("Can't enable PMM: %s", message))
+	r.Recorder.Event(cr, corev1.EventTypeWarning, "PMMMisconfigured", message)
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: cr.Generation,
+	})
+}
+
 func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.PMMEnabled() {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, v2.ConditionPMMReady)
 		return nil
 	}
 
-	log := logging.FromContext(ctx)
-
 	if cr.Spec.PMM.Secret == "" {
-		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotSpecified",
+			fmt.Sprintf("`.spec.pmm.secret` is empty in %s", cr.Name))
 		return nil
 	}
 
@@ -544,7 +638,8 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		Namespace: cr.Namespace,
 	}, pmmSecret); err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("Can't enable PMM: %s secret doesn't exist", cr.Spec.PMM.Secret))
+			r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotFound",
+				fmt.Sprintf("%s secret doesn't exist", cr.Spec.PMM.Secret))
 			return nil
 		}
 		return errors.Wrap(err, "failed to get pmm secret")
@@ -567,9 +662,16 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 
 	pmmContainer, err := pmm.Container(pmmSecret, cr)
 	if err != nil {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s", err.Error()))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretInvalid", err.Error())
 		return nil
 	}
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "PMMConfigured",
+		ObservedGeneration: cr.Generation,
+	})
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
 	if err != nil {
@@ -699,7 +801,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 	}
 
 	if cr.CompareVersion("2.6.0") >= 0 {
-		var removedExtension []string
+		var removedExtensions []string
 		installedExtensions := cr.Status.InstalledCustomExtensions
 		crExtensions := make(map[string]struct{})
 		for _, ext := range extensionNames {
@@ -710,13 +812,13 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
 			if _, ok := crExtensions[ext]; !ok {
-				removedExtension = append(removedExtension, ext)
+				removedExtensions = append(removedExtensions, ext)
 			}
 		}
 
-		if len(removedExtension) > 0 {
+		if len(removedExtensions) > 0 {
 			disable := func(ctx context.Context, exec postgres.Executor) error {
-				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtension))
+				return errors.WithStack(disableCustomExtensionsInDB(ctx, exec, removedExtensions))
 			}
 
 			primary, err := perconaPG.GetPrimaryPod(ctx, r.Client, cr)
@@ -766,9 +868,11 @@ func disableCustomExtensionsInDB(ctx context.Context, exec postgres.Executor, cu
 			},
 		)
 
-		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
+		if err != nil {
+			return errors.Wrap(err, "drop custom extension")
+		}
 
-		return errors.Wrap(err, "custom extension deletion")
+		log.V(1).Info("extension was disabled ", "extensionName", extensionName)
 	}
 
 	return nil
@@ -785,7 +889,6 @@ func isBackupRunning(ctx context.Context, cl client.Reader, cr *v2.PerconaPGClus
 	}
 
 	for _, job := range jobList.Items {
-		job := job
 		if perconaController.JobFailed(&job) || perconaController.JobCompleted(&job) {
 			continue
 		}
@@ -874,17 +977,15 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchersDeprecated) && slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
+	if !controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchersDeprecated) && controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchers) {
 		return nil
 	}
 
 	if cr.Spec.Backups.TrackLatestRestorableTime != nil && *cr.Spec.Backups.TrackLatestRestorableTime {
 		orig := cr.DeepCopy()
-		cr.Finalizers = slices.DeleteFunc(cr.Finalizers, func(f string) bool {
-			return f == pNaming.FinalizerStopWatchersDeprecated
-		})
-		if !slices.Contains(cr.Finalizers, pNaming.FinalizerStopWatchers) {
-			cr.Finalizers = append(cr.Finalizers, pNaming.FinalizerStopWatchers)
+		controllerutil.RemoveFinalizer(cr, pNaming.FinalizerStopWatchersDeprecated)
+		if !controllerutil.ContainsFinalizer(cr, pNaming.FinalizerStopWatchers) {
+			controllerutil.AddFinalizer(cr, pNaming.FinalizerStopWatchers)
 		}
 		if err := r.Client.Patch(ctx, cr.DeepCopy(), client.MergeFrom(orig)); err != nil {
 			return errors.Wrap(err, "patch finalizers")

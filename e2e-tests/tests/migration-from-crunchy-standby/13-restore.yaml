@@ -1,0 +1,58 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-standby,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Percona primary pod not found"
+        exit 1
+      fi
+
+      # Capture the current database time as the PITR target BEFORE truncating,
+      # then force a WAL switch so this point is flushed to the archive before
+      # any truncate WAL is written.  --target-timeline=current is valid with
+      # --type=time (but not with --type=immediate) and prevents pgBackRest from
+      # following a newer timeline that may exist in the archive from a previous
+      # restore, which would cause a checkpoint-record PANIC.
+      restore_target=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -q -t -c "SELECT to_char(clock_timestamp(), 'YYYY-MM-DD HH24:MI:SS')" \
+        | xargs)
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- \
+        psql -q -c "SELECT pg_switch_wal();"
+      echo "PITR target: ${restore_target}"
+
+      # Truncate the table to prove the restore actually brings data back.
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -d migrationtest -c 'TRUNCATE TABLE migration_data;'
+      "
+
+      # Verify the table is empty before triggering the restore.
+      count=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
+        "psql -q -t -d migrationtest -c 'SELECT count(*) FROM migration_data;' | tr -d ' '")
+      if [ "${count}" != "0" ]; then
+        echo "ERROR: Expected 0 rows after truncate, got ${count}"
+        exit 1
+      fi
+
+      cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGRestore
+      metadata:
+        name: post-migration-restore
+      spec:
+        pgCluster: percona-standby
+        repoName: repo1
+        options:
+        - --type=time
+        - --target="${restore_target}"
+        - --target-timeline=current
+      EOF

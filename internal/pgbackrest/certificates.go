@@ -9,8 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 )
 
 const (
@@ -35,6 +33,15 @@ const (
 
 	certRepoPrivateKeySecretKey = "pgbackrest-repo-host.key" // #nosec G101 this is a name, not a credential
 	certRepoSecretKey           = "pgbackrest-repo-host.crt" // #nosec G101 this is a name, not a credential
+)
+
+// Exported key names for use by the cert-manager integration.
+const (
+	CertAuthoritySecretKey        = certAuthoritySecretKey
+	CertClientSecretKey           = certClientSecretKey
+	CertClientPrivateKeySecretKey = certClientPrivateKeySecretKey
+	CertRepoSecretKey             = certRepoSecretKey
+	CertRepoPrivateKeySecretKey   = certRepoPrivateKeySecretKey
 )
 
 // certFile concatenates the results of multiple PEM-encoding marshalers.
@@ -71,7 +78,7 @@ func clientCertificates() []corev1.KeyToPath {
 			// pgBackRest requires that certificate keys not be readable by any
 			// other user.
 			// - https://github.com/pgbackrest/pgbackrest/blob/release/2.38/src/common/io/tls/common.c#L128
-			Mode: initialize.Int32(0o600),
+			Mode: new(int32(0o600)),
 		},
 	}
 }
@@ -103,7 +110,7 @@ func instanceServerCertificates() []corev1.KeyToPath {
 			// pgBackRest requires that certificate keys not be readable by any
 			// other user.
 			// - https://github.com/pgbackrest/pgbackrest/blob/release/2.38/src/common/io/tls/common.c#L128
-			Mode: initialize.Int32(0o600),
+			Mode: new(int32(0o600)),
 		},
 	}
 }
@@ -123,7 +130,7 @@ func repositoryServerCertificates() []corev1.KeyToPath {
 			// pgBackRest requires that certificate keys not be readable by any
 			// other user.
 			// - https://github.com/pgbackrest/pgbackrest/blob/release/2.38/src/common/io/tls/common.c#L128
-			Mode: initialize.Int32(0o600),
+			Mode: new(int32(0o600)),
 		},
 	}
 }

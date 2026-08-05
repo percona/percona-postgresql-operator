@@ -14,7 +14,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -64,6 +64,50 @@ func PGTDEVolumeMount() corev1.VolumeMount {
 	}
 }
 
+// PGTDEVolume returns the projected volume for pg_tde Vault secrets (token and optional CA cert).
+func PGTDEVolume(vault *v1beta1.PGTDEVaultSpec) corev1.Volume {
+	volume := corev1.Volume{
+		Name: naming.PGTDEVolume,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: new(int32(0o600)),
+				Sources: []corev1.VolumeProjection{
+					{Secret: &corev1.SecretProjection{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: vault.TokenSecret.Name,
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  vault.TokenSecret.Key,
+								Path: vault.TokenSecret.Key,
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	if vault.HasCA() {
+		volume.Projected.Sources = append(
+			volume.Projected.Sources, corev1.VolumeProjection{
+				Secret: &corev1.SecretProjection{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: vault.CASecret.Name,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  vault.CASecret.Key,
+							Path: vault.CASecret.Key,
+						},
+					},
+				},
+			})
+	}
+
+	return volume
+}
+
 // InstancePod initializes outInstancePod with the database container and the
 // volumes needed by PostgreSQL.
 func InstancePod(ctx context.Context,
@@ -86,7 +130,7 @@ func InstancePod(ctx context.Context,
 				// PostgreSQL expects client certificate keys to not be readable
 				// by any other user.
 				// - https://www.postgresql.org/docs/current/libpq-ssl.html
-				DefaultMode: initialize.Int32(0o600),
+				DefaultMode: new(int32(0o600)),
 				Sources: []corev1.VolumeProjection{
 					{Secret: inClusterCertificates},
 					{Secret: inClientCertificates},
@@ -251,49 +295,7 @@ func InstancePod(ctx context.Context,
 		downwardAPIVolume,
 	}
 	if vault := inCluster.Spec.Extensions.PGTDE.Vault; vault != nil {
-		pgTDETokenSecret := &corev1.SecretProjection{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: vault.TokenSecret.Name,
-			},
-			Items: []corev1.KeyToPath{
-				{
-					Key:  vault.TokenSecret.Key,
-					Path: vault.TokenSecret.Key,
-				},
-			},
-		}
-
-		pgTDEVolume := corev1.Volume{
-			Name: pgTDEVolumeMount.Name,
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					DefaultMode: initialize.Int32(0o600),
-					Sources: []corev1.VolumeProjection{
-						{Secret: pgTDETokenSecret},
-					},
-				},
-			},
-		}
-
-		if vault.CASecret.Name != "" {
-			pgTDECASecret := &corev1.SecretProjection{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: vault.CASecret.Name,
-				},
-				Items: []corev1.KeyToPath{
-					{
-						Key:  vault.CASecret.Key,
-						Path: vault.CASecret.Key,
-					},
-				},
-			}
-			pgTDEVolume.Projected.Sources = append(
-				pgTDEVolume.Projected.Sources, corev1.VolumeProjection{
-					Secret: pgTDECASecret,
-				})
-		}
-
-		outInstancePod.Volumes = append(outInstancePod.Volumes, pgTDEVolume)
+		outInstancePod.Volumes = append(outInstancePod.Volumes, PGTDEVolume(vault))
 	}
 
 	if HugePages2MiRequested(inCluster) {
@@ -366,6 +368,24 @@ func InstancePod(ctx context.Context,
 		outInstancePod.Volumes = append(outInstancePod.Volumes, walVolume)
 	}
 
+	// K8SPG-440: mount user-defined extra volumes into the PostgreSQL container.
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		for _, extraVolume := range inInstanceSpec.ExtraVolumes {
+			outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
+				Name:         extraVolume.Name,
+				VolumeSource: extraVolume.VolumeSource,
+			})
+			for _, mount := range extraVolume.Mounts {
+				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+					Name:      extraVolume.Name,
+					MountPath: mount.MountPath,
+					SubPath:   mount.SubPath,
+					ReadOnly:  mount.ReadOnly,
+				})
+			}
+		}
+	}
+
 	outInstancePod.Containers = []corev1.Container{container, reloader}
 
 	// If the InstanceSidecars feature gate is enabled and instance sidecars are
@@ -403,7 +423,7 @@ func PodSecurityContext(cluster *v1beta1.PostgresCluster) *corev1.PodSecurityCon
 	// - https://docs.k8s.io/tasks/configure-pod-container/security-context/
 	// - https://docs.openshift.com/container-platform/4.8/authentication/managing-security-context-constraints.html
 	if cluster.Spec.OpenShift == nil || !*cluster.Spec.OpenShift {
-		podSecurityContext.FSGroup = initialize.Int64(26)
+		podSecurityContext.FSGroup = new(int64(26))
 	}
 
 	return podSecurityContext

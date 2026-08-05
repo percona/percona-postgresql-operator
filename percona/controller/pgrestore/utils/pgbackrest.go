@@ -10,7 +10,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type PGBackRestRestore struct {
@@ -62,8 +62,16 @@ func (r *PGBackRestRestore) Start(ctx context.Context) error {
 			PostgresClusterDataSource: &v1beta1.PostgresClusterDataSource{},
 		}
 	}
+	if r.pgCluster.Spec.Backups.PGBackRest.Restore.PostgresClusterDataSource == nil {
+		r.pgCluster.Spec.Backups.PGBackRest.Restore.PostgresClusterDataSource = &v1beta1.PostgresClusterDataSource{}
+	}
+	if r.pgCluster.Spec.Backups.PGBackRest.Restore.Tolerations == nil {
+		if jobs := r.pgCluster.Spec.Backups.PGBackRest.Jobs; jobs != nil {
+			r.pgCluster.Spec.Backups.PGBackRest.Restore.Tolerations = jobs.Tolerations
+		}
+	}
 
-	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(true)
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = new(true)
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.RepoName = ptr.Deref(r.pgRestore.Spec.RepoName, "")
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Options = r.pgRestore.Spec.Options
 	r.pgCluster.Spec.Backups.PGBackRest.Restore.Env = r.pgRestore.Spec.ContainerOptions.Env
@@ -89,7 +97,7 @@ func (r *PGBackRestRestore) DisableRestore(ctx context.Context) error {
 		}
 	}
 
-	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = ptr.To(false)
+	r.pgCluster.Spec.Backups.PGBackRest.Restore.Enabled = new(false)
 	delete(r.pgCluster.Annotations, naming.PGBackRestRestore)
 
 	if err := r.Patch(ctx, r.pgCluster, client.MergeFrom(orig)); err != nil {

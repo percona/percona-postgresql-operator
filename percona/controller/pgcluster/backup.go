@@ -2,6 +2,7 @@ package pgcluster
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -71,12 +72,21 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 
 		readyPod, err := controller.GetReadyInstancePod(ctx, r.Client, cr.Name, cr.Namespace)
 		if err != nil {
-			return errors.Wrap(err, "get ready instance pod")
+			log.Info("No ready instance pod found, skipping backup cleanup", "repo", repo.Name, "reason", err.Error())
+			continue
 		}
 		info, err = pgbackrest.GetInfo(ctx, readyPod, repo.Name)
 		if err != nil {
 			if errors.Is(err, pgbackrest.ErrNoValidBackups) {
 				log.Info("There are no info about backups in the pgbackrest", "repo", repo.Name)
+				continue
+			}
+			if errors.Is(err, pgbackrest.ErrStanzaNotCreated) {
+				log.Info("pgBackRest stanza not yet created, skipping backup cleanup", "repo", repo.Name)
+				continue
+			}
+			if strings.Contains(err.Error(), "container not found") {
+				log.Info("Container not ready, skipping backup cleanup", "repo", repo.Name, "reason", err.Error())
 				continue
 			}
 			return errors.Wrap(err, "get pgBackRest info")
@@ -115,6 +125,7 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 				}); err != nil {
 					return errors.Wrapf(err, "delete job %s/%s", job.Name, job.Namespace)
 				}
+
 			}
 			if err := r.Client.Delete(ctx, &pgBackup); err != nil {
 				return errors.Wrapf(err, "delete backup %s/%s", pgBackup.Name, pgBackup.Namespace)
@@ -149,6 +160,28 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 
 	if pb == nil {
 		if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupManual) {
+			// A completed Job should normally have been fully cleaned up by the
+			// PerconaPGBackup `delete-backup` finalizer. If it was not, recover here
+			// and finish the missing cleanup.
+			if (controller.JobCompleted(&job) || controller.JobFailed(&job)) &&
+				controllerutil.ContainsFinalizer(&job, pNaming.FinalizerKeepJob) {
+				if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					j := new(batchv1.Job)
+					if err := cl.Get(ctx, client.ObjectKeyFromObject(&job), j); err != nil {
+						return errors.Wrap(err, "get job")
+					}
+
+					controllerutil.RemoveFinalizer(j, pNaming.FinalizerKeepJob)
+					for k := range naming.PGBackRestLabels(cr.Name) {
+						delete(j.Labels, k)
+					}
+
+					return cl.Update(ctx, j)
+				}); err != nil {
+					return errors.Wrap(err, "update backup job labels and finalizers")
+				}
+			}
+
 			// we shouldn't create pg-backup for manual backup jobs and should wait until it's pg-backup will have `.status.jobName`
 			return nil
 		}
@@ -167,7 +200,7 @@ func reconcileBackupJob(ctx context.Context, cl client.Client, cr *v2.PerconaPGC
 			},
 			Spec: v2.PerconaPGBackupSpec{
 				PGCluster: cr.Name,
-				RepoName:  ptr.To(repoName),
+				RepoName:  new(repoName),
 			},
 		}
 		if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.Metadata != nil {
@@ -208,7 +241,6 @@ func findPGBackup(ctx context.Context, cl client.Reader, cr *v2.PerconaPGCluster
 	}
 
 	for _, pb := range pbList {
-		pb := pb
 		if pb.GetAnnotations()[pNaming.AnnotationPGBackrestBackupJobName] == job.Name || pb.Status.JobName == job.Name {
 			return &pb, nil
 		}

@@ -8,7 +8,10 @@ commands:
 
       source ../../functions
 
+      cr_ver=2.8.2
+
       get_cr \
         | yq eval '
-            .spec.crVersion="2.7.0"' - \
+            .spec.initContainer.image = "docker.io/percona/percona-postgresql-operator:'${cr_ver}'" |
+            .spec.crVersion="'${cr_ver}'"' - \
         | kubectl -n "${NAMESPACE}" apply -f -

@@ -24,7 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // If pgMonitor is enabled the pgMonitor sidecar(s) have been added to the
@@ -108,7 +108,7 @@ func (r *Reconciler) reconcilePGMonitorExporter(ctx context.Context,
 		}
 	}
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log message from pgmonitor package about executing SQL.
 		// Nothing is being "executed" yet.
 		return action(logging.NewContext(ctx, logging.Discard()), func(

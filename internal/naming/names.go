@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -156,9 +156,6 @@ const (
 	// PGBackRestRestoreContainerName is the name assigned to the container used to run pgBackRest
 	// restores
 	PGBackRestRestoreContainerName = "pgbackrest-restore"
-
-	// PGBackRestRepoName is the name used for a pgbackrest repository
-	PGBackRestRepoName = "%s-pgbackrest-repo-%s"
 
 	// PGBackRestPGDataLogPath is the pgBackRest default log path configuration used by the
 	// PostgreSQL instance.
@@ -335,7 +332,8 @@ func InstanceCertificates(instance metav1.Object) metav1.ObjectMeta {
 // InstanceSet returns the ObjectMeta necessary to lookup the objects
 // associated with a single instance set. Includes PodDisruptionBudgets
 func InstanceSet(cluster *v1beta1.PostgresCluster,
-	set *v1beta1.PostgresInstanceSetSpec) metav1.ObjectMeta {
+	set *v1beta1.PostgresInstanceSetSpec,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.Name + "-set-" + set.Name,
 		Namespace: cluster.Namespace,
@@ -515,7 +513,8 @@ func PGBackRestRBAC(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 
 // PGBackRestRepoVolume returns the ObjectMeta for a pgBackRest repository volume
 func PGBackRestRepoVolume(cluster *v1beta1.PostgresCluster,
-	repoName string) metav1.ObjectMeta {
+	repoName string,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      fmt.Sprintf("%s-%s", cluster.GetName(), repoName),
 		Namespace: cluster.GetNamespace(),
@@ -546,6 +545,24 @@ func PGBackRestSSHSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 func PGBackRestSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      cluster.GetName() + "-pgbackrest",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestClientCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest client TLS certificate.
+func PGBackRestClientCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-client-tls",
+		Namespace: cluster.GetNamespace(),
+	}
+}
+
+// PGBackRestRepoCertSecret returns the ObjectMeta for the cert-manager-managed
+// Secret containing the pgBackRest repository host TLS certificate.
+func PGBackRestRepoCertSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      cluster.GetName() + "-pgbackrest-repo-tls",
 		Namespace: cluster.GetNamespace(),
 	}
 }
@@ -651,5 +668,20 @@ func TLSIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name + "-tls-issuer",
+	}
+}
+
+// ClusterCAIssuer returns the ObjectMeta for the cluster-scoped CA ClusterIssuer used by cert-manager.
+func ClusterCAIssuer(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name: cluster.Spec.TLS.IssuerConf.Name + "-ca-issuer",
+	}
+}
+
+// ClusterCACertSecret returns the ObjectMeta for the cluster-scoped CA Secret in cert-manager's namespace.
+func ClusterCACertSecret(cluster *v1beta1.PostgresCluster, certManagerNamespace string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: certManagerNamespace,
+		Name:      cluster.Spec.TLS.IssuerConf.Name + "-ca-cert",
 	}
 }

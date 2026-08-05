@@ -20,11 +20,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var testTeamId = "5678"
@@ -558,8 +557,8 @@ func TestHandleUpgradeHA(t *testing.T) {
 	ns := setupNamespace(t, tClient).Name
 	clusterInBridgeWithHaDisabled := testClusterApiResource()
 	clusterInBridgeWithHaEnabled := testClusterApiResource()
-	clusterInBridgeWithHaEnabled.ID = "2345"                  // originally "1234"
-	clusterInBridgeWithHaEnabled.IsHA = initialize.Bool(true) // originally "false"
+	clusterInBridgeWithHaEnabled.ID = "2345"      // originally "1234"
+	clusterInBridgeWithHaEnabled.IsHA = new(true) // originally "false"
 
 	reconciler := &CrunchyBridgeClusterReconciler{
 		Client: tClient,

@@ -10,7 +10,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: custom-extensions
       controller: true
@@ -22,6 +22,7 @@ spec:
       - command:
         - /usr/local/bin/init-entrypoint.sh
       - name: postgres-startup
+      - name: nss-wrapper-init-logcollector
       - command:
         - /opt/crunchy/bin/relocate-extensions.sh
       - command:

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 
@@ -18,7 +19,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="configmaps",verbs={get}
@@ -82,9 +83,7 @@ func generateConfig(pgadmin *v1beta1.PGAdmin) (string, error) {
 	}
 
 	// Copy any specified settings over the defaults.
-	for k, v := range pgadmin.Spec.Config.Settings {
-		settings[k] = v
-	}
+	maps.Copy(settings, pgadmin.Spec.Config.Settings)
 
 	// Write mandatory settings over any specified ones.
 	// SERVER_MODE must always be enabled when running on a webserver.
@@ -187,9 +186,7 @@ func generateGunicornConfig(pgadmin *v1beta1.PGAdmin) (string, error) {
 	}
 
 	// Copy any specified settings over the defaults.
-	for k, v := range pgadmin.Spec.Config.Gunicorn {
-		settings[k] = v
-	}
+	maps.Copy(settings, pgadmin.Spec.Config.Gunicorn)
 
 	// Write mandatory settings over any specified ones.
 	// - https://docs.gunicorn.org/en/latest/settings.html#workers

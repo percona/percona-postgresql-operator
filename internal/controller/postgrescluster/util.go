@@ -6,18 +6,17 @@ package postgrescluster
 
 import (
 	"fmt"
-	"hash/fnv"
-	"io"
 
 	gover "github.com/hashicorp/go-version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/rand"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var tmpDirSizeLimit = resource.MustParse("16Mi")
@@ -313,14 +312,11 @@ func jobCompleted(job *batchv1.Job) bool {
 	return false
 }
 
-// safeHash32 runs content and returns a short alphanumeric string that
-// represents everything written to w. The string is unlikely to have bad words
-// and is safe to store in the Kubernetes API. This is the same algorithm used
-// by ControllerRevision's "controller.kubernetes.io/hash".
-func safeHash32(content func(w io.Writer) error) (string, error) {
-	hash := fnv.New32()
-	if err := content(hash); err != nil {
-		return "", err
+func isStatusConditionTrue(conditions []metav1.Condition, conditionType string) bool {
+	cond := meta.FindStatusCondition(conditions, conditionType)
+	if cond == nil {
+		return false
 	}
-	return rand.SafeEncodeString(fmt.Sprint(hash.Sum32())), nil
+
+	return cond.Status == metav1.ConditionTrue
 }

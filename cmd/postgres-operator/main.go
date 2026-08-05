@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"os"
 	goruntime "runtime"
 	"strconv"
@@ -34,7 +35,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/standalone_pgadmin"
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/upgradecheck"
@@ -48,7 +48,7 @@ import (
 	perconaRuntime "github.com/percona/percona-postgresql-operator/v2/percona/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/percona/utils/registry"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var (
@@ -125,15 +125,6 @@ func main() {
 	)
 	assertNoError(err)
 
-	// Add Percona custom resource types to scheme
-	assertNoError(v2.AddToScheme(mgr.GetScheme()))
-
-	assertNoError(volumesnapshotv1.AddToScheme(mgr.GetScheme()))
-
-	// K8SPG-552
-	// Add Scheme for cert-manager resources like Issuer and Certificate.
-	assertNoError(certmanagerscheme.AddToScheme(mgr.GetScheme()))
-
 	// add all PostgreSQL Operator controllers to the runtime manager
 	err = addControllersToManager(ctx, mgr)
 	assertNoError(err)
@@ -146,7 +137,7 @@ func main() {
 		log.Info("upgrade checking enabled")
 		// get the URL for the check for upgrades endpoint if set in the env
 		assertNoError(upgradecheck.ManagedScheduler(mgr,
-			isOpenshift(ctx, mgr.GetConfig()), os.Getenv("CHECK_FOR_UPGRADES_URL"), versionString, nil))
+			false, os.Getenv("CHECK_FOR_UPGRADES_URL"), versionString, nil))
 	}
 
 	assertNoError(mgr.Start(ctx))
@@ -158,13 +149,16 @@ func main() {
 func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	os.Setenv("REGISTRATION_REQUIRED", "false")
 
+	platform := detectPlatform(ctx, mgr.GetConfig())
+	openShift := platform == "openshift"
+
 	r := &postgrescluster.Reconciler{
 		Client:              mgr.GetClient(),
 		Scheme:              mgr.GetScheme(),
 		Owner:               postgrescluster.ControllerName,
 		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
 		Tracer:              otel.Tracer(postgrescluster.ControllerName),
-		IsOpenShift:         isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift:         openShift,
 		CertManagerCtrlFunc: certmanager.NewController,
 		RestConfig:          mgr.GetConfig(),
 	}
@@ -175,12 +169,29 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	if cm.Controller() == nil {
 		return errors.New("missing controller in manager")
 	}
+	r.Controller = cm.Controller()
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&v2.PerconaPGCluster{},
 		v2.IndexFieldEnvFromSecrets,
 		v2.EnvFromSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGCluster{},
+		v2.IndexFieldPGBouncerUserSecrets,
+		v2.PGBouncerUserSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGCluster{},
+		v2.IndexFieldLogRotateExtraConfig,
+		v2.LogRotateExtraConfigIndexerFunc,
 	); err != nil {
 		return err
 	}
@@ -193,10 +204,10 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Owner:                pgcluster.PGClusterControllerName,
 		Recorder:             mgr.GetEventRecorderFor(pgcluster.PGClusterControllerName),
 		Tracer:               otel.Tracer(pgcluster.PGClusterControllerName),
-		Platform:             detectPlatform(ctx, mgr.GetConfig()),
+		Platform:             platform,
 		KubeVersion:          getServerVersion(ctx, mgr.GetConfig()),
 		CrunchyController:    cm.Controller(),
-		IsOpenShift:          isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift:          openShift,
 		Cron:                 pgcluster.NewCronRegistry(),
 		ExternalChan:         externalEvents,
 		StopExternalWatchers: stopChan,
@@ -272,7 +283,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 		Client:      mgr.GetClient(),
 		Owner:       "pgadmin-controller",
 		Recorder:    mgr.GetEventRecorderFor(naming.ControllerPGAdmin),
-		IsOpenShift: isOpenshift(ctx, mgr.GetConfig()),
+		IsOpenShift: openShift,
 	}
 
 	if err := pgAdminReconciler.SetupWithManager(mgr); err != nil {
@@ -288,7 +299,7 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 	log := logging.FromContext(ctx)
 
 	options := runtime.Options{}
-	options.Cache.SyncPeriod = initialize.Pointer(time.Hour)
+	options.Cache.SyncPeriod = new(time.Hour)
 
 	options.HealthProbeBindAddress = ":8081"
 
@@ -355,86 +366,109 @@ func initManager(ctx context.Context) (runtime.Options, error) {
 		}
 	}
 
+	// add scheme
+	scheme := runtime.Scheme
+	assertNoError(v2.AddToScheme(scheme))
+	assertNoError(volumesnapshotv1.AddToScheme(scheme))
+	assertNoError(certmanagerscheme.AddToScheme(scheme))
+	options.Scheme = scheme
+
 	return options, nil
 }
 
-func isGKE(ctx context.Context, cfg *rest.Config) bool {
+// hasAPIGroup returns true if the cluster exposes the given API group name.
+func hasAPIGroup(ctx context.Context, cfg *rest.Config, groupName string) bool {
 	log := logging.FromContext(ctx)
-
-	const groupName, kind = "cloud.google.com", "BackendConfig"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
-		assertNoError(err)
+		log.V(1).Info("platform detection: could not create discovery client", "error", err.Error())
+		return false
 	}
-	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected GKE environment")
-					return true
-				}
-			}
-		}
+	ok, err := k8s.GroupExists(dc, groupName)
+	if err != nil {
+		log.V(1).Info("platform detection: could not list API groups", "error", err.Error())
+		return false
 	}
+	return ok
+}
 
+type platformProbe struct {
+	name      string
+	label     string
+	apiGroups []string
+	hosts     []string
+	custom    func(ctx context.Context, cfg *rest.Config) bool
+}
+
+func (p platformProbe) detect(ctx context.Context, cfg *rest.Config) bool {
+	if p.custom != nil {
+		return p.custom(ctx, cfg)
+	}
+	for _, g := range p.apiGroups {
+		if hasAPIGroup(ctx, cfg, g) {
+			return true
+		}
+	}
+	for _, h := range p.hosts {
+		if strings.Contains(cfg.Host, h) {
+			return true
+		}
+	}
 	return false
 }
 
-func isEKS(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
+var platformProbes = []platformProbe{
+	{name: "openshift", label: "Openshift", apiGroups: []string{"security.openshift.io"}},
+	{name: "gke", label: "GKE", apiGroups: []string{"networking.gke.io"}},
+	// crd.k8s.amazonaws.com (VPC CNI) and metrics.eks.amazonaws.com are independent EKS signals.
+	{name: "eks", label: "EKS", apiGroups: []string{"crd.k8s.amazonaws.com", "metrics.eks.amazonaws.com"}},
+	// AKS exposes no unique API groups; inspect the API server TLS cert SAN instead.
+	{name: "aks", label: "AKS", custom: detectAKS},
+	{name: "doks", label: "DOKS", apiGroups: []string{"dataplane-operator.doks.digitalocean.com"}},
+	{name: "oke", label: "OKE", apiGroups: []string{"oci.oraclecloud.com"}, hosts: []string{".oraclecloud.com"}},
+	{name: "ack", label: "ACK", apiGroups: []string{"alibabacloud.com"}, hosts: []string{".aliyuncs.com"}},
+	// kommander.mesosphere.io is the legacy D2iQ/Konvoy group name for NKP.
+	{name: "nkp", label: "NKP", apiGroups: []string{"nkp.nutanix.com", "kommander.mesosphere.io"}},
+	{name: "platform9", label: "Platform9", hosts: []string{".platform9.io", ".platform9.net"}},
+	{name: "tanzu", label: "Tanzu", apiGroups: []string{"run.tanzu.vmware.com"}},
+	{name: "rancher", label: "Rancher", apiGroups: []string{"management.cattle.io"}},
+}
 
-	const groupName, kind = "vpcresources.k8s.aws", "SecurityGroupPolicy"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
+func detectAKS(ctx context.Context, cfg *rest.Config) bool {
+	tlsCfg, err := rest.TLSConfigFor(cfg)
 	if err != nil {
-		assertNoError(err)
+		logging.FromContext(ctx).V(1).Info("platform detection: could not build TLS config", "error", err.Error())
+		return false
 	}
-	for _, g := range groups.Groups {
-		if g.Name != groupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == kind {
-					log.Info("detected EKS environment")
-					return true
-				}
+	host := strings.TrimPrefix(cfg.Host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	netConn, err := (&tls.Dialer{Config: tlsCfg}).DialContext(dialCtx, "tcp", host)
+	if err != nil {
+		logging.FromContext(ctx).V(1).Info("platform detection: could not dial API server", "error", err.Error())
+		return false
+	}
+	defer netConn.Close()
+	conn := netConn.(*tls.Conn)
+	for _, cert := range conn.ConnectionState().PeerCertificates {
+		for _, san := range cert.DNSNames {
+			if strings.HasSuffix(san, ".azmk8s.io") {
+				return true
 			}
 		}
 	}
-
 	return false
 }
 
 func detectPlatform(ctx context.Context, cfg *rest.Config) string {
-	switch {
-	case isOpenshift(ctx, cfg):
-		return "openshift"
-	case isGKE(ctx, cfg):
-		return "gke"
-	case isEKS(ctx, cfg):
-		return "eks"
-	default:
-		return "unknown"
+	for _, probe := range platformProbes {
+		if probe.detect(ctx, cfg) {
+			logging.FromContext(ctx).Info("detected " + probe.label + " environment")
+			return probe.name
+		}
 	}
+	return "unknown"
 }
 
 // getServerVersion returns the stringified server version (i.e., the same info `kubectl version`
@@ -495,38 +529,6 @@ func getLogLevel() zapcore.LevelEnabler {
 	}
 }
 
-func isOpenshift(ctx context.Context, cfg *rest.Config) bool {
-	log := logging.FromContext(ctx)
-
-	const sccGroupName, sccKind = "security.openshift.io", "SecurityContextConstraints"
-
-	client, err := discovery.NewDiscoveryClientForConfig(cfg)
-	assertNoError(err)
-
-	groups, err := client.ServerGroups()
-	if err != nil {
-		assertNoError(err)
-	}
-	for _, g := range groups.Groups {
-		if g.Name != sccGroupName {
-			continue
-		}
-		for _, v := range g.Versions {
-			resourceList, err := client.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil {
-				assertNoError(err)
-			}
-			for _, r := range resourceList.APIResources {
-				if r.Kind == sccKind {
-					log.Info("detected Openshift environment")
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
 
 type envConfig struct {
 	LeaderElection          bool   `default:"true" envconfig:"PGO_CONTROLLER_LEADER_ELECTION_ENABLED"`

@@ -1,4 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl create serviceaccount openldap-tls \
+        --namespace "${NAMESPACE}"
+
+      if [[ $(detect_k8s_platform) == "openshift" ]]; then
+        oc adm policy add-scc-to-user anyuid -z openldap-tls -n "${NAMESPACE}"
+        sleep 5
+      fi
 apply:
   - files/openldap-tls.yaml

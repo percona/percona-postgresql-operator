@@ -13,7 +13,7 @@ import (
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestCalculateConfigHashes(t *testing.T) {
@@ -80,7 +80,7 @@ func TestCalculateConfigHashes(t *testing.T) {
 	assert.Equal(t, preCalculatedRepo3S3Hash, configHashMap["repo3"])
 
 	// call CalculateConfigHashes multiple times to ensure consistent results
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		hashMap, hash, err := CalculateConfigHashes(postgresCluster)
 		assert.NilError(t, err)
 		assert.Equal(t, configHash, hash)
@@ -92,7 +92,7 @@ func TestCalculateConfigHashes(t *testing.T) {
 	// shuffle the repo slice in order to ensure the same result is returned regardless of the
 	// order of the repos slice
 	shuffleCluster := postgresCluster.DeepCopy()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		repos := shuffleCluster.Spec.Backups.PGBackRest.Repos
 		rand.Shuffle(len(repos), func(i, j int) {
 			repos[i], repos[j] = repos[j], repos[i]
@@ -103,7 +103,7 @@ func TestCalculateConfigHashes(t *testing.T) {
 	}
 
 	// now modify some values in each repo and confirm we see a different result
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		modCluster := postgresCluster.DeepCopy()
 		switch i {
 		case 0:

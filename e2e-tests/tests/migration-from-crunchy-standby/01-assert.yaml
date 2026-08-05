@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 480
+commands:
+  - script: |-
+      set -o errexit
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      # Wait for the primary pod to be ready
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/data=postgres \
+        -n "${CRUNCHY_NS}" \
+        --for=condition=Ready \
+        --timeout=420s
+
+      # Wait for pgBouncer to be ready
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source,postgres-operator.crunchydata.com/role=pgbouncer \
+        -n "${CRUNCHY_NS}" \
+        --for=condition=Ready \
+        --timeout=120s
+
+      # Wait for pgbackrest stanza to be created.
+      # The backup annotation (triggering the full backup) is applied in the
+      # next step only after stanza creation, so we don't wait for a job here.
+      kubectl wait postgrescluster/crunchy-source \
+        -n "${CRUNCHY_NS}" \
+        --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
+        --timeout=300s

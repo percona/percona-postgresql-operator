@@ -23,7 +23,7 @@ func PodSecurityContext() *corev1.PodSecurityContext {
 func RestrictedSecurityContext(enableSeccompProfile bool) *corev1.SecurityContext {
 	secContext := &corev1.SecurityContext{
 		// Prevent any container processes from gaining privileges.
-		AllowPrivilegeEscalation: Bool(false),
+		AllowPrivilegeEscalation: new(false),
 
 		// Drop any capabilities granted by the container runtime.
 		// This must be uppercase to pass Pod Security Admission.
@@ -33,13 +33,13 @@ func RestrictedSecurityContext(enableSeccompProfile bool) *corev1.SecurityContex
 		},
 
 		// Processes in privileged containers are essentially root on the host.
-		Privileged: Bool(false),
+		Privileged: new(false),
 
 		// Limit filesystem changes to volumes that are mounted read-write.
-		ReadOnlyRootFilesystem: Bool(true),
+		ReadOnlyRootFilesystem: new(true),
 
 		// Fail to start the container if its image runs as UID 0 (root).
-		RunAsNonRoot: Bool(true),
+		RunAsNonRoot: new(true),
 	}
 
 	if enableSeccompProfile {

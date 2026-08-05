@@ -8,7 +8,6 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -35,7 +34,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.Time{}),
+						Time: new(metav1.Time{}),
 					},
 				},
 			},
@@ -46,7 +45,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.NewTime(now.Add(-1 * time.Minute))), // 1mins ago, within deadline
+						Time: new(metav1.NewTime(now.Add(-1 * time.Minute))), // 1mins ago, within deadline
 					},
 				},
 			},
@@ -57,7 +56,7 @@ func TestShouldFailSnapshot(t *testing.T) {
 			volumeSnapshot: &volumesnapshotv1.VolumeSnapshot{
 				Status: &volumesnapshotv1.VolumeSnapshotStatus{
 					Error: &volumesnapshotv1.VolumeSnapshotError{
-						Time: ptr.To(metav1.NewTime(now.Add(-10 * time.Minute))), // 10 minutes ago (past 5min deadline)
+						Time: new(metav1.NewTime(now.Add(-10 * time.Minute))), // 10 minutes ago (past 5min deadline)
 					},
 				},
 			},
@@ -176,13 +175,13 @@ func TestReconcileDataSnapshot(t *testing.T) {
 		existingVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vsName, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(pvcName),
+					PersistentVolumeClaimName: new(pvcName),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
-				ReadyToUse: ptr.To(true),
+				ReadyToUse: new(true),
 			},
 		}
 
@@ -282,13 +281,13 @@ func TestReconcileWALSnapshot(t *testing.T) {
 		existingVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vsName, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(walPVCName),
+					PersistentVolumeClaimName: new(walPVCName),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
-				ReadyToUse: ptr.To(true),
+				ReadyToUse: new(true),
 			},
 		}
 		backup := &v2.PerconaPGBackup{
@@ -408,22 +407,22 @@ func TestReconcileTablespaceSnapshot(t *testing.T) {
 		existingVS1 := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vs1Name, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(ts1PVC),
+					PersistentVolumeClaimName: new(ts1PVC),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		existingVS2 := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{Name: vs2Name, Namespace: ns},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To(ts2PVC),
+					PersistentVolumeClaimName: new(ts2PVC),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		backup := &v2.PerconaPGBackup{
 			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns, UID: "backup-uid"},
@@ -555,12 +554,12 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("data-pvc"),
+					PersistentVolumeClaimName: new("data-pvc"),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 		walVS := &volumesnapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
@@ -568,12 +567,12 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("wal-pvc"),
+					PersistentVolumeClaimName: new("wal-pvc"),
 				},
 			},
-			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: ptr.To(true)},
+			Status: &volumesnapshotv1.VolumeSnapshotStatus{ReadyToUse: new(true)},
 		}
 
 		cl := fake.NewClientBuilder().
@@ -616,15 +615,15 @@ func TestReconcileRunning(t *testing.T) {
 				Namespace: ns,
 			},
 			Spec: volumesnapshotv1.VolumeSnapshotSpec{
-				VolumeSnapshotClassName: ptr.To(snapshotClassName),
+				VolumeSnapshotClassName: new(snapshotClassName),
 				Source: volumesnapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: ptr.To("data-pvc"),
+					PersistentVolumeClaimName: new("data-pvc"),
 				},
 			},
 			Status: &volumesnapshotv1.VolumeSnapshotStatus{
 				Error: &volumesnapshotv1.VolumeSnapshotError{
-					Time:    ptr.To(metav1.NewTime(time.Now().Add(-10 * time.Minute))),
-					Message: ptr.To("disk full"),
+					Time:    new(metav1.NewTime(time.Now().Add(-10 * time.Minute))),
+					Message: new("disk full"),
 				},
 			},
 		}
@@ -726,271 +725,6 @@ func TestGenerateSnapshotIntent(t *testing.T) {
 			assert.Equal(t, "PerconaPGBackup", vs.OwnerReferences[0].Kind)
 		})
 	}
-}
-
-func TestTryAcquireLease(t *testing.T) {
-	ctx := t.Context()
-	ns := "test-ns"
-	clusterName := "my-cluster"
-
-	s := scheme.Scheme
-	require.NoError(t, corev1.AddToScheme(s))
-	require.NoError(t, v2.AddToScheme(s))
-	require.NoError(t, volumesnapshotv1.AddToScheme(s))
-	require.NoError(t, coordinationv1.AddToScheme(s))
-
-	cluster := &v2.PerconaPGCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: ns},
-	}
-	noopExec := &mockSnapshotExecutor{}
-
-	t.Run("acquires lease when no lease exists", func(t *testing.T) {
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-
-		lease := &coordinationv1.Lease{}
-		require.NoError(t, cl.Get(ctx, client.ObjectKey{
-			Name:      "pg-" + clusterName + "-backup-lock",
-			Namespace: ns,
-		}, lease))
-		require.NotNil(t, lease.Spec.HolderIdentity)
-		assert.Equal(t, "backup-1|uid-1", *lease.Spec.HolderIdentity)
-	})
-
-	t.Run("returns false when lease is held by another active backup", func(t *testing.T) {
-		otherBackup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "other-backup", Namespace: ns, UID: "uid-other"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status: v2.PerconaPGBackupStatus{
-				State: v2.BackupRunning,
-			},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup|uid-other"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, otherBackup, existingLease).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.False(t, acquired)
-	})
-
-	t.Run("returns false when backup has finalizers", func(t *testing.T) {
-		otherBackup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "other-backup",
-				Namespace:  ns,
-				UID:        "uid-other",
-				Finalizers: []string{pNaming.FinalizerSnapshotInProgress},
-			},
-			Spec: v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status: v2.PerconaPGBackupStatus{
-				State: v2.BackupFailed,
-			},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("other-backup|uid-other"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, otherBackup, existingLease).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.False(t, acquired)
-	})
-
-	t.Run("acquires stale lease when holder backup is not found", func(t *testing.T) {
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("deleted-backup|uid-deleted"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, existingLease).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-
-		lease := &coordinationv1.Lease{}
-		require.NoError(t, cl.Get(ctx, client.ObjectKey{
-			Name:      "pg-" + clusterName + "-backup-lock",
-			Namespace: ns,
-		}, lease))
-		require.NotNil(t, lease.Spec.HolderIdentity)
-		assert.Equal(t, "backup-1|uid-1", *lease.Spec.HolderIdentity)
-	})
-
-	t.Run("acquires stale lease when holder backup has succeeded", func(t *testing.T) {
-		completedBackup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "completed-backup", Namespace: ns, UID: "uid-completed"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status: v2.PerconaPGBackupStatus{
-				State: v2.BackupSucceeded,
-			},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("completed-backup|uid-completed"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, completedBackup, existingLease).
-			WithStatusSubresource(completedBackup).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-	})
-
-	t.Run("acquires stale lease when holder backup has failed", func(t *testing.T) {
-		failedBackup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "failed-backup", Namespace: ns, UID: "uid-failed"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status: v2.PerconaPGBackupStatus{
-				State: v2.BackupFailed,
-			},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("failed-backup|uid-failed"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, failedBackup, existingLease).
-			WithStatusSubresource(failedBackup).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-	})
-
-	t.Run("acquires stale lease when holder backup is found but has a different UID", func(t *testing.T) {
-		existingBackup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-abc"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-			Status:     v2.PerconaPGBackupStatus{},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-xyz"),
-			},
-		}
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-2", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, existingBackup, existingLease).
-			WithStatusSubresource(backup).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-	})
-
-	t.Run("returns true when lease is already held by self", func(t *testing.T) {
-		backup := &v2.PerconaPGBackup{
-			ObjectMeta: metav1.ObjectMeta{Name: "backup-1", Namespace: ns, UID: "uid-1"},
-			Spec:       v2.PerconaPGBackupSpec{PGCluster: clusterName},
-		}
-		existingLease := &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pg-" + clusterName + "-backup-lock",
-				Namespace: ns,
-			},
-			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To("backup-1|uid-1"),
-			},
-		}
-		cl := fake.NewClientBuilder().
-			WithScheme(s).
-			WithObjects(backup, existingLease).
-			Build()
-
-		r := newSnapshotReconciler(cl, logging.Discard(), cluster, backup, noopExec)
-		acquired, err := r.tryAcquireLease(ctx)
-		require.NoError(t, err)
-		assert.True(t, acquired)
-	})
 }
 
 // mockSnapshotExecutor is a no-op snapshotExecutor for tests.

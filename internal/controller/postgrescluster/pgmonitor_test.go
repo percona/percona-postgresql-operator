@@ -21,11 +21,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
+
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func testExporterCollectorsAnnotation(t *testing.T, ctx context.Context, cluster *v1beta1.PostgresCluster, queriesConfig, webConfig *corev1.ConfigMap) {
@@ -86,7 +86,7 @@ func TestAddPGMonitorExporterToInstancePodSpec(t *testing.T) {
 
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Name = "pg1"
-	cluster.Spec.Port = initialize.Int32(5432)
+	cluster.Spec.Port = new(int32(5432))
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 
 	cluster.SetLabels(map[string]string{

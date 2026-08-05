@@ -1,0 +1,57 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      init_temp_dir
+
+      CRUNCHY_NS="${NAMESPACE}-crunchy"
+
+      kubectl create namespace "${CRUNCHY_NS}" || true
+
+      # singleNamespace=true scopes pgo to its own namespace only
+      helm install pgo \
+        oci://registry.developers.crunchydata.com/crunchydata/pgo \
+        --namespace "${CRUNCHY_NS}" \
+        --version "${CPGO_VERSION}" \
+        --set singleNamespace=true \
+        --wait
+
+      # Deploy minio WITH TLS — pgBackRest requires HTTPS; repo1-s3-verify-tls=n skips validation.
+      kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+
+      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+      # Self-signed cert; SAN is irrelevant because verify-tls=n
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/minio.key" \
+        -out "${TEMP_DIR}/minio.crt" \
+        -subj "/CN=minio-service"
+
+      kubectl -n "${NAMESPACE}" create secret generic minio-tls \
+        --from-file=public.crt="${TEMP_DIR}/minio.crt" \
+        --from-file=private.key="${TEMP_DIR}/minio.key"
+
+      deploy_minio minio-service minio-tls
+
+      cat > "${TEMP_DIR}/pgbackrest-minio.ini" << EOF
+      [global]
+      repo1-s3-key=${access_key}
+      repo1-s3-key-secret=${secret_key}
+      EOF
+
+      # Separate secrets: Percona operator (test namespace) and Crunchy (crunchy namespace)
+      kubectl -n "${NAMESPACE}" create secret generic "migration-from-crunchy-pgbackrest-secrets" \
+        --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
+      kubectl -n "${CRUNCHY_NS}" create secret generic "crunchy-pgbackrest-secret" \
+        --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
+
+      deploy_operator
+      deploy_client

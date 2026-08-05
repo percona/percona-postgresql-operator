@@ -1,147 +1,168 @@
-This directory contains the files that are used to install [Crunchy PostgreSQL for Kubernetes][hub-listing],
-which includes PGO, the Postgres Operator from [Crunchy Data][], using [Operator Lifecycle Manager][OLM].
+# OLM Bundle Generation
 
-The integration centers around a [ClusterServiceVersion][olm-csv] [manifest](./bundle.csv.yaml)
-that gets packaged for OperatorHub. Changes there are accepted only if they pass all the [scorecard][]
-tests. Consult the [technical requirements][hub-contrib] when making changes.
+This directory generates and validates OLM bundles for Percona Operator for PostgreSQL.
 
-<!-- Requirements might have changed with https://github.com/operator-framework/community-operators/issues/4159 -->
+The Makefile builds two bundle variants:
 
-[Crunchy Data]: https://www.crunchydata.com
-[hub-contrib]: https://operator-framework.github.io/community-operators/packaging-operator/
-[hub-listing]: https://operatorhub.io/operator/postgresql
-[OLM]: https://github.com/operator-framework/operator-lifecycle-manager
-[olm-csv]: https://github.com/operator-framework/operator-lifecycle-manager/blob/master/doc/design/building-your-csv.md
-[scorecard]: https://sdk.operatorframework.io/docs/testing-operators/scorecard/
+- `community`: package `percona-postgresql-operator`
+- `redhat`: package `percona-postgresql-operator-certified`
 
-[Red Hat Container Certification]: https://redhat-connect.gitbook.io/partner-guide-for-red-hat-openshift-and-container/
-[Red Hat Operator Certification]: https://redhat-connect.gitbook.io/certified-operator-guide/
+## Requirements
 
-<!-- registry.connect.redhat.com/crunchydata/postgres-operator-bundle -->
+Run the commands from this directory:
 
-## Notes
+```sh
+cd installers/olm
+```
 
-### v5 Versions per Repository
-
-Community: https://github.com/k8s-operatorhub/community-operators/tree/main/operators/postgresql
-
-5.0.2
-5.0.3
-5.0.4
-5.0.5
-5.1.0
-
-Community Prod: https://github.com/redhat-openshift-ecosystem/community-operators-prod/tree/main/operators/postgresql
-
-5.0.2
-5.0.3
-5.0.4
-5.0.5
-5.1.0
-
-Certified: https://github.com/redhat-openshift-ecosystem/certified-operators/tree/main/operators/crunchy-postgres-operator
-
-5.0.4
-5.0.5
-5.1.0
-
-Marketplace: https://github.com/redhat-openshift-ecosystem/redhat-marketplace-operators/tree/main/operators/crunchy-postgres-operator-rhmp
-
-5.0.4
-5.0.5
-5.1.0
-
-### Issues Encountered
-
-We hit various issues with 5.1.0 where the 'replaces' name, set in the clusterserviceversion.yaml, didn't match the
-expected names found for all indexes. Previously, we set the 'com.redhat.openshift.versions' annotation to "v4.6-v4.9".
-The goal for this setting was to limit the upper bound of supported versions for a particularly PGO release.
-The problem with this was, at the time of the 5.1.0 release, OCP 4.10 had been just been released. This meant that the
-5.0.5 bundle did not exist in the OCP 4.10 index. The solution presented by Red Hat was to use the 'skips' clause for
-the 5.1.0 release to remedy the immediate problem, but then go back to using an unbounded setting for subsequent
-releases.
-
-For the certified, marketplace and community repositories, this strategy of using 'skips' instead of replaces worked as
-expected. However, for the production community operator bundle, we were seeing a failure that required adding an
-additional 'replaces' value of 5.0.4 in addition to the 5.0.5 'skips' value. While this allowed the PR to merge, it
-seems at odds with the behavior at the other repos.
-
-For more information on the use of 'skips' and 'replaces', please see:
-https://olm.operatorframework.io/docs/concepts/olm-architecture/operator-catalog/creating-an-update-graph/
-
-
-Another version issue encountered was related to our attempt to both support OCP v4.6 (which is an Extended Update
-Support (EUS) release) while also limiting Kubernetes to 1.20+. The issue with this is that OCP 4.6 utilizes k8s 1.19
-and the kube minversion validation was in fact limiting the OCP version as well. Our hope was that those setting would
-be treated independently, but that was unfortunately not the case. The fix for this was to move this kube version to the
-1.19, despite its being released 3rd quarter of 2020 with 1 year of patch support.
-
-Following the lessons learned above, when bumping the Openshift supported version from v4.6 to v4.8, we will similarly
-keep the matching minimum Kubernetes version, i.e. 1.21.
-https://access.redhat.com/solutions/4870701
-
-## Testing
-
-### Setup
+Install the local toolchain used by the Makefile:
 
 ```sh
 make tools
 ```
 
-### Testing
+The Makefile puts `tools/<system>` first in `PATH`, so `generate.sh` uses the expected versions of `jq`, `yq`, `kubectl`, `operator-sdk`, and `opm`.
+
+## Generate Bundles
+
+Generate and validate both bundles:
 
 ```sh
-make bundles validate-bundles
+make bundles VERSION=3.0.0
 ```
 
-Previously, the 'validate_bundle_image' function in validate-bundles.sh ended
-with the following command:
+Generate only the community bundle:
 
 ```sh
-	# Create an index database from the bundle image.
-	"${opm[@]}" index add --bundles="${image}" --generate
-
-	# drwxr-xr-x. 2 user user     22 database
-	# -rw-r--r--. 1 user user 286720 database/index.db
-	# -rw-r--r--. 1 user user    267 index.Dockerfile
+make bundles/community VERSION=3.0.0
 ```
 
-this command was used to generate the updated registry database, but this step
-is no longer required when validating the OLM bundles.
-- https://github.com/operator-framework/operator-registry/blob/master/docs/design/opm-tooling.md#add-1
+Generate only the Red Hat certified bundle:
 
 ```sh
-BUNDLE_DIRECTORY='bundles/community'
-BUNDLE_IMAGE='gcr.io/.../postgres-operator-bundle:latest'
-INDEX_IMAGE='gcr.io/.../postgres-operator-bundle-index:latest'
-NAMESPACE='pgo'
-
-docker build --tag "$BUNDLE_IMAGE" "$BUNDLE_DIRECTORY"
-docker push "$BUNDLE_IMAGE"
-
-opm index add --bundles "$BUNDLE_IMAGE" --tag "$INDEX_IMAGE" --container-tool=docker
-docker push "$INDEX_IMAGE"
-
-./install.sh operator "$BUNDLE_DIRECTORY" "$INDEX_IMAGE" "$NAMESPACE" "$NAMESPACE"
-
-# Cleanup
-operator-sdk cleanup postgresql --namespace="$NAMESPACE"
-kubectl -n "$NAMESPACE" delete operatorgroup olm-operator-group
+make bundles/redhat VERSION=3.0.0
 ```
 
-### Post Bundle Generation
+Generated files are written to:
 
-After generating and testing the OLM bundles, there are two manual steps.
+```text
+bundles/community
+bundles/redhat
+```
 
-1. Update the image SHA values (denoted with '<update_(imagetype)_SHA_value>', required for both the Red Hat 'Certified' and
-'Marketplace' bundles)
-2. Update the 'description.md' file to indicate which OCP versions this release of PGO was tested against.
+## Build And Push Bundle Images
 
-### Troubleshooting
+Build one bundle image:
 
-If, when running `make validate-bundles` you encounter an error similar to
+```sh
+make build VERSION=3.0.0 BUNDLE_DISTRO=community
+make build VERSION=3.0.0 BUNDLE_DISTRO=redhat
+```
 
-`cannot find Containerfile or Dockerfile in context directory: stat /mnt/Dockerfile: permission denied`
+Override the target image when needed:
 
-the target command is likely being blocked by SELinux and you will need to adjust
-your settings accordingly.
+```sh
+make build VERSION=3.0.0 BUNDLE_DISTRO=redhat \
+  BUNDLE_IMG=perconalab/percona-postgresql-operator:certified-bundle-3.0.0
+```
+
+Push the selected `BUNDLE_IMG`:
+
+```sh
+make push VERSION=3.0.0 \
+  BUNDLE_IMG=perconalab/percona-postgresql-operator:certified-bundle-3.0.0
+```
+
+## Validate Bundles
+
+The `bundles/*` targets already run:
+
+```sh
+operator-sdk bundle validate bundles/<distro> --select-optional='suite=operatorframework'
+```
+
+Additional validation targets are available:
+
+```sh
+make validate-bundles
+make validate-community-directory
+make validate-redhat-directory
+make validate-community-image
+make validate-redhat-image
+```
+
+## Useful Variables
+
+Common variables:
+
+```text
+VERSION              Release version. Required.
+OPENSHIFT_VERSIONS   OpenShift range annotation. Default: v4.18-v4.21
+IMAGE                Community operator image.
+REDHAT_OPERATOR_IMAGE Red Hat operator image.
+BUNDLE_DISTRO        Bundle to build: community or redhat.
+BUNDLE_IMG           Bundle image tag used by build/push.
+CONTAINER            Container tool. Default: docker.
+```
+
+Example:
+
+```sh
+make bundles/redhat VERSION=3.0.0 \
+  OPENSHIFT_VERSIONS=v4.18-v4.21 \
+```
+
+## Red Hat Notes
+
+The Red Hat bundle uses `distributions/redhat.sh` as a distribution automation. It sets certified package metadata, related images, digest references, and CSV overrides.
+
+If a Red Hat image digest cannot be resolved from the Red Hat catalog, the generated CSV uses:
+
+```text
+@<DIGEST>
+```
+
+Replace these placeholders before submitting the final certified bundle.
+
+For Red Hat, `spec.skips` is generated for previous certified versions. Community continues to use:
+
+```yaml
+metadata:
+  annotations:
+    olm.skipRange: <VERSION
+```
+
+## Known Issues
+
+### Update Graphs
+
+Some previous certified releases required `skips` instead of `replaces` because the replaced bundle was not present in every OpenShift index. This can happen when the supported OpenShift range changes between releases and older bundles are missing from newer indexes.
+
+For this release flow:
+
+- community uses `olm.skipRange: <VERSION`
+- Red Hat uses explicit `spec.skips`
+
+See the OLM update graph docs for background:
+
+```text
+https://olm.operatorframework.io/docs/concepts/olm-architecture/operator-catalog/creating-an-update-graph/
+```
+
+### SELinux During Validation
+
+If validation fails with an error similar to:
+
+```text
+cannot find Containerfile or Dockerfile in context directory: stat /mnt/Dockerfile: permission denied
+```
+
+the container runtime may be blocked by SELinux. Adjust the local SELinux/container settings and rerun the validation target.
+
+## Cleanup
+
+Remove generated bundles, temporary SDK projects, and downloaded tools:
+
+```sh
+make clean
+```

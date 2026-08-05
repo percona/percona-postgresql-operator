@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+
+      data=$(kubectl get configmap 14-restored-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+
+      # All rows written before the backup must be present after restore.
+      # Row 5 ('written-after-percona-promotion') was in the full backup
+      # taken at step 12, so it must also be present.
+      for expected in \
+        "initial-data-before-standby" \
+        "data-added-while-standby-syncing" \
+        "more-data-for-replication-test" \
+        "written-after-percona-promotion"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing after restore. Got: ${data}"
+          exit 1
+        }
+      done
+
+      echo "All rows successfully restored from post-migration backup"

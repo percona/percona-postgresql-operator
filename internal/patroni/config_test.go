@@ -18,14 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestClusterYAML(t *testing.T) {
@@ -119,6 +118,128 @@ watchdog:
 		assert.Equal(t, labels["example.com/env"], "production")
 		assert.Equal(t, labels["example.com/owner"], "team-a")
 		assert.Equal(t, labels["postgres-operator.crunchydata.com/cluster"], "cluster-name")
+	})
+
+	t.Run("remove_data_directory_on_diverged_timelines set when version >= 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			RemoveDataDirectoryOnDivergedTimelines: true,
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		assert.Equal(t, pgSection["remove_data_directory_on_diverged_timelines"], true)
+	})
+
+	t.Run("remove_data_directory_on_diverged_timelines false when version >= 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		assert.Equal(t, pgSection["remove_data_directory_on_diverged_timelines"], false)
+	})
+
+	t.Run("remove_data_directory_on_diverged_timelines absent when version < 2.9.0", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.8.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{
+			RemoveDataDirectoryOnDivergedTimelines: true,
+		}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		_, exists := pgSection["remove_data_directory_on_diverged_timelines"]
+		assert.Assert(t, !exists, "expected remove_data_directory_on_diverged_timelines to be absent for version < 2.9.0")
+	})
+
+	t.Run("PGTDE enabled adds bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+
+		cluster.Spec.PostgresVersion = 17
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		binName, ok := pgSection["bin_name"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql.bin_name section")
+
+		assert.Equal(t, binName["pg_basebackup"], "pg_tde_basebackup")
+		assert.Equal(t, binName["pg_rewind"], "pg_tde_rewind")
+	})
+
+	t.Run("PGTDE disabled no bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		_, hasBinName := pgSection["bin_name"]
+		assert.Assert(t, !hasBinName, "expected no bin_name when PGTDE is disabled")
 	})
 
 	t.Run(">PG10", func(t *testing.T) {
@@ -235,8 +356,8 @@ func TestDynamicConfiguration(t *testing.T) {
 			cluster: &v1beta1.PostgresCluster{
 				Spec: v1beta1.PostgresClusterSpec{
 					Patroni: &v1beta1.PatroniSpec{
-						LeaderLeaseDurationSeconds: initialize.Int32(99),
-						SyncPeriodSeconds:          initialize.Int32(8),
+						LeaderLeaseDurationSeconds: new(int32(99)),
+						SyncPeriodSeconds:          new(int32(8)),
 					},
 				},
 			},
@@ -818,7 +939,7 @@ func TestDynamicConfiguration(t *testing.T) {
 					Standby: &v1beta1.PostgresStandbySpec{
 						Enabled: true,
 						Host:    "0.0.0.0",
-						Port:    initialize.Int32(5432),
+						Port:    new(int32(5432)),
 					},
 				},
 			},
@@ -861,7 +982,7 @@ func TestDynamicConfiguration(t *testing.T) {
 					Standby: &v1beta1.PostgresStandbySpec{
 						Enabled:  true,
 						Host:     "0.0.0.0",
-						Port:     initialize.Int32(5432),
+						Port:     new(int32(5432)),
 						RepoName: "repo",
 					},
 				},
@@ -896,33 +1017,6 @@ func TestDynamicConfiguration(t *testing.T) {
 					"port":                   int32(5432),
 					"restore_command":        "mandatory",
 					"unrelated":              "input",
-				},
-			},
-		},
-		{
-			name: "tde enabled",
-			cluster: &v1beta1.PostgresCluster{
-				Spec: v1beta1.PostgresClusterSpec{
-					Patroni: &v1beta1.PatroniSpec{
-						DynamicConfiguration: map[string]any{
-							"postgresql": map[string]any{
-								"parameters": map[string]any{
-									"encryption_key_command": "echo test",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: map[string]any{
-				"loop_wait": int32(10),
-				"ttl":       int32(30),
-				"postgresql": map[string]any{
-					"bin_name":      map[string]any{"pg_rewind": string("/tmp/pg_rewind_tde.sh")},
-					"parameters":    map[string]any{},
-					"pg_hba":        []string{},
-					"use_pg_rewind": bool(true),
-					"use_slots":     bool(false),
 				},
 			},
 		},
@@ -1118,40 +1212,7 @@ restapi: {}
 tags: {}
 	`, "\t\n")+"\n")
 
-	cluster.Spec.Patroni = &v1beta1.PatroniSpec{
-		DynamicConfiguration: map[string]any{
-			"postgresql": map[string]any{
-				"parameters": map[string]any{
-					"encryption_key_command": "echo test",
-				},
-			},
-		},
-	}
-
-	datawithTDE, err := instanceYAML(cluster, instance, nil)
-	assert.NilError(t, err)
-	assert.Equal(t, datawithTDE, strings.Trim(`
-# Generated by postgres-operator. DO NOT EDIT UNLESS YOU KNOW WHAT YOU'RE DOING.
-# If you want to override the config, annotate this ConfigMap with pgv2.percona.com/override-config=true
-bootstrap:
-  initdb:
-  - data-checksums
-  - encoding=UTF8
-  - waldir=/pgdata/pg12_wal
-  - encryption-key-command=echo test
-  method: initdb
-kubernetes: {}
-postgresql:
-  basebackup:
-  - waldir=/pgdata/pg12_wal
-  create_replica_methods:
-  - basebackup
-  pgpass: /tmp/.pgpass
-  use_unix_socket: true
-restapi: {}
-tags: {}
-	`, "\t\n")+"\n")
-
+	cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
 	cluster.Spec.Patroni.CreateReplicaMethods = []v1beta1.CreateReplicaMethod{"basebackup", "pgbackrest"}
 	dataWithCustomMethods, err := instanceYAML(cluster, instance, nil)
 	assert.NilError(t, err)
@@ -1163,7 +1224,6 @@ bootstrap:
   - data-checksums
   - encoding=UTF8
   - waldir=/pgdata/pg12_wal
-  - encryption-key-command=echo test
   method: initdb
 kubernetes: {}
 postgresql:
@@ -1313,7 +1373,6 @@ func TestProbeTiming(t *testing.T) {
 			FailureThreshold: 1,
 		}},
 	} {
-		tt := tt
 		actual := probeTiming(&v1beta1.PatroniSpec{
 			LeaderLeaseDurationSeconds: &tt.lease,
 			SyncPeriodSeconds:          &tt.sync,

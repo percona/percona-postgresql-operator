@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+
+      data=$(kubectl get configmap 05-migrated-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+      pods=$(kubectl get configmap 05-migrated-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.pods}')
+
+      echo "Pods verified: ${pods}"
+      echo "Data: ${data}"
+
+      # Confirm all three expected rows appear in the combined output
+      # (which covers every pod that was queried).
+      for expected in "row-one" "row-two" "row-three"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing from combined pod output. Got: ${data}"
+          exit 1
+        }
+      done
+
+      echo "All expected rows present across all pods"

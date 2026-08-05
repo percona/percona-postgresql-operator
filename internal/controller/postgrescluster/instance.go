@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -35,11 +36,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Instance represents a single PostgreSQL instance of a PostgresCluster.
@@ -289,6 +292,31 @@ func (observed *observedInstances) writablePod(container string) (*corev1.Pod, *
 	return nil, nil
 }
 
+// runningPods returns the Pod of every non-terminating instance whose named
+// container is running, and whether that accounts for every instance in the
+// cluster. Callers that must reach the whole cluster, rather than any one
+// member of it, should wait while complete is false.
+func (observed *observedInstances) runningPods(container string) (pods []*corev1.Pod, complete bool) {
+	if observed == nil {
+		return nil, false
+	}
+
+	complete = true
+	for _, instance := range observed.forCluster {
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			complete = false
+			continue
+		}
+		if running, known := instance.IsRunning(container); !running || !known || len(instance.Pods) == 0 {
+			complete = false
+			continue
+		}
+		pods = append(pods, instance.Pods[0])
+	}
+
+	return pods, complete
+}
+
 // +kubebuilder:rbac:groups="",resources="pods",verbs={list}
 // +kubebuilder:rbac:groups="apps",resources="statefulsets",verbs={list}
 
@@ -327,9 +355,7 @@ func (r *Reconciler) observeInstances(
 	if autogrow {
 		for _, statusIS := range cluster.Status.InstanceSets {
 			if statusIS.DesiredPGDataVolume != nil {
-				for k, v := range statusIS.DesiredPGDataVolume {
-					previousDesiredRequests[k] = v
-				}
+				maps.Copy(previousDesiredRequests, statusIS.DesiredPGDataVolume)
 			}
 		}
 	}
@@ -658,6 +684,8 @@ func (r *Reconciler) reconcileInstanceSets(
 		return err
 	}
 
+	ctx = logging.NewContext(ctx, logging.FromContext(ctx).WithName("SmartUpdate"))
+
 	// Rollout changes to instances by calling rolloutInstance.
 	err = r.rolloutInstances(ctx, cluster, instances,
 		func(ctx context.Context, instance *Instance) error {
@@ -790,8 +818,14 @@ func (r *Reconciler) rolloutInstance(
 		return r.PodExec(ctx, pod.Namespace, pod.Name, naming.ContainerDatabase, stdin, stdout, stderr, command...)
 	}
 
+	log := logging.FromContext(ctx)
+
 	primary, known := instance.IsPrimary()
 	primary = primary && known
+
+	if primary {
+		log.Info("Instance is primary", "instance", instance.Name)
+	}
 
 	// When the cluster has more than one instance participating in failover,
 	// perform a controlled switchover to one of those instances. Patroni will
@@ -822,7 +856,6 @@ func (r *Reconciler) rolloutInstance(
 		span.RecordError(err)
 		return err
 	}
-
 	// When the cluster has only one instance for failover, perform a series of
 	// immediate checkpoints to increase the likelihood that a "fast" shutdown
 	// will complete before the SIGKILL near TerminationGracePeriodSeconds.
@@ -849,7 +882,7 @@ func (r *Reconciler) rolloutInstance(
 			err = errors.WithStack(err)
 			elapsed := time.Since(start)
 
-			logging.FromContext(ctx).V(1).Info("attempted checkpoint",
+			log.Info("attempted checkpoint",
 				"duration", elapsed, "stdout", stdout, "stderr", stderr)
 
 			span.RecordError(err)
@@ -868,13 +901,17 @@ func (r *Reconciler) rolloutInstance(
 
 		// Communicate the lack or slowness of CHECKPOINT and shutdown anyway.
 		if err != nil {
+			log.Error(err, "Unable to checkpoint primary before shutdown")
 			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "NoCheckpoint",
 				"Unable to checkpoint primary before shutdown: %v", err)
 		} else if duration > threshold {
+			log.Info(fmt.Sprintf("Shutting down primary despite checkpoint taking over %v (threshold: %v)", duration, threshold))
 			r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "SlowCheckpoint",
 				"Shutting down primary despite checkpoint taking over %v", duration)
 		}
 	}
+
+	log.Info("Rolling out instance", "pod", pod.Name)
 
 	// Delete the Pod so its controlling StatefulSet will recreate it. Patroni
 	// will receive a SIGTERM and use "pg_ctl" to perform a "fast" shutdown of
@@ -1101,7 +1138,7 @@ func (r *Reconciler) scaleUpInstances(
 		next := naming.GenerateInstance(cluster, set)
 		// if there are any available instance names (as determined by observing any PVCs for the
 		// instance set that are not currently associated with an instance, e.g. in the event the
-		// instance STS was deleted), then reuse them instead of generating a new name
+		// instance STS was deleted), then reuse them instead of generating a new name.
 		if len(availableInstanceNames) > 0 {
 			next.Name = availableInstanceNames[0]
 			availableInstanceNames = availableInstanceNames[1:]
@@ -1201,6 +1238,32 @@ func (r *Reconciler) reconcileInstance(
 			primaryCertificate, replicationCertSecretProjection(clusterReplicationSecret),
 			postgresDataVolume, postgresWALVolume, tablespaceVolumes,
 			&instance.Spec.Template.Spec)
+
+		// K8SPG-911: reconcilePGTDEProviders has not repointed the key provider
+		// at the credentials in the spec yet, so keep mounting the ones it does
+		// name. Rolling now would leave pg_tde reading a token the provider was
+		// never told about. Once phase 1 lands, the phase moves on and the
+		// volume updates, which is what restarts the Pods for phase 2.
+		if cluster.Spec.Extensions.PGTDE.Vault != nil {
+			change, changeErr := pgtde.VaultChangeFor(cluster)
+			if changeErr != nil {
+				// Without the revisions there is no way to tell a pending
+				// change from a settled one. Hold the volume: a Pod that keeps
+				// its credentials can be rolled later, one that loses them
+				// cannot get them back.
+				log.Error(changeErr, "keeping the pg_tde vault volume")
+			}
+			if changeErr != nil || change.Phase == pgtde.StageCredentials {
+				pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+			}
+		}
+
+		// we need to preserve vault secret as long as extension is enabled
+		// otherwise pods won't survive the restart failing to find the token file
+		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
+			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
+		}
 
 		if backupsSpecFound {
 			addPGBackRestToInstancePodSpec(
@@ -1347,7 +1410,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 
 	// Don't clutter the namespace with extra ControllerRevisions.
 	// The "controller-revision-hash" label still exists on the Pod.
-	sts.Spec.RevisionHistoryLimit = initialize.Int32(0)
+	sts.Spec.RevisionHistoryLimit = new(int32(0))
 
 	// Give the Pod a stable DNS record based on its name.
 	// - https://docs.k8s.io/concepts/workloads/controllers/statefulset/#stable-network-id
@@ -1384,24 +1447,24 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// is always the first to startup and the last to shutdown.
 	if cluster.Status.StartupInstance == "" {
 		// there is no designated startup instance; all instances should run.
-		sts.Spec.Replicas = initialize.Int32(1)
+		sts.Spec.Replicas = new(int32(1))
 	} else if cluster.Status.StartupInstance != sts.Name {
 		// there is a startup instance defined, but not this instance; do not run.
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown &&
 		numInstancePods <= 1 {
 		// this is the last instance of the shutdown sequence; do not run.
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	} else {
 		// this is the designated instance, but
 		// - others are still running during shutdown, or
 		// - it is time to startup.
-		sts.Spec.Replicas = initialize.Int32(1)
+		sts.Spec.Replicas = new(int32(1))
 	}
 
 	// K8SPG-771
 	if suspend {
-		sts.Spec.Replicas = initialize.Int32(0)
+		sts.Spec.Replicas = new(int32(0))
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.
@@ -1411,7 +1474,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// ShareProcessNamespace makes Kubernetes' pause process PID 1 and lets
 	// containers see each other's processes.
 	// - https://docs.k8s.io/tasks/configure-pod-container/share-process-namespace/
-	sts.Spec.Template.Spec.ShareProcessNamespace = initialize.Bool(true)
+	sts.Spec.Template.Spec.ShareProcessNamespace = new(true)
 
 	// Patroni calls the Kubernetes API and pgBackRest may interact with a cloud
 	// storage provider. Use the instance ServiceAccount and automatically mount
@@ -1423,7 +1486,7 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 	// Disable environment variables for services other than the Kubernetes API.
 	// - https://docs.k8s.io/concepts/services-networking/connect-applications-service/#accessing-the-service
 	// - https://releases.k8s.io/v1.23.0/pkg/kubelet/kubelet_pods.go#L553-L563
-	sts.Spec.Template.Spec.EnableServiceLinks = initialize.Bool(false)
+	sts.Spec.Template.Spec.EnableServiceLinks = new(false)
 
 	// K8SPG-514
 	if spec.SecurityContext != nil {
@@ -1491,22 +1554,50 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileInstanceCertificates writes the Secret that contains certificates
-// and private keys for instance of cluster. When cert-manager is installed,
-// it creates a Certificate CR and augments the resulting secret with Patroni
-// and pgBackRest keys. Otherwise, it uses internal PKI.
+// and private keys for instance of cluster. When the root CA is cert-manager-
+// managed, it creates a Certificate CR and augments the resulting secret with
+// Patroni and pgBackRest keys. Otherwise, it uses internal PKI — first
+// reconciling any stale Certificate CR left by K8SPG-1017 to update its
+// ownerRef (K8SPG-1007 recovery). When userProvidedOnly is specified, it
+// returns the existing user-provided Secret, or a placeholder containing its
+// name and namespace if it does not exist.
 func (r *Reconciler) reconcileInstanceCertificates(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	spec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	rootCertificateAuth *pki.RootCertificateAuthority,
 ) (*corev1.Secret, error) {
-	// Check if cert-manager is installed
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
-	}
+	if cluster.Spec.CustomTLSSecret == nil {
+		if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+			existing := &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}
+			// Allow the StatefulSet to be created so its generated name is visible
+			// to the user. The next reconciliation checks its certificate Secret
+			// and pauses until the user provides it.
+			if err := client.IgnoreNotFound(
+				r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+			); err != nil {
+				return nil, errors.Wrapf(err, "get user-provided instance TLS secret %s", existing.Name)
+			}
+			return existing, nil
+		}
 
-	if certManagerInstalled {
-		return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
+		}
+
+		if certManagerManaged {
+			return r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+		}
+
+		// cluster certificates are not managed by cert-manager
+		// but Certificate object exists due to the bug described in K8SPG-1017
+		// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+			_, err := r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
+			if err != nil {
+				logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+			}
+		}
 	}
 
 	// Fall back to internal certificate generation
@@ -1557,7 +1648,6 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			naming.LabelInstance:    instance.Name,
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
 
-	instanceCerts.Type = corev1.SecretTypeOpaque
 	instanceCerts.Data = make(map[string][]byte)
 
 	if existing.Data != nil {
@@ -1568,45 +1658,31 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 			instanceCerts.Data["dns.key"] = tlsKey
 		}
 	}
+	if len(instanceCerts.Data["dns.crt"]) == 0 || len(instanceCerts.Data["dns.key"]) == 0 {
+		return &corev1.Secret{ObjectMeta: naming.InstanceCertificates(instance)}, nil
+	}
 
-	if len(instanceCerts.Data["dns.crt"]) > 0 && len(instanceCerts.Data["dns.key"]) > 0 {
-		leafCert := &pki.LeafCertificate{}
-		_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
-		_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
+	leafCert := &pki.LeafCertificate{}
+	_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
+	_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
 
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
+	caCert, err := instanceCACert(rootCertificateAuth, existing)
+	if err != nil {
+		return nil, err
+	}
 
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
-	} else {
-		var leafCert *pki.LeafCertificate
-		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate instance certificate")
-		}
+	err = patroni.InstanceCertificates(ctx,
+		caCert, leafCert.Certificate,
+		leafCert.PrivateKey, instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add patroni certificates")
+	}
 
-		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
-			leafCert.PrivateKey, instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add patroni certificates")
-		}
-
-		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
-			instanceCerts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
-		}
+	err = pgbackrest.InstanceCertificates(ctx, cluster,
+		caCert, leafCert.Certificate, leafCert.PrivateKey,
+		instanceCerts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add pgbackrest certificates")
 	}
 
 	err = errors.WithStack(r.apply(ctx, instanceCerts))
@@ -1615,6 +1691,23 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	}
 
 	return instanceCerts, nil
+}
+
+func instanceCACert(rootCertificateAuth *pki.RootCertificateAuthority, issuedSecret *corev1.Secret) (pki.Certificate, error) {
+	if rootCertificateAuth != nil {
+		return rootCertificateAuth.Certificate, nil
+	}
+
+	ca := issuedSecret.Data[corev1.ServiceAccountRootCAKey]
+	if len(ca) == 0 {
+		return pki.Certificate{}, errors.New("external issuer did not return a CA certificate for the instance")
+	}
+
+	var caCert pki.Certificate
+	if err := caCert.UnmarshalText(ca); err != nil {
+		return pki.Certificate{}, errors.Wrap(err, "failed to parse CA certificate from cert-manager secret")
+	}
+	return caCert, nil
 }
 
 // reconcileInternalInstanceCertificates creates instance certificates using internal PKI.

@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      data=$(kubectl get configmap 05-standby-initial-sync -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+      echo "${data}" | grep -q "initial-data-before-standby" || {
+        echo "ERROR: initial data not replicated to standby. Got: ${data}"
+        exit 1
+      }

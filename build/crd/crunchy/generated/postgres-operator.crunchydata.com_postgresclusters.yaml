@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.0
-  name: postgresclusters.postgres-operator.crunchydata.com
+  name: postgresclusters.upstream.pgv2.percona.com
 spec:
-  group: postgres-operator.crunchydata.com
+  group: upstream.pgv2.percona.com
   names:
     kind: PostgresCluster
     listKind: PostgresClusterList
@@ -22521,6 +22521,11 @@ spec:
                     format: int32
                     minimum: 1024
                     type: integer
+                  removeDataDirectoryOnDivergedTimelines:
+                    description: RemoveDataDirectoryOnDivergedTimelines allows controlling
+                      remove_data_directory_on_diverged_timelines in Patroni cluster
+                      config.
+                    type: boolean
                   switchover:
                     description: Switchover gives options to perform ad hoc switchovers
                       in a PostgresCluster.
@@ -28812,6 +28817,8 @@ spec:
                   caValidityDuration:
                     type: string
                   certValidityDuration:
+                    type: string
+                  pgBackRestCertValidityDuration:
                     type: string
                 type: object
               tlsOnly:

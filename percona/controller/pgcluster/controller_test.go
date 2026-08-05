@@ -17,10 +17,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,7 +29,7 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var _ = Describe("PG Cluster", Ordered, func() {
@@ -219,7 +219,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 			})
 		})
 
-		When("pmm secret has no data", func() {
+		When("pmm secret doesn't contain PMM_SERVER_TOKEN", func() {
 			BeforeAll(func() {
 				Expect(k8sClient.Create(ctx, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -227,7 +227,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 						Namespace: ns,
 					},
 					Data: map[string][]byte{
-						"PMM_SERVER_KEY": {},
+						"SOME_RANDOM_KEY": []byte("some-data"),
 					},
 				})).Should(Succeed())
 
@@ -242,49 +242,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
 			})
-		})
 
-		When("pmm secret has data for PMM_SERVER_KEY", func() {
-			BeforeAll(func() {
-				Expect(k8sClient.Update(ctx, &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-					Data: map[string][]byte{
-						"PMM_SERVER_KEY": []byte("some-data"),
-					},
-				})).Should(Succeed())
+			It("should have PMMReady condition set to False", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
 
-				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("should have pmm container", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-
-				Expect(havePMMSidecar(sts)).To(BeTrue())
-			})
-
-			It("should have PMM secret hash", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
-			})
-
-			It("should label PMM secret", func() {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-				}
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
-				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal("PMMSecretInvalid"))
 			})
 		})
 
@@ -330,6 +296,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
 				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
 			})
+
+			It("should have PMMReady condition set to True", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			})
 		})
 
 		When("cr has disabled pmm", func() {
@@ -348,6 +323,13 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
+			})
+
+			It("should remove PMMReady condition", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				Expect(meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)).To(BeNil())
 			})
 		})
 	})
@@ -862,7 +844,7 @@ var _ = Describe("Pause with backup", Ordered, func() {
 		},
 		Spec: v2.PerconaPGBackupSpec{
 			PGCluster: crName,
-			RepoName:  ptr.To("repo1"),
+			RepoName:  new("repo1"),
 		},
 	}
 
@@ -1652,16 +1634,18 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(stsList.Items).NotTo(BeEmpty())
 
 		for _, sts := range stsList.Items {
-			l := len(sts.Spec.Template.Spec.Containers)
-			sidecar := sts.Spec.Template.Spec.Containers[l-4]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar-2"))
+			containersByName := map[string]corev1.Container{}
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				containersByName[c.Name] = c
+			}
+
+			sidecar, ok := containersByName["instance-sidecar-2"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd-2"}))
 			Expect(sidecar.Image).To(Equal("instance-image-2"))
 
-			sidecar = sts.Spec.Template.Spec.Containers[l-3]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar"))
+			sidecar, ok = containersByName["instance-sidecar"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
 			Expect(sidecar.Image).To(Equal("instance-image"))
 		}
@@ -2400,6 +2384,170 @@ var _ = Describe("CR Validations", Ordered, func() {
 			})
 		})
 	})
+
+	Context("pg_tde validations", Ordered, func() {
+		When("creating a CR with valid pg_tde configurations", func() {
+			It("should accept pg_tde enabled with vault on PG 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde not specified at all", func() {
+				cr, err := readDefaultCR("cr-validation-tde-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled with vault on PG < 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid pg_tde configurations", func() {
+			It("should reject pg_tde enabled on PG < 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"pg_tde is only supported for PG17 and above",
+				))
+			})
+
+			It("should reject pg_tde enabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-6", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+		})
+
+		When("updating a CR with pg_tde transition rules", func() {
+			It("should reject removing vault while pg_tde is still enabled", func() {
+				cr, err := readDefaultCR("cr-validation-tde-8", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				updated := cr.DeepCopy()
+				updated.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Update(ctx, updated)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+
+			It("should accept disabling pg_tde while keeping vault", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept removing vault after pg_tde is disabled", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+		})
+	})
 })
 
 var _ = Describe("Init Container", Ordered, func() {
@@ -2500,10 +2648,10 @@ var _ = Describe("Init Container", Ordered, func() {
 							"ALL",
 						},
 					},
-					Privileged:               ptr.To(false),
-					RunAsNonRoot:             ptr.To(true),
-					ReadOnlyRootFilesystem:   ptr.To(true),
-					AllowPrivilegeEscalation: ptr.To(false),
+					Privileged:               new(false),
+					RunAsNonRoot:             new(true),
+					ReadOnlyRootFilesystem:   new(true),
+					AllowPrivilegeEscalation: new(false),
 					SeccompProfile: &corev1.SeccompProfile{
 						Type: corev1.SeccompProfileTypeRuntimeDefault,
 					},
@@ -2542,10 +2690,10 @@ var _ = Describe("Init Container", Ordered, func() {
 						"ALL",
 					},
 				},
-				Privileged:               ptr.To(false),
-				RunAsNonRoot:             ptr.To(true),
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				AllowPrivilegeEscalation: ptr.To(false),
+				Privileged:               new(false),
+				RunAsNonRoot:             new(true),
+				ReadOnlyRootFilesystem:   new(true),
+				AllowPrivilegeEscalation: new(false),
 				SeccompProfile: &corev1.SeccompProfile{
 					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
@@ -2565,7 +2713,7 @@ var _ = Describe("Init Container", Ordered, func() {
 
 			cr.Spec.InitContainer.Image = "new-image"
 			cr.Spec.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}
 			cr.Spec.InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2626,7 +2774,7 @@ var _ = Describe("Init Container", Ordered, func() {
 					},
 				}))
 				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-					RunAsNonRoot: ptr.To(false),
+					RunAsNonRoot: new(false),
 				}))
 				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2661,7 +2809,7 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2679,7 +2827,7 @@ var _ = Describe("Init Container", Ordered, func() {
 			cr.Spec.InstanceSets[0].InitContainer = new(v1beta1.InitContainerSpec)
 			cr.Spec.InstanceSets[0].InitContainer.Image = "instance-image"
 			cr.Spec.InstanceSets[0].InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(true),
+				RunAsNonRoot: new(true),
 			}
 			cr.Spec.InstanceSets[0].InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2740,7 +2888,7 @@ var _ = Describe("Init Container", Ordered, func() {
 					},
 				}))
 				Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-					RunAsNonRoot: ptr.To(true),
+					RunAsNonRoot: new(true),
 				}))
 				Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 				Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2775,7 +2923,7 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))
@@ -2800,8 +2948,8 @@ var _ = Describe("Init Container", Ordered, func() {
 			cr.Spec.Backups.PGBackRest.InitContainer = new(v1beta1.InitContainerSpec)
 			cr.Spec.Backups.PGBackRest.InitContainer.Image = "pgbackrest-image"
 			cr.Spec.Backups.PGBackRest.InitContainer.ContainerSecurityContext = &corev1.SecurityContext{
-				RunAsNonRoot: ptr.To(false),
-				Privileged:   ptr.To(true),
+				RunAsNonRoot: new(false),
+				Privileged:   new(true),
 			}
 			cr.Spec.Backups.PGBackRest.InitContainer.Resources = &corev1.ResourceRequirements{
 				Limits: corev1.ResourceList{
@@ -2846,8 +2994,8 @@ var _ = Describe("Init Container", Ordered, func() {
 				},
 			}))
 			Expect(initContainer.SecurityContext).To(Equal(&corev1.SecurityContext{
-				Privileged:   ptr.To(true),
-				RunAsNonRoot: ptr.To(false),
+				Privileged:   new(true),
+				RunAsNonRoot: new(false),
 			}))
 			Expect(initContainer.TerminationMessagePath).To(Equal("/dev/termination-log"))
 			Expect(initContainer.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageReadFile))

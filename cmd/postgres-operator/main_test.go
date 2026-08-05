@@ -11,6 +11,8 @@ import (
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
+
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 )
 
 func TestInitManager(t *testing.T) {
@@ -27,13 +29,13 @@ func TestInitManager(t *testing.T) {
 
 		assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 			map[string]int{
-				"PGAdmin.postgres-operator.crunchydata.com":         1,
-				"PGUpgrade.postgres-operator.crunchydata.com":       1,
-				"PerconaPGBackup.pgv2.percona.com":                  1,
-				"PerconaPGCluster.pgv2.percona.com":                 1,
-				"PerconaPGRestore.pgv2.percona.com":                 1,
-				"PerconaPGUpgrade.pgv2.percona.com":                 1,
-				"PostgresCluster.postgres-operator.crunchydata.com": 1,
+				"PGAdmin.upstream.pgv2.percona.com":         1,
+				"PGUpgrade.upstream.pgv2.percona.com":       1,
+				"PerconaPGBackup.pgv2.percona.com":          1,
+				"PerconaPGCluster.pgv2.percona.com":         1,
+				"PerconaPGRestore.pgv2.percona.com":         1,
+				"PerconaPGUpgrade.pgv2.percona.com":         1,
+				"PostgresCluster.upstream.pgv2.percona.com": 1,
 			})
 
 		assert.Assert(t, options.Cache.DefaultNamespaces == nil)
@@ -41,6 +43,9 @@ func TestInitManager(t *testing.T) {
 		assert.Assert(t, options.LeaseDuration.Seconds() == 60)
 		assert.Assert(t, options.RenewDeadline.Seconds() == 40)
 		assert.Assert(t, options.RetryPeriod.Seconds() == 10)
+
+		assert.Assert(t, options.Scheme == runtime.Scheme,
+			"expected the shared scheme to be configured before manager creation")
 
 		{
 			options.Cache.SyncPeriod = nil
@@ -51,6 +56,7 @@ func TestInitManager(t *testing.T) {
 			options.LeaseDuration = nil
 			options.RenewDeadline = nil
 			options.RetryPeriod = nil
+			options.Scheme = nil
 
 			assert.Assert(t, reflect.ValueOf(options).IsZero(),
 				"expected remaining fields to be unset:\n%+v", options)
@@ -125,13 +131,13 @@ func TestInitManager(t *testing.T) {
 				}
 				assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 					map[string]int{
-						"PGAdmin.postgres-operator.crunchydata.com":         1,
-						"PGUpgrade.postgres-operator.crunchydata.com":       1,
-						"PerconaPGBackup.pgv2.percona.com":                  1,
-						"PerconaPGCluster.pgv2.percona.com":                 1,
-						"PerconaPGRestore.pgv2.percona.com":                 1,
-						"PerconaPGUpgrade.pgv2.percona.com":                 1,
-						"PostgresCluster.postgres-operator.crunchydata.com": 1,
+						"PGAdmin.upstream.pgv2.percona.com":         1,
+						"PGUpgrade.upstream.pgv2.percona.com":       1,
+						"PerconaPGBackup.pgv2.percona.com":          1,
+						"PerconaPGCluster.pgv2.percona.com":         1,
+						"PerconaPGRestore.pgv2.percona.com":         1,
+						"PerconaPGUpgrade.pgv2.percona.com":         1,
+						"PostgresCluster.upstream.pgv2.percona.com": 1,
 					})
 			}
 		})
@@ -143,13 +149,13 @@ func TestInitManager(t *testing.T) {
 			assert.NilError(t, err)
 			assert.DeepEqual(t, options.Controller.GroupKindConcurrency,
 				map[string]int{
-					"PGAdmin.postgres-operator.crunchydata.com":         19,
-					"PGUpgrade.postgres-operator.crunchydata.com":       19,
-					"PerconaPGBackup.pgv2.percona.com":                  19,
-					"PerconaPGCluster.pgv2.percona.com":                 19,
-					"PerconaPGRestore.pgv2.percona.com":                 19,
-					"PerconaPGUpgrade.pgv2.percona.com":                 19,
-					"PostgresCluster.postgres-operator.crunchydata.com": 19,
+					"PGAdmin.upstream.pgv2.percona.com":         19,
+					"PGUpgrade.upstream.pgv2.percona.com":       19,
+					"PerconaPGBackup.pgv2.percona.com":          19,
+					"PerconaPGCluster.pgv2.percona.com":         19,
+					"PerconaPGRestore.pgv2.percona.com":         19,
+					"PerconaPGUpgrade.pgv2.percona.com":         19,
+					"PostgresCluster.upstream.pgv2.percona.com": 19,
 				})
 		})
 	})

@@ -2,10 +2,12 @@ package controller
 
 import (
 	"context"
+	"slices"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -71,11 +73,16 @@ func GetReadyInstancePod(ctx context.Context, c client.Client, clusterName, name
 	if err := c.List(ctx, pods, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, errors.Wrap(err, "list pods")
 	}
-	for _, pod := range pods.Items {
+	for i := range pods.Items {
+		pod := &pods.Items[i]
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
-		return &pod, nil
+		if slices.ContainsFunc(pod.Status.Conditions, func(c corev1.PodCondition) bool {
+			return c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue
+		}) {
+			return pod, nil
+		}
 	}
 	return nil, errors.New("no running instance found")
 }
@@ -107,6 +114,10 @@ func RunFinalizer[T client.Object](ctx context.Context, cl client.Client, obj T,
 	if controllerutil.RemoveFinalizer(obj, finalizer) {
 		log.Info("Removing finalizer", "name", finalizer)
 		if err := cl.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
+			if k8serrors.IsNotFound(err) {
+				log.Info("Object not found when removing finalizer, skipping", "name", finalizer)
+				return true, nil
+			}
 			return false, errors.Wrap(err, "remove finalizers")
 		}
 	}

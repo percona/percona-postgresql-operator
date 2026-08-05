@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      # Unique S3 path so parallel test runs do not collide.
+      CRUNCHY_REPO_PATH="/migration-pv/${RANDOM}/crunchy-repo1"
+
+      kubectl create configmap -n "${NAMESPACE}" pv-migration-config \
+        --from-literal=crunchy-repo-path="${CRUNCHY_REPO_PATH}" \
+        --from-literal=minio-endpoint="${MINIO_ENDPOINT}"
+
+      # The Crunchy cluster uses the same pgBackRest secret as the Percona
+      # cluster (same minio credentials, different S3 path).
+      # Note: secret name in crunchy-source.yaml must match migration-pv-pgbackrest-secrets.
+      cat "${TEST_CONFIG_DIR}/crunchy-source.yaml" | \
+        yq eval ".spec.postgresVersion = ${PG_VER}" | \
+        $sed "s|<repo-path>|${CRUNCHY_REPO_PATH}|g" | \
+        $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
+        kubectl -n "${NAMESPACE}" apply -f -
+    timeout: 20

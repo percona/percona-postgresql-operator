@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+
+      pv_name=$(kubectl get configmap pv-names -n "${NAMESPACE}" \
+        -o jsonpath='{.data.pv-name}')
+
+      # Wait for all Crunchy postgres pods to terminate.
+      kubectl wait pod \
+        -l postgres-operator.crunchydata.com/cluster=crunchy-source \
+        -n "${NAMESPACE}" \
+        --for=delete \
+        --timeout=90s || true
+
+      # Wait for the PV to transition from Bound → Released.
+      # This happens once the PVC is deleted by the Crunchy operator.
+      attempt=0
+      while [ "${attempt}" -lt 24 ]; do
+        phase=$(kubectl get pv "${pv_name}" -o jsonpath='{.status.phase}')
+        echo "PV ${pv_name} phase: ${phase} (attempt ${attempt}/24)"
+        if [ "${phase}" = "Released" ]; then
+          echo "PV is Released — data preserved, ready for Percona binding"
+          exit 0
+        fi
+        attempt=$((attempt + 1))
+        sleep 5
+      done
+
+      echo "ERROR: PV ${pv_name} did not reach Released phase in time (current: ${phase})"
+      exit 1

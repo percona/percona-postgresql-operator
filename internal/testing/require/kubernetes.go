@@ -118,8 +118,10 @@ func kubernetes3(t TestingT) (*envtest.Environment, client.Client) {
 	); assert.Check(t,
 		err == nil && len(pkgs) > 0 && pkgs[0].Module != nil, "got %v\n%#v", err, pkgs,
 	) {
-		snapshotter, err = filepath.Rel(root, pkgs[0].Module.Dir)
-		assert.NilError(t, err)
+		if pkgs[0].Module.Dir != "" {
+			snapshotter, err = filepath.Rel(root, pkgs[0].Module.Dir)
+			assert.NilError(t, err)
+		}
 	}
 
 	kubernetes.Lock()

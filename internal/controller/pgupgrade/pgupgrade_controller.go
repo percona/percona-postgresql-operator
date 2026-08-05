@@ -21,10 +21,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -41,8 +40,8 @@ type PGUpgradeReconciler struct {
 }
 
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list,watch}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={list,watch}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={list,watch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={list,watch}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -56,7 +55,7 @@ func (r *PGUpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={list}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={list}
 
 // findUpgradesForPostgresCluster returns PGUpgrades that target cluster.
 func (r *PGUpgradeReconciler) findUpgradesForPostgresCluster(
@@ -106,11 +105,11 @@ func (r *PGUpgradeReconciler) watchPostgresClusters() handler.Funcs {
 	}
 }
 
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades",verbs={get}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="pgupgrades/status",verbs={patch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades",verbs={get}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="pgupgrades/status",verbs={patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={delete}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get}
-//+kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get}
+//+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/status",verbs={patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch}
 //+kubebuilder:rbac:groups="batch",resources="jobs",verbs={list}
 //+kubebuilder:rbac:groups="",resources="endpoints",verbs={get}
@@ -250,7 +249,17 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Get the status version and check the jobs to see if this upgrade has completed
 	statusVersion := int64(world.Cluster.Status.PostgresVersion)
-	upgradeJob := world.Jobs[pgUpgradeJob(upgrade).Name]
+
+	// Find the upgrade job by its role and PGUpgrade name labels
+	var upgradeJob *batchv1.Job
+	for _, job := range world.Jobs {
+		if job.GetLabels()[LabelRole] == pgUpgrade &&
+			job.GetLabels()[LabelPGUpgrade] == commonLabels(pgUpgrade, upgrade)[LabelPGUpgrade] {
+			upgradeJob = job
+			break
+		}
+	}
+
 	upgradeJobComplete := upgradeJob != nil &&
 		jobCompleted(upgradeJob)
 	upgradeJobFailed := upgradeJob != nil &&
@@ -259,7 +268,8 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	var removeDataJobsFailed bool
 	var removeDataJobsCompleted []*batchv1.Job
 	for _, job := range world.Jobs {
-		if job.GetLabels()[LabelRole] == removeData {
+		if job.GetLabels()[LabelRole] == removeData &&
+			job.GetLabels()[LabelPGUpgrade] == commonLabels(removeData, upgrade)[LabelPGUpgrade] {
 			if jobCompleted(job) {
 				removeDataJobsCompleted = append(removeDataJobsCompleted, job)
 			} else if jobFailed(job) {
@@ -455,7 +465,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// TODO: error from apply could mean that the job exists with a different spec.
 	if err == nil && !upgradeJobComplete {
 		err = errors.WithStack(r.apply(ctx,
-			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, config.FetchKeyCommand(&world.Cluster.Spec))))
+			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, world.Cluster.Spec.Extensions.PGTDE.Enabled)))
 	}
 
 	// Create the jobs to remove the data from the replicas, as long as
@@ -502,7 +512,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func setStatusToProgressingIfReasonWas(reason string, upgrade *v1beta1.PGUpgrade) {
 	progressing := meta.FindStatusCondition(upgrade.Status.Conditions,
 		ConditionPGUpgradeProgressing)
-	if progressing == nil || (progressing != nil && progressing.Reason == reason) {
+	if progressing == nil || progressing.Reason == reason {
 		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
 			ObservedGeneration: upgrade.GetGeneration(),
 			Type:               ConditionPGUpgradeProgressing,

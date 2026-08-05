@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+
+      data=$(kubectl get configmap 08-restored-data -n "${NAMESPACE}" \
+        -o jsonpath='{.data.data}')
+
+      for expected in "row-one" "row-two" "row-three"; do
+        echo "${data}" | grep -q "${expected}" || {
+          echo "ERROR: '${expected}' missing after restore. Got: ${data}"
+          exit 1
+        }
+      done
+
+      for absent in "post-backup-row-one" "post-backup-row-two"; do
+        if echo "${data}" | grep -q "${absent}"; then
+          echo "ERROR: '${absent}' present after restore (should be absent). Got: ${data}"
+          exit 1
+        fi
+      done
+
+      echo "PASS: restore verified — migrated data intact, post-backup rows rolled back"

@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l postgres-operator.crunchydata.com/cluster=percona-standby,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      if [ -z "${primary}" ]; then
+        echo "ERROR: Percona primary pod not found after promotion"
+        exit 1
+      fi
+
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        psql -d migrationtest -c \"INSERT INTO migration_data VALUES (4, 'written-after-percona-promotion');\"
+      "
+
+      data=$(kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c \
+        "psql -q -t -d migrationtest -c 'SELECT id, value FROM migration_data ORDER BY id;'")
+
+      kubectl create configmap -n "${NAMESPACE}" 10-percona-primary-data \
+        --from-literal=data="${data}"
+
+      # Workaround for upstream Crunchy PGO bug: the operator hardcodes
+      # archive-async=y in the generated pgBackRest config, causing the
+      # background archiver to silently drop 00000002.history with error 103
+      # (archive.info missing) during the dataSource bootstrap promotion.
+      # Re-push synchronously here after the stanza has been created.
+      # In the standby flow the Percona archive shares the same S3 path as
+      # Crunchy so the file may already be present; use || true accordingly.
+      # See: https://github.com/CrunchyData/postgres-operator/issues/XXXX
+      kubectl exec -n "${NAMESPACE}" "${primary}" -c database -- bash -c "
+        pgbackrest --stanza=db --no-archive-async \
+          archive-push \"\${PGDATA}/pg_wal/00000002.history\" || true
+      "

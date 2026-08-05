@@ -1,16 +1,6 @@
-PGO_IMAGE_NAME ?= percona-postgresql-operator
-PGO_IMAGE_MAINTAINER ?= Percona
-PGO_IMAGE_SUMMARY ?= Percona PostgreSQL Operator
-PGO_IMAGE_DESCRIPTION ?= $(PGO_IMAGE_SUMMARY)
-PGO_IMAGE_URL ?= https://github.com/percona/percona-postgresql-operator
-PGO_IMAGE_PREFIX ?= localhost
-
 PGMONITOR_DIR ?= hack/tools/pgmonitor
 PGMONITOR_VERSION ?= v4.11.0
 QUERIES_CONFIG_DIR ?= hack/tools/queries
-
-# Buildah's "build" used to be "bud". Use the alias to be compatible for a while.
-BUILDAH_BUILD ?= buildah bud
 
 GO ?= CGO_ENABLED=1 go
 GO_BUILD = $(GO) build -trimpath
@@ -18,6 +8,10 @@ GO_TEST ?= $(GO) test
 KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
+
+# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
+CRD_OPTIONS ?= crd:crdVersions='v1'
+CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
 
 ##@ General
 
@@ -38,11 +32,7 @@ help: ## Display this help.
 
 .PHONY: all
 all: ## Build all images
-all: build-docker-image
-
-.PHONY: setup
-setup: ## Run Setup needed to build images
-setup: get-pgmonitor
+all: build
 
 .PHONY: get-pgmonitor
 get-pgmonitor:
@@ -55,12 +45,9 @@ get-pgmonitor:
 
 .PHONY: clean
 clean: ## Clean resources
-clean: clean-deprecated
 	rm -f bin/postgres-operator
 	rm -f config/rbac/role.yaml
 	rm -rf licenses/*/
-	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
-	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
 	rm -rf build/crd/generated build/crd/*/generated
 	[ ! -f hack/tools/setup-envtest ] || rm hack/tools/setup-envtest
 	[ ! -d hack/tools/envtest ] || { chmod -R u+w hack/tools/envtest && rm -r hack/tools/envtest; }
@@ -68,25 +55,6 @@ clean: clean-deprecated
 	[ ! -d hack/tools/external-snapshotter ] || rm -rf hack/tools/external-snapshotter
 	[ ! -n "$$(ls hack/tools)" ] || rm -r hack/tools/*
 	[ ! -d hack/.kube ] || rm -r hack/.kube
-
-.PHONY: clean-deprecated
-clean-deprecated: ## Clean deprecated resources
-	@# packages used to be downloaded into the vendor directory
-	[ ! -d vendor ] || rm -r vendor
-	@# executables used to be compiled into the $GOBIN directory
-	[ ! -n '$(GOBIN)' ] || rm -f $(GOBIN)/postgres-operator $(GOBIN)/apiserver $(GOBIN)/*pgo
-	@# executables used to be in subdirectories
-	[ ! -d bin/pgo-rmdata ] || rm -r bin/pgo-rmdata
-	[ ! -d bin/pgo-backrest ] || rm -r bin/pgo-backrest
-	[ ! -d bin/pgo-scheduler ] || rm -r bin/pgo-scheduler
-	[ ! -d bin/postgres-operator ] || rm -r bin/postgres-operator
-	@# keys used to be generated before install
-	[ ! -d conf/pgo-backrest-repo ] || rm -r conf/pgo-backrest-repo
-	[ ! -d conf/postgres-operator ] || rm -r conf/postgres-operator
-	@# crunchy-postgres-exporter used to live in this repo
-	[ ! -d bin/crunchy-postgres-exporter ] || rm -r bin/crunchy-postgres-exporter
-	[ ! -d build/crunchy-postgres-exporter ] || rm -r build/crunchy-postgres-exporter
-
 
 ##@ Deployment
 .PHONY: createnamespaces
@@ -150,44 +118,6 @@ build-postgres-operator: ## Build the postgres-operator binary
 		) --ldflags '-X "main.versionString=$(PGO_VERSION)"' $(\
 		) --trimpath -o bin/postgres-operator ./cmd/postgres-operator
 
-##@ Build - Images
-.PHONY: build-postgres-operator-image
-build-postgres-operator-image: ## Build the postgres-operator image
-build-postgres-operator-image: PGO_IMAGE_REVISION := $(shell git rev-parse HEAD)
-build-postgres-operator-image: PGO_IMAGE_TIMESTAMP := $(shell date -u +%FT%TZ)
-build-postgres-operator-image: build-postgres-operator
-build-postgres-operator-image: build/postgres-operator/Dockerfile
-	$(if $(shell (echo 'buildah version 1.24'; $(word 1,$(BUILDAH_BUILD)) --version) | sort -Vc 2>&1), \
-		$(warning WARNING: old buildah does not invalidate its cache for changed labels: \
-			https://github.com/containers/buildah/issues/3517))
-	$(if $(IMAGE_TAG),,	$(error missing IMAGE_TAG))
-	$(strip $(BUILDAH_BUILD)) \
-		--tag $(BUILDAH_TRANSPORT)$(PGO_IMAGE_PREFIX)/$(PGO_IMAGE_NAME):$(IMAGE_TAG) \
-		--label name='$(PGO_IMAGE_NAME)' \
-		--label build-date='$(PGO_IMAGE_TIMESTAMP)' \
-		--label description='$(PGO_IMAGE_DESCRIPTION)' \
-		--label maintainer='$(PGO_IMAGE_MAINTAINER)' \
-		--label summary='$(PGO_IMAGE_SUMMARY)' \
-		--label url='$(PGO_IMAGE_URL)' \
-		--label vcs-ref='$(PGO_IMAGE_REVISION)' \
-		--label vendor='$(PGO_IMAGE_MAINTAINER)' \
-		--label io.k8s.display-name='$(PGO_IMAGE_NAME)' \
-		--label io.k8s.description='$(PGO_IMAGE_DESCRIPTION)' \
-		--label io.openshift.tags="postgresql,postgres,sql,nosql,crunchy" \
-		--annotation org.opencontainers.image.authors='$(PGO_IMAGE_MAINTAINER)' \
-		--annotation org.opencontainers.image.vendor='$(PGO_IMAGE_MAINTAINER)' \
-		--annotation org.opencontainers.image.created='$(PGO_IMAGE_TIMESTAMP)' \
-		--annotation org.opencontainers.image.description='$(PGO_IMAGE_DESCRIPTION)' \
-		--annotation org.opencontainers.image.revision='$(PGO_IMAGE_REVISION)' \
-		--annotation org.opencontainers.image.title='$(PGO_IMAGE_SUMMARY)' \
-		--annotation org.opencontainers.image.url='$(PGO_IMAGE_URL)' \
-		$(if $(PGO_VERSION),$(strip \
-			--label release='$(PGO_VERSION)' \
-			--label version='$(PGO_VERSION)' \
-			--annotation org.opencontainers.image.version='$(PGO_VERSION)' \
-		)) \
-		--file $< --format docker --layers .
-
 ##@ Test
 .PHONY: check
 check: ## Run basic go tests with coverage output
@@ -219,88 +149,52 @@ check-envtest-existing: createnamespaces
 		$(GO_TEST) -count=1 -cover -p=1 -tags=envtest ./...
 	kubectl delete -k ./config/dev
 
-# Expects operator to be running
-.PHONY: check-kuttl
-check-kuttl: ## Run kuttl end-to-end tests
-check-kuttl: ## example command: make check-kuttl KUTTL_TEST='
-	${KUTTL_TEST} \
-		--config testing/kuttl/kuttl-test.yaml
-
-.PHONY: generate-kuttl
-generate-kuttl: export KUTTL_PG_UPGRADE_FROM_VERSION ?= 15
-generate-kuttl: export KUTTL_PG_UPGRADE_TO_VERSION ?= 16
-generate-kuttl: export KUTTL_PG_VERSION ?= 16
-generate-kuttl: export KUTTL_POSTGIS_VERSION ?= 3.4
-generate-kuttl: export KUTTL_PSQL_IMAGE ?= registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-16.3-1
-generate-kuttl: export KUTTL_TEST_DELETE_NAMESPACE ?= kuttl-test-delete-namespace
-generate-kuttl: ## Generate kuttl tests
-	[ ! -d testing/kuttl/e2e-generated ] || rm -r testing/kuttl/e2e-generated
-	[ ! -d testing/kuttl/e2e-generated-other ] || rm -r testing/kuttl/e2e-generated-other
-	bash -ceu ' \
-	case $(KUTTL_PG_VERSION) in \
-	16 ) export KUTTL_BITNAMI_IMAGE_TAG=16.0.0-debian-11-r3 ;; \
-	15 ) export KUTTL_BITNAMI_IMAGE_TAG=15.0.0-debian-11-r4 ;; \
-	14 ) export KUTTL_BITNAMI_IMAGE_TAG=14.5.0-debian-11-r37 ;; \
-	13 ) export KUTTL_BITNAMI_IMAGE_TAG=13.8.0-debian-11-r39 ;; \
-	12 ) export KUTTL_BITNAMI_IMAGE_TAG=12.12.0-debian-11-r40 ;; \
-	esac; \
-	render() { envsubst '"'"' \
-		$$KUTTL_PG_UPGRADE_FROM_VERSION $$KUTTL_PG_UPGRADE_TO_VERSION \
-		$$KUTTL_PG_VERSION $$KUTTL_POSTGIS_VERSION $$KUTTL_PSQL_IMAGE \
-		$$KUTTL_BITNAMI_IMAGE_TAG $$KUTTL_TEST_DELETE_NAMESPACE'"'"'; }; \
-	while [ $$# -gt 0 ]; do \
-		source="$${1}" target="$${1/e2e/e2e-generated}"; \
-		mkdir -p "$${target%/*}"; render < "$${source}" > "$${target}"; \
-		shift; \
-	done' - testing/kuttl/e2e/*/*.yaml testing/kuttl/e2e-other/*/*.yaml testing/kuttl/e2e/*/*/*.yaml testing/kuttl/e2e-other/*/*/*.yaml
+.PHONY: go-fix
+go-fix: ## Run go fix on all packages
+	$(GO) fix ./...
 
 ##@ Generate
 
-.PHONY: check-generate
-check-generate: ## Check crd, deepcopy functions, and rbac generation
-check-generate: generate-crd
-check-generate: generate-deepcopy
-check-generate: generate-rbac
-	git diff --exit-code -- config/crd
-	git diff --exit-code -- config/rbac
-	git diff --exit-code -- pkg/apis
-
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-generate: kustomize
-generate: generate-crd
-generate: generate-deepcopy
-generate: generate-rbac
-generate: generate-manager
-generate: generate-bundle
-generate: generate-cw
+	$(MAKE) go-fix
+	$(MAKE) generate-all
+
+.PHONY: generate-all
+generate-all: kustomize
+generate-all: generate-crd
+generate-all: generate-deepcopy
+generate-all: generate-rbac
+generate-all: generate-manager
+generate-all: generate-bundle
+generate-all: generate-cw
 
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
-		paths='./pkg/apis/postgres-operator.crunchydata.com/...' \
+		$(CRD_OPTIONS) \
+		paths='./pkg/apis/upstream.pgv2.percona.com/...' \
 		output:dir='build/crd/crunchy/generated' # build/crd/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgupgrades/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/pgadmins/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/...' \
 		output:dir='build/crd/crunchybridgeclusters/generated' # build/crd/{plural}/generated/{group}_{plural}.yaml
 	@
-	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/postgres-operator.crunchydata.com_postgresclusters.yaml
-	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/postgres-operator.crunchydata.com_pgupgrades.yaml
-	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/postgres-operator.crunchydata.com_pgadmins.yaml
-	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/postgres-operator.crunchydata.com_crunchybridgeclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchy/ > ./config/crd/bases/upstream.pgv2.percona.com_postgresclusters.yaml
+	$(KUSTOMIZE) build ./build/crd/pgupgrades > ./config/crd/bases/upstream.pgv2.percona.com_pgupgrades.yaml
+	$(KUSTOMIZE) build ./build/crd/pgadmins > ./config/crd/bases/upstream.pgv2.percona.com_pgadmins.yaml
+	$(KUSTOMIZE) build ./build/crd/crunchybridgeclusters > ./config/crd/bases/upstream.pgv2.percona.com_crunchybridgeclusters.yaml
 
 .PHONY: generate-deepcopy
 generate-deepcopy: ## Generate deepcopy functions
@@ -314,13 +208,19 @@ generate-rbac: ## Generate rbac
 		'./...' 'config/rbac/'
 	$(KUSTOMIZE) build ./config/rbac/namespace/ > ./deploy/rbac.yaml
 
+.PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
 
+.PHONY: generate-crd-without-description
+generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
+generate-crd-without-description: kustomize generate-crd
+
+.PHONY: generate-percona-crd
 generate-percona-crd:
 	go generate ./percona/...
 	GOBIN='$(CURDIR)/hack/tools' ./hack/controller-generator.sh \
-		crd:crdVersions='v1' \
+		$(CRD_OPTIONS) \
 		paths='./pkg/apis/pgv2.percona.com/...' \
 		output:dir='build/crd/percona/generated' # build/crd/generated/{group}_{plural}.yaml
 	$(KUSTOMIZE) build ./build/crd/percona/ > ./config/crd/bases/pgv2.percona.com_perconapgclusters.yaml
@@ -353,18 +253,6 @@ generate-cw-bundle:
 license: licenses
 licenses: ## Aggregate license files
 	./bin/license_aggregator.sh ./cmd/...
-
-.PHONY: release-postgres-operator-image release-postgres-operator-image-labels
-release-postgres-operator-image: ## Build the postgres-operator image and all its prerequisites
-release-postgres-operator-image: release-postgres-operator-image-labels
-release-postgres-operator-image: licenses
-release-postgres-operator-image: build-postgres-operator-image
-release-postgres-operator-image-labels:
-	$(if $(PGO_IMAGE_DESCRIPTION),,	$(error missing PGO_IMAGE_DESCRIPTION))
-	$(if $(PGO_IMAGE_MAINTAINER),, 	$(error missing PGO_IMAGE_MAINTAINER))
-	$(if $(PGO_IMAGE_NAME),,       	$(error missing PGO_IMAGE_NAME))
-	$(if $(PGO_IMAGE_SUMMARY),,    	$(error missing PGO_IMAGE_SUMMARY))
-	$(if $(PGO_VERSION),,			$(error missing PGO_VERSION))
 
 ##@ Percona
 
@@ -409,11 +297,8 @@ tools: tools/setup-envtest
 tools/setup-envtest:
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
-build-docker-image: get-pgmonitor
+build: get-pgmonitor
 	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE) $(ROOT_REPO)/e2e-tests/build
-
-build-extension-installer-image:
-	ROOT_REPO=$(ROOT_REPO) VERSION=$(VERSION) IMAGE=$(IMAGE)-ext-installer COMPONENT=extension-installer $(ROOT_REPO)/e2e-tests/build
 
 SWAGGER = $(shell pwd)/bin/swagger
 swagger: ## Download swagger locally if necessary.
@@ -448,22 +333,27 @@ update-version:
 
 # Prepare release
 PG_VER ?= $(shell grep -o "postgresVersion: .*" deploy/cr.yaml|grep -oE "[0-9]+")
+CERT_MANAGER_VER := $(shell grep -Eo "cert-manager v.*" go.mod|grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
 include e2e-tests/release_versions
-release: generate
+release: generate license
+	$(SED) -i "/CERT_MANAGER_VER/s/CERT_MANAGER_VER=\".*/CERT_MANAGER_VER=\"$(CERT_MANAGER_VER)\"/" e2e-tests/functions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
+		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
 		-e "s|    image: docker.io/perconalab/percona-postgresql-operator:main|    image: $(IMAGE)|" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL17)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER17)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST17)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
+
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
 
 # Prepare main branch after release
 CURRENT_VERSION := $(shell grep -oE "crVersion: [0-9]+\.[0-9]+\.[0-9]+" deploy/cr.yaml | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
@@ -472,7 +362,9 @@ MINOR_VER       := $(word 2,$(subst ., ,$(CURRENT_VERSION)))
 NEXT_VER        := $(MAJOR_VER).$(shell expr $(MINOR_VER) + 1).0
 PREV1_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 1).0
 PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
-after-release: update-version generate
+
+.PHONY: after-release after-release-versions
+after-release: update-version generate after-release-versions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
@@ -480,7 +372,7 @@ after-release: update-version generate
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
 		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-upgrade#}" \
@@ -488,7 +380,38 @@ after-release: update-version generate
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
 
+# Update sidecars
+	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
+
 # Update upgrade-consistency
 	$(SED) -i "s/$(PREV2_VERSION)/$(PREV1_VERSION)/g" e2e-tests/tests/upgrade-consistency/01-*.yaml
 	$(SED) -i "s/$(PREV1_VERSION)/$(CURRENT_VERSION)/g" e2e-tests/tests/upgrade-consistency/02-*.yaml
 	$(SED) -i "s/$(CURRENT_VERSION)/$(NEXT_VER)/g" e2e-tests/tests/upgrade-consistency/03-*.yaml e2e-tests/tests/init-deploy/05-assert.yaml
+
+after-release-versions:
+	$(SED) -i \
+		-e "s#^IMAGE_OPERATOR=.*#IMAGE_OPERATOR=$(IMAGE_TAG_BASE):main#" \
+		-e "s#^IMAGE_POSTGRESQL14=.*#IMAGE_POSTGRESQL14=$(IMAGE_TAG_BASE):main-ppg14-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER14=.*#IMAGE_PGBOUNCER14=$(IMAGE_TAG_BASE):main-pgbouncer14#" \
+		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=$(IMAGE_TAG_BASE):main-ppg14-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=$(IMAGE_TAG_BASE):main-pgbackrest14#" \
+		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=$(IMAGE_TAG_BASE):main-ppg15-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER15=.*#IMAGE_PGBOUNCER15=$(IMAGE_TAG_BASE):main-pgbouncer15#" \
+		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=$(IMAGE_TAG_BASE):main-ppg15-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=$(IMAGE_TAG_BASE):main-pgbackrest15#" \
+		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=$(IMAGE_TAG_BASE):main-ppg16-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER16=.*#IMAGE_PGBOUNCER16=$(IMAGE_TAG_BASE):main-pgbouncer16#" \
+		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=$(IMAGE_TAG_BASE):main-ppg16-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=$(IMAGE_TAG_BASE):main-pgbackrest16#" \
+		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=$(IMAGE_TAG_BASE):main-ppg17-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER17=.*#IMAGE_PGBOUNCER17=$(IMAGE_TAG_BASE):main-pgbouncer17#" \
+		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=$(IMAGE_TAG_BASE):main-ppg17-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=$(IMAGE_TAG_BASE):main-pgbackrest17#" \
+		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=$(IMAGE_TAG_BASE):main-ppg18-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
+		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
+		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
+		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
+		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
+		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		e2e-tests/release_versions

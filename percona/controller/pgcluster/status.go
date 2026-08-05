@@ -3,6 +3,7 @@ package pgcluster
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -12,10 +13,11 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
@@ -31,7 +33,7 @@ func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGClust
 	}
 
 	// If proxy is not configured, use the primary service as host.
-	if cr.Spec.Proxy == nil || cr.Spec.Proxy.PGBouncer == nil {
+	if !cr.Spec.Proxy.PGBouncerEnabled() {
 		return svcFQDN(naming.ClusterPrimaryService(postgresCluster).Name, postgresCluster.Namespace), nil
 	}
 
@@ -118,6 +120,7 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		ready += is.ReadyReplicas
 	}
 
+	log := logging.FromContext(ctx)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cluster := &v2.PerconaPGCluster{}
 		if err := r.Client.Get(ctx, types.NamespacedName{
@@ -141,10 +144,16 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 		cluster.Status.State = r.getState(cr, &cluster.Status, status)
 
 		if err := r.reconcileStandbyLag(ctx, cluster); err != nil {
-			return errors.Wrap(err, "reconcile replication lag status")
+			log.Error(err, "reconcile replication lag status")
 		}
 
 		cluster.Status.ObservedGeneration = cluster.Generation
+
+		if cond := meta.FindStatusCondition(cr.Status.Conditions, v2.ConditionPMMReady); cond != nil {
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
+		} else {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v2.ConditionPMMReady)
+		}
 
 		updateConditions(cluster, status)
 
@@ -188,11 +197,23 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	}
 
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
+}
 
+// perconaOwnedConditions are the condition types the Percona controllers own.
+// They never appear in the PostgresCluster status, so they're exempt from the
+// mirroring cleanup in syncConditionsFromPostgresToPercona.
+var perconaOwnedConditions = []string{
+	pNaming.ConditionClusterIsReadyForBackup,
+	pNaming.ConditionAPIGroupMigration,
+	pNaming.ConditionStandbyLagging,
+	v2.ConditionPMMReady,
 }
 
 func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+	crunchyTypes := make(map[string]struct{}, len(postgresStatus.Conditions))
 	for _, pcCond := range postgresStatus.Conditions {
+		crunchyTypes[pcCond.Type] = struct{}{}
+
 		_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 			Type:               pcCond.Type,
 			Status:             pcCond.Status,
@@ -202,10 +223,24 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 			ObservedGeneration: cr.Generation,
 		})
 	}
+
+	stale := make([]string, 0, len(cr.Status.Conditions))
+	for _, cond := range cr.Status.Conditions {
+		if _, ok := crunchyTypes[cond.Type]; ok {
+			continue
+		}
+		if slices.Contains(perconaOwnedConditions, cond.Type) {
+			continue
+		}
+		stale = append(stale, cond.Type)
+	}
+
+	for _, condType := range stale {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, condType)
+	}
 }
 
 func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
-
 	if cr.Status.Patroni.Status == nil {
 		cr.Status.Patroni.Status = &v1beta1.PatroniStatus{}
 	}
@@ -225,5 +260,4 @@ func syncPgbackrestFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 	if postgresStatus.PGBackRest != nil {
 		cr.Status.PGBackRest = postgresStatus.PGBackRest.DeepCopy()
 	}
-
 }

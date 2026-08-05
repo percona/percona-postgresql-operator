@@ -7,5 +7,5 @@ commands:
       set -o xtrace
 
       source ../../functions
-      destination=$(kubectl get perconapgbackup -n "${NAMESPACE}" start-from-backup-source-full-s3 -o jsonpath='{.status.destination}' | sed 's/^s3:\/\/pg-operator-testing//g')
+      destination=$(kubectl get perconapgbackup -n "${NAMESPACE}" start-from-backup-source-full-repo1 -o jsonpath='{.status.destination}' | sed "s|^s3://$BUCKET||g")
       get_cr "start-from-backup" ${RANDOM} ${destination} | kubectl -n "${NAMESPACE}" apply -f -

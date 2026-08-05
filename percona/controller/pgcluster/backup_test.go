@@ -5,18 +5,22 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func compareMaps(x map[string]string, y map[string]string) bool {
@@ -95,7 +99,6 @@ func TestBackupOwnerReference(t *testing.T) {
 	}
 
 	for _, job := range jobList.Items {
-		job := job
 		if job.Labels[naming.LabelPGBackRestBackup] == string(naming.BackupReplicaCreate) {
 			job.Status.Conditions = []batchv1.JobCondition{
 				{
@@ -119,7 +122,6 @@ func TestBackupOwnerReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, cj := range cronjobList.Items {
-		cj := cj
 		if err := createFakeJobForCron(ctx, fakeClient, &cj); err != nil {
 			t.Fatal(err)
 		}
@@ -160,6 +162,139 @@ func TestBackupOwnerReference(t *testing.T) {
 	}
 }
 
+func TestReconcileBackupJobCleansUpFinishedManualJob(t *testing.T) {
+	const crName = "some-cluster"
+	const ns = crName
+	const repoName = "repo1"
+	const jobName = "completed-manual-job-backup"
+	const backupName = "attached-pgbackup"
+
+	t.Run("without attached pg-backup", func(t *testing.T) {
+		ctx := t.Context()
+
+		cr, err := readDefaultCR(crName, ns)
+		require.NoError(t, err)
+
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       jobName,
+				Namespace:  ns,
+				Labels:     naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual),
+				Finalizers: []string{pNaming.FinalizerKeepJob},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{{
+					Type:   batchv1.JobComplete,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+
+		cl, err := buildFakeClient(ctx, cr, job)
+		require.NoError(t, err)
+
+		require.NoError(t, reconcileBackupJob(ctx, cl, cr, *job, repoName))
+
+		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, job))
+		assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
+		for k := range naming.PGBackRestLabels(crName) {
+			_, ok := job.Labels[k]
+			assert.False(t, ok)
+		}
+		assert.Equal(t, string(naming.BackupManual), job.Labels[naming.LabelPGBackRestBackup])
+		assert.Equal(t, repoName, job.Labels[naming.LabelPGBackRestRepo])
+		assert.NotContains(t, job.Labels, naming.LabelPGBackRest)
+	})
+
+	t.Run("failed job without attached pg-backup", func(t *testing.T) {
+		ctx := t.Context()
+
+		cr, err := readDefaultCR(crName, ns)
+		require.NoError(t, err)
+
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       jobName,
+				Namespace:  ns,
+				Labels:     naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual),
+				Finalizers: []string{pNaming.FinalizerKeepJob},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+
+		cl, err := buildFakeClient(ctx, cr, job)
+		require.NoError(t, err)
+
+		require.NoError(t, reconcileBackupJob(ctx, cl, cr, *job, repoName))
+
+		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, job))
+		assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
+		for k := range naming.PGBackRestLabels(crName) {
+			_, ok := job.Labels[k]
+			assert.False(t, ok)
+		}
+		assert.Equal(t, string(naming.BackupManual), job.Labels[naming.LabelPGBackRestBackup])
+		assert.Equal(t, repoName, job.Labels[naming.LabelPGBackRestRepo])
+		assert.NotContains(t, job.Labels, naming.LabelPGBackRest)
+	})
+
+	t.Run("with attached pg-backup", func(t *testing.T) {
+		ctx := t.Context()
+
+		cr, err := readDefaultCR(crName, ns)
+		require.NoError(t, err)
+
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       jobName,
+				Namespace:  ns,
+				Labels:     naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual),
+				Finalizers: []string{pNaming.FinalizerKeepJob},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{{
+					Type:   batchv1.JobComplete,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+
+		pgBackup := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName,
+				Namespace: ns,
+			},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: crName,
+				RepoName:  ptr.To(repoName),
+			},
+			Status: v2.PerconaPGBackupStatus{
+				JobName: jobName,
+			},
+		}
+
+		cl, err := buildFakeClient(ctx, cr, job, pgBackup)
+		require.NoError(t, err)
+
+		require.NoError(t, reconcileBackupJob(ctx, cl, cr, *job, repoName))
+
+		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, job))
+		assert.True(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
+		for k, v := range naming.PGBackRestBackupJobLabels(crName, repoName, naming.BackupManual) {
+			assert.Equal(t, v, job.Labels[k])
+		}
+
+		backup := &v2.PerconaPGBackup{}
+		require.NoError(t, cl.Get(ctx, types.NamespacedName{Name: backupName, Namespace: ns}, backup))
+		assert.Equal(t, jobName, backup.Status.JobName)
+	})
+}
+
 func createFakeJobForCron(ctx context.Context, cl client.Client, cronJob *batchv1.CronJob) error {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +315,6 @@ func createFakeJobForCron(ctx context.Context, cl client.Client, cronJob *batchv
 
 func createFakePodsForStatefulsets(ctx context.Context, cl client.Client, stsList *appsv1.StatefulSetList) error {
 	for _, sts := range stsList.Items {
-		sts := sts
 		for i := 0; i < int(*sts.Spec.Replicas); i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

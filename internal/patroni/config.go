@@ -6,6 +6,7 @@ package patroni
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"strings"
 
@@ -13,10 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -157,6 +157,14 @@ func clusterYAML(
 		},
 	}
 
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		postgresqlSection := root["postgresql"].(map[string]any)
+		postgresqlSection["bin_name"] = map[string]any{
+			"pg_basebackup": "pg_tde_basebackup",
+			"pg_rewind":     "pg_tde_rewind",
+		}
+	}
+
 	if !ClusterBootstrapped(cluster) {
 		// Patroni has not yet bootstrapped. Populate the "bootstrap.dcs" field to
 		// facilitate it. When Patroni is already bootstrapped, this field is ignored.
@@ -175,6 +183,10 @@ func clusterYAML(
 		}
 	}
 
+	if cluster.CompareVersion("2.9.0") >= 0 && cluster.Spec.Patroni != nil {
+		root["postgresql"].(map[string]any)["remove_data_directory_on_diverged_timelines"] = cluster.Spec.Patroni.RemoveDataDirectoryOnDivergedTimelines
+	}
+
 	b, err := yaml.Marshal(root)
 	return string(append([]byte(yamlGeneratedWarning), b...)), err
 }
@@ -188,9 +200,7 @@ func DynamicConfiguration(
 ) map[string]any {
 	// Copy the entire configuration before making any changes.
 	root := make(map[string]any, len(configuration))
-	for k, v := range configuration {
-		root[k] = v
-	}
+	maps.Copy(root, configuration)
 
 	root["ttl"] = *cluster.Spec.Patroni.LeaderLeaseDurationSeconds
 	root["loop_wait"] = *cluster.Spec.Patroni.SyncPeriodSeconds
@@ -201,18 +211,8 @@ func DynamicConfiguration(
 		"use_slots": false,
 	}
 
-	// When TDE is configured, override the pg_rewind binary name to point
-	// to the wrapper script.
-	if config.FetchKeyCommand(&cluster.Spec) != "" {
-		postgresql["bin_name"] = map[string]any{
-			"pg_rewind": "/tmp/pg_rewind_tde.sh",
-		}
-	}
-
 	if section, ok := root["postgresql"].(map[string]any); ok {
-		for k, v := range section {
-			postgresql[k] = v
-		}
+		maps.Copy(postgresql, section)
 	}
 	root["postgresql"] = postgresql
 
@@ -224,9 +224,7 @@ func DynamicConfiguration(
 		}
 	}
 	if section, ok := postgresql["parameters"].(map[string]any); ok {
-		for k, v := range section {
-			parameters[k] = v
-		}
+		maps.Copy(parameters, section)
 	}
 	// Override the above with mandatory parameters.
 	if pgParameters.Mandatory != nil {
@@ -300,9 +298,7 @@ func DynamicConfiguration(
 		// Copy the "standby_cluster" section before making any changes.
 		standby := make(map[string]any)
 		if section, ok := root["standby_cluster"].(map[string]any); ok {
-			for k, v := range section {
-				standby[k] = v
-			}
+			maps.Copy(standby, section)
 		}
 
 		// Unset any previous value for restore_command - we will set it later if needed
@@ -652,11 +648,6 @@ func instanceYAML(
 
 				// NOTE(cbandy): The "--waldir" option was introduced in PostgreSQL v10.
 				"waldir=" + postgres.WALDirectory(cluster, instance),
-			}
-
-			// Append the encryption key command, if provided.
-			if ekc := config.FetchKeyCommand(&cluster.Spec); ekc != "" {
-				initdb = append(initdb, fmt.Sprintf("encryption-key-command=%s", ekc))
 			}
 
 			// Populate some "bootstrap" fields to initialize the cluster.

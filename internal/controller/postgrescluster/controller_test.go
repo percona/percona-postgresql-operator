@@ -33,7 +33,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestDeleteControlled(t *testing.T) {
@@ -358,7 +358,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{
@@ -376,7 +376,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{
@@ -389,7 +389,7 @@ spec:
 					MatchFields(IgnoreExtras, Fields{
 						"Manager": Equal(string(test.Reconciler.Owner)),
 						"FieldsV1": PointTo(MatchAllFields(Fields{
-							"Raw": WithTransform(func(in []byte) (out map[string]interface{}) {
+							"Raw": WithTransform(func(in []byte) (out map[string]any) {
 								Expect(yaml.Unmarshal(in, &out)).To(Succeed())
 								return out
 							}, MatchAllKeys(Keys{

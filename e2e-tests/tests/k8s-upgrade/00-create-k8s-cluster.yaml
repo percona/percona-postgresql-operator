@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 1000
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      name="k8s-upgrade-$RANDOM"
+
+      if [[ "${K8S_UPGRADE_PLATFORM}" != "gke" && "${K8S_UPGRADE_PLATFORM}" != "digitalocean" ]]; then
+        echo "Unsupported platform: ${K8S_UPGRADE_PLATFORM}"
+        exit 1
+      fi
+
+      if [[ -n "${K8S_UPGRADE_INITIAL_VERSION}" && -z "${K8S_UPGRADE_FINAL_VERSION}" ]] ||
+        [[ -z "${K8S_UPGRADE_INITIAL_VERSION}" && -n "${K8S_UPGRADE_FINAL_VERSION}" ]]; then
+        echo "K8S_UPGRADE_INITIAL_VERSION and K8S_UPGRADE_FINAL_VERSION are both required when one is configured"
+        exit 1
+      fi
+
+      # By defautt, we will use the two most recent Kubernetes versions available for the specified platform and region
+      initial_version="${K8S_UPGRADE_INITIAL_VERSION:-$(get_available_k8s_versions 2 "${K8S_UPGRADE_PLATFORM}" "${K8S_UPGRADE_REGION}")}"
+      final_version="${K8S_UPGRADE_FINAL_VERSION:-$(get_available_k8s_versions 1 "${K8S_UPGRADE_PLATFORM}" "${K8S_UPGRADE_REGION}")}"
+
+      create_k8s_cluster "$name" "$initial_version" "${K8S_UPGRADE_PLATFORM}" "${K8S_UPGRADE_REGION}"
+
+      # Saving cluster information and available versions for the next test steps
+      kubectl create configmap cluster-name \
+        --from-literal=name="$name" \
+        --namespace "${NAMESPACE}"
+
+      kubectl create configmap initial-cluster-version \
+        --from-literal=version="$initial_version" \
+        --namespace "${NAMESPACE}"
+
+      kubectl create configmap final-cluster-version \
+        --from-literal=version="$final_version" \
+        --namespace "${NAMESPACE}"

@@ -12,4 +12,4 @@ commands:
         | yq '.spec.backups.enabled=false' \
         | kubectl -n "${NAMESPACE}" apply -f -
 
-      wait_for_ready_containers "some-name-instance1" 2
+      wait_for_ready_containers "some-name-instance1" 4

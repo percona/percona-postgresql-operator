@@ -7,8 +7,10 @@ package postgrescluster
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	appsv1 "k8s.io/api/apps/v1"
@@ -25,12 +27,16 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
@@ -40,6 +46,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
@@ -48,8 +55,10 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -59,22 +68,25 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client              client.Client
-	Scheme              *k8sruntime.Scheme
-	DiscoveryClient     *discovery.DiscoveryClient
-	IsOpenShift         bool
-	Owner               client.FieldOwner
-	PodExec             runtime.PodExecutor
-	Recorder            record.EventRecorder
-	Registration        registration.Registration
-	Tracer              trace.Tracer
-	CertManagerCtrlFunc certmanager.NewControllerFunc
-	RestConfig          *rest.Config
+	Client                       client.Client
+	Scheme                       *k8sruntime.Scheme
+	DiscoveryClient              *discovery.DiscoveryClient
+	IsOpenShift                  bool
+	Owner                        client.FieldOwner
+	PodExec                      runtime.PodExecutor
+	Recorder                     record.EventRecorder
+	Registration                 registration.Registration
+	Tracer                       trace.Tracer
+	CertManagerCtrlFunc          certmanager.NewControllerFunc
+	RestConfig                   *rest.Config
+	Controller                   controller.Controller
+	Cache                        cache.Cache
+	certManagerWatchesRegistered atomic.Bool
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters",verbs={get,list,watch}
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/status",verbs={patch}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters",verbs={get,list,watch}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/status",verbs={patch}
 
 // Reconcile reconciles a ConfigMap in a namespace managed by the PostgreSQL Operator
 func (r *Reconciler) Reconcile(
@@ -245,6 +257,25 @@ func (r *Reconciler) Reconcile(
 		}
 	}
 
+	// K8SPG-1045
+	if err == nil {
+		if err = r.reconcileTLSCondition(ctx, cluster); err != nil {
+			return runtime.ErrorWithBackoff(err)
+		}
+
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady, metav1.ConditionFalse) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:               v1beta1.PostgresClusterProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Paused",
+				Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
+				ObservedGeneration: cluster.GetGeneration(),
+			})
+			return runtime.ErrorWithBackoff(patchClusterStatus())
+		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+	}
+
 	pgHBAs := postgres.NewHBAs()
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
@@ -273,12 +304,15 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.PGAudit {
 		pgaudit.PostgreSQLParameters(&pgParameters)
 	}
+	if cluster.Spec.Extensions.PGCron {
+		pgcron.PostgreSQLParameters(&pgParameters)
+	}
+	if cluster.Spec.Extensions.SetUser {
+		setuser.PostgreSQLParameters(&pgParameters)
+	}
 
-	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEEnabled)
-	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
 	// pg_tde should be removed from shared libraries only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+	if cluster.Spec.Extensions.PGTDE.Enabled || isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 		pgtde.PostgreSQLParameters(&pgParameters)
 	}
 
@@ -290,6 +324,16 @@ func (r *Reconciler) Reconcile(
 
 	if err == nil {
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
+	}
+
+	if err == nil {
+		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
+		if certErr != nil {
+			log.V(1).Info("failed to check if root CA is cert-manager managed, will retry on next reconcile",
+				"error", certErr)
+		} else if certManagerManaged {
+			r.registerCertManagerWatches(ctx)
+		}
 	}
 
 	if err == nil {
@@ -503,7 +547,7 @@ func (r *Reconciler) patch(
 // creator of such a reference have either "delete" permission on the owner or
 // "update" permission on the owner's "finalizers" subresource.
 // - https://docs.k8s.io/reference/access-authn-authz/admission-controllers/
-// +kubebuilder:rbac:groups="postgres-operator.crunchydata.com",resources="postgresclusters/finalizers",verbs={update}
+// +kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="postgresclusters/finalizers",verbs={update}
 
 // setControllerReference sets owner as a Controller OwnerReference on controlled.
 // Only one OwnerReference can be a controller, so it returns an error if another
@@ -554,6 +598,17 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	r.Cache = mgr.GetCache()
+
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v1beta1.PostgresCluster{},
+		v1beta1.IndexFieldPGBouncerUserSecrets,
+		v1beta1.PGBouncerUserSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -567,7 +622,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		},
 	})
 
-	return builder.ControllerManagedBy(mgr).
+	bldr := builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
 		Owns(&corev1.Endpoints{}).
@@ -582,8 +637,102 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Watches(&corev1.Secret{}, r.watchClusterSecrets(), builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			return hasCluster
+		}))).
 		Watches(&corev1.Pod{}, r.watchPods()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},
-			r.controllerRefHandlerFuncs()). // watch all StatefulSets
-		Complete(r)
+			r.controllerRefHandlerFuncs()) // watch all StatefulSets
+
+	// When cert-manager is installed, watch Certificate resources owned by
+	// PostgresCluster and cert-manager-issued Secrets (which are owned by
+	// Certificate, not PostgresCluster) so that deletions or renewals trigger
+	// an immediate reconcile rather than waiting for the next resync.
+	certManagerExists, err := k8s.GroupVersionKindExists(r.DiscoveryClient, "cert-manager.io/v1", "Certificate")
+	if err != nil {
+		return err
+	}
+	if certManagerExists {
+		certManagerSecretPredicate := builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			_, hasCertAnnotation := obj.GetAnnotations()["cert-manager.io/certificate-name"]
+			return hasCluster && hasCertAnnotation
+		}))
+		bldr.Owns(&cmv1.Certificate{}).
+			Owns(&cmv1.Issuer{}).
+			Watches(&corev1.Secret{}, r.watchCertManagerSecrets(), certManagerSecretPredicate)
+	}
+
+	return bldr.Complete(r)
+}
+
+// registerCertManagerWatches dynamically registers watches for cert-manager
+// Certificate, Issuer, and cert-manager-issued Secret resources for
+// case where cert-manager is installed after the operator starts, so the
+// watches were not registered in SetupWithManager.
+func (r *Reconciler) registerCertManagerWatches(ctx context.Context) {
+	if r.Controller == nil || r.Cache == nil {
+		return
+	}
+
+	if r.certManagerWatchesRegistered.Load() {
+		return
+	}
+
+	log := logging.FromContext(ctx)
+
+	certHandler := handler.TypedEnqueueRequestForOwner[*cmv1.Certificate](
+		r.Scheme, r.Client.RESTMapper(),
+		&v1beta1.PostgresCluster{},
+		handler.OnlyControllerOwner(),
+	)
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &cmv1.Certificate{}, certHandler,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for Certificates")
+		return
+	}
+
+	issuerHandler := handler.TypedEnqueueRequestForOwner[*cmv1.Issuer](
+		r.Scheme, r.Client.RESTMapper(),
+		&v1beta1.PostgresCluster{},
+		handler.OnlyControllerOwner(),
+	)
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &cmv1.Issuer{}, issuerHandler,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for Issuers")
+		return
+	}
+	secretHandler := handler.TypedEnqueueRequestsFromMapFunc(
+		func(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+			cluster := secret.GetLabels()[naming.LabelCluster]
+			if len(cluster) > 0 {
+				return []reconcile.Request{
+					{NamespacedName: client.ObjectKey{
+						Namespace: secret.GetNamespace(),
+						Name:      cluster,
+					}},
+				}
+			}
+			return nil
+		},
+	)
+	certManagerSecretPredicate := predicate.NewTypedPredicateFuncs(func(secret *corev1.Secret) bool {
+		_, hasCluster := secret.GetLabels()[naming.LabelCluster]
+		_, hasCertAnnotation := secret.GetAnnotations()["cert-manager.io/certificate-name"]
+		return hasCluster && hasCertAnnotation
+	})
+	if err := r.Controller.Watch(source.Kind(
+		r.Cache, &corev1.Secret{}, secretHandler, certManagerSecretPredicate,
+	)); err != nil {
+		log.Error(err, "failed to register dynamic watch for cert-manager Secrets")
+		return
+	}
+
+	r.certManagerWatchesRegistered.Store(true)
+
+	log.Info("dynamically registered cert-manager watches")
 }

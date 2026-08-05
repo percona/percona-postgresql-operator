@@ -6,12 +6,14 @@ package postgrescluster
 
 import (
 	"context"
+	"strings"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,7 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -28,6 +30,93 @@ const (
 	clusterKeyFile  = "tls.key"
 	rootCertFile    = "ca.crt"
 )
+
+// K8SPG-1045
+func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	cond := metav1.Condition{
+		Type:               v1beta1.ConditionTypeTLSSecretsReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "TLSSecretsFound",
+		ObservedGeneration: cluster.GetGeneration(),
+	}
+
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
+		cond.Message = "certManagementPolicy is " + string(cluster.Spec.TLS.GetCertManagementPolicy())
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+
+	var missing []string
+
+	checkSecret := func(projection *corev1.SecretProjection, secretName string) error {
+		if projection != nil {
+			secretName = projection.Name
+		}
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      secretName,
+		}}
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+		if client.IgnoreNotFound(err) != nil {
+			return errors.Wrapf(err, "get TLS secret %s", secret.Name)
+		}
+		if k8serrors.IsNotFound(err) {
+			missing = append(missing, secret.Name)
+		}
+
+		return nil
+	}
+
+	if err := checkSecret(cluster.Spec.CustomRootCATLSSecret, naming.PostgresRootCASecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check root ca secret")
+	}
+	if err := checkSecret(cluster.Spec.CustomTLSSecret, naming.PostgresTLSSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check custom tls secret")
+	}
+	if err := checkSecret(cluster.Spec.CustomReplicationClientTLSSecret, naming.ReplicationClientCertSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check replication client cert secret")
+	}
+	if err := checkSecret(nil, naming.PGBackRestSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check pgBackRest TLS secret")
+	}
+
+	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+		if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name); err != nil {
+			return errors.Wrap(err, "check PgBouncer TLS secret")
+		}
+	}
+
+	if cluster.Spec.CustomTLSSecret == nil {
+		instances := &appsv1.StatefulSetList{}
+		if err := r.Client.List(
+			ctx, instances,
+			client.InNamespace(cluster.Namespace),
+			client.MatchingLabels{
+				naming.LabelCluster: cluster.Name,
+				naming.LabelData:    naming.DataPostgres,
+			},
+		); err != nil {
+			return errors.Wrap(err, "list instances to check TLS secrets")
+		}
+
+		for i := range instances.Items {
+			if err := checkSecret(nil, naming.InstanceCertificates(&instances.Items[i]).Name); err != nil {
+				return errors.Wrap(err, "check instance TLS secret")
+			}
+		}
+	}
+
+	if len(missing) > 0 {
+		cond.Message = "Missing user-provided TLS secrets: " + strings.Join(missing, ", ") + ". certManagementPolicy is userProvidedOnly"
+		cond.Reason = "TLSSecretsMissing"
+		cond.Status = metav1.ConditionFalse
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+	return nil
+}
 
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
@@ -42,11 +131,22 @@ func (r *Reconciler) reconcileRootCertificate(
 ) (
 	*pki.RootCertificateAuthority, error,
 ) {
+	mode, err := certmanager.ResolveIssuerMode(ctx, r.Client, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	if mode == certmanager.IssuerModeExternal {
+		return nil, nil
+	}
+
 	const keyCertificate, keyPrivateKey = "root.crt", "root.key"
 
 	// K8SPG-553
 	existing := &corev1.Secret{
 		ObjectMeta: naming.PostgresRootCASecret(cluster),
+	}
+	if mode == certmanager.IssuerModeManagedCluster {
+		existing.ObjectMeta = naming.ClusterCACertSecret(cluster, certmanager.CertManagerNamespace())
 	}
 
 	privateKey := keyPrivateKey
@@ -64,19 +164,8 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	err := errors.WithStack(
+	err = errors.WithStack(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
-	// K8SPG-555: we need to check ca certificate from old operator versions
-	// TODO: remove when 2.4.0 will become unsupported
-	if k8serrors.IsNotFound(err) {
-		nn := client.ObjectKeyFromObject(existing)
-		nn.Name = naming.RootCertSecret
-		err = errors.WithStack(
-			r.Client.Get(ctx, nn, existing))
-		if err == nil {
-			existing.Name = naming.RootCertSecret
-		}
-	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
 
@@ -89,15 +178,41 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if err != nil {
+			return nil, errors.Wrap(err, "get user-provided root CA secret")
+		}
+
+		root := &pki.RootCertificateAuthority{}
+		if err := root.Certificate.UnmarshalText(existing.Data[certificateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse certificate in user-provided root CA secret %q", existing.Name)
+		}
+		if err := root.PrivateKey.UnmarshalText(existing.Data[privateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse private key in user-provided root CA secret %q", existing.Name)
+		}
+		if !pki.RootIsValid(root) {
+			return nil, errors.Errorf("user-provided root CA secret %q is invalid", existing.Name)
+		}
+		return root, nil
+	}
 	// If the secret is managed by cert-manager, parse it using cert-manager key names
 	// (tls.crt/tls.key) and return without overwriting the secret with internal PKI.
 	if err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
+		if _, certManagerErr := r.reconcileCertManagerRootCertificate(ctx, cluster); certManagerErr != nil {
+			return nil, certManagerErr
+		}
 		root := &pki.RootCertificateAuthority{}
 		_ = root.Certificate.UnmarshalText(existing.Data["tls.crt"])
 		_ = root.PrivateKey.UnmarshalText(existing.Data["tls.key"])
 		if pki.RootIsValid(root) {
 			return root, nil
 		}
+		return nil, errors.New("waiting for cert-manager to issue a valid CA certificate")
+	}
+
+	if mode == certmanager.IssuerModeManagedCluster {
+		// The cluster-scoped CA cert/secret is entirely cert-manager's
+		// responsibility; there is no internal-PKI fallback for it.
 		return nil, errors.New("waiting for cert-manager to issue a valid CA certificate")
 	}
 
@@ -130,7 +245,6 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
-	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
 
 	if cluster.Labels != nil {
 		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
@@ -140,17 +254,8 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	// A root secret is scoped to the namespace where postgrescluster(s)
-	// are deployed. For operator deployments with postgresclusters in more than
-	// one namespace, there will be one root per namespace.
-	// During reconciliation, the owner reference block of the root secret is
-	// updated to include the postgrescluster as an owner.
-	// However, unlike the leaf certificate, the postgrescluster will not be
-	// set as the controller. This allows for multiple owners to guide garbage
-	// collection, but avoids any errors related to setting multiple controllers.
-	// https://docs.k8s.io/concepts/workloads/controllers/garbage-collection/#owners-and-dependents
 	if err == nil {
-		err = errors.WithStack(r.setOwnerReference(cluster, intent))
+		err = errors.WithStack(r.setControllerReference(cluster, intent))
 	}
 	if err == nil {
 		intent.Data[keyCertificate], err = root.Certificate.MarshalText()
@@ -193,8 +298,17 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 		return nil, errors.Wrap(err, "error applying CA certificate")
 	}
 
+	mode, err := certmanager.ResolveIssuerMode(ctx, r.Client, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	secretMeta := naming.PostgresRootCASecret(cluster)
+	if mode == certmanager.IssuerModeManagedCluster {
+		secretMeta = naming.ClusterCACertSecret(cluster, certmanager.CertManagerNamespace())
+	}
+
 	// Try to fetch the CA secret created by cert-manager.
-	secret := &corev1.Secret{ObjectMeta: naming.PostgresRootCASecret(cluster)}
+	secret := &corev1.Secret{ObjectMeta: secretMeta}
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
 		if k8serrors.IsNotFound(err) {
 			log.Info("waiting for cert-manager to issue CA certificate")
@@ -209,14 +323,13 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
-// reconcileClusterCertificate first checks if a custom certificate
-// secret is configured. If so, that secret projection is returned.
-// Otherwise, it checks if cert-manager is installed. If installed, cert-manager
-// is used to create and manage the certificate. Otherwise, a secret containing
-// a generated leaf certificate is created using the internal PKI.
-// In either case, the relevant secret is expected to contain three files:
-// tls.crt, tls.key and ca.crt which are the TLS certificate, private key
-// and CA certificate, respectively.
+// reconcileClusterCertificate returns the cluster TLS secret projection.
+// If CustomTLSSecret is set, that projection is returned. Otherwise the
+// path depends on the root CA: when it is cert-manager-managed,
+// cert-manager issues the leaf; when it is internal but a stale
+// Certificate CR is left behind by K8SPG-1017, the CR is reconciled
+// (K8SPG-1007 ownerRef recovery) before falling back to the internal PKI
+// leaf. The returned secret contains tls.crt, tls.key and ca.crt.
 func (r *Reconciler) reconcileClusterCertificate(
 	ctx context.Context, root *pki.RootCertificateAuthority,
 	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
@@ -228,16 +341,46 @@ func (r *Reconciler) reconcileClusterCertificate(
 		return cluster.Spec.CustomTLSSecret, nil
 	}
 
-	certManagerInstalled, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		return r.reconcileUserProvidedClusterCertificate(ctx, cluster)
+	}
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if cert-manager is installed")
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
 	}
 
-	if certManagerInstalled {
-		return r.reconcileCertManagerClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+	if certManagerManaged {
+		return r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
+	}
+
+	// cluster certificates are not managed by cert-manager
+	// but Certificate object exists due to the bug described in K8SPG-1017
+	// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
+	if cert := certmanager.ClusterCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+		_, err := r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
+		if err != nil {
+			logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
+		}
 	}
 
 	return r.reconcileInternalClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+}
+
+func (r *Reconciler) reconcileUserProvidedClusterCertificate(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.SecretProjection, error) {
+	secret := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+		return nil, errors.Wrapf(err, "get user-provided TLS secret %s", secret.Name)
+	}
+
+	for _, key := range []string{clusterCertFile, clusterKeyFile, rootCertFile} {
+		if len(secret.Data[key]) == 0 {
+			return nil, errors.Errorf("user-provided TLS secret %q is missing key %q", secret.Name, key)
+		}
+	}
+
+	return clusterCertSecretProjection(secret), nil
 }
 
 // reconcileInternalClusterCertificate creates a cluster certificate using internal PKI.
@@ -252,7 +395,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 
 	existing := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	))
 
 	leaf := &pki.LeafCertificate{}
 	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
@@ -290,7 +434,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "postgres-tls",
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.
@@ -325,17 +470,23 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 // reconcileCertManagerClusterCertificate creates a cluster certificate using cert-manager.
 // It first ensures the TLS issuer exists, then creates the cluster Certificate CR.
 func (r *Reconciler) reconcileCertManagerClusterCertificate(
-	ctx context.Context, root *pki.RootCertificateAuthority,
-	cluster *v1beta1.PostgresCluster, primaryService *corev1.Service,
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	primaryService *corev1.Service,
 	replicaService *corev1.Service,
 ) (
 	*corev1.SecretProjection, error,
 ) {
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
 
-	err := c.ApplyIssuer(ctx, cluster)
+	mode, err := certmanager.ResolveIssuerMode(ctx, r.Client, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply TLS issuer")
+		return nil, errors.Wrap(err, "failed to resolve issuer mode")
+	}
+	if mode != certmanager.IssuerModeExternal {
+		if err := c.ApplyIssuer(ctx, cluster); err != nil {
+			return nil, errors.Wrap(err, "failed to apply TLS issuer")
+		}
 	}
 
 	primaryDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
@@ -358,6 +509,64 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 	}), nil
 }
 
+// shouldReconcileCertManagerCertificate reports whether a stale cert-manager
+// Certificate CR exists for the cluster and should be reconciled to update
+// its ownerRef (K8SPG-1007 recovery for Certificates left behind by the
+// K8SPG-1017 bug). Returns false when cert-manager is not installed or the
+// Certificate CR does not exist.
+func (r *Reconciler) shouldReconcileCertManagerCertificate(ctx context.Context, namespace, certName string) bool {
+	installed, err := r.isCertManagerInstalled(ctx, namespace)
+	if err != nil || !installed {
+		return false
+	}
+
+	// CertificateExists is read-only, so use the dry-run controller to match
+	// the intent (no mutating cert-manager calls happen on this path).
+	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true /* dry run */)
+
+	exists, err := c.CertificateExists(ctx, namespace, certName)
+
+	return err == nil && exists
+}
+
+func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1beta1.PostgresCluster) (bool, error) {
+	if cluster.Spec.CustomRootCATLSSecret != nil {
+		return false, nil
+	}
+
+	mode, err := certmanager.ResolveIssuerMode(ctx, r.Client, cluster)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to resolve issuer mode")
+	}
+
+	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	if err != nil {
+		return false, err
+	}
+
+	if mode != certmanager.IssuerModeManagedNamespaced {
+		if !installed {
+			return false, errors.New("cert-manager is required when spec.tls.issuerConf is set")
+		}
+		return true, nil
+	}
+
+	if !installed {
+		return false, nil
+	}
+
+	rootSecret := &corev1.Secret{ObjectMeta: naming.PostgresRootCASecret(cluster)}
+	err = r.Client.Get(ctx, client.ObjectKeyFromObject(rootSecret), rootSecret)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, errors.WithStack(err)
+	}
+
+	return rootSecret.Annotations["cert-manager.io/certificate-name"] != "", nil
+}
+
 func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
 	if r.RestConfig == nil {
 		return false, nil
@@ -369,7 +578,8 @@ func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (boo
 		case errors.Is(err, certmanager.ErrCertManagerNotFound):
 			return false, nil
 		case errors.Is(err, certmanager.ErrCertManagerNotReady):
-			return true, nil
+			logging.FromContext(ctx).Info("cert-manager is not ready, falling back to internal PKI")
+			return false, nil
 		}
 		return false, err
 	}

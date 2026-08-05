@@ -19,12 +19,122 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+func TestGetAdditionalTrustedCAs(t *testing.T) {
+	ctx := context.Background()
+	_, cc := setupKubernetes(t)
+	require.ParallelCapacity(t, 0)
+
+	reconciler := &Reconciler{Client: cc}
+
+	ns := setupNamespace(t, cc)
+	cluster := testCluster()
+	cluster.Namespace = ns.Name
+	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+		PGBouncer: &v1beta1.PGBouncerPodSpec{},
+	}
+
+	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----\n")
+	customCA := []byte("-----BEGIN CERTIFICATE-----\nCCCC\n-----END CERTIFICATE-----\n")
+
+	for name, data := range map[string]map[string][]byte{
+		"ca-one": {"ca.crt": ca1},
+		"ca-two": {"ca.crt": ca2},
+		"custom-tls": {
+			"my-ca":   customCA,
+			"tls.crt": []byte("cert"),
+			"tls.key": []byte("key"),
+		},
+		"custom-tls-without-ca": {
+			"tls.crt": []byte("cert"),
+			"tls.key": []byte("key"),
+		},
+	} {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns.Name},
+			Data:       data,
+		}
+		assert.NilError(t, cc.Create(ctx, secret))
+	}
+
+	t.Run("ReferencedSecrets", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"}, {Name: "does-not-exist"}, {Name: "ca-two"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{ca1, ca2})
+	})
+
+	// K8SPG-952: in manual TLS mode the frontend CA file is built solely
+	// from this list, so it must begin with the authority of the custom
+	// TLS Secret.
+	t.Run("CustomTLSAuthorityPrepended", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-tls"},
+			Items: []corev1.KeyToPath{
+				{Key: "my-ca", Path: "ca.crt"},
+				{Key: "tls.crt", Path: "tls.crt"},
+				{Key: "tls.key", Path: "tls.key"},
+			},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{customCA, ca1})
+	})
+
+	t.Run("CustomTLSSecretMissing", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "does-not-exist"},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		_, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.ErrorContains(t, err, "does-not-exist")
+	})
+
+	t.Run("CustomTLSAuthorityKeyMissing", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-tls-without-ca"},
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-one"},
+		}
+
+		_, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.ErrorContains(t, err, "ca.crt")
+	})
+
+	// The custom TLS Secret plays no part in the bundle when no additional
+	// CAs are requested; its authority is mounted directly from it.
+	t.Run("CustomTLSWithoutAdditionalCAs", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "does-not-exist"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Equal(t, len(cas), 0)
+	})
+}
 
 func TestGeneratePGBouncerService(t *testing.T) {
 	_, cc := setupKubernetes(t)
@@ -61,9 +171,27 @@ namespace: ns5
 		}
 	})
 
+	t.Run("ZeroReplicas", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+			PGBouncer: &v1beta1.PGBouncerPodSpec{
+				Replicas: new(int32),
+			},
+		}
+
+		service, specified, err := reconciler.generatePGBouncerService(cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, !specified)
+
+		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta, `
+name: pg7-pgbouncer
+namespace: ns5
+		`))
+	})
+
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{
-			Port: initialize.Int32(9651),
+			Port: new(int32(9651)),
 		},
 	}
 
@@ -84,7 +212,7 @@ labels:
 name: pg7-pgbouncer
 namespace: ns5
 ownerReferences:
-- apiVersion: postgres-operator.crunchydata.com/v1beta1
+- apiVersion: upstream.pgv2.percona.com/v1beta1
   blockOwnerDeletion: true
   controller: true
   kind: PostgresCluster
@@ -219,12 +347,12 @@ ownerReferences:
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
 		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
-			NodePort: initialize.Int32(32000), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"pg7-pgbouncer\"")
 				assert.Assert(t, service == nil)
 			}},
 		{Description: "NodePort with Port 32001", Type: "NodePort",
-			NodePort: initialize.Int32(32001), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
 				alwaysExpect(t, service)
@@ -237,7 +365,7 @@ ownerReferences:
 `))
 			}},
 		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
-			NodePort: initialize.Int32(32002), Expect: func(t testing.TB, service *corev1.Service, err error) {
+			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
 				alwaysExpect(t, service)
@@ -287,7 +415,7 @@ func TestReconcilePGBouncerService(t *testing.T) {
 
 	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 		PGBouncer: &v1beta1.PGBouncerPodSpec{
-			Port: initialize.Int32(19041),
+			Port: new(int32(19041)),
 		},
 	}
 
@@ -340,7 +468,7 @@ func TestReconcilePGBouncerService(t *testing.T) {
 
 				cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
 					PGBouncer: &v1beta1.PGBouncerPodSpec{
-						Port: initialize.Int32(19041),
+						Port: new(int32(19041)),
 					},
 				}
 				cluster.Spec.Proxy.PGBouncer.Service = &v1beta1.ServiceSpec{Type: beforeType}
@@ -509,7 +637,7 @@ topologySpreadConstraints:
 
 		t.Run("DisableDefaultPodScheduling", func(t *testing.T) {
 			cluster := cluster.DeepCopy()
-			cluster.Spec.DisableDefaultPodScheduling = initialize.Bool(true)
+			cluster.Spec.DisableDefaultPodScheduling = new(true)
 
 			deploy, specified, err := reconciler.generatePGBouncerDeployment(
 				ctx, cluster, primary, configmap, secret)
@@ -562,8 +690,8 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("not created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
-		cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromInt32(0))
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromInt32(0))
 		assert.NilError(t, r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster))
 		assert.Assert(t, !foundPDB(cluster))
 	})
@@ -571,8 +699,8 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("int created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
-		cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromInt32(1))
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromInt32(1))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
@@ -581,7 +709,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 		assert.Assert(t, foundPDB(cluster))
 
 		t.Run("deleted", func(t *testing.T) {
-			cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromInt32(0))
+			cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromInt32(0))
 			err := r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster)
 			if apierrors.IsConflict(err) {
 				// When running in an existing environment another controller will sometimes update
@@ -598,8 +726,8 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 	t.Run("str created", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.Spec.Proxy.PGBouncer.Replicas = initialize.Int32(1)
-		cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromString("50%"))
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromString("50%"))
 
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
@@ -608,7 +736,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 		assert.Assert(t, foundPDB(cluster))
 
 		t.Run("deleted", func(t *testing.T) {
-			cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromString("0%"))
+			cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromString("0%"))
 			err := r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster)
 			if apierrors.IsConflict(err) {
 				// When running in an existing environment another controller will sometimes update
@@ -622,13 +750,13 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 		})
 
 		t.Run("delete with 00%", func(t *testing.T) {
-			cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromString("50%"))
+			cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromString("50%"))
 
 			assert.NilError(t, r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster))
 			assert.Assert(t, foundPDB(cluster))
 
 			t.Run("deleted", func(t *testing.T) {
-				cluster.Spec.Proxy.PGBouncer.MinAvailable = initialize.Pointer(intstr.FromString("00%"))
+				cluster.Spec.Proxy.PGBouncer.MinAvailable = new(intstr.FromString("00%"))
 				err := r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster)
 				if apierrors.IsConflict(err) {
 					// When running in an existing environment another controller will sometimes update
