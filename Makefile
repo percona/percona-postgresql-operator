@@ -149,17 +149,25 @@ check-envtest-existing: createnamespaces
 		$(GO_TEST) -count=1 -cover -p=1 -tags=envtest ./...
 	kubectl delete -k ./config/dev
 
+.PHONY: go-fix
+go-fix: ## Run go fix on all packages
+	$(GO) fix ./...
+
 ##@ Generate
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-generate: kustomize
-generate: generate-crd
-generate: generate-deepcopy
-generate: generate-rbac
-generate: generate-manager
-generate: generate-bundle
-generate: generate-cw
+	$(MAKE) go-fix
+	$(MAKE) generate-all
+
+.PHONY: generate-all
+generate-all: kustomize
+generate-all: generate-crd
+generate-all: generate-deepcopy
+generate-all: generate-rbac
+generate-all: generate-manager
+generate-all: generate-bundle
+generate-all: generate-cw
 
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd

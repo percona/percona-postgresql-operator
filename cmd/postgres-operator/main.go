@@ -187,6 +187,14 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 	); err != nil {
 		return err
 	}
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v2.PerconaPGCluster{},
+		v2.IndexFieldLogRotateExtraConfig,
+		v2.LogRotateExtraConfigIndexerFunc,
+	); err != nil {
+		return err
+	}
 
 	externalEvents := make(chan event.GenericEvent)
 	stopChan := make(chan event.DeleteEvent)
