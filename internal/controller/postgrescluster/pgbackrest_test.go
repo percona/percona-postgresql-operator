@@ -1192,6 +1192,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		expectReconcile bool
 		// whether or not the test should expect a current job in the env to be deleted
 		expectCurrentJobDeletion bool
+		// whether or not to verify that applying a stale current job returns a conflict
+		verifyStaleJobConflict bool
 		// the reason associated with the expected event for the test (can be empty if
 		// no event is expected)
 		expectedEventReason string
@@ -1389,6 +1391,7 @@ func TestReconcileManualBackup(t *testing.T) {
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
 		expectCurrentJobDeletion: false,
 		expectReconcile:          true,
+		verifyStaleJobConflict:   true,
 	}, {
 		testDesc:         "reconcile new job when in-progress job exists for another id",
 		createCurrentJob: true,
@@ -1527,6 +1530,23 @@ func TestReconcileManualBackup(t *testing.T) {
 					// verify status is populated with the proper ID
 					assert.Assert(t, postgresCluster.Status.PGBackRest.ManualBackup != nil)
 					assert.Assert(t, postgresCluster.Status.PGBackRest.ManualBackup.ID != "")
+
+					if tc.verifyStaleJobConflict {
+						staleJob := jobs.Items[0].DeepCopy()
+						updatedJob := jobs.Items[0].DeepCopy()
+						delete(updatedJob.Labels, naming.LabelPGBackRestBackup)
+						assert.NilError(t, tClient.Update(ctx, updatedJob))
+
+						err = r.reconcileManualBackup(ctx, postgresCluster,
+							[]*batchv1.Job{staleJob}, sa, instances)
+						assert.Assert(t, apierrors.IsConflict(err))
+
+						actualJob := &batchv1.Job{}
+						assert.NilError(t, tClient.Get(ctx,
+							client.ObjectKeyFromObject(updatedJob), actualJob))
+						_, restored := actualJob.Labels[naming.LabelPGBackRestBackup]
+						assert.Assert(t, !restored)
+					}
 
 					return
 				} else {

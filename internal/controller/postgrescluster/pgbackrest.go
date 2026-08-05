@@ -2757,6 +2757,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if currentBackupJob != nil {
 		backupJob.ObjectMeta.Name = currentBackupJob.ObjectMeta.Name
+		// K8SPG-1125: Prevent restoring Job labels removed by finishBackup.
+		backupJob.ObjectMeta.ResourceVersion = currentBackupJob.ObjectMeta.ResourceVersion
 	}
 
 	var labels, annotations map[string]string
