@@ -672,6 +672,11 @@ func TestUpdateConditions(t *testing.T) {
 					Status: metav1.ConditionFalse,
 					Reason: "LagNotDetected",
 				},
+				{
+					Type:   pNaming.ConditionReadyForLogicalReplication,
+					Status: metav1.ConditionTrue,
+					Reason: "PrimaryReady",
+				},
 			},
 			statusConditions: []metav1.Condition{
 				{
@@ -695,6 +700,7 @@ func TestUpdateConditions(t *testing.T) {
 				v2.ConditionPMMReady,
 				pNaming.ConditionAPIGroupMigration,
 				pNaming.ConditionStandbyLagging,
+				pNaming.ConditionReadyForLogicalReplication,
 			},
 		},
 	}

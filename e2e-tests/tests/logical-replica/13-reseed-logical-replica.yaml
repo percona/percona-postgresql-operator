@@ -1,0 +1,33 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 30
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      # The same entry as step 03, now against the restored cluster. Step 12
+      # left nothing of the old incarnation behind, so this is an ordinary first
+      # bootstrap. One replica is enough here: both methods are already covered
+      # above, and this seeds from the repository the restore came from.
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["logical-replica"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'
