@@ -17,6 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/internal/patroni/dcs"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
@@ -44,7 +45,7 @@ func (r *Reconciler) reconcileClusterConfigMap(
 
 	if err == nil {
 		err = patroni.ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters,
-			clusterConfigMap)
+			dcs.For(cluster).ClusterYAML(cluster), clusterConfigMap)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, clusterConfigMap))
@@ -117,43 +118,20 @@ func (r *Reconciler) generateClusterPrimaryService(
 
 	err := errors.WithStack(r.setControllerReference(cluster, service))
 
-	// Endpoints for a Service have the same name as the Service. Copy labels,
-	// annotations, and ownership, too.
-	endpoints := &corev1.Endpoints{}
-	service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
-	endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
-
-	if leader == nil {
-		// TODO(cbandy): We need to build a different kind of Service here.
-		return nil, nil, errors.New("Patroni DCS other than Kubernetes Endpoints is not implemented")
+	spec, subset, backendErr := dcs.For(cluster).PrimaryService(cluster, leader)
+	if backendErr != nil {
+		return nil, nil, backendErr
 	}
+	service.Spec = spec
 
-	// Allocate no IP address (headless) and manage the Endpoints ourselves.
-	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
-	// - https://docs.k8s.io/concepts/services-networking/service/#services-without-selectors
-	service.Spec.ClusterIP = corev1.ClusterIPNone
-	service.Spec.Selector = nil
-
-	service.Spec.Ports = []corev1.ServicePort{{
-		Name:       naming.PortPostgreSQL,
-		Port:       *cluster.Spec.Port,
-		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.FromString(naming.PortPostgreSQL),
-	}}
-
-	// Resolve to the ClusterIP for which Patroni has configured the Endpoints.
-	endpoints.Subsets = []corev1.EndpointSubset{{
-		Addresses: []corev1.EndpointAddress{{IP: leader.Spec.ClusterIP}},
-	}}
-
-	// Copy the EndpointPorts from the ServicePorts.
-	for _, sp := range service.Spec.Ports {
-		endpoints.Subsets[0].Ports = append(endpoints.Subsets[0].Ports,
-			corev1.EndpointPort{
-				Name:     sp.Name,
-				Port:     sp.Port,
-				Protocol: sp.Protocol,
-			})
+	var endpoints *corev1.Endpoints
+	if subset != nil {
+		// Endpoints for a Service have the same name as the Service. Copy labels,
+		// annotations, and ownership, too.
+		endpoints = &corev1.Endpoints{}
+		service.ObjectMeta.DeepCopyInto(&endpoints.ObjectMeta)
+		endpoints.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Endpoints"))
+		endpoints.Subsets = []corev1.EndpointSubset{*subset}
 	}
 
 	return service, endpoints, err
@@ -177,7 +155,7 @@ func (r *Reconciler) reconcileClusterPrimaryService(
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
-	if err == nil {
+	if err == nil && endpoints != nil {
 		err = errors.WithStack(r.apply(ctx, endpoints))
 	}
 	return service, err

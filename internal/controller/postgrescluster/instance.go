@@ -35,6 +35,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v2/internal/patroni/dcs"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
@@ -1276,8 +1277,9 @@ func (r *Reconciler) reconcileInstance(
 			return errors.Wrap(err, "failed to determine initial init image")
 		}
 
+		dcsEnvVars := dcs.For(cluster).InstanceEnvVars(cluster, patroniLeaderService, instance.Spec.Template.Spec.Containers)
 		err = patroni.InstancePod(
-			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
+			ctx, cluster, clusterConfigMap, clusterPodService, dcsEnvVars,
 			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
 	}
 
@@ -1541,7 +1543,7 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
-		err = patroni.InstanceConfigMap(ctx, cluster, spec, instanceConfigMap)
+		err = patroni.InstanceConfigMap(ctx, cluster, spec, dcs.For(cluster).InstanceYAML(cluster), instanceConfigMap)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, instanceConfigMap))
