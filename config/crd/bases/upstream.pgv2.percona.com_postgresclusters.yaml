@@ -13594,7 +13594,7 @@ spec:
                         - tokenSecret
                         type: object
                       walEncryption:
-                        description: Encrypt write-ahead log segments. Requires enabled
+                        description: Encrypt write-ahead log segments. Requires pg_tde.enabled
                           to be true.
                         type: boolean
                     type: object
