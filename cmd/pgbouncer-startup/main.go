@@ -15,13 +15,13 @@ import (
 )
 
 const (
-	pauseTimeout       = 30 * time.Second
+	pauseTimeout       = startup.PauseTimeoutSeconds * time.Second
 	pauseRetryInterval = time.Second
 	adminHost          = "localhost"
 )
 
 func main() {
-	f, err := os.OpenFile(startup.LogAbsolutePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(startup.LogAbsolutePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}

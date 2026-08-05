@@ -36,4 +36,7 @@ const (
 	// AdminPasswordEnvVar names the environment variable holding AdminUser's
 	// password in the PgBouncer container.
 	AdminPasswordEnvVar = "PGBOUNCER_ADMIN_PASSWORD" // #nosec G101 this is a name, not a credential
+
+	// PauseTimeoutSeconds is the timeout for setting pause.
+	PauseTimeoutSeconds = 30
 )
