@@ -175,6 +175,14 @@ containers:
       fieldRef:
         apiVersion: v1
         fieldPath: metadata.name
+  - name: PATRONI_KUBERNETES_POD_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.podIP
+  - name: PATRONI_KUBERNETES_PORTS
+    value: |
+      []
   - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
     value: $(PATRONI_NAME).:5432
   - name: PATRONI_POSTGRESQL_LISTEN
@@ -189,14 +197,6 @@ containers:
     value: '*:8008'
   - name: PATRONICTL_CONFIG_FILE
     value: /etc/patroni
-  - name: PATRONI_KUBERNETES_POD_IP
-    valueFrom:
-      fieldRef:
-        apiVersion: v1
-        fieldPath: status.podIP
-  - name: PATRONI_KUBERNETES_PORTS
-    value: |
-      []
   livenessProbe:
     exec:
       command:
@@ -289,6 +289,14 @@ containers:
       fieldRef:
         apiVersion: v1
         fieldPath: metadata.name
+  - name: PATRONI_KUBERNETES_POD_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.podIP
+  - name: PATRONI_KUBERNETES_PORTS
+    value: |
+      []
   - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
     value: $(PATRONI_NAME).:5432
   - name: PATRONI_POSTGRESQL_LISTEN
@@ -303,14 +311,6 @@ containers:
     value: '*:8008'
   - name: PATRONICTL_CONFIG_FILE
     value: /etc/patroni
-  - name: PATRONI_KUBERNETES_POD_IP
-    valueFrom:
-      fieldRef:
-        apiVersion: v1
-        fieldPath: status.podIP
-  - name: PATRONI_KUBERNETES_PORTS
-    value: |
-      []
   livenessProbe:
     failureThreshold: 3
     httpGet:
