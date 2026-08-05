@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -353,6 +354,8 @@ func instanceEnvironment(
 	// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/config.py#L247
 	// - https://github.com/zalando/patroni/blob/v2.0.2/patroni/postgresql/postmaster.py#L215-L216
 
+	// Insert after PATRONI_NAME: appending would reorder existing StatefulSet
+	// env and force a rolling restart.
 	variables := []corev1.EnvVar{
 		// Set "name" to the v1.Pod's name. Required for Patroni's node identity.
 		// Patroni must be restarted when changing this value.
@@ -417,7 +420,7 @@ func instanceEnvironment(
 		},
 	}
 
-	return append(variables, dcsEnvVars...)
+	return slices.Insert(variables, 1, dcsEnvVars...)
 }
 
 // instanceConfigFiles returns projections of Patroni's configuration files

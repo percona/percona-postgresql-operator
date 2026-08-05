@@ -1167,6 +1167,10 @@ func TestInstanceEnvironment(t *testing.T) {
     fieldRef:
       apiVersion: v1
       fieldPath: metadata.name
+- name: PATRONI_KUBERNETES_POD_IP
+  value: 1.2.3.4
+- name: PATRONI_KUBERNETES_PORTS
+  value: '[]'
 - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
   value: $(PATRONI_NAME).pod-dns:5432
 - name: PATRONI_POSTGRESQL_LISTEN
@@ -1181,10 +1185,6 @@ func TestInstanceEnvironment(t *testing.T) {
   value: '*:8008'
 - name: PATRONICTL_CONFIG_FILE
   value: /etc/patroni
-- name: PATRONI_KUBERNETES_POD_IP
-  value: 1.2.3.4
-- name: PATRONI_KUBERNETES_PORTS
-  value: '[]'
 		`))
 	})
 }
