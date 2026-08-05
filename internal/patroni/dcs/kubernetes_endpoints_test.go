@@ -189,10 +189,10 @@ kind: Service
 		service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 		assert.NilError(t, err)
 
-		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
+		assert.DeepEqual(t, service.Annotations, map[string]string{
 			"a": "v1",
 		})
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
 			"postgres-operator.crunchydata.com/patroni": "pg2-ha",
@@ -210,11 +210,11 @@ kind: Service
 		service, err = (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 		assert.NilError(t, err)
 
-		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
+		assert.DeepEqual(t, service.Annotations, map[string]string{
 			"a": "v1",
 			"c": "v3",
 		})
-		assert.DeepEqual(t, service.ObjectMeta.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
+		assert.DeepEqual(t, service.Labels, map[string]string(naming.WithPerconaLabels(map[string]string{
 			"b": "v2",
 			"d": "v4",
 			"postgres-operator.crunchydata.com/cluster": "pg2",
