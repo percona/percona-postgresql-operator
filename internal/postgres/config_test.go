@@ -111,7 +111,7 @@ func TestPGTDELinkCommands(t *testing.T) {
 func TestBashTDELink(t *testing.T) {
 	// execute calls the bash function with args.
 	execute := func(args ...string) (string, error) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-ceu", "--", bashTDELink+`tdelink "$@"`, "-")
 		cmd.Args = append(cmd.Args, args...)
 		output, err := cmd.CombinedOutput()
@@ -199,7 +199,7 @@ func TestBashTDELink(t *testing.T) {
 func TestBashTDEUnlink(t *testing.T) {
 	// execute calls the bash function with args.
 	execute := func(args ...string) (string, error) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-ceu", "--", bashTDELink+`tdeunlink "$@"`, "-")
 		cmd.Args = append(cmd.Args, args...)
 		output, err := cmd.CombinedOutput()
@@ -265,7 +265,7 @@ func TestBashTDEUnlink(t *testing.T) {
 
 func TestBashHalt(t *testing.T) {
 	t.Run("NoPipeline", func(t *testing.T) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-c", "--", bashHalt+`; halt ab cd e`)
 
 		var exit *exec.ExitError
@@ -277,7 +277,7 @@ func TestBashHalt(t *testing.T) {
 	})
 
 	t.Run("PipelineZeroStatus", func(t *testing.T) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-c", "--", bashHalt+`; true && halt message`)
 
 		var exit *exec.ExitError
@@ -289,7 +289,7 @@ func TestBashHalt(t *testing.T) {
 	})
 
 	t.Run("PipelineNonZeroStatus", func(t *testing.T) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-c", "--", bashHalt+`; (exit 99) || halt $'multi\nline'`)
 
 		var exit *exec.ExitError
@@ -301,7 +301,7 @@ func TestBashHalt(t *testing.T) {
 	})
 
 	t.Run("Subshell", func(t *testing.T) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-c", "--", bashHalt+`; (halt 'err') || echo 'after'`)
 
 		stderr := new(bytes.Buffer)
@@ -317,7 +317,7 @@ func TestBashHalt(t *testing.T) {
 
 func TestBashPermissions(t *testing.T) {
 	// macOS `stat` takes different arguments than BusyBox and GNU coreutils.
-	if output, err := exec.Command("stat", "--help").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "stat", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "stat" executable`)
 	} else if !strings.Contains(string(output), "%A") {
 		t.Skip(`requires "stat" with access format sequence`)
@@ -329,7 +329,7 @@ func TestBashPermissions(t *testing.T) {
 	assert.NilError(t, os.WriteFile(filepath.Join(dir, "sub", "fn"), nil, 0o624)) // #nosec G306 OK permissions for a temp dir in a test
 	assert.NilError(t, os.Chmod(filepath.Join(dir, "sub", "fn"), 0o624))
 
-	cmd := exec.Command("bash")
+	cmd := exec.CommandContext(t.Context(), "bash")
 	cmd.Args = append(cmd.Args, "-c", "--",
 		bashPermissions+`; permissions "$@"`, "-",
 		filepath.Join(dir, "sub", "fn"))
@@ -344,7 +344,7 @@ func TestBashPermissions(t *testing.T) {
 
 func TestBashRecreateDirectory(t *testing.T) {
 	// macOS `stat` takes different arguments than BusyBox and GNU coreutils.
-	if output, err := exec.Command("stat", "--help").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "stat", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "stat" executable`)
 	} else if !strings.Contains(string(output), "%a") {
 		t.Skip(`requires "stat" with access format sequence`)
@@ -356,7 +356,7 @@ func TestBashRecreateDirectory(t *testing.T) {
 	assert.NilError(t, os.WriteFile(filepath.Join(dir, "d", "file"), nil, 0o644))    // #nosec G306 OK permissions for a temp dir in a test
 
 	stat := func(args ...string) string {
-		cmd := exec.Command("stat", "-c", "%i %#a %N")
+		cmd := exec.CommandContext(t.Context(), "stat", "-c", "%i %#a %N")
 		cmd.Args = append(cmd.Args, args...)
 		out, err := cmd.CombinedOutput()
 
@@ -373,7 +373,7 @@ func TestBashRecreateDirectory(t *testing.T) {
 		filepath.Join(dir, "d", "file"),
 	)
 
-	cmd := exec.Command("bash")
+	cmd := exec.CommandContext(t.Context(), "bash")
 	cmd.Args = append(cmd.Args, "-ceu", "--",
 		bashRecreateDirectory+` recreate "$@"`, "-",
 		filepath.Join(dir, "d"), "0740")
@@ -412,7 +412,7 @@ func TestBashRecreateDirectory(t *testing.T) {
 
 func TestBashSafeLink(t *testing.T) {
 	// macOS `mv` takes different arguments than GNU coreutils.
-	if output, err := exec.Command("mv", "--help").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(t.Context(), "mv", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "mv" executable`)
 	} else if !strings.Contains(string(output), "no-target-directory") {
 		t.Skip(`requires "mv" that overwrites a directory symlink`)
@@ -420,7 +420,7 @@ func TestBashSafeLink(t *testing.T) {
 
 	// execute calls the bash function with args.
 	execute := func(args ...string) (string, error) {
-		cmd := exec.Command("bash")
+		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-ceu", "--", bashSafeLink+`safelink "$@"`, "-")
 		cmd.Args = append(cmd.Args, args...)
 		output, err := cmd.CombinedOutput()
@@ -687,7 +687,7 @@ func TestStartupCommand(t *testing.T) {
 	assert.NilError(t, os.WriteFile(file, []byte(script), 0o600))
 
 	// Expect shellcheck to be happy.
-	cmd := exec.Command(shellcheck, "--enable=all", file)
+	cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
 	output, err := cmd.CombinedOutput()
 	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 

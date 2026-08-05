@@ -18,7 +18,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -118,8 +117,8 @@ func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.Even
 func PostgreSQLParameters(cluster *crunchyv1beta1.PostgresCluster, outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
 
-	canEnableWALEncryption := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) &&
-		meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
+	canEnableWALEncryption := meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled) &&
+		meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
 
 	if cluster.Spec.Extensions.PGTDE.WALEncryption && canEnableWALEncryption {
 		outParameters.Mandatory.Add("pg_tde.wal_encrypt", "on")
