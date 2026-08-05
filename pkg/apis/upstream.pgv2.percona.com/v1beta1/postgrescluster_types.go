@@ -270,7 +270,7 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 
-	// Encrypt write-ahead log segments. Requires enabled to be true.
+	// Encrypt write-ahead log segments. Requires pg_tde.enabled to be true.
 	WALEncryption bool `json:"walEncryption,omitempty"`
 
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`

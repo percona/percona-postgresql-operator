@@ -10,9 +10,7 @@ import (
 	gover "github.com/hashicorp/go-version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -310,13 +308,4 @@ func jobCompleted(job *batchv1.Job) bool {
 		}
 	}
 	return false
-}
-
-func isStatusConditionTrue(conditions []metav1.Condition, conditionType string) bool {
-	cond := meta.FindStatusCondition(conditions, conditionType)
-	if cond == nil {
-		return false
-	}
-
-	return cond.Status == metav1.ConditionTrue
 }

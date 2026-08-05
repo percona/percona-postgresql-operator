@@ -364,6 +364,7 @@ func populatePGInstanceConfigurationMap(
 		// WAL encryption doesn't play well with archive-async
 		global.Set("archive-async", "n")
 		global.Set("checksum-page", "n")
+		global.Set("archive-header-check", "n")
 	} else {
 		// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
 		global.Set("archive-async", "y")
@@ -450,6 +451,7 @@ func populateRepoHostConfigurationMap(
 
 	if walEncryption {
 		global.Set("checksum-page", "n")
+		global.Set("archive-header-check", "n")
 	}
 
 	for option, val := range globalConfig {
