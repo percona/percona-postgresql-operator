@@ -21,13 +21,13 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-func TestKubernetesClusterYAML(t *testing.T) {
+func TestKubernetesEndpointsClusterYAML(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	assert.NilError(t, cluster.Default(context.Background(), nil))
 	cluster.Namespace = "some-namespace"
 	cluster.Name = "cluster-name"
 
-	dcsYAML := (kubernetesBackend{}).ClusterYAML(cluster)
+	dcsYAML := (kubernetesEndpointsBackend{}).ClusterYAML(cluster)
 	assert.Assert(t, cmp.MarshalMatches(dcsYAML, `
 kubernetes:
   labels:
@@ -39,12 +39,12 @@ kubernetes:
 	`))
 }
 
-func TestKubernetesInstanceYAML(t *testing.T) {
-	dcsYAML := (kubernetesBackend{}).InstanceYAML(new(v1beta1.PostgresCluster))
+func TestKubernetesEndpointsInstanceYAML(t *testing.T) {
+	dcsYAML := (kubernetesEndpointsBackend{}).InstanceYAML(new(v1beta1.PostgresCluster))
 	assert.Assert(t, dcsYAML == nil)
 }
 
-func TestKubernetesInstanceEnvVars(t *testing.T) {
+func TestKubernetesEndpointsInstanceEnvVars(t *testing.T) {
 	leaderService := new(corev1.Service)
 	leaderService.Spec.Ports = []corev1.ServicePort{{Name: "postgres"}}
 	leaderService.Spec.Ports[0].TargetPort.StrVal = "postgres"
@@ -53,7 +53,7 @@ func TestKubernetesInstanceEnvVars(t *testing.T) {
 		Name: "postgres", ContainerPort: 9999, Protocol: corev1.ProtocolTCP,
 	}}
 
-	vars := (kubernetesBackend{}).InstanceEnvVars(new(v1beta1.PostgresCluster), leaderService, containers)
+	vars := (kubernetesEndpointsBackend{}).InstanceEnvVars(new(v1beta1.PostgresCluster), leaderService, containers)
 
 	assert.Assert(t, cmp.MarshalMatches(vars, `
 - name: PATRONI_KUBERNETES_POD_IP
@@ -69,11 +69,11 @@ func TestKubernetesInstanceEnvVars(t *testing.T) {
 	`))
 }
 
-func TestKubernetesPermissions(t *testing.T) {
+func TestKubernetesEndpointsPermissions(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 
 	t.Run("Upstream", func(t *testing.T) {
-		permissions := (kubernetesBackend{}).Permissions(cluster)
+		permissions := (kubernetesEndpointsBackend{}).Permissions(cluster)
 		assert.Assert(t, cmp.MarshalMatches(permissions, `
 - apiGroups:
   - ""
@@ -100,7 +100,7 @@ func TestKubernetesPermissions(t *testing.T) {
 		cluster.Spec.OpenShift = new(bool)
 		*cluster.Spec.OpenShift = true
 
-		permissions := (kubernetesBackend{}).Permissions(cluster)
+		permissions := (kubernetesEndpointsBackend{}).Permissions(cluster)
 		assert.Assert(t, cmp.MarshalMatches(permissions, `
 - apiGroups:
   - ""
@@ -129,12 +129,12 @@ func TestKubernetesPermissions(t *testing.T) {
 	})
 }
 
-func TestKubernetesDistributedConfigurationService(t *testing.T) {
+func TestKubernetesEndpointsDistributedConfigurationService(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg1"
 
-	service := (kubernetesBackend{}).DistributedConfigurationService(cluster)
+	service := (kubernetesEndpointsBackend{}).DistributedConfigurationService(cluster)
 	assert.Assert(t, service != nil)
 	assert.Equal(t, service.Namespace, "ns1")
 	assert.Equal(t, service.Name, naming.PatroniScope(cluster)+"-config")
@@ -142,7 +142,7 @@ func TestKubernetesDistributedConfigurationService(t *testing.T) {
 	assert.Assert(t, service.Spec.Selector == nil, "got %v", service.Spec.Selector)
 }
 
-func TestKubernetesLeaderLeaseService(t *testing.T) {
+func TestKubernetesEndpointsLeaderLeaseService(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 	cluster.Namespace = "ns1"
 	cluster.Name = "pg2"
@@ -166,7 +166,7 @@ kind: Service
 	}
 
 	t.Run("NoServiceSpec", func(t *testing.T) {
-		service, err := (kubernetesBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
+		service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 		assert.NilError(t, err)
 		alwaysExpect(t, service)
 		// Defaults to ClusterIP.
@@ -186,7 +186,7 @@ kind: Service
 			Labels:      map[string]string{"b": "v2"},
 		}
 
-		service, err := (kubernetesBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
+		service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 		assert.NilError(t, err)
 
 		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
@@ -207,7 +207,7 @@ kind: Service
 			},
 		}
 
-		service, err = (kubernetesBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
+		service, err = (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 		assert.NilError(t, err)
 
 		assert.DeepEqual(t, service.ObjectMeta.Annotations, map[string]string{
@@ -242,7 +242,7 @@ kind: Service
 			cluster := cluster.DeepCopy()
 			cluster.Spec.Service = &v1beta1.ServiceSpec{Type: test.Type}
 
-			service, err := (kubernetesBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
+			service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, new(record.FakeRecorder))
 			assert.NilError(t, err)
 			alwaysExpect(t, service)
 			test.Expect(t, service)
@@ -254,18 +254,18 @@ kind: Service
 		cluster.Spec.Service = &v1beta1.ServiceSpec{Type: "ClusterIP", NodePort: new(int32(32000))}
 
 		recorder := new(record.FakeRecorder)
-		service, err := (kubernetesBackend{}).LeaderLeaseService(cluster, recorder)
+		service, err := (kubernetesEndpointsBackend{}).LeaderLeaseService(cluster, recorder)
 		assert.ErrorContains(t, err, `NodePort cannot be set with type ClusterIP on Service "pg2-ha"`)
 		assert.Assert(t, service == nil)
 	})
 }
 
-func TestKubernetesPrimaryService(t *testing.T) {
+func TestKubernetesEndpointsPrimaryService(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	cluster.Spec.Port = new(int32(2600))
 
 	t.Run("NoLeader", func(t *testing.T) {
-		spec, subset, err := (kubernetesBackend{}).PrimaryService(cluster, nil)
+		spec, subset, err := (kubernetesEndpointsBackend{}).PrimaryService(cluster, nil)
 		assert.ErrorContains(t, err, "not implemented")
 		assert.DeepEqual(t, spec, corev1.ServiceSpec{})
 		assert.Assert(t, subset == nil)
@@ -275,7 +275,7 @@ func TestKubernetesPrimaryService(t *testing.T) {
 		leader := &corev1.Service{}
 		leader.Spec.ClusterIP = "1.9.8.3"
 
-		spec, subset, err := (kubernetesBackend{}).PrimaryService(cluster, leader)
+		spec, subset, err := (kubernetesEndpointsBackend{}).PrimaryService(cluster, leader)
 		assert.NilError(t, err)
 
 		assert.Equal(t, spec.ClusterIP, corev1.ClusterIPNone)
@@ -299,7 +299,7 @@ ports:
 	})
 }
 
-func TestKubernetesObserve(t *testing.T) {
+func TestKubernetesEndpointsObserve(t *testing.T) {
 	_, cc := require.Kubernetes2(t)
 	require.ParallelCapacity(t, 0)
 	ns := require.Namespace(t, cc)
@@ -310,14 +310,14 @@ func TestKubernetesObserve(t *testing.T) {
 	cluster.Name = "observe-test"
 
 	t.Run("NotFound, not ready", func(t *testing.T) {
-		observation, err := (kubernetesBackend{}).Observe(ctx, cc, cluster, false)
+		observation, err := (kubernetesEndpointsBackend{}).Observe(ctx, cc, cluster, false)
 		assert.NilError(t, err)
 		assert.Equal(t, observation.SystemIdentifier, "")
 		assert.Equal(t, observation.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("NotFound, ready", func(t *testing.T) {
-		observation, err := (kubernetesBackend{}).Observe(ctx, cc, cluster, true)
+		observation, err := (kubernetesEndpointsBackend{}).Observe(ctx, cc, cluster, true)
 		assert.NilError(t, err)
 		assert.Equal(t, observation.SystemIdentifier, "")
 		assert.Equal(t, observation.RequeueAfter, time.Second)
@@ -329,14 +329,14 @@ func TestKubernetesObserve(t *testing.T) {
 		assert.NilError(t, cc.Create(ctx, endpoints))
 		t.Cleanup(func() { assert.Check(t, client.IgnoreNotFound(cc.Delete(ctx, endpoints))) })
 
-		observation, err := (kubernetesBackend{}).Observe(ctx, cc, cluster, false)
+		observation, err := (kubernetesEndpointsBackend{}).Observe(ctx, cc, cluster, false)
 		assert.NilError(t, err)
 		assert.Equal(t, observation.SystemIdentifier, "123456")
 		assert.Equal(t, observation.RequeueAfter, time.Duration(0))
 	})
 }
 
-func TestKubernetesDelete(t *testing.T) {
+func TestKubernetesEndpointsDelete(t *testing.T) {
 	_, cc := require.Kubernetes2(t)
 	require.ParallelCapacity(t, 0)
 	ns := require.Namespace(t, cc)
@@ -353,7 +353,7 @@ func TestKubernetesDelete(t *testing.T) {
 	}
 	assert.NilError(t, cc.Create(ctx, endpoints))
 
-	assert.NilError(t, (kubernetesBackend{}).Delete(ctx, cc, cluster))
+	assert.NilError(t, (kubernetesEndpointsBackend{}).Delete(ctx, cc, cluster))
 
 	err := cc.Get(ctx, client.ObjectKeyFromObject(endpoints), endpoints)
 	assert.Assert(t, apierrors.IsNotFound(err), "expected the Endpoints to be deleted, got %v", err)
