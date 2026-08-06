@@ -28,6 +28,7 @@ spec:
     metadata:
       annotations:
         pgv2.percona.com/tde-installed: "true"
+        pgv2.percona.com/tde-wal-encryption: "false"
     spec:
       containers:
       - name: database

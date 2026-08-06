@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1249,7 +1250,7 @@ func (r *Reconciler) reconcileInstance(
 
 		// we need to preserve vault secret as long as extension is enabled
 		// otherwise pods won't survive the restart failing to find the token file
-		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		if !cluster.Spec.Extensions.PGTDE.Enabled && meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
 			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
 		}
@@ -1376,14 +1377,20 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 		)
 	}
 
-	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEEnabled)
-	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
 	// we should restart pods only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 		sts.Spec.Template.Annotations = naming.Merge(
 			sts.Spec.Template.Annotations,
-			map[string]string{naming.TDEInstalledAnnotation: "true"},
+			map[string]string{
+				naming.TDEInstalledAnnotation: "true",
+				// pg_tde.wal_encrypt is read at startup, so toggling it has to
+				// recreate the Pods. It reaches PostgreSQL through Patroni's
+				// dynamic configuration, which leaves nothing else in the Pod
+				// template to change; keeping the value here is what
+				// rolloutInstances compares.
+				naming.TDEWALEncryptionAnnotation: strconv.FormatBool(
+					cluster.Spec.Extensions.PGTDE.WALEncryption),
+			},
 		)
 	}
 
