@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -725,6 +726,33 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
+// builtInExtensionEnabled reports whether the extension is currently enabled via
+// spec.extensions.builtin. The names are the ones used in CREATE EXTENSION, which
+// is also what spec.extensions.custom holds and what disableCustomExtensionsInDB
+// passes to DROP EXTENSION.
+func builtInExtensionEnabled(cr *v2.PerconaPGCluster, name string) bool {
+	builtIn := cr.Spec.Extensions.BuiltIn
+
+	switch name {
+	case "pg_stat_monitor":
+		return ptr.Deref(builtIn.PGStatMonitor, false)
+	case "pg_stat_statements":
+		return ptr.Deref(builtIn.PGStatStatements, false)
+	case "pgaudit":
+		return ptr.Deref(builtIn.PGAudit, false)
+	case "vector":
+		return ptr.Deref(builtIn.PGVector, false)
+	case "pg_repack":
+		return ptr.Deref(builtIn.PGRepack, false)
+	case "pg_cron":
+		return ptr.Deref(builtIn.PGCron, false)
+	case "set_user":
+		return ptr.Deref(builtIn.SetUser, false)
+	}
+
+	return false
+}
+
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.Extensions.Storage.Secret == nil {
 		return nil
@@ -754,9 +782,17 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
-			if _, ok := crExtensions[ext]; !ok {
-				removedExtensions = append(removedExtensions, ext)
+			if _, ok := crExtensions[ext]; ok {
+				continue
 			}
+			// ...unless the user moved it from spec.extensions.custom to
+			// spec.extensions.builtin. Dropping it here would destroy the data
+			// the extension owns (e.g. the cron.job rows) and the builtin
+			// reconcile would then re-create it empty.
+			if builtInExtensionEnabled(cr, ext) {
+				continue
+			}
+			removedExtensions = append(removedExtensions, ext)
 		}
 
 		if len(removedExtensions) > 0 {

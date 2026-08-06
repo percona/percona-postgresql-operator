@@ -303,12 +303,11 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
 		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
 	}
-	if cr.Spec.Extensions.BuiltIn.PGCron == nil {
-		cr.Spec.Extensions.BuiltIn.PGCron = new(false)
-	}
-	if cr.Spec.Extensions.BuiltIn.SetUser == nil {
-		cr.Spec.Extensions.BuiltIn.SetUser = new(false)
-	}
+	// pgCron and setUser are deliberately not defaulted: an unset flag must stay
+	// unset so the operator can tell "the user never asked for this extension"
+	// apart from "the user asked to remove it". Defaulting to false would make
+	// the operator drop an extension the user installed on their own (as a
+	// custom extension or by hand), destroying its data - e.g. the cron.job rows.
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = new(true)
@@ -503,41 +502,13 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
-	postgresCluster.Spec.Extensions.PGCron = cr.Spec.Extensions.BuiltIn.PGCron
-	postgresCluster.Spec.Extensions.SetUser = cr.Spec.Extensions.BuiltIn.SetUser
-
-	// An extension installed via spec.extensions.custom must never be dropped
-	// by the builtin reconcile loop (its disabled builtin flag would otherwise
-	// trigger DROP EXTENSION and destroy user objects, e.g. cron.job entries).
-	// For the plain-bool flags the only way to prevent that is forcing true;
-	// for the tri-state flags (pg_cron, set_user) the flag is cleared instead:
-	// a custom extension is user-managed (CREATE EXTENSION and preload config
-	// are on the user), so the builtin loop must not touch it at all.
-	for _, ext := range cr.Spec.Extensions.Custom {
-		switch ext.Name {
-		case "pg_stat_monitor":
-			postgresCluster.Spec.Extensions.PGStatMonitor = true
-		case "pg_stat_statements":
-			postgresCluster.Spec.Extensions.PGStatStatements = true
-		case "pgaudit", "pg_audit":
-			postgresCluster.Spec.Extensions.PGAudit = true
-		case "pgvector", "vector":
-			postgresCluster.Spec.Extensions.PGVector = true
-		case "pg_repack":
-			postgresCluster.Spec.Extensions.PGRepack = true
-		case "pg_cron":
-			// the lifecycle of a custom-installed extension is user-managed:
-			// clear the flag (nil = leave alone) so the builtin loop neither
-			// drops it nor takes over CREATE/ALTER; an explicit builtin true
-			// stays in force
-			if !ptr.Deref(postgresCluster.Spec.Extensions.PGCron, false) {
-				postgresCluster.Spec.Extensions.PGCron = nil
-			}
-		case "set_user":
-			if !ptr.Deref(postgresCluster.Spec.Extensions.SetUser, false) {
-				postgresCluster.Spec.Extensions.SetUser = nil
-			}
-		}
+	// nil is passed through on purpose: it tells the upstream controller to
+	// leave the extension alone, which is what an unset flag must mean
+	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
+		postgresCluster.Spec.Extensions.PGCron = new(*cr.Spec.Extensions.BuiltIn.PGCron)
+	}
+	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
+		postgresCluster.Spec.Extensions.SetUser = new(*cr.Spec.Extensions.BuiltIn.SetUser)
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly

@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -582,14 +583,97 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				// pg_cron comes via spec.extensions.custom: the flag must be
-				// cleared (nil = leave alone), so the builtin loop neither
-				// drops it nor takes over CREATE EXTENSION
+				// pg_cron comes via spec.extensions.custom and the builtin flag
+				// was never set: it must stay unset (nil = leave alone), so the
+				// builtin loop neither drops it nor takes over CREATE EXTENSION
 				assert.Nil(t, actual.Spec.Extensions.PGCron)
-				// set_user is not requested anywhere: explicit false stays,
-				// so disabling keeps working for new specs
+				// the same holds for an extension the user installed by hand,
+				// without listing it in spec.extensions.custom at all
+				assert.Nil(t, actual.Spec.Extensions.SetUser)
+			},
+		},
+		"explicit builtin flags are passed through": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						BuiltIn: BuiltInExtensionsSpec{
+							PGCron:  ptr.To(true),
+							SetUser: ptr.To(false),
+						},
+						// pg_cron is listed here as well: an explicit builtin
+						// flag wins, the user asked the operator to manage it
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				require.NotNil(t, actual.Spec.Extensions.PGCron)
+				assert.True(t, *actual.Spec.Extensions.PGCron)
+				// an explicit false must still drop the extension, otherwise
+				// there would be no way to uninstall a builtin one
 				require.NotNil(t, actual.Spec.Extensions.SetUser)
 				assert.False(t, *actual.Spec.Extensions.SetUser)
+			},
+		},
+		"builtin flags are not shared with the user CR": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						BuiltIn: BuiltInExtensionsSpec{
+							PGCron: ptr.To(true),
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, cr *PerconaPGCluster) {
+				require.NotNil(t, actual.Spec.Extensions.PGCron)
+				// the internal object must own its copy: mutating it must not
+				// write back into the user CR
+				*actual.Spec.Extensions.PGCron = false
+				require.NotNil(t, cr.Spec.Extensions.BuiltIn.PGCron)
+				assert.True(t, *cr.Spec.Extensions.BuiltIn.PGCron)
 			},
 		},
 	}

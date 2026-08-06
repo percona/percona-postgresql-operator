@@ -42,12 +42,9 @@ for installed in "${PGDATA_EXTENSIONS}"/*.installed; do
 done
 
 for key in "${extensions[@]}"; do
-	# do not skip when the .installed marker exists: relocate-extensions.sh runs
-	# before this script on every pod start and overwrites the files an extension
-	# shares with the postgres image (e.g. pg_cron is bundled in the image now),
-	# so the custom build must be reinstalled on top of them every time
 	if [ -f "${PGDATA_EXTENSIONS}"/"${key}".installed ]; then
-		echo "Extension ${key} marker found, reinstalling over the relocated image files"
+		echo "Extension ${key} already installed"
+		continue
 	fi
 
 	echo "Installing extension: ${key}"

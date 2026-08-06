@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-extensions
+status:
+  # the custom list is empty now, pg_cron is managed as a builtin extension
+  installedCustomExtensions: []
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready
