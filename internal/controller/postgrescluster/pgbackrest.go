@@ -2758,7 +2758,7 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	if currentBackupJob != nil {
 		backupJob.ObjectMeta.Name = currentBackupJob.ObjectMeta.Name
 		// K8SPG-1125: Prevent restoring Job labels removed by finishBackup.
-		backupJob.ResourceVersion = currentBackupJob.ObjectMeta.ResourceVersion
+		backupJob.ResourceVersion = currentBackupJob.ResourceVersion
 	}
 
 	var labels, annotations map[string]string
