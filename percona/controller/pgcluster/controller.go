@@ -40,6 +40,7 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
@@ -109,6 +110,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
+		Watches(&corev1.ConfigMap{}, r.watchLogRotateExtraConfig()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -183,6 +185,33 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 			v2.IndexFieldEnvFromSecrets: secret.Name,
 		}, client.InNamespace(secret.Namespace)); err != nil {
 			log.Error(err, "Failed to list clusters by env from secrets index failed", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
+func (r *PGClusterReconciler) watchLogRotateExtraConfig() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchLogRotateExtraConfig")
+
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldLogRotateExtraConfig: cm.Name,
+		}, client.InNamespace(cm.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by logRotate extra config index", "key", client.ObjectKeyFromObject(cm).String())
 			return nil
 		}
 
@@ -346,6 +375,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := logcollector.Reconcile(ctx, r.Client, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile log collector")
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {

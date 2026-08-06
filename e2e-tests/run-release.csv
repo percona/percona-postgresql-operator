@@ -1,6 +1,7 @@
 backup-enable-disable
 builtin-extensions
 cert-manager-tls
+cert-management-policy
 custom-envs
 custom-extensions
 custom-tls
@@ -8,6 +9,7 @@ database-init-sql
 demand-backup
 demand-backup-offline-snapshot
 dynamic-configuration
+extra-volumes
 finalizers
 init-deploy
 k8s-upgrade
@@ -22,11 +24,14 @@ major-upgrade-16-to-17-postgis
 major-upgrade-17-to-18-postgis
 ldap
 ldap-tls
+logcollection
 monitoring
 one-pod
+repo-host-autogrow
 operator-self-healing
 pgbouncer-mtls
 pg-tde
+pg-tde-wal-encrypt
 pitr
 scaling
 scheduled-backup
