@@ -18,6 +18,7 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcileLogRotate(t *testing.T) {
@@ -223,11 +224,12 @@ func TestExtraConfigRollsPods(t *testing.T) {
 
 func TestResolveDefaultEnabled(t *testing.T) {
 	require.NoError(t, v2.AddToScheme(scheme.Scheme))
+	require.NoError(t, crunchyv1beta1.AddToScheme(scheme.Scheme))
 
 	tests := map[string]struct {
-		logCollector *v2.LogCollectorSpec
-		statusState  v2.AppState
-		wantEnabled  *bool
+		logCollector          *v2.LogCollectorSpec
+		postgresClusterExists bool
+		wantEnabled           *bool
 	}{
 		"nil LogCollector is not modified": {
 			logCollector: nil,
@@ -238,19 +240,14 @@ func TestResolveDefaultEnabled(t *testing.T) {
 			wantEnabled:  new(false),
 		},
 		"new cluster defaults to enabled": {
-			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
-			statusState:  "",
-			wantEnabled:  new(true),
+			logCollector:          &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			postgresClusterExists: false,
+			wantEnabled:           new(true),
 		},
 		"existing cluster defaults to disabled": {
-			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
-			statusState:  v2.AppStateReady,
-			wantEnabled:  new(false),
-		},
-		"initializing cluster defaults to disabled": {
-			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
-			statusState:  v2.AppStateInit,
-			wantEnabled:  new(false),
+			logCollector:          &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			postgresClusterExists: true,
+			wantEnabled:           new(false),
 		},
 	}
 
@@ -261,11 +258,15 @@ func TestResolveDefaultEnabled(t *testing.T) {
 				Spec: v2.PerconaPGClusterSpec{
 					LogCollector: tt.logCollector,
 				},
-				Status: v2.PerconaPGClusterStatus{
-					State: tt.statusState,
-				},
 			}
-			c := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cr)
+			if tt.postgresClusterExists {
+				builder = builder.WithObjects(&crunchyv1beta1.PostgresCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				})
+			}
+			c := builder.Build()
 
 			err := resolveDefaultEnabled(t.Context(), c, cr)
 			require.NoError(t, err)
@@ -277,6 +278,13 @@ func TestResolveDefaultEnabled(t *testing.T) {
 			} else {
 				require.NotNil(t, cr.Spec.LogCollector.Enabled)
 				assert.Equal(t, *tt.wantEnabled, *cr.Spec.LogCollector.Enabled)
+
+				// Verify the value was persisted to the CR.
+				persisted := &v2.PerconaPGCluster{}
+				require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: "test", Namespace: "default"}, persisted))
+				require.NotNil(t, persisted.Spec.LogCollector)
+				require.NotNil(t, persisted.Spec.LogCollector.Enabled)
+				assert.Equal(t, *tt.wantEnabled, *persisted.Spec.LogCollector.Enabled)
 			}
 		})
 	}
