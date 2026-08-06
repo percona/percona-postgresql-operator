@@ -139,6 +139,60 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestReconcileNotUpdatingOldBackup(t *testing.T) {
+	ctx := t.Context()
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+
+	now := metav1.NewTime(time.Now().Truncate(time.Microsecond))
+	latestCompletedAt := metav1.NewTime(now.Add(time.Hour))
+	latestRestorableTime := metav1.NewTime(now.Add(30 * time.Minute))
+	newLatestRestorableTime := metav1.NewTime(now.Add(45 * time.Minute))
+	oldBackup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "old-backup", Namespace: cluster.Namespace},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{
+			State:                v2.BackupSucceeded,
+			CompletedAt:          &now,
+			LatestRestorableTime: v2.PITRestoreDateTime{Time: &latestRestorableTime},
+		},
+	}
+	latestBackup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "latest-backup", Namespace: cluster.Namespace},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{
+			State:       v2.BackupSucceeded,
+			CompletedAt: &latestCompletedAt,
+		},
+	}
+
+	cl, err := buildFakeClient(ctx, cluster, oldBackup, latestBackup)
+	require.NoError(t, err)
+	timestampRequested := false
+	r := &PGBackupReconciler{
+		Client: cl,
+		LatestCommitGetter: func(context.Context, client.Client, *v2.PerconaPGCluster, *v2.PerconaPGBackup) (*metav1.Time, error) {
+			timestampRequested = true
+			return &newLatestRestorableTime, nil
+		},
+	}
+
+	_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(oldBackup)})
+	require.NoError(t, err)
+
+	updated := new(v2.PerconaPGBackup)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(oldBackup), updated))
+	assert.False(t, timestampRequested)
+	require.NotNil(t, updated.Status.LatestRestorableTime.Time)
+	assert.True(t, updated.Status.LatestRestorableTime.Equal(&latestRestorableTime))
+}
+
 func TestFailIfClusterIsNotReady(t *testing.T) {
 	ctx := context.Background()
 
