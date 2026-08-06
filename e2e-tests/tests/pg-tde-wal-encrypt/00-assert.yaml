@@ -15,13 +15,6 @@ spec:
     singular: perconapgcluster
   scope: Namespaced
 ---
-# K8SPG-911: pg_tde keeps its keys in Vault, and start_vault writes the token and
-# the CA certificate the cluster mounts into this Secret.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: vault-secret
----
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:

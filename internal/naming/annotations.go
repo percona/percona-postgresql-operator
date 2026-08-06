@@ -90,6 +90,13 @@ const (
 
 	// K8SPG-911
 	TDEInstalledAnnotation = perconaAnnotationPrefix + "tde-installed"
+
+	// K8SPG-911
+	// TDEWALEncryptionAnnotation carries the pg_tde.wal_encrypt setting on the
+	// instance Pod template. That parameter only takes effect when PostgreSQL
+	// starts, and nothing else about the Pod changes when it is toggled, so the
+	// annotation is what makes the Pods roll out.
+	TDEWALEncryptionAnnotation = perconaAnnotationPrefix + "tde-wal-encryption"
 )
 
 // SuggestedPGBackRestRepoVolumeSizeAnnotation returns the Pod annotation used
