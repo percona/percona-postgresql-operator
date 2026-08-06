@@ -9,8 +9,6 @@ commands:
 
       source ../../functions
 
-      # Create a new cluster WITHOUT logcollector.enabled set (field removed).
-      # For new clusters the operator should default it to enabled.
       get_cr \
         | yq eval 'del(.spec.logcollector.enabled)' - \
         | kubectl -n "${NAMESPACE}" apply -f -

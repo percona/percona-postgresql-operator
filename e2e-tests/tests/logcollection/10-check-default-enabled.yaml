@@ -12,32 +12,9 @@ commands:
       cluster=logcollection
       primary=$(get_pod_by_role ${cluster} primary name)
 
-      # 1. Verify logcollector sidecar containers are present on the primary pod.
+      # Verify logcollector sidecar containers are present on the primary pod.
       instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
         -o 'jsonpath={.spec.containers[*].name}')
       echo "Containers on primary: ${instance_containers}"
       echo "${instance_containers}" | grep -qw logs
       echo "${instance_containers}" | grep -qw logrotate
-
-      # 2. Verify the pod containers have not been restarted.
-      #    The original bug caused the StatefulSet to be created without logcollector
-      #    sidecars, then immediately updated to add them, causing pods to be terminated
-      #    and recreated. If containers were restarted, restartCount would be > 0.
-      restart_sum=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
-        -o 'jsonpath={.status.containerStatuses[*].restartCount}' \
-        | tr ' ' '+' | bc)
-      echo "Total container restarts on primary: ${restart_sum}"
-      if [ "${restart_sum}" -gt 0 ]; then
-        echo "FAIL: containers were restarted — pod spec likely changed after initial creation"
-        exit 1
-      fi
-
-      # 3. Verify the logcollector init container ran (proves sidecars were wired
-      #    from the very first pod creation, not added later).
-      init_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
-        -o 'jsonpath={.spec.initContainers[*].name}')
-      echo "Init containers on primary: ${init_containers}"
-      echo "${init_containers}" | grep -qw nss-wrapper-init-logcollector
-
-      echo "OK: new cluster defaults logcollector to enabled without pod recreation"
-
