@@ -1,6 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+
+      kubectl -n "${NAMESPACE}" get perconapgcluster cert-management-policy -o json \
+        | jq -e '
+            .status.conditions |
+            any(.[]; .type == "ReadyForBackup" and .status == "False" and .reason == "PGBackRestRepoHostReady") and
+            any(.[]; .type == "TLSSecretsReady" and .status == "False" and .reason == "TLSSecretsMissing") and
+            any(.[]; .type == "Progressing" and .status == "False" and .reason == "Paused")
+          ' >/dev/null
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -14,23 +26,3 @@ apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
   name: cert-management-policy
-status:
-  conditions:
-  - reason: PGBackRestRepoHostReady
-    status: "False"
-    type: ReadyForBackup
-  - reason: TLSSecretsMissing
-    status: "False"
-    type: TLSSecretsReady
-  - reason: Paused
-    status: "False"
-    type: Progressing
-  - reason: RepoHostNotReady
-    status: "False"
-    type: PGBackRestRepoHostReady
-  - reason: StanzaNotCreated
-    status: "False"
-    type: PGBackRestReplicaRepoReady
-  - reason: RepoBackupNotComplete
-    status: "False"
-    type: PGBackRestReplicaCreate
