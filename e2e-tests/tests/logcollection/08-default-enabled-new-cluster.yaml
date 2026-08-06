@@ -1,9 +1,10 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 300
+timeout: 180
 commands:
   - script: |-
       set -o errexit
+      set -o pipefail
       set -o xtrace
 
       source ../../functions
@@ -11,43 +12,12 @@ commands:
       cluster=logcollection
 
       # Delete the existing cluster so we can create a fresh one.
-      kubectl -n "${NAMESPACE}" delete perconapgcluster "${cluster}" --wait=true || true
-      kubectl -n "${NAMESPACE}" delete postgrescluster "${cluster}" --wait=true || true
+      kubectl -n "${NAMESPACE}" delete perconapgcluster "${cluster}" --wait=false
+      remove_all_finalizers
+      kubectl -n "${NAMESPACE}" wait --for=delete "perconapgcluster/${cluster}" --timeout=120s
+      kubectl -n "${NAMESPACE}" wait --for=delete "postgrescluster/${cluster}" --timeout=120s
 
-      # Wait until the old pods are fully gone.
-      retry 40 3 bash -c "kubectl -n '${NAMESPACE}' get pods -l postgres-operator.crunchydata.com/cluster=${cluster} 2>&1 | grep -q 'No resources found'"
-
-      # Create a new cluster WITHOUT logcollector.enabled set (field removed).
-      # For new clusters the operator should default it to enabled.
-      get_cr \
-        | yq eval 'del(.spec.logcollector.enabled)' - \
-        | kubectl -n "${NAMESPACE}" apply -f -
-
-      # Wait for cluster to become ready.
-      wait_cluster_consistency "${cluster}" 30
-
-      # Verify logcollector sidecar containers are present on the primary pod.
-      primary=$(get_pod_by_role ${cluster} primary name)
-      instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
-        -o 'jsonpath={.spec.containers[*].name}')
-      echo "Containers on primary: ${instance_containers}"
-      echo "${instance_containers}" | grep -qw logs
-      echo "${instance_containers}" | grep -qw logrotate
-
-      # Verify the pod was NOT restarted (restartCount == 0 for all containers).
-      # A restart would indicate the pod was first created with the wrong spec
-      # and then recreated—the exact bug we are guarding against.
-      restart_counts=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
-        -o 'jsonpath={.status.containerStatuses[*].restartCount}')
-      echo "Restart counts: ${restart_counts}"
-      for count in ${restart_counts}; do
-        if [ "${count}" -ne 0 ]; then
-          echo "FAIL: container restarted (restartCount=${count}), pods were likely recreated"
-          exit 1
-        fi
-      done
-
-      echo "OK: new cluster defaults logcollector to enabled without pod recreation"
-    timeout: 300
-
-
+      # Clean up PVCs so StatefulSet pods don't hang on stale volumes.
+      kubectl -n "${NAMESPACE}" delete pvc \
+        -l postgres-operator.crunchydata.com/cluster="${cluster}" \
+        --ignore-not-found

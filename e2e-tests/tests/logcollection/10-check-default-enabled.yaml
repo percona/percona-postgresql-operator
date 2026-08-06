@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster=logcollection
+      primary=$(get_pod_by_role ${cluster} primary name)
+
+      # 1. Verify logcollector sidecar containers are present on the primary pod.
+      instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
+        -o 'jsonpath={.spec.containers[*].name}')
+      echo "Containers on primary: ${instance_containers}"
+      echo "${instance_containers}" | grep -qw logs
+      echo "${instance_containers}" | grep -qw logrotate
+
+      # 2. Verify the pod spec was never changed after initial creation.
+      #    The original bug caused the StatefulSet to be created with logcollector
+      #    sidecars, then immediately updated without them (or vice-versa), causing
+      #    pods to be terminated and recreated. If the StatefulSet was updated, its
+      #    currentRevision and updateRevision will differ or observedGeneration > 1.
+      sts=$(kubectl -n "${NAMESPACE}" get sts \
+        -l postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/data=postgres \
+        -o jsonpath='{.items[0].metadata.name}')
+      current_rev=$(kubectl -n "${NAMESPACE}" get sts "${sts}" \
+        -o 'jsonpath={.status.currentRevision}')
+      update_rev=$(kubectl -n "${NAMESPACE}" get sts "${sts}" \
+        -o 'jsonpath={.status.updateRevision}')
+      echo "StatefulSet ${sts}: currentRevision=${current_rev} updateRevision=${update_rev}"
+      if [ "${current_rev}" != "${update_rev}" ]; then
+        echo "FAIL: StatefulSet revisions differ — pod spec was changed after initial creation"
+        exit 1
+      fi
+
+      echo "OK: new cluster defaults logcollector to enabled without pod recreation"
+
