@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/Percona-Lab/percona-version-service v0.0.0-20230404081016-ea25e30cdcbc
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/cert-manager/cert-manager v1.21.0
+	github.com/cert-manager/cert-manager v1.21.1
 	github.com/go-logr/logr v1.4.4
 	github.com/go-openapi/errors v0.22.8
 	github.com/go-openapi/runtime v0.33.0
