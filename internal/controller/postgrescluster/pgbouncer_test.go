@@ -791,6 +791,7 @@ func TestReconcilePause(t *testing.T) {
 
 	const adminPassword = "some-admin-password"
 	const podIP = "10.0.0.1"
+	const port = int32(5432)
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "hippo-pgbouncer"},
@@ -828,6 +829,7 @@ func TestReconcilePause(t *testing.T) {
 			v1beta1.LabelVersion: "3.1.0",
 		})
 		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		cluster.Spec.Proxy.PGBouncer.Port = new(port)
 		return cluster
 	}
 
@@ -916,6 +918,7 @@ func TestReconcilePause(t *testing.T) {
 				newPGBouncerAdmin: func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
 					assert.Equal(t, opts.User, pgbouncer.AdminUser)
 					assert.Equal(t, opts.Password, adminPassword)
+					assert.Equal(t, opts.Port, strconv.Itoa(int(port)))
 
 					if opts.Host != podIP {
 						return nil, errors.Errorf("no pgbouncer Pod has IP %q", opts.Host)
