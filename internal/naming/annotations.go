@@ -4,6 +4,8 @@
 
 package naming
 
+import "strings"
+
 const (
 	annotationPrefix        = labelPrefix
 	perconaAnnotationPrefix = perconaLabelPrefix
@@ -82,6 +84,38 @@ const (
 	// modifications that won't be overwritten during reconciliation.
 	OverrideConfigAnnotation = perconaAnnotationPrefix + "override-config"
 
+	// SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix identifies Pod annotations
+	// containing a desired size for a volume-backed pgBackRest repository.
+	SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix = "suggested-pgbackrest-"
+
 	// K8SPG-911
 	TDEInstalledAnnotation = perconaAnnotationPrefix + "tde-installed"
+
+	// K8SPG-911
+	// TDEWALEncryptionAnnotation carries the pg_tde.wal_encrypt setting on the
+	// instance Pod template. That parameter only takes effect when PostgreSQL
+	// starts, and nothing else about the Pod changes when it is toggled, so the
+	// annotation is what makes the Pods roll out.
+	TDEWALEncryptionAnnotation = perconaAnnotationPrefix + "tde-wal-encryption"
 )
+
+// SuggestedPGBackRestRepoVolumeSizeAnnotation returns the Pod annotation used
+// to communicate an automatically calculated PVC size for repoName.
+func SuggestedPGBackRestRepoVolumeSizeAnnotation(repoName string) string {
+	return SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix + repoName + "-pvc-size"
+}
+
+// PGBackRestRepoFromVolumeSizeAnnotation extracts a repository name from an
+// automatic volume-size annotation.
+func PGBackRestRepoFromVolumeSizeAnnotation(annotation string) (string, bool) {
+	if !strings.HasPrefix(annotation, SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix) ||
+		!strings.HasSuffix(annotation, "-pvc-size") {
+		return "", false
+	}
+
+	repoName := strings.TrimSuffix(
+		strings.TrimPrefix(annotation, SuggestedPGBackRestRepoVolumeSizeAnnotationPrefix),
+		"-pvc-size",
+	)
+	return repoName, repoName != ""
+}

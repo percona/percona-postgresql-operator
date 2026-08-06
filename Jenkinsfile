@@ -579,6 +579,46 @@ pipeline {
                         clusterRunner('cluster4')
                     }
                 }
+                stage('cluster5') {
+                    agent {
+                        label 'docker-x64-min'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster5')
+                    }
+                }
+                stage('cluster6') {
+                    agent {
+                        label 'docker-x64-min'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster6')
+                    }
+                }
+                stage('cluster7') {
+                    agent {
+                        label 'docker-x64-min'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster7')
+                    }
+                }
+                stage('cluster8') {
+                    agent {
+                        label 'docker-x64-min'
+                    }
+                    steps {
+                        prepareNode()
+                        unstash "sourceFILES"
+                        clusterRunner('cluster8')
+                    }
+                }
             }
         }
     }

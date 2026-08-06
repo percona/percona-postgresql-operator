@@ -28,6 +28,7 @@ spec:
     metadata:
       annotations:
         pgv2.percona.com/tde-installed: "true"
+        pgv2.percona.com/tde-wal-encryption: "false"
     spec:
       containers:
       - name: database
@@ -56,6 +57,8 @@ spec:
         - mountPath: /dev/shm
           name: dshm
       - name: replication-cert-copy
+      - name: logs
+      - name: logrotate
       - name: pgbackrest
       - name: pgbackrest-config
       volumes:

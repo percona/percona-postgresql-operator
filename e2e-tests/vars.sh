@@ -91,6 +91,7 @@ export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
 export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
 export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:3-dev-latest"}
+export IMAGE_LOGCOLLECTOR=${IMAGE_LOGCOLLECTOR:-"perconalab/fluentbit:main-logcollector"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
