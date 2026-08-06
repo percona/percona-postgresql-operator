@@ -32,9 +32,6 @@ status:
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  # 3 = create + restore shutdown/startup (step 08) + image change (step 09);
-  # the restore-target instance is recreated from scratch and ends up at 2,
-  # kuttl only needs one of the three instance STS to match this entry
   generation: 3
   labels:
     app.kubernetes.io/component: pg
@@ -115,10 +112,6 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  # 6 = create + 2 manual-backup options writes (steps 02, 07)
-  #   + restore spec write and cleanup (step 08) + cluster upgrade (step 09).
-  # The operator upgrade in step 04 adds nothing: an unset builtin flag stays
-  # unset, so it does not bump the generation.
   generation: 6
   labels:
     e2e: upgrade-minor

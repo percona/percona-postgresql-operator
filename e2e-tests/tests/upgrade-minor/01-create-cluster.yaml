@@ -33,15 +33,10 @@ commands:
       postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
       operator_image=$(get_version_images $lower_ver OPERATOR)
 
-      # released cr + max-settings overlay (wal/tablespace volumes, sidecars,
-      # extra users, repo2 minio, databaseInitSQL, patroni parameters)
       yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
         "${TEMP_DIR}/cr_lower.yaml" ../../tests/upgrade-minor/conf/upgrade-minor.yaml \
         >"${TEMP_DIR}/cr.yaml"
 
-      # pin the database-init image: without it InitImage() derives the image
-      # from the RUNNING operator's repo + the crVersion tag, so an operator
-      # under test from a non-release org would roll the instances on upgrade
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |

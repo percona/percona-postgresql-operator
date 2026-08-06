@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
       init_temp_dir # do this only in the first TestStep
-      destroy_cert_manager # leftovers change TLS behavior of the released operator
+      destroy_cert_manager 
 
       git_tag="v$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
       deploy_operator_gh $git_tag

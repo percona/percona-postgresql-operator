@@ -100,8 +100,6 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  # 6 = create + custom install (02) + pg_repack on/off (04, +2) + uninstall (06) + storage switch (10);
-  # the step-04 regression check toggles builtin pg_repack, adding two spec writes
   observedGeneration: 6
   pgbackrest:
     repoHost:

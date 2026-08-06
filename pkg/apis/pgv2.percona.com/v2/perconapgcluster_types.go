@@ -303,11 +303,6 @@ func (cr *PerconaPGCluster) Default() {
 	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
 		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
 	}
-	// pgCron and setUser are deliberately not defaulted: an unset flag must stay
-	// unset so the operator can tell "the user never asked for this extension"
-	// apart from "the user asked to remove it". Defaulting to false would make
-	// the operator drop an extension the user installed on their own (as a
-	// custom extension or by hand), destroying its data - e.g. the cron.job rows.
 
 	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
 		cr.Spec.AutoCreateUserSchema = new(true)
@@ -502,13 +497,16 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
 	}
-	// nil is passed through on purpose: it tells the upstream controller to
-	// leave the extension alone, which is what an unset flag must mean
+
 	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
 		postgresCluster.Spec.Extensions.PGCron = new(*cr.Spec.Extensions.BuiltIn.PGCron)
+	} else {
+		postgresCluster.Spec.Extensions.PGCron = nil
 	}
 	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
 		postgresCluster.Spec.Extensions.SetUser = new(*cr.Spec.Extensions.BuiltIn.SetUser)
+	} else {
+		postgresCluster.Spec.Extensions.SetUser = nil
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
