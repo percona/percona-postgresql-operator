@@ -277,8 +277,8 @@ func (r *Reconciler) Reconcile(
 	}
 
 	// pg_tde should be removed from shared libraries only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
-		pgtde.PostgreSQLParameters(&pgParameters)
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		pgtde.PostgreSQLParameters(cluster, &pgParameters)
 	}
 
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)

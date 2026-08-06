@@ -13787,11 +13787,18 @@ spec:
                         - host
                         - tokenSecret
                         type: object
+                      walEncryption:
+                        description: Encrypt write-ahead log segments. Requires pg_tde.enabled
+                          to be true.
+                        type: boolean
                     type: object
                     x-kubernetes-validations:
                     - message: vault is required for enabling pg_tde
                       rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
                         == false) || has(self.vault)'
+                    - message: pg_tde must be enabled to enable WAL encryption
+                      rule: '!has(self.walEncryption) || !self.walEncryption || (has(self.enabled)
+                        && self.enabled)'
                   pgvector:
                     properties:
                       enabled:

@@ -24,23 +24,35 @@ func PostgreSQL(
 		outParameters.Default = postgres.NewParameterSet()
 	}
 
+	walEncryption := inCluster.Spec.Extensions.PGTDE.WALEncryption
+
 	// Send WAL files to all configured repositories when not in recovery.
 	// - https://pgbackrest.org/user-guide.html#quickstart/configure-archiving
 	// - https://pgbackrest.org/command.html#command-archive-push
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
 	archive := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-push "%p"`
 
+	// K8SPG-911: pg_tde keeps WAL segments encrypted on disk, which pgBackRest cannot
+	// read. pg_tde_archive_decrypt writes a decrypted copy of the segment and runs the
+	// command it is given against that copy. The "%%" leaves a literal "%p" for
+	// pg_tde_archive_decrypt to replace with the path of that copy, rather than having
+	// PostgreSQL expand it to the encrypted original.
+	if walEncryption {
+		archive = `pg_tde_archive_decrypt %f %p "pgbackrest --stanza=` +
+			DefaultStanzaName + ` archive-push %%p"`
+	}
+
 	// K8SPG-518
 	if inCluster.CompareVersion("2.8.0") >= 0 {
 		if trackRestorableTime := inCluster.Spec.Backups.TrackLatestRestorableTime; trackRestorableTime != nil && *trackRestorableTime {
-			updateCommandRestorableTime(&archive)
+			updateCommandRestorableTime(&archive, walEncryption)
 			// K8SPG-518: This parameter is required to ensure that the commit timestamp is
 			// included in the WAL file. This is necessary for the WAL watcher to
 			// function correctly.
 			outParameters.Mandatory.Add("track_commit_timestamp", "true")
 		}
 	} else {
-		updateCommandRestorableTime(&archive)
+		updateCommandRestorableTime(&archive, walEncryption)
 	}
 
 	outParameters.Mandatory.Add("archive_mode", "on")
@@ -78,10 +90,27 @@ func PostgreSQL(
 	// Fetch WAL files from any configured repository during recovery.
 	// - https://pgbackrest.org/command.html#command-archive-get
 	// - https://www.postgresql.org/docs/current/runtime-config-wal.html
-	restore := `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"`
-	if inCluster.CompareVersion("2.9.0") >= 0 {
-		restore = "/opt/crunchy/bin/restore-command-wrapper.sh " + restore
+	//
+	// The repository option belongs to pgBackRest, so it goes on the pgBackRest
+	// command rather than on whatever is wrapping it.
+	archiveGet := func(repoOption string) string {
+		if walEncryption {
+			return WALEncryptRestoreCommand(repoOption)
+		}
+		return `pgbackrest --stanza=` + DefaultStanzaName + ` archive-get %f "%p"` + repoOption
 	}
+
+	// The wrapper script only decides whether to skip WAL recovery before exec'ing
+	// what it is given, so it has to stay outermost.
+	wrap := func(command string) string {
+		if inCluster.CompareVersion("2.9.0") >= 0 {
+			command = "/opt/crunchy/bin/restore-command-wrapper.sh " + command
+		}
+		return command
+	}
+
+	restore := wrap(archiveGet(""))
+	restoreOverridden := false
 	if inCluster.Spec.Patroni != nil && inCluster.Spec.Patroni.DynamicConfiguration != nil {
 		postgresql, ok := inCluster.Spec.Patroni.DynamicConfiguration["postgresql"].(map[string]any)
 		if ok {
@@ -90,6 +119,7 @@ func PostgreSQL(
 				restore_command, ok := params["restore_command"].(string)
 				if ok {
 					restore = restore_command
+					restoreOverridden = true
 				}
 			}
 		}
@@ -102,16 +132,44 @@ func PostgreSQL(
 		// is validated by the Kubernetes API, so it does not need to be quoted
 		// nor escaped.
 		repoName := inCluster.Spec.Standby.RepoName
-		restore += " --repo=" + strings.TrimPrefix(repoName, "repo")
+		repoOption := " --repo=" + strings.TrimPrefix(repoName, "repo")
+
+		// A user-supplied restore_command is opaque to us, so it can only be
+		// appended to.
+		if restoreOverridden {
+			restore += repoOption
+		} else {
+			restore = wrap(archiveGet(repoOption))
+		}
 		outParameters.Mandatory.Add("restore_command", restore)
 	}
 }
 
-func updateCommandRestorableTime(archive *string) {
+// WALEncryptRestoreCommand returns a restore_command that fetches a WAL segment
+// from the pgBackRest repository and encrypts it into place. Any repoOption is
+// passed to pgBackRest, so it belongs inside the command being wrapped.
+//
+// K8SPG-911: archive_command decrypts before pushing, so the repository holds
+// plaintext WAL. pg_tde_restore_encrypt fetches a segment into a temporary file
+// and encrypts it into place. As with archive_command, the "%%" escapes are there
+// for pg_tde_restore_encrypt rather than for PostgreSQL.
+func WALEncryptRestoreCommand(repoOption string) string {
+	return `pg_tde_restore_encrypt %f %p "pgbackrest --stanza=` + DefaultStanzaName +
+		` archive-get %%f \"%%p\"` + repoOption + `"`
+}
+
+func updateCommandRestorableTime(archive *string, walEncryption bool) {
 	fixTimezone := `sed -E "s/([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}) (UTC|[\\+\\-][0-9]{2})/\1T\2\3/" | sed "s/UTC/Z/"`
 	extractCommitTime := `grep -oP "COMMIT \K[^;]+" | ` + fixTimezone + ``
 	validateCommitTime := `grep -E "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$"`
 
-	*archive += ` && timestamp=$(pg_waldump -r Transaction "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
+	// K8SPG-911: this reads the segment PostgreSQL substitutes into "%p", which is
+	// still the encrypted original, so it needs the pg_tde build of pg_waldump.
+	waldump := "pg_waldump"
+	if walEncryption {
+		waldump = "pg_tde_waldump -k $PGDATA/pg_tde"
+	}
+
+	*archive += ` && timestamp=$(` + waldump + ` -r Transaction "%p" | ` + extractCommitTime + ` | tail -n 1 | ` + validateCommitTime + `);`
 	*archive += ` if [ ! -z ${timestamp} ]; then echo ${timestamp} > /pgdata/latest_commit_timestamp.txt; fi`
 }
