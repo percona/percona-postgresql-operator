@@ -55,6 +55,7 @@ const (
 	AdminUser           = startup.AdminUser
 	AdminPasswordEnvVar = startup.AdminPasswordEnvVar
 	PausedValue         = startup.PausedValue
+	PGBouncerPortEnvVar = startup.PortEnvVar
 
 	adminUsersSetting = "admin_users"
 )

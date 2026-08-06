@@ -5,7 +5,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -29,7 +31,10 @@ func main() {
 
 	log.SetOutput(io.MultiWriter(os.Stderr, f))
 
-	if err := handlePause(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := handlePause(ctx); err != nil {
 		log.Fatalf("ERROR: %v", err)
 	}
 }
@@ -38,7 +43,7 @@ func main() {
 // During runtime, the operator runs PAUSE, but this is not persisted across restarts.
 // Failure to pause is fatal: the container must not be considered started while
 // it is accepting connections the user asked us to hold.
-func handlePause() error {
+func handlePause(ctx context.Context) error {
 	wanted, err := pauseWanted(startup.PausedFileAbsolutePath)
 	if err != nil {
 		return errors.Wrap(err, "read paused marker")
@@ -52,16 +57,21 @@ func handlePause() error {
 		return errors.Errorf("%s is not set, cannot pause", startup.AdminPasswordEnvVar)
 	}
 
-	client, err := pgbruntime.NewAdminClient(startup.AdminUser, password, adminHost)
+	client, err := pgbruntime.NewAdminClient(pgbruntime.AdminClientOptions{
+		Host:     adminHost,
+		User:     startup.AdminUser,
+		Password: password,
+		Port:     os.Getenv(startup.PortEnvVar),
+	})
 	if err != nil {
 		return errors.Wrap(err, "create pgbouncer admin client")
 	}
 	defer func() { _ = client.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), pauseTimeout)
+	pctx, cancel := context.WithTimeout(ctx, pauseTimeout)
 	defer cancel()
 
-	if err := pause(ctx, client, pauseRetryInterval); err != nil {
+	if err := pause(pctx, client, pauseRetryInterval); err != nil {
 		return errors.Wrap(err, "pause pgbouncer")
 	}
 

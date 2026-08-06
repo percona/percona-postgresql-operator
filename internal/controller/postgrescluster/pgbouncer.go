@@ -771,7 +771,12 @@ func (r *Reconciler) reconcilePGBouncerPause(ctx context.Context, secret *corev1
 	}
 
 	proxy := cluster.Spec.Proxy
-	shouldPause := proxy.PGBouncerEnabled() && proxy.PGBouncerPaused()
+	if !proxy.PGBouncerEnabled() {
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+		return nil
+	}
+
+	shouldPause := proxy.PGBouncerPaused()
 	isPaused := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGBouncerPaused)
 	if shouldPause == isPaused {
 		return nil
@@ -822,11 +827,12 @@ func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Se
 			return errors.Errorf("pgbouncer pod %s has no IP yet", pod.Name)
 		}
 
-		adminClient, err := r.newPGBouncerAdmin(
-			pgbouncer.AdminUser,
-			string(password),
-			pod.Status.PodIP,
-		)
+		adminClient, err := r.newPGBouncerAdmin(pgbruntime.AdminClientOptions{
+			User:     pgbouncer.AdminUser,
+			Password: string(password),
+			Host:     pod.Status.PodIP,
+			Port:     fmt.Sprintf("%d", *cluster.Spec.Proxy.PGBouncer.Port),
+		})
 		if err != nil {
 			return errors.Wrapf(err, "create pgbouncer admin client for pod %s", pod.Name)
 		}

@@ -6,6 +6,7 @@ package pgbouncer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -278,17 +279,23 @@ func Pod(
 	logVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
 
 	if inCluster.CompareVersion("3.1.0") >= 0 {
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name: AdminPasswordEnvVar,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: inSecret.Name,
+		container.Env = append(container.Env, []corev1.EnvVar{
+			{
+				Name: AdminPasswordEnvVar,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: inSecret.Name,
+						},
+						Key: AdminPasswordSecretKey,
 					},
-					Key: AdminPasswordSecretKey,
 				},
 			},
-		})
+			{
+				Name:  PGBouncerPortEnvVar,
+				Value: fmt.Sprintf("%d", *inCluster.Spec.Proxy.PGBouncer.Port),
+			},
+		}...)
 		container.VolumeMounts = append(container.VolumeMounts, logVolumeMount, crunchyBinVolumeMount)
 
 		container.StartupProbe = &corev1.Probe{

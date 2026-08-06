@@ -267,8 +267,10 @@ ownerReferences:
 		cluster.Spec.Proxy.PGBouncer.Service = &v1beta1.ServiceSpec{
 			Metadata: &v1beta1.Metadata{
 				Annotations: map[string]string{"c": "v3"},
-				Labels: map[string]string{"d": "v4",
-					"postgres-operator.crunchydata.com/cluster": "wrongName"},
+				Labels: map[string]string{
+					"d": "v4",
+					"postgres-operator.crunchydata.com/cluster": "wrongName",
+				},
 			},
 		}
 
@@ -352,12 +354,15 @@ ownerReferences:
 		NodePort    *int32
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
-		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
+		{
+			Description: "ClusterIP with Port 32000", Type: "ClusterIP",
 			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"pg7-pgbouncer\"")
 				assert.Assert(t, service == nil)
-			}},
-		{Description: "NodePort with Port 32001", Type: "NodePort",
+			},
+		},
+		{
+			Description: "NodePort with Port 32001", Type: "NodePort",
 			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
@@ -369,8 +374,10 @@ ownerReferences:
   protocol: TCP
   targetPort: pgbouncer
 `))
-			}},
-		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
+			},
+		},
+		{
+			Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
 			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
@@ -382,7 +389,8 @@ ownerReferences:
   protocol: TCP
   targetPort: pgbouncer
 `))
-			}},
+			},
+		},
 	}
 
 	for _, test := range typesAndPort {
@@ -779,7 +787,7 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 }
 
 func TestReconcilePause(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const adminPassword = "some-admin-password"
 	const podIP = "10.0.0.1"
@@ -905,12 +913,12 @@ func TestReconcilePause(t *testing.T) {
 
 			r := &Reconciler{
 				Client: cl,
-				newPGBouncerAdmin: func(user, password, host string) (pgbruntime.AdminClient, error) {
-					assert.Equal(t, user, pgbouncer.AdminUser)
-					assert.Equal(t, password, adminPassword)
+				newPGBouncerAdmin: func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+					assert.Equal(t, opts.User, pgbouncer.AdminUser)
+					assert.Equal(t, opts.Password, adminPassword)
 
-					if host != podIP {
-						return nil, errors.Errorf("no pgbouncer Pod has IP %q", host)
+					if opts.Host != podIP {
+						return nil, errors.Errorf("no pgbouncer Pod has IP %q", opts.Host)
 					}
 					return admin, nil
 				},

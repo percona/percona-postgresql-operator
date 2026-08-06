@@ -20,22 +20,36 @@ type AdminClientOptions struct {
 	User     string
 	Password string
 	Host     string
+	Port     string
 }
 
-func NewAdminClient(user, password, host string) (AdminClient, error) {
-	if user == "" {
-		return nil, errors.New("user is required")
+func (o AdminClientOptions) validate() error {
+	if o.User == "" {
+		return errors.New("user is required")
 	}
-	if password == "" {
-		return nil, errors.New("password is required")
+	if o.Password == "" {
+		return errors.New("password is required")
 	}
-	if host == "" {
-		return nil, errors.New("host is required")
+	if o.Host == "" {
+		return errors.New("host is required")
 	}
+	return nil
+}
 
+func (o AdminClientOptions) dsn() string {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=pgbouncer sslmode=require",
-		host, user, password)
-	db, err := sql.Open("postgres", dsn)
+		o.Host, o.User, o.Password)
+	if o.Port != "" {
+		dsn = fmt.Sprintf("%s port=%s", dsn, o.Port)
+	}
+	return dsn
+}
+
+func NewAdminClient(opts AdminClientOptions) (AdminClient, error) {
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("postgres", opts.dsn())
 	if err != nil {
 		return nil, errors.Wrap(err, "open pgbouncer connection")
 	}

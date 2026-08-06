@@ -83,7 +83,7 @@ type Reconciler struct {
 	Controller                   controller.Controller
 	Cache                        cache.Cache
 	certManagerWatchesRegistered atomic.Bool
-	newPGBouncerAdmin            func(user, password, host string) (pgbruntime.AdminClient, error)
+	newPGBouncerAdmin            func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error)
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -593,8 +593,8 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	}
 
 	if r.newPGBouncerAdmin == nil {
-		r.newPGBouncerAdmin = func(user, password, host string) (pgbruntime.AdminClient, error) {
-			return pgbruntime.NewAdminClient(user, password, host)
+		r.newPGBouncerAdmin = func(o pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+			return pgbruntime.NewAdminClient(o)
 		}
 	}
 

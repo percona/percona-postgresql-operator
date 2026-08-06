@@ -39,4 +39,6 @@ const (
 
 	// PauseTimeoutSeconds is the timeout for setting pause.
 	PauseTimeoutSeconds = 30
+
+	PortEnvVar = "PGBOUNCER_PORT"
 )
