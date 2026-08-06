@@ -4,7 +4,7 @@ timeout: 300
 commands:
   - script: |
       tmp_file=$(mktemp)
-      kubectl -n $NAMESPACE get pg pg-tde -o yaml | yq '.status.conditions.[] | select(.type == "PGTDEEnabled")' > ${tmp_file}
+      kubectl -n $NAMESPACE get pg pg-tde-wal-encrypt -o yaml | yq '.status.conditions.[] | select(.type == "PGTDEEnabled")' > ${tmp_file}
       [[ $(cat ${tmp_file} | yq .message) == "pg_tde is enabled in PerconaPGCluster" ]]
       [[ $(cat ${tmp_file} | yq .observedGeneration) == "1" ]]
       [[ $(cat ${tmp_file} | yq .reason) == "Enabled" ]]
@@ -14,13 +14,13 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: pg-tde
+    postgres-operator.crunchydata.com/cluster: pg-tde-wal-encrypt
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
     - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
-      name: pg-tde
+      name: pg-tde-wal-encrypt
       controller: true
       blockOwnerDeletion: true
 spec:
@@ -93,14 +93,14 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: pg-tde
+  name: pg-tde-wal-encrypt
 status:
   state: ready
 ---
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: pg-tde
+  name: pg-tde-wal-encrypt
 status:
   pgTDERevision: 58dc94b68c
 ---
@@ -108,7 +108,7 @@ kind: Job
 apiVersion: batch/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: pg-tde
+    postgres-operator.crunchydata.com/cluster: pg-tde-wal-encrypt
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
     postgres-operator.crunchydata.com/pgbackrest-repo: repo1
