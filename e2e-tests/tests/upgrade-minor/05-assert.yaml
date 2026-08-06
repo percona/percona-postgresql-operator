@@ -139,6 +139,9 @@ status:
   - type: APIGroupMigration
     reason: APIGroupMigrationNotNeeded
     status: "True"
+  - type: TLSSecretsReady
+    reason: TLSSecretsFound
+    status: "True"
   - type: PGTDEEnabled
     reason: Disabled
     status: "False"

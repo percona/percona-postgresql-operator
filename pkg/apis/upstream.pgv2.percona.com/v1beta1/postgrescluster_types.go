@@ -266,8 +266,12 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.walEncryption) || !self.walEncryption || (has(self.enabled) && self.enabled)",message="pg_tde must be enabled to enable WAL encryption"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
+
+	// Encrypt write-ahead log segments. Requires pg_tde.enabled to be true.
+	WALEncryption bool `json:"walEncryption,omitempty"`
 
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
@@ -292,9 +296,30 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
+	// +kubebuilder:default=auto
+	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
+	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }
+
+func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
+	if s == nil || s.CertManagementPolicy == "" {
+		return CertManagementAuto
+	}
+	return s.CertManagementPolicy
+}
+
+type CertManagementPolicy string
+
+const (
+	CertManagementAuto             CertManagementPolicy = "auto"
+	CertManagementUserProvidedOnly CertManagementPolicy = "userProvidedOnly"
+)
+
+const (
+	ConditionTypeTLSSecretsReady = "TLSSecretsReady"
+)
 
 // DataSource defines data sources for a new PostgresCluster.
 type DataSource struct {
@@ -390,7 +415,7 @@ type PostgresClusterDataSource struct {
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest restore command.
@@ -789,7 +814,7 @@ type PostgresStandbySpec struct {
 
 	// The name of the pgBackRest repository to follow for WAL files.
 	// +optional
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName string `json:"repoName,omitempty"`
 
 	// Network address of the PostgreSQL server to follow via streaming replication.

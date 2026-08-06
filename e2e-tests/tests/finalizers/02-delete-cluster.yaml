@@ -29,3 +29,18 @@ commands:
       assert_no_cluster_secrets
       sleep 15
       assert_no_cluster_secrets
+
+      # K8SPG-713: Verify no "not found" errors occurred during finalizer removal.
+      # This catches the race condition where the CR disappears before the
+      # finalizer-removal patch completes.
+      operator_pod=$(get_operator_pod)
+      finalizer_errors=$(kubectl logs -n "${OPERATOR_NS:-$NAMESPACE}" "$operator_pod" -c operator \
+        | grep "Reconciler error" \
+        | grep "remove finalizers" \
+        | grep "not found" || true)
+      if [ -n "$finalizer_errors" ]; then
+        echo "ERROR: Detected 'not found' errors during finalizer removal (K8SPG-713):"
+        echo "$finalizer_errors"
+        exit 1
+      fi
+

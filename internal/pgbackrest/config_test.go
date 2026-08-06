@@ -262,25 +262,27 @@ func TestMakePGBackrestLogDir(t *testing.T) {
 func TestReloadCommand(t *testing.T) {
 	shellcheck := require.ShellCheck(t)
 
-	command := reloadCommand("some-name", true)
+	for _, repos := range [][]string{nil, {"repo1", "repo4"}} {
+		command := reloadCommand("some-name", true, repos)
 
-	// Expect a bash command with an inline script.
-	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
-	assert.Assert(t, len(command) > 3)
+		// Expect a bash command with an inline script.
+		assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
+		assert.Assert(t, len(command) > 3)
 
-	// Write out that inline script.
-	dir := t.TempDir()
-	file := filepath.Join(dir, "script.bash")
-	assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+		// Write out that inline script.
+		dir := t.TempDir()
+		file := filepath.Join(dir, "script.bash")
+		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
 
-	// Expect shellcheck to be happy.
-	cmd := exec.Command(shellcheck, "--enable=all", file)
-	output, err := cmd.CombinedOutput()
-	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+		// Expect shellcheck to be happy.
+		cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
+		output, err := cmd.CombinedOutput()
+		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+	}
 }
 
 func TestReloadCommandPrettyYAML(t *testing.T) {
-	assert.Assert(t, cmp.MarshalContains(reloadCommand("any", true), "\n- |"),
+	assert.Assert(t, cmp.MarshalContains(reloadCommand("any", true, nil), "\n- |"),
 		"expected literal block scalar")
 }
 
@@ -292,24 +294,65 @@ func TestRestoreCommand(t *testing.T) {
 		"--stanza=" + DefaultStanzaName, "--pg1-path=" + pgdata,
 		"--repo=1",
 	}
-	command := RestoreCommand(pgdata, "try", nil, false, strings.Join(opts, " "))
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.Spec.PostgresVersion = 13
 
-	assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
-	assert.Assert(t, len(command) > 3)
+	shellcheckScript := func(t *testing.T, command []string) {
+		t.Helper()
 
-	dir := t.TempDir()
-	file := filepath.Join(dir, "script.bash")
-	assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+		assert.DeepEqual(t, command[:3], []string{"bash", "-ceu", "--"})
+		assert.Assert(t, len(command) > 3)
 
-	cmd := exec.Command(shellcheck, "--enable=all", file)
-	output, err := cmd.CombinedOutput()
-	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+		dir := t.TempDir()
+		file := filepath.Join(dir, "script.bash")
+		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
+
+		cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
+		output, err := cmd.CombinedOutput()
+		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
+	}
+
+	command := RestoreCommand(cluster, nil, pgdata, "try", nil, strings.Join(opts, " "))
+	shellcheckScript(t, command)
+	assert.Assert(t, !strings.Contains(command[3], "tdelink"),
+		"expected no pg_tde link without WAL encryption")
+
+	// K8SPG-911: with WAL encryption, the keyring is linked into the root of the
+	// volume that holds the WAL files after the restore and before Postgres starts.
+	t.Run("WALEncryption", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+		cluster.Spec.Extensions.PGTDE.WALEncryption = true
+
+		instance := &v1beta1.PostgresInstanceSetSpec{}
+		instance.WALVolumeClaimSpec = new(corev1.PersistentVolumeClaimSpec)
+
+		command := RestoreCommand(cluster, instance, pgdata, "try", nil,
+			strings.Join(opts, " "))
+		shellcheckScript(t, command)
+
+		script := command[3]
+		assert.Assert(t, cmp.Contains(script, `tdelink "/pgdata/pg13/pg_tde" "/pgdata/pg_tde"`))
+		assert.Assert(t, cmp.Contains(script, `tdelink "/pgdata/pg13/pg_tde" "/pgwal/pg_tde"`))
+		assert.Assert(t, cmp.Contains(script, "pg_tde.wal_encrypt = 'on'"))
+
+		// The keyring has to be in place before recovery runs pg_tde_restore_encrypt,
+		// and it comes out of the restore, so the links go between the two.
+		assert.Assert(t,
+			strings.Index(script, `bash -xc "pgbackrest restore`) <
+				strings.Index(script, "tdelink \"/pgdata/pg13/pg_tde\""),
+			"expected the links after the restore")
+		assert.Assert(t,
+			strings.Index(script, "tdelink \"/pgdata/pg13/pg_tde\"") <
+				strings.Index(script, "pg_ctl start"),
+			"expected the links before Postgres starts")
+	})
 }
 
 func TestRestoreCommandPrettyYAML(t *testing.T) {
 	assert.Assert(t,
 		cmp.MarshalContains(
-			RestoreCommand("/dir", "try", nil, false, "--options"),
+			RestoreCommand(&v1beta1.PostgresCluster{}, nil, "/dir", "try", nil, "--options"),
 			"\n- |",
 		),
 		"expected literal block scalar")
@@ -332,7 +375,7 @@ func TestDedicatedSnapshotVolumeRestoreCommand(t *testing.T) {
 	file := filepath.Join(dir, "script.bash")
 	assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
 
-	cmd := exec.Command(shellcheck, "--enable=all", file)
+	cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
 	output, err := cmd.CombinedOutput()
 	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 }

@@ -590,7 +590,7 @@ spec:
                 description: |-
                   The name of the pgBackRest repo to run the backup command against.
                   This is required when method is 'pgbackrest'.
-                pattern: ^repo[1-4]
+                pattern: ^repo[1-4]$
                 type: string
             required:
             - pgCluster
@@ -701,7 +701,7 @@ spec:
                     type: object
                   name:
                     description: The name of the repository
-                    pattern: ^repo[1-4]
+                    pattern: ^repo[1-4]$
                     type: string
                   s3:
                     description: |-
@@ -3717,7 +3717,7 @@ spec:
                           repoName:
                             description: The name of the pgBackRest repo to run the
                               backup command against.
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                         required:
                         - repoName
@@ -9040,7 +9040,7 @@ spec:
                               type: object
                             name:
                               description: The name of the repository
-                              pattern: ^repo[1-4]
+                              pattern: ^repo[1-4]$
                               type: string
                             s3:
                               description: |-
@@ -10481,7 +10481,7 @@ spec:
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
                               for the new PostgresCluster.
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                           resources:
                             description: Resource requirements for the pgBackRest
@@ -12726,7 +12726,7 @@ spec:
                             type: object
                           name:
                             description: The name of the repository
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                           s3:
                             description: |-
@@ -14265,7 +14265,7 @@ spec:
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
                           for the new PostgresCluster.
-                        pattern: ^repo[1-4]
+                        pattern: ^repo[1-4]$
                         type: string
                       resources:
                         description: Resource requirements for the pgBackRest restore
@@ -14789,11 +14789,18 @@ spec:
                         - host
                         - tokenSecret
                         type: object
+                      walEncryption:
+                        description: Encrypt write-ahead log segments. Requires pg_tde.enabled
+                          to be true.
+                        type: boolean
                     type: object
                     x-kubernetes-validations:
                     - message: vault is required for enabling pg_tde
                       rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
                         == false) || has(self.vault)'
+                    - message: pg_tde must be enabled to enable WAL encryption
+                      rule: '!has(self.walEncryption) || !self.walEncryption || (has(self.enabled)
+                        && self.enabled)'
                   pgvector:
                     properties:
                       enabled:
@@ -34878,12 +34885,18 @@ spec:
                   repoName:
                     description: The name of the pgBackRest repository to follow for
                       WAL files.
-                    pattern: ^repo[1-4]
+                    pattern: ^repo[1-4]$
                     type: string
                 type: object
               tls:
                 properties:
                   caValidityDuration:
+                    type: string
+                  certManagementPolicy:
+                    default: auto
+                    enum:
+                    - auto
+                    - userProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string
@@ -35173,6 +35186,10 @@ spec:
                           description: Whether or not the pgBackRest repository PersistentVolumeClaim
                             is bound to a volume
                           type: boolean
+                        desiredRepoVolume:
+                          description: Desired size of the PersistentVolumeClaim containing
+                            the repository.
+                          type: string
                         name:
                           description: The name of the pgBackRest repository
                           type: string
@@ -35641,7 +35658,7 @@ spec:
                   The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                   that should be utilized to perform a pgBackRest restore when initializing the data source
                   for the new PostgresCluster.
-                pattern: ^repo[1-4]
+                pattern: ^repo[1-4]$
                 type: string
                 x-kubernetes-validations:
                 - message: repoName is an immutable field
@@ -45852,7 +45869,7 @@ spec:
                           repoName:
                             description: The name of the pgBackRest repo to run the
                               backup command against.
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                         required:
                         - repoName
@@ -51165,7 +51182,7 @@ spec:
                               type: object
                             name:
                               description: The name of the repository
-                              pattern: ^repo[1-4]
+                              pattern: ^repo[1-4]$
                               type: string
                             s3:
                               description: |-
@@ -52615,7 +52632,7 @@ spec:
                               The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                               that should be utilized to perform a pgBackRest restore when initializing the data source
                               for the new PostgresCluster.
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                           resources:
                             description: Resource requirements for the pgBackRest
@@ -54967,7 +54984,7 @@ spec:
                             type: object
                           name:
                             description: The name of the repository
-                            pattern: ^repo[1-4]
+                            pattern: ^repo[1-4]$
                             type: string
                           s3:
                             description: |-
@@ -56506,7 +56523,7 @@ spec:
                           The name of the pgBackRest repo within the source PostgresCluster that contains the backups
                           that should be utilized to perform a pgBackRest restore when initializing the data source
                           for the new PostgresCluster.
-                        pattern: ^repo[1-4]
+                        pattern: ^repo[1-4]$
                         type: string
                       resources:
                         description: Resource requirements for the pgBackRest restore
@@ -56891,11 +56908,18 @@ spec:
                         - host
                         - tokenSecret
                         type: object
+                      walEncryption:
+                        description: Encrypt write-ahead log segments. Requires pg_tde.enabled
+                          to be true.
+                        type: boolean
                     type: object
                     x-kubernetes-validations:
                     - message: vault is required for enabling pg_tde
                       rule: '!has(self.enabled) || (has(self.enabled) && self.enabled
                         == false) || has(self.vault)'
+                    - message: pg_tde must be enabled to enable WAL encryption
+                      rule: '!has(self.walEncryption) || !self.walEncryption || (has(self.enabled)
+                        && self.enabled)'
                   pgAudit:
                     type: boolean
                   pgCron:
@@ -74008,7 +74032,7 @@ spec:
                   repoName:
                     description: The name of the pgBackRest repository to follow for
                       WAL files.
-                    pattern: ^repo[1-4]
+                    pattern: ^repo[1-4]$
                     type: string
                 type: object
               supplementalGroups:
@@ -74025,6 +74049,12 @@ spec:
               tls:
                 properties:
                   caValidityDuration:
+                    type: string
+                  certManagementPolicy:
+                    default: auto
+                    enum:
+                    - auto
+                    - userProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string
@@ -76332,6 +76362,10 @@ spec:
                           description: Whether or not the pgBackRest repository PersistentVolumeClaim
                             is bound to a volume
                           type: boolean
+                        desiredRepoVolume:
+                          description: Desired size of the PersistentVolumeClaim containing
+                            the repository.
+                          type: string
                         name:
                           description: The name of the pgBackRest repository
                           type: string
