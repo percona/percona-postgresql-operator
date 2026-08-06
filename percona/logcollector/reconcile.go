@@ -44,17 +44,12 @@ func Reconcile(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) er
 }
 
 // resolveDefaultEnabled defaults an unset Enabled to on for new clusters and off
-// for existing ones. The resolved value is persisted back to the CR's spec so the
-// decision is stable across reconcile loops.
+// for existing ones, keyed on whether the crunchy PostgresCluster already exists.
 func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.LogCollector == nil || cr.Spec.LogCollector.Enabled != nil {
 		return nil
 	}
 
-	// Determine whether this is a new cluster by checking if the underlying
-	// PostgresCluster already exists. Unlike status.State (which may be set
-	// within the same reconcile), the PostgresCluster is only created later
-	// in the reconcile loop, so on the very first reconcile it will not exist.
 	existing := &crunchyv1beta1.PostgresCluster{}
 	err := c.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, existing)
 	if err != nil && !k8serrors.IsNotFound(err) {
