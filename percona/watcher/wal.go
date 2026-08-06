@@ -8,13 +8,13 @@ import (
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
 	pgv2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
@@ -30,13 +30,27 @@ var (
 	LatestTimestampIsBeforeBackupStart = errors.New("latest commit timestamp is before backup start timestamp")
 )
 
+// LatestCommitGetter returns the latest restorable timestamp for a backup
+type LatestCommitGetter func(context.Context, client.Client, *pgv2.PerconaPGCluster, *pgv2.PerconaPGBackup) (*metav1.Time, error)
+
+func GetLatestCommitGetter() LatestCommitGetter {
+	return func(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
+		execCli, err := clientcmd.NewClient()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create exec client")
+		}
+
+		return getLatestCommitTimestamp(ctx, cli, execCli, cr, backup)
+	}
+}
+
 type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv2.PerconaPGCluster)
 
 func GetWALWatcher(cr *pgv2.PerconaPGCluster) (string, WALWatcher) {
-	return cr.Namespace + "-" + cr.Name + "-wal-watcher", WatchCommitTimestamps
+	return cr.Namespace + "-" + cr.Name + "-wal-watcher", watchCommitTimestamps
 }
 
-func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv2.PerconaPGCluster) {
+func watchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv2.PerconaPGCluster) {
 	log := logging.FromContext(ctx).WithName("WALWatcher")
 
 	if !cr.Spec.Backups.IsEnabled() {
@@ -69,15 +83,15 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			}
 			log.V(1).Info("Running WAL watcher")
 
-			latestBackup, err := getLatestBackup(ctx, cli, localCr)
+			latestBackup, err := k8s.GetLatestBackup(ctx, cli, localCr)
 			if err != nil {
-				if !errors.Is(err, errRunningBackup) && !errors.Is(err, errNoBackups) {
+				if !errors.Is(err, k8s.ErrRunningBackup) && !errors.Is(err, k8s.ErrNoBackups) {
 					log.Error(err, "get latest backup")
 				}
 
 				continue
 			}
-			ts, err := GetLatestCommitTimestamp(ctx, cli, execCli, localCr, latestBackup)
+			ts, err := getLatestCommitTimestamp(ctx, cli, execCli, localCr, latestBackup)
 			if err != nil {
 				switch {
 				case errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady:
@@ -95,7 +109,8 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			latestRestorableTime := latestBackup.Status.LatestRestorableTime
 			log.V(1).Info("Latest commit timestamp", "timestamp", ts, "latestRestorableTime", latestRestorableTime.Time)
 			if latestRestorableTime.Time == nil || latestRestorableTime.UTC().Before(ts.Time) {
-				log.Info("Triggering PGBackup reconcile",
+				log.Info(
+					"Triggering PGBackup reconcile",
 					"latestBackup", latestBackup.Name,
 					"latestRestorableTime", latestRestorableTime.Time,
 					"latestCommitTimestamp", ts,
@@ -113,66 +128,8 @@ func WatchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 	}
 }
 
-var (
-	errRunningBackup = errors.New("backups are running")
-	errNoBackups     = errors.New("no backups found")
-)
-
-func getLatestBackup(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster) (*pgv2.PerconaPGBackup, error) {
-	backupList := &pgv2.PerconaPGBackupList{}
-	err := cli.List(ctx, backupList, &client.ListOptions{
-		Namespace: cr.Namespace,
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"spec.pgCluster": cr.Name,
-		}),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(backupList.Items) == 0 {
-		return nil, errNoBackups
-	}
-
-	latest := &pgv2.PerconaPGBackup{}
-	runningBackupExists := false
-	for _, backup := range backupList.Items {
-		if ptr.Deref(backup.Spec.Method, pgv2.BackupMethodPGBackrest) == pgv2.BackupMethodVolumeSnapshot {
-			continue
-		}
-
-		switch backup.Status.State {
-		case pgv2.BackupSucceeded:
-			var completedAt *metav1.Time
-
-			if backup.Status.CompletedAt != nil {
-				completedAt = backup.Status.CompletedAt
-			}
-			if completedAt == nil {
-				completedAt = &backup.CreationTimestamp
-			}
-
-			if latest.Status.CompletedAt == nil || completedAt.After(latest.Status.CompletedAt.Time) {
-				latest = &backup
-			}
-		case pgv2.BackupFailed:
-		default:
-			runningBackupExists = true
-		}
-	}
-
-	if latest.Status.CompletedAt == nil {
-		if runningBackupExists {
-			return nil, errRunningBackup
-		}
-		return nil, errors.New("no completed backups found")
-	}
-
-	return latest, nil
-}
-
-// GetLatestCommitTimestamp gets the timestamp of the latest commit.
-func GetLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
+// getLatestCommitTimestamp gets the timestamp of the latest commit.
+func getLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *clientcmd.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (*metav1.Time, error) {
 	log := logging.FromContext(ctx)
 
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
