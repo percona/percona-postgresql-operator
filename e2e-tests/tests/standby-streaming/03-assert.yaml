@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  - script: |-
+      kubectl wait \
+        --for='jsonpath={.status.conditions[?(@.type=="AllInjected")].status}=True' \
+        networkchaos --all \
+        -n "${NAMESPACE}" \
+        --timeout=60s

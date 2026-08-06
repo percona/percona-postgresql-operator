@@ -775,15 +775,85 @@ function get_qan20_values() {
 		| jq '.rows[].sparkline'
 }
 
+function get_cluster_runtime_version() {
+	local runtime_version
+
+	runtime_version=$(kubectl get nodes \
+		-o jsonpath='{.items[0].status.nodeInfo.containerRuntimeVersion}')
+
+	echo "${runtime_version}"
+}
+
+function get_cluster_runtime() {
+	runtime_version=$(get_cluster_runtime_version)
+
+	case "$runtime_version" in
+		containerd://*)
+			echo "containerd"
+			;;
+		cri-o://*)
+			echo "crio"
+			;;
+		docker://*)
+			echo "docker"
+			;;
+		*)
+			echo "Unsupported container runtime: $runtime_version" >&2
+			return 1
+			;;
+	esac
+}
+
+get_cluster_runtime_socket_path() {
+	runtime_version=$(get_cluster_runtime_version)
+
+	case "$runtime_version" in
+		containerd://*-k3s*)
+			echo "/run/k3s/containerd/containerd.sock"
+			;;
+		containerd://*)
+			echo "/run/containerd/containerd.sock"
+			;;
+		cri-o://*)
+			echo "/var/run/crio/crio.sock"
+			;;
+		docker://*)
+			echo "/var/run/docker.sock"
+			;;
+		*)
+			echo "Unsupported container runtime: $runtime_version" >&2
+			return 1
+			;;
+	esac
+}
+
 function deploy_chaos_mesh() {
+	local runtime_config
+	local runtime
+	local socket_path
+
 	destroy_chaos_mesh
 
-	helm repo add chaos-mesh https://charts.chaos-mesh.org
-	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version ${CHAOS_MESH_VER}
+	runtime=$(get_cluster_runtime)
+	socket_path=$(get_cluster_runtime_socket_path)
+
+	helm repo add chaos-mesh https://charts.chaos-mesh.org \
+		--force-update
+
+	helm install chaos-mesh chaos-mesh/chaos-mesh \
+		--namespace="${NAMESPACE}" \
+		--create-namespace \
+		--version="${CHAOS_MESH_VER}" \
+		--set chaosDaemon.runtime="${runtime}" \
+		--set chaosDaemon.socketPath="${socket_path}" \
+		--set dashboard.create=false
+
 	if [[ "${PLATFORM}" == "openshift" ]]; then
-		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
+		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace="${NAMESPACE}"
+		kubectl rollout restart daemonset/chaos-daemon --namespace="${NAMESPACE}"
 	fi
-	sleep 10
+
+	kubectl rollout status daemonset/chaos-daemon --namespace="${NAMESPACE}" --timeout=120s
 }
 
 function destroy_chaos_mesh() {
@@ -855,6 +925,36 @@ function network_loss() {
         .spec.selector.pods.'${ns}'[0] = "'${pod}'"' ${TESTS_CONFIG_DIR}/chaos-network-loss.yml \
 		| kubectl apply --namespace ${ns} -f -
 	sleep 5
+}
+
+function network_delay() {
+	local ns=$1
+	local source_instance=$2
+	local target_service=$3
+
+	yq eval '
+		.metadata.name = "chaos-source-target-delay-'"${RANDOM}"'" |
+		.metadata.namespace = "'"${ns}"'" |
+		.spec.action = "netem" |
+		.spec.selector.namespaces = ["'"${ns}"'"] |
+		.spec.selector.labelSelectors."app.kubernetes.io/instance" = "'"${source_instance}"'" |
+		.spec.direction = "to" |
+		.spec.externalTargets = [
+			"'"${target_service}.${ns}.svc.cluster.local"'"
+		] |
+		del(.spec.target)
+	' "${TESTS_CONFIG_DIR}/chaos-network-delay.yml" \
+		| kubectl apply --namespace "${ns}" -f -
+}
+
+function block_external_egress() {
+	local ns="$1"
+	local cluster="$2"
+	local file="${TESTS_CONFIG_DIR}/block-external-egress.yml"
+
+	sed \
+			-e "s#test-cluster#${cluster}#g" \
+			"$file" | kubectl apply --namespace "${ns}" -f -
 }
 
 function wait_deployment() {
