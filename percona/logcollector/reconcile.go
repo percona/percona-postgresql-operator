@@ -60,6 +60,7 @@ func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaP
 	if k8serrors.IsNotFound(err) {
 		enabled = true
 	} else {
+		// preserve the existent state
 		enabled = hasLogCollectorSidecar(existing)
 	}
 	cr.Spec.LogCollector.Enabled = &enabled
