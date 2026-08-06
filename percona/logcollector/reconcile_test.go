@@ -220,3 +220,64 @@ func TestExtraConfigRollsPods(t *testing.T) {
 
 	assert.NotEqual(t, hash1, hash2, "config hash should change when extraConfig contents change")
 }
+
+func TestResolveDefaultEnabled(t *testing.T) {
+	require.NoError(t, v2.AddToScheme(scheme.Scheme))
+
+	tests := map[string]struct {
+		logCollector *v2.LogCollectorSpec
+		statusState  v2.AppState
+		wantEnabled  *bool
+	}{
+		"nil LogCollector is not modified": {
+			logCollector: nil,
+			wantEnabled:  nil,
+		},
+		"explicitly set Enabled is not overridden": {
+			logCollector: &v2.LogCollectorSpec{Enabled: new(false)},
+			wantEnabled:  new(false),
+		},
+		"new cluster defaults to enabled": {
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			statusState:  "",
+			wantEnabled:  new(true),
+		},
+		"existing cluster defaults to disabled": {
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			statusState:  v2.AppStateReady,
+			wantEnabled:  new(false),
+		},
+		"initializing cluster defaults to disabled": {
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			statusState:  v2.AppStateInit,
+			wantEnabled:  new(false),
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &v2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: v2.PerconaPGClusterSpec{
+					LogCollector: tt.logCollector,
+				},
+				Status: v2.PerconaPGClusterStatus{
+					State: tt.statusState,
+				},
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+			err := resolveDefaultEnabled(t.Context(), c, cr)
+			require.NoError(t, err)
+
+			if tt.logCollector == nil {
+				assert.Nil(t, cr.Spec.LogCollector)
+			} else if tt.wantEnabled == nil {
+				assert.Nil(t, cr.Spec.LogCollector.Enabled)
+			} else {
+				require.NotNil(t, cr.Spec.LogCollector.Enabled)
+				assert.Equal(t, *tt.wantEnabled, *cr.Spec.LogCollector.Enabled)
+			}
+		})
+	}
+}

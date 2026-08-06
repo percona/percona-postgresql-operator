@@ -44,19 +44,19 @@ func Reconcile(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) er
 }
 
 // resolveDefaultEnabled defaults an unset Enabled to on for new clusters and off
-// for existing ones, keyed on whether the crunchy PostgresCluster already exists.
-func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
+// for existing ones, keyed on whether the PerconaPGCluster has been reconciled before
+// (i.e. its status has been populated).
+func resolveDefaultEnabled(_ context.Context, _ client.Client, cr *v2.PerconaPGCluster) error {
 	if cr.Spec.LogCollector == nil || cr.Spec.LogCollector.Enabled != nil {
 		return nil
 	}
 
-	existing := &crunchyv1beta1.PostgresCluster{}
-	err := c.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, existing)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return errors.Wrap(err, "get postgres cluster")
-	}
-
-	isNewCluster := k8serrors.IsNotFound(err)
+	// A cluster that has never been reconciled has an empty State in its status.
+	// We use this as a stable indicator of "new cluster" instead of checking
+	// whether the underlying PostgresCluster exists, because the PostgresCluster
+	// is created later in the same reconcile loop and would flip the result on
+	// the next iteration.
+	isNewCluster := cr.Status.State == ""
 	cr.Spec.LogCollector.Enabled = &isNewCluster
 	return nil
 }
