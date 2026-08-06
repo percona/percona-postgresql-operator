@@ -12,7 +12,7 @@ metadata:
     postgres-operator.crunchydata.com/pgbackrest: ''
     postgres-operator.crunchydata.com/pgbackrest-dedicated: ''
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: postgis
       controller: true
@@ -33,7 +33,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: postgis
       controller: true
@@ -54,7 +54,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: postgis
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
-    - apiVersion: postgres-operator.crunchydata.com/v1beta1
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
       name: postgis
       controller: true
@@ -65,7 +65,7 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
-apiVersion: postgres-operator.crunchydata.com/v1beta1
+apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: postgis

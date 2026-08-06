@@ -32,6 +32,7 @@ operator-self-healing
 pgbouncer-mtls
 pg-tde
 pitr
+postgis
 scaling
 scheduled-backup
 self-healing

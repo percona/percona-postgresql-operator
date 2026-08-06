@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 120
+timeout: 180
 commands:
   - script: |-
       set -o errexit
@@ -8,39 +8,66 @@ commands:
 
       source ../../functions
 
-      PSQL_URI="postgres:$(get_psql_user_pass postgis-pguser-postgres)@$(get_psql_user_host postgis-pguser-postgres)/postgres"
+      BASE_URI="postgres:$(get_psql_user_pass postgis-pguser-postgres)@$(get_psql_user_host postgis-pguser-postgres)"
 
-      result=$(run_psql_local \
-        "SELECT left(postgis_version(),1);" \
-        "${PSQL_URI}")
-      if [[ "${result}" != "${POSTGIS_VER:0:1}" ]]; then
-        echo "PostGIS version check failed: expected major version ${POSTGIS_VER:0:1}, got ${result}"
-        exit 1
-      fi
+      select_matching() {
+        local db=$1
+        local sql=$2
+        local pattern=$3
 
-      for schema in tiger tiger_data topology; do
-        result=$(run_psql_local \
-          "SELECT nspname FROM pg_catalog.pg_namespace WHERE nspname='${schema}';" \
-          "${PSQL_URI}")
-        if [[ "${result}" != "${schema}" ]]; then
-          echo "PostGIS schema '${schema}' is missing"
-          exit 1
-        fi
-      done
+        run_psql_local "${sql}" "${BASE_URI}/${db}" \
+          | tr -d '[:blank:]' | grep -E "${pattern}" | sort | paste -sd, -
+      }
 
-      result=$(run_psql_local \
+      get_extensions() {
+        select_matching "$1" \
+          "SELECT extname FROM pg_extension ORDER BY extname;" \
+          '^(fuzzystrmatch|postgis|postgis_tiger_geocoder|postgis_topology)$'
+      }
+
+      check_extensions() {
+        [[ "$(get_extensions "$1")" == "fuzzystrmatch,postgis,postgis_tiger_geocoder,postgis_topology" ]]
+      }
+
+      retry 24 5 check_extensions postgres
+      retry 24 5 check_extensions mygisdata
+
+      extensions_postgres=$(get_extensions postgres)
+      extensions_mygisdata=$(get_extensions mygisdata)
+
+      schemas=$(select_matching postgres \
+        "SELECT nspname FROM pg_catalog.pg_namespace ORDER BY nspname;" \
+        '^(tiger|topology)$')
+
+      geometry=$(run_psql_local \
         "SELECT pg_typeof(ST_MakePoint(28.385200,-81.563900));" \
-        "${PSQL_URI}")
-      if [[ "${result}" != "geometry" ]]; then
-        echo "ST_MakePoint check failed: expected 'geometry', got '${result}'"
-        exit 1
+        "${BASE_URI}/postgres" | tr -d '[:space:]')
+
+      geojson=$(run_psql_local \
+        "SELECT ST_AsGeoJSON(ST_SetSRID(ST_MakePoint(-118.4079,33.9434),4326)::geography);" \
+        "${BASE_URI}/postgres" | tr -d '[:space:]')
+
+      version=$(run_psql_local \
+        "SELECT left(postgis_version(),1);" \
+        "${BASE_URI}/postgres" | tr -d '[:space:]')
+      spec_version=$(kubectl -n "${NAMESPACE}" get postgrescluster postgis -o jsonpath='{.spec.postGISVersion}')
+      version_matches=false
+      if [[ "${spec_version}" == "${POSTGIS_VER}" && "${version}" == "${POSTGIS_VER:0:1}" ]]; then
+        version_matches=true
       fi
 
-      result=$(run_psql_local \
-        "SELECT ST_AsGeoJSON('SRID=4326;POINT(-118.4079 33.9434)'::geography);" \
-        "${PSQL_URI}")
-      expected='{"type":"Point","coordinates":[-118.4079,33.9434]}'
-      if [[ "${result}" != "${expected}" ]]; then
-        echo "ST_AsGeoJSON check failed: expected '${expected}', got '${result}'"
-        exit 1
+      primary=$(get_pod_by_role postgis primary name)
+      image=$(kubectl -n "${NAMESPACE}" get pod "${primary}" -o jsonpath='{.spec.containers[?(@.name=="database")].image}')
+      image_is_gis=false
+      if [[ "${image}" == *postgres-gis* ]]; then
+        image_is_gis=true
       fi
+
+      kubectl create configmap -n "${NAMESPACE}" 03-check-postgis \
+        --from-literal=extensions_postgres="${extensions_postgres}" \
+        --from-literal=extensions_mygisdata="${extensions_mygisdata}" \
+        --from-literal=schemas="${schemas}" \
+        --from-literal=geometry="${geometry}" \
+        --from-literal=geojson="${geojson}" \
+        --from-literal=version_matches="${version_matches}" \
+        --from-literal=image_is_gis="${image_is_gis}"

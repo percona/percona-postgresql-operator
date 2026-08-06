@@ -8,5 +8,5 @@ commands:
 
       source ../../functions
 
-      # Use the PostGIS-enabled PostgreSQL image
-      get_cr | yq eval '.spec.image = "'$IMAGE_POSTGIS'"' - | kubectl -n "${NAMESPACE}" apply -f -
+      postgres_image=$(get_container_image "postgis" "${PG_VER}")
+      get_cr | yq eval ".spec.image = \"${postgres_image}\"" - | kubectl -n "${NAMESPACE}" apply -f -

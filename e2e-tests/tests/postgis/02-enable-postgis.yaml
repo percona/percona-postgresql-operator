@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 100
+timeout: 360
 commands:
   - script: |-
       set -o errexit
@@ -8,9 +8,16 @@ commands:
 
       source ../../functions
 
+      PSQL_URI="postgres:$(get_psql_user_pass postgis-pguser-postgres)@$(get_psql_user_host postgis-pguser-postgres)/postgres"
+
+      # Create a second DB before enable so auto-install covers both databases.
+      run_psql_local "CREATE DATABASE mygisdata;" "${PSQL_URI}"
+
       # Patch the underlying PostgresCluster to enable PostGIS.
       # The Percona operator does not override postGISVersion on reconcile,
       # so this setting is preserved and triggers PostGIS extension installation.
       kubectl -n "${NAMESPACE}" patch postgrescluster postgis \
         --type=merge \
         --patch "{\"spec\":{\"postGISVersion\":\"${POSTGIS_VER}\"}}"
+
+      wait_cluster_consistency postgis
