@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -227,9 +228,9 @@ func TestResolveDefaultEnabled(t *testing.T) {
 	require.NoError(t, crunchyv1beta1.AddToScheme(scheme.Scheme))
 
 	tests := map[string]struct {
-		logCollector          *v2.LogCollectorSpec
-		postgresClusterExists bool
-		wantEnabled           *bool
+		logCollector *v2.LogCollectorSpec
+		existingPG   *crunchyv1beta1.PostgresCluster // nil means no PostgresCluster exists
+		wantEnabled  *bool
 	}{
 		"nil LogCollector is not modified": {
 			logCollector: nil,
@@ -240,14 +241,38 @@ func TestResolveDefaultEnabled(t *testing.T) {
 			wantEnabled:  new(false),
 		},
 		"new cluster defaults to enabled": {
-			logCollector:          &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
-			postgresClusterExists: false,
-			wantEnabled:           new(true),
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			existingPG:   nil,
+			wantEnabled:  new(true),
 		},
-		"existing cluster defaults to disabled": {
-			logCollector:          &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
-			postgresClusterExists: true,
-			wantEnabled:           new(false),
+		"existing cluster without sidecars defaults to disabled": {
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			existingPG: &crunchyv1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: crunchyv1beta1.PostgresClusterSpec{
+					InstanceSets: []crunchyv1beta1.PostgresInstanceSetSpec{
+						{Name: "instance1"},
+					},
+				},
+			},
+			wantEnabled: new(false),
+		},
+		"existing cluster with logcollector sidecars defaults to enabled": {
+			logCollector: &v2.LogCollectorSpec{Enabled: nil, Image: "img"},
+			existingPG: &crunchyv1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: crunchyv1beta1.PostgresClusterSpec{
+					InstanceSets: []crunchyv1beta1.PostgresInstanceSetSpec{
+						{
+							Name: "instance1",
+							Containers: []corev1.Container{
+								{Name: "logs"},
+							},
+						},
+					},
+				},
+			},
+			wantEnabled: new(true),
 		},
 	}
 
@@ -260,12 +285,11 @@ func TestResolveDefaultEnabled(t *testing.T) {
 				},
 			}
 
-			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cr)
-			if tt.postgresClusterExists {
-				builder = builder.WithObjects(&crunchyv1beta1.PostgresCluster{
-					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-				})
+			objs := []client.Object{cr}
+			if tt.existingPG != nil {
+				objs = append(objs, tt.existingPG)
 			}
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(objs...)
 			c := builder.Build()
 
 			err := resolveDefaultEnabled(t.Context(), c, cr)
@@ -278,13 +302,6 @@ func TestResolveDefaultEnabled(t *testing.T) {
 			} else {
 				require.NotNil(t, cr.Spec.LogCollector.Enabled)
 				assert.Equal(t, *tt.wantEnabled, *cr.Spec.LogCollector.Enabled)
-
-				// Verify the value was persisted to the CR.
-				persisted := &v2.PerconaPGCluster{}
-				require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: "test", Namespace: "default"}, persisted))
-				require.NotNil(t, persisted.Spec.LogCollector)
-				require.NotNil(t, persisted.Spec.LogCollector.Enabled)
-				assert.Equal(t, *tt.wantEnabled, *persisted.Spec.LogCollector.Enabled)
 			}
 		})
 	}

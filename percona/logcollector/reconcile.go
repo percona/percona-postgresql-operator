@@ -56,20 +56,25 @@ func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaP
 		return errors.Wrap(err, "get postgres cluster")
 	}
 
-	isNewCluster := k8serrors.IsNotFound(err)
-	cr.Spec.LogCollector.Enabled = &isNewCluster
-
-	// Persist the resolved default back to the CR spec so subsequent reconciles
-	// see an explicit value and skip this resolution. Without this patch the
-	// decision would flip on the next reconcile (after the PostgresCluster is
-	// created), causing pod recreation.
-	orig := cr.DeepCopy()
-	orig.Spec.LogCollector.Enabled = nil // restore the original nil to create a proper diff
-	if err := c.Patch(ctx, cr, client.MergeFrom(orig)); err != nil {
-		return errors.Wrap(err, "persist logcollector.enabled default")
+	var enabled bool
+	if k8serrors.IsNotFound(err) {
+		enabled = true
+	} else {
+		enabled = hasLogCollectorSidecar(existing)
 	}
-
+	cr.Spec.LogCollector.Enabled = &enabled
 	return nil
+}
+
+func hasLogCollectorSidecar(pg *crunchyv1beta1.PostgresCluster) bool {
+	for i := range pg.Spec.InstanceSets {
+		for _, c := range pg.Spec.InstanceSets[i].Containers {
+			if c.Name == containerName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func wireSidecars(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
