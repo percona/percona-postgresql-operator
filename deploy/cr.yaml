@@ -896,6 +896,7 @@ spec:
 #      enabled: false
 #    pg_tde:
 #      enabled: false
+#      walEncryption: false
 #      vault:
 #        host: https://vault-service:8200
 #        mountPath: tde

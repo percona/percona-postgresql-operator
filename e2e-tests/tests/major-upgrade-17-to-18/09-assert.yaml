@@ -1,0 +1,104 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+commands:
+  # K8SPG-911: the upgrade moves the data directory to the new major version, so the
+  # pg_tde keyring and everything reading it -- the WAL tools archive_command and
+  # restore_command run, and the key the encrypted table is sealed with -- have to
+  # follow it there.
+  - script: |
+      set -o errexit
+
+      pgversion=$(kubectl -n ${NAMESPACE} get pg major-upgrade-17-to-18 -o jsonpath='{.spec.postgresVersion}')
+      primary=$(kubectl -n ${NAMESPACE} get pods -o jsonpath='{.items[].metadata.name}' \
+        --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=major-upgrade-17-to-18)
+
+      if [[ $(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
+        echo "pg_tde.wal_encrypt is not enabled in ${primary} after the upgrade"
+        exit 1
+      fi
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -o name \
+        --selector=postgres-operator.crunchydata.com/cluster=major-upgrade-17-to-18,postgres-operator.crunchydata.com/data=postgres); do
+        annotation=$(kubectl -n ${NAMESPACE} get ${pod} -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
+        if [[ ${annotation} != "true" ]]; then
+          echo "${pod} is not annotated for WAL encryption: ${annotation}"
+          exit 1
+        fi
+
+        target=$(kubectl -n ${NAMESPACE} exec ${pod} -c database -- readlink /pgdata/pg_tde)
+        if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
+          echo "${pod} does not link the pg_tde keyring of the upgraded data directory: ${target}"
+          exit 1
+        fi
+        if ! kubectl -n ${NAMESPACE} exec ${pod} -c database -- test -d /pgdata/pg_tde; then
+          echo "${pod} pg_tde keyring link does not resolve"
+          exit 1
+        fi
+      done
+
+      archive_command=$(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A -c 'SHOW archive_command;')
+      if [[ ${archive_command} != 'pg_tde_archive_decrypt %f %p "pgbackrest --stanza=db archive-push %%p"'* ]]; then
+        echo "archive_command doesn't start with the pg_tde_archive_decrypt wrapper in ${primary}: ${archive_command}"
+        exit 1
+      fi
+
+      if [[ ${archive_command} != *'pg_tde_waldump'* ]]; then
+        echo "archive_command doesn't use pg_tde_waldump in ${primary}: ${archive_command}"
+        exit 1
+      fi
+
+      restore_command=$(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A -c 'SHOW restore_command;')
+      if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
+        echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${primary}: ${restore_command}"
+        exit 1
+      fi
+
+      for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
+        conf=$(kubectl get -n ${NAMESPACE} cm major-upgrade-17-to-18-pgbackrest-config -o yaml | yq '.data."'"${key}"'"')
+        if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
+          echo "no checksum-page in ${key}"
+          exit 1
+        fi
+      done
+
+      instance_conf=$(kubectl get -n ${NAMESPACE} cm major-upgrade-17-to-18-pgbackrest-config -o yaml | yq '.data."pgbackrest_instance.conf"')
+      if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
+        echo "archive-async is not disabled in pgbackrest_instance.conf"
+        exit 1
+      fi
+
+      commit_timestamp=$(kubectl -n ${NAMESPACE} exec ${primary} -- cat /pgdata/latest_commit_timestamp.txt) || {
+        echo "pg_tde_waldump wrote no commit timestamp for the WAL archived in step 09"
+        exit 1
+      }
+      if ! echo "${commit_timestamp}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}(Z|[\+\-][0-9]{2})$'; then
+        echo "pg_tde_waldump wrote an unusable commit timestamp: ${commit_timestamp}"
+        exit 1
+      fi
+
+      archiving_healthy=$(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A \
+        -c 'SELECT last_failed_time IS NULL OR last_archived_time > last_failed_time FROM pg_stat_archiver;')
+      if [[ ${archiving_healthy} != "t" ]]; then
+        echo "archive_command is failing:"
+        kubectl -n ${NAMESPACE} exec ${primary} -- psql -c 'SELECT * FROM pg_stat_archiver;'
+        exit 1
+      fi
+
+      encrypted=$(kubectl -n ${NAMESPACE} exec ${primary} -- psql -t -A -d myapp \
+        -c "SELECT pg_tde_is_encrypted('myApp');")
+      if [[ ${encrypted} != "t" ]]; then
+        echo "myApp is not encrypted after the upgrade: ${encrypted}"
+        exit 1
+      fi
+
+      # pg_tde_verify_key will throw an error if it fails
+      kubectl -n ${NAMESPACE} exec ${primary} -- psql -v ON_ERROR_STOP=1 -t -A -d myapp \
+        -c 'SELECT pg_tde_verify_key();'
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: major-upgrade-17-to-18
+status:
+  state: ready

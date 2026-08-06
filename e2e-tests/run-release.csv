@@ -31,6 +31,7 @@ repo-host-autogrow
 operator-self-healing
 pgbouncer-mtls
 pg-tde
+pg-tde-wal-encrypt
 pitr
 postgis
 scaling
