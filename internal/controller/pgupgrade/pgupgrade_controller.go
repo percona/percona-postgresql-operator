@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -466,7 +465,7 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// TODO: error from apply could mean that the job exists with a different spec.
 	if err == nil && !upgradeJobComplete {
 		err = errors.WithStack(r.apply(ctx,
-			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, config.FetchKeyCommand(&world.Cluster.Spec))))
+			r.generateUpgradeJob(ctx, upgrade, world.ClusterPrimary, world.Cluster.Spec.Extensions.PGTDE.Enabled)))
 	}
 
 	// Create the jobs to remove the data from the replicas, as long as

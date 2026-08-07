@@ -25,6 +25,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -84,14 +85,16 @@ func (r *Reconciler) reconcilePGBouncerConfigMap(
 
 	configmap.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	configmap.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
 	if err == nil {
 		pgbouncer.ConfigMap(cluster, configmap)
@@ -153,7 +156,7 @@ func (r *Reconciler) reconcilePGBouncerInPostgreSQL(
 
 	// First, calculate a hash of the SQL that should be executed in PostgreSQL.
 
-	revision, err := safeHash32(func(hasher io.Writer) error {
+	revision, err := util.SafeHash32(func(hasher io.Writer) error {
 		// Discard log messages from the pgbouncer package about executing SQL.
 		// Nothing is being "executed" yet.
 		return action(logging.NewContext(ctx, logging.Discard()), func(
@@ -249,10 +252,12 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 ) (*corev1.Secret, error) {
 	existing := &corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)}
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	)
 	if client.IgnoreNotFound(err) != nil {
 		return nil, err
 	}
+	secretFound := err == nil
 
 	if !cluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; delete the Secret if it exists.
@@ -264,6 +269,12 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if !secretFound {
+			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
+		}
+		return existing, nil
+	}
 	var userSecret *corev1.Secret
 	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil && ref.Name != "" {
 		userSecret = &corev1.Secret{}
@@ -312,14 +323,16 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	intent.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	intent.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
 	var additionalTrustedCAs [][]byte
 	if err == nil {
@@ -403,10 +416,12 @@ func (r *Reconciler) generatePGBouncerService(
 
 	service.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	service.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
+	)
 
 	if spec := cluster.Spec.Proxy.PGBouncer.Service; spec != nil {
 		service.Annotations = naming.Merge(service.Annotations,
@@ -510,14 +525,16 @@ func (r *Reconciler) generatePGBouncerDeployment(
 
 	deploy.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil())
+		cluster.Spec.Proxy.PGBouncer.Metadata.GetAnnotationsOrNil(),
+	)
 	deploy.Labels = naming.Merge(
 		cluster.Spec.Metadata.GetLabelsOrNil(),
 		cluster.Spec.Proxy.PGBouncer.Metadata.GetLabelsOrNil(),
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 	deploy.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			naming.LabelCluster: cluster.Name,
@@ -543,7 +560,8 @@ func (r *Reconciler) generatePGBouncerDeployment(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster: cluster.Name,
 			naming.LabelRole:    naming.RolePGBouncer,
-		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "pgbouncer", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// if the shutdown flag is set, set pgBouncer replicas to 0
 	if cluster.Spec.Shutdown != nil && *cluster.Spec.Shutdown {
@@ -574,7 +592,8 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	if !initialize.FromPointer(cluster.Spec.DisableDefaultPodScheduling) {
 		deploy.Spec.Template.Spec.TopologySpreadConstraints = append(
 			deploy.Spec.Template.Spec.TopologySpreadConstraints,
-			defaultTopologySpreadConstraints(*deploy.Spec.Selector)...)
+			defaultTopologySpreadConstraints(*deploy.Spec.Selector)...,
+		)
 	}
 
 	// Restart containers any time they stop, die, are killed, etc.
@@ -625,7 +644,8 @@ func (r *Reconciler) reconcilePGBouncerDeployment(
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) error {
 	deploy, specified, err := r.generatePGBouncerDeployment(
-		ctx, cluster, primaryCertificate, configmap, secret)
+		ctx, cluster, primaryCertificate, configmap, secret,
+	)
 
 	// Set observations whether the deployment exists or not.
 	defer func() {

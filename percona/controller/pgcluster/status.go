@@ -3,6 +3,7 @@ package pgcluster
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -148,6 +149,12 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 
 		cluster.Status.ObservedGeneration = cluster.Generation
 
+		if cond := meta.FindStatusCondition(cr.Status.Conditions, v2.ConditionPMMReady); cond != nil {
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
+		} else {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, v2.ConditionPMMReady)
+		}
+
 		updateConditions(cluster, status)
 
 		return r.Client.Status().Update(ctx, cluster)
@@ -192,8 +199,21 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 	setClusterNotReadyCondition(metav1.ConditionTrue, "AllConditionsAreTrue")
 }
 
+// perconaOwnedConditions are the condition types the Percona controllers own.
+// They never appear in the PostgresCluster status, so they're exempt from the
+// mirroring cleanup in syncConditionsFromPostgresToPercona.
+var perconaOwnedConditions = []string{
+	pNaming.ConditionClusterIsReadyForBackup,
+	pNaming.ConditionAPIGroupMigration,
+	pNaming.ConditionStandbyLagging,
+	v2.ConditionPMMReady,
+}
+
 func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
+	crunchyTypes := make(map[string]struct{}, len(postgresStatus.Conditions))
 	for _, pcCond := range postgresStatus.Conditions {
+		crunchyTypes[pcCond.Type] = struct{}{}
+
 		_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 			Type:               pcCond.Type,
 			Status:             pcCond.Status,
@@ -202,6 +222,21 @@ func syncConditionsFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus
 			LastTransitionTime: pcCond.LastTransitionTime,
 			ObservedGeneration: cr.Generation,
 		})
+	}
+
+	stale := make([]string, 0, len(cr.Status.Conditions))
+	for _, cond := range cr.Status.Conditions {
+		if _, ok := crunchyTypes[cond.Type]; ok {
+			continue
+		}
+		if slices.Contains(perconaOwnedConditions, cond.Type) {
+			continue
+		}
+		stale = append(stale, cond.Type)
+	}
+
+	for _, condType := range stale {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, condType)
 	}
 }
 

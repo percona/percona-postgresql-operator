@@ -14,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +41,7 @@ import (
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector"
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/pmm"
 	perconaPG "github.com/percona/percona-postgresql-operator/v2/percona/postgres"
@@ -109,6 +111,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Service{}, r.watchServices())).
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
+		Watches(&corev1.ConfigMap{}, r.watchLogRotateExtraConfig()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
@@ -183,6 +186,33 @@ func (r *PGClusterReconciler) watchEnvFromSecrets() handler.TypedEventHandler[cl
 			v2.IndexFieldEnvFromSecrets: secret.Name,
 		}, client.InNamespace(secret.Namespace)); err != nil {
 			log.Error(err, "Failed to list clusters by env from secrets index failed", "key", client.ObjectKeyFromObject(secret).String())
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for _, cr := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&cr),
+			})
+		}
+		return reqs
+	})
+}
+
+func (r *PGClusterReconciler) watchLogRotateExtraConfig() handler.TypedEventHandler[client.Object, reconcile.Request] {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		log := logf.FromContext(ctx).WithName("watchLogRotateExtraConfig")
+
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return nil
+		}
+
+		var clusters v2.PerconaPGClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v2.IndexFieldLogRotateExtraConfig: cm.Name,
+		}, client.InNamespace(cm.Namespace)); err != nil {
+			log.Error(err, "Failed to list clusters by logRotate extra config index", "key", client.ObjectKeyFromObject(cm).String())
 			return nil
 		}
 
@@ -346,6 +376,10 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	if err := r.reconcilePMM(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to add pmm sidecar")
+	}
+
+	if err := logcollector.Reconcile(ctx, r.Client, cr); err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile log collector")
 	}
 
 	if err := r.handleMonitorUserPassChange(ctx, cr); err != nil {
@@ -572,15 +606,30 @@ func (r *PGClusterReconciler) reconcileOldCACert(ctx context.Context, cr *v2.Per
 	return nil
 }
 
+// reportPMMMisconfiguration surfaces a PMM misconfiguration to the user: PMM
+// stays disabled, but the cluster keeps running, so the problem is reported
+// via a warning event and the PMMReady status condition instead of an error.
+func (r *PGClusterReconciler) reportPMMMisconfiguration(ctx context.Context, cr *v2.PerconaPGCluster, reason, message string) {
+	logging.FromContext(ctx).Info(fmt.Sprintf("Can't enable PMM: %s", message))
+	r.Recorder.Event(cr, corev1.EventTypeWarning, "PMMMisconfigured", message)
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: cr.Generation,
+	})
+}
+
 func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	if !cr.PMMEnabled() {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, v2.ConditionPMMReady)
 		return nil
 	}
 
-	log := logging.FromContext(ctx)
-
 	if cr.Spec.PMM.Secret == "" {
-		log.Info(fmt.Sprintf("Can't enable PMM: `.spec.pmm.secret` is empty in %s", cr.Name))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotSpecified",
+			fmt.Sprintf("`.spec.pmm.secret` is empty in %s", cr.Name))
 		return nil
 	}
 
@@ -590,7 +639,8 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 		Namespace: cr.Namespace,
 	}, pmmSecret); err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("Can't enable PMM: %s secret doesn't exist", cr.Spec.PMM.Secret))
+			r.reportPMMMisconfiguration(ctx, cr, "PMMSecretNotFound",
+				fmt.Sprintf("%s secret doesn't exist", cr.Spec.PMM.Secret))
 			return nil
 		}
 		return errors.Wrap(err, "failed to get pmm secret")
@@ -613,9 +663,16 @@ func (r *PGClusterReconciler) reconcilePMM(ctx context.Context, cr *v2.PerconaPG
 
 	pmmContainer, err := pmm.Container(pmmSecret, cr)
 	if err != nil {
-		log.Info(fmt.Sprintf("Can't enable PMM: %s", err.Error()))
+		r.reportPMMMisconfiguration(ctx, cr, "PMMSecretInvalid", err.Error())
 		return nil
 	}
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:               v2.ConditionPMMReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "PMMConfigured",
+		ObservedGeneration: cr.Generation,
+	})
 
 	pmmSecretHash, err := k8s.ObjectHash(pmmSecret)
 	if err != nil {
@@ -727,27 +784,27 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 // builtInExtensionEnabled reports whether the extension is currently enabled via
-// spec.extensions.builtin. The names are the ones used in CREATE EXTENSION, which
-// is also what spec.extensions.custom holds and what disableCustomExtensionsInDB
-// passes to DROP EXTENSION.
+// spec.extensions.<extension>. The names are the ones used in CREATE EXTENSION,
+// which is also what spec.extensions.custom holds and what
+// disableCustomExtensionsInDB passes to DROP EXTENSION.
 func builtInExtensionEnabled(cr *v2.PerconaPGCluster, name string) bool {
-	builtIn := cr.Spec.Extensions.BuiltIn
+	extensions := cr.Spec.Extensions
 
 	switch name {
 	case "pg_stat_monitor":
-		return ptr.Deref(builtIn.PGStatMonitor, false)
+		return ptr.Deref(extensions.PGStatMonitor.Enabled, false)
 	case "pg_stat_statements":
-		return ptr.Deref(builtIn.PGStatStatements, false)
+		return ptr.Deref(extensions.PGStatStatements.Enabled, false)
 	case "pgaudit":
-		return ptr.Deref(builtIn.PGAudit, false)
+		return ptr.Deref(extensions.PGAudit.Enabled, false)
 	case "vector":
-		return ptr.Deref(builtIn.PGVector, false)
+		return ptr.Deref(extensions.PGVector.Enabled, false)
 	case "pg_repack":
-		return ptr.Deref(builtIn.PGRepack, false)
+		return ptr.Deref(extensions.PGRepack.Enabled, false)
 	case "pg_cron":
-		return ptr.Deref(builtIn.PGCron, false)
+		return ptr.Deref(extensions.PGCron.Enabled, false)
 	case "set_user":
-		return ptr.Deref(builtIn.SetUser, false)
+		return ptr.Deref(extensions.SetUser.Enabled, false)
 	}
 
 	return false

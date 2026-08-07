@@ -602,10 +602,8 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					CRVersion:       version.Version(),
 					PostgresVersion: 18,
 					Extensions: ExtensionsSpec{
-						BuiltIn: BuiltInExtensionsSpec{
-							PGCron:  ptr.To(true),
-							SetUser: ptr.To(false),
-						},
+						PGCron:  BuiltInExtensionSpec{Enabled: ptr.To(true)},
+						SetUser: BuiltInExtensionSpec{Enabled: ptr.To(false)},
 						// pg_cron is listed here as well: an explicit builtin
 						// flag wins, the user asked the operator to manage it
 						Custom: []CustomExtensionSpec{
@@ -647,9 +645,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					CRVersion:       version.Version(),
 					PostgresVersion: 18,
 					Extensions: ExtensionsSpec{
-						BuiltIn: BuiltInExtensionsSpec{
-							PGCron: ptr.To(true),
-						},
+						PGCron: BuiltInExtensionSpec{Enabled: ptr.To(true)},
 					},
 					InstanceSets: PGInstanceSets{
 						{
@@ -672,8 +668,8 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				// the internal object must own its copy: mutating it must not
 				// write back into the user CR
 				*actual.Spec.Extensions.PGCron = false
-				require.NotNil(t, cr.Spec.Extensions.BuiltIn.PGCron)
-				assert.True(t, *cr.Spec.Extensions.BuiltIn.PGCron)
+				require.NotNil(t, cr.Spec.Extensions.PGCron.Enabled)
+				assert.True(t, *cr.Spec.Extensions.PGCron.Enabled)
 			},
 		},
 		"unset builtin flags clear the stored value": {
@@ -741,6 +737,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			if tt.assertClusterFunc != nil {
 				tt.assertClusterFunc(t, crunchyCluster, tt.expectedPerconaPGCluster)
 			}
+		})
+	}
+}
+
+// K8SPG-440
+func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
+	extraVolumes := []crunchyv1beta1.ExtraVolume{
+		{
+			Name: "fts-dicts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+				},
+			},
+			Mounts: []crunchyv1beta1.ExtraVolumeMount{
+				{MountPath: "/pgdata/dicts", ReadOnly: true},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		spec PGInstanceSetSpec
+		want []crunchyv1beta1.ExtraVolume
+	}{
+		"forwards extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1", ExtraVolumes: extraVolumes},
+			want: extraVolumes,
+		},
+		"no extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1"},
+			want: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.spec.ToCrunchy()
+			assert.Equal(t, tc.want, got.ExtraVolumes)
 		})
 	}
 }

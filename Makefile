@@ -149,17 +149,25 @@ check-envtest-existing: createnamespaces
 		$(GO_TEST) -count=1 -cover -p=1 -tags=envtest ./...
 	kubectl delete -k ./config/dev
 
+.PHONY: go-fix
+go-fix: ## Run go fix on all packages
+	$(GO) fix ./...
+
 ##@ Generate
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-generate: kustomize
-generate: generate-crd
-generate: generate-deepcopy
-generate: generate-rbac
-generate: generate-manager
-generate: generate-bundle
-generate: generate-cw
+	$(MAKE) go-fix
+	$(MAKE) generate-all
+
+.PHONY: generate-all
+generate-all: kustomize
+generate-all: generate-crd
+generate-all: generate-deepcopy
+generate-all: generate-rbac
+generate-all: generate-manager
+generate-all: generate-bundle
+generate-all: generate-cw
 
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
@@ -336,7 +344,7 @@ release: generate license
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
@@ -404,8 +412,6 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
 		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
 		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
-		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:dev-latest#" \
-		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:dev-latest#" \
-		-e "s#^IMAGE_PMM3_CLIENT=.*#IMAGE_PMM3_CLIENT=perconalab/pmm-client:3-dev-latest#" \
-		-e "s#^IMAGE_PMM3_SERVER=.*#IMAGE_PMM3_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
+		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest#" \
 		e2e-tests/release_versions
