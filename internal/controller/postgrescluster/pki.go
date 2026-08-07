@@ -81,7 +81,7 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 	}
 
 	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
-		if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name); err != nil {
+		if err := checkSecret(cluster.Spec.Proxy.PGBouncer.CustomTLSSecret, naming.ClusterPGBouncer(cluster).Name); err != nil {
 			return errors.Wrap(err, "check PgBouncer TLS secret")
 		}
 	}

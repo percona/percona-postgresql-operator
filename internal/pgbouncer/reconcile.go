@@ -84,7 +84,17 @@ func Secret(ctx context.Context,
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		if frontendCertManagerSecret != nil {
+		if inCluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+			for _, key := range []string{
+				certFrontendAuthoritySecretKey,
+				certFrontendPrivateKeySecretKey,
+				certFrontendSecretKey,
+			} {
+				if v, ok := inSecret.Data[key]; ok {
+					outSecret.Data[key] = v
+				}
+			}
+		} else if frontendCertManagerSecret != nil {
 			if err == nil {
 				outSecret.Data[certFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
 			}
@@ -134,7 +144,8 @@ func Secret(ctx context.Context,
 	// bundle so PgBouncer also trusts them when verifying client
 	// certificates. Entries keep their given order so identical inputs
 	// always produce identical bundle bytes.
-	if err == nil && len(additionalCAs) > 0 {
+	if err == nil && len(additionalCAs) > 0 &&
+		inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
 		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
 		for _, ca := range additionalCAs {
 			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
@@ -181,10 +192,12 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append(append([]corev1.VolumeProjection{},
-			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
-				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
+		Sources: append(
+			append(append([]corev1.VolumeProjection{},
+				podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
+				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0 &&
+						inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}
