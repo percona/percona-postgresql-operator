@@ -10,7 +10,7 @@ KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
 # CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
-CRD_OPTIONS ?= crd:crdVersions='v1'
+CRD_OPTIONS ?= crd:crdVersions='v1',maxDescLen=0
 CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
 
 ##@ General
