@@ -2104,13 +2104,15 @@ check_logs_for_errors() {
 	local cluster="$1" since="$2" allow="$3" fail=0 pod f
 	local op_ns="${OPERATOR_NS:-$NAMESPACE}"
 	rm -f "${TEMP_DIR}"/log_errors_*.txt
+	# the operator logs JSON only with LOG_STRUCTURED=true, deploy/operator.yaml
+	# sets it to false, so match the console encoder format as well
 	kubectl -n "$op_ns" logs deployment/percona-postgresql-operator --since-time="$since" 2>/dev/null \
-		| grep -E '"level":"error"|panic:' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
+		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
 	for pod in $(kubectl -n "$NAMESPACE" get pods -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/data=postgres -o name); do
 		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
 			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true
 	done
-	kubectl -n "$NAMESPACE" get events --types=Warning \
+	kubectl -n "$NAMESPACE" get events --field-selector type=Warning \
 		-o jsonpath='{range .items[*]}{.lastTimestamp} {.involvedObject.name} {.reason} {.message}{"\n"}{end}' 2>/dev/null \
 		| awk -v s="$since" '$1 >= s' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_events.txt" || true
 	for f in operator postgres events; do
