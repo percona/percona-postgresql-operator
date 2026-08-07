@@ -14031,7 +14031,6 @@ spec:
                         - type: string
                         x-kubernetes-int-or-string: true
                       paused:
-                        description: If set, pauses pgbouncer connections.
                         type: boolean
                       port:
                         default: 5432
@@ -32889,7 +32888,6 @@ spec:
                         - type: string
                         x-kubernetes-int-or-string: true
                       paused:
-                        description: If set, pauses pgbouncer connections.
                         type: boolean
                       port:
                         default: 5432
