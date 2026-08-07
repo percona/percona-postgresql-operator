@@ -15,7 +15,16 @@ const renewalRatio = 3
 
 // Certificate represents an X.509 certificate that conforms to the Internet
 // PKI Profile, RFC 5280.
-type Certificate struct{ x509 *x509.Certificate }
+type Certificate struct {
+	x509 *x509.Certificate
+
+	// chain holds the PEM encoding of any certificates that followed the
+	// first one when this Certificate was unmarshaled from a bundle, e.g. an
+	// intermediate certificate authority followed by its root. It is nil for
+	// certificates that were generated rather than unmarshaled. MarshalText
+	// appends it after the leading certificate so the full bundle round-trips.
+	chain []byte
+}
 
 // PrivateKey represents the private key of a Certificate.
 type PrivateKey struct{ ecdsa *ecdsa.PrivateKey }

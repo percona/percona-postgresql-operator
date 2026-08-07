@@ -22,8 +22,9 @@ type InfoBackup struct {
 	Label      string            `json:"label,omitempty"`
 	Type       v2.PGBackupType   `json:"type,omitempty"`
 	Info       struct {
-		Size int64 `json:"size,omitempty"`
-	} `json:"info,omitempty"`
+		// For full backups, delta equals backup size
+		Delta int64 `json:"delta,omitempty"`
+	} `json:"info"`
 	Timestamp struct {
 		Start int64 `json:"start,omitempty"`
 		Stop  int64 `json:"stop,omitempty"`

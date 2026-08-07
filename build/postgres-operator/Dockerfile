@@ -70,6 +70,7 @@ COPY build/postgres-operator/postgres-entrypoint.sh /usr/local/bin
 COPY build/postgres-operator/postgres-liveness-check.sh /usr/local/bin
 COPY build/postgres-operator/postgres-readiness-check.sh /usr/local/bin
 COPY build/postgres-operator/restore-command-wrapper.sh /usr/local/bin
+COPY build/postgres-operator/logcollector /logcollector
 COPY hack/tools/queries /opt/crunchy/conf
 
 RUN chgrp -R 0 /opt/crunchy/conf && chmod -R g=u opt/crunchy/conf

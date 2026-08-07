@@ -52,6 +52,45 @@ func TestInstancePodDNSNames(t *testing.T) {
 	assert.Assert(t, !strings.HasSuffix(names[0], "."), "not expected root, got %q", names[0])
 }
 
+func TestSafeDNSName(t *testing.T) {
+	assert.Equal(t, "hello", SafeDNSName("hello"), "short name should be unchanged")
+	assert.Equal(t, "hello", SafeDNSName("hello--"), "trailing hyphens should be stripped")
+
+	long := strings.Repeat("a", 63)
+	assert.Equal(t, long, SafeDNSName(long), "exactly 63 chars should pass through")
+
+	long = strings.Repeat("a", 70)
+	assert.Equal(t, strings.Repeat("a", 63), SafeDNSName(long), "names over 63 chars should be truncated")
+
+	assert.Equal(t, strings.Repeat("a", 62),
+		SafeDNSName(strings.Repeat("a", 62)+"--"),
+		"truncation should remove any trailing hyphen")
+
+	assert.Equal(t, "", SafeDNSName("---"), "all hyphens should become empty")
+	assert.Equal(t, "", SafeDNSName(""), "empty string should stay empty")
+}
+
+func TestSafeDNSUniqueName(t *testing.T) {
+	assert.Equal(t, "hello", SafeDNSUniqueName("hello"), "short name should be unchanged")
+	assert.Equal(t, "hello", SafeDNSUniqueName("hello--"), "trailing hyphens should be stripped")
+
+	long := strings.Repeat("a", 63)
+	assert.Equal(t, long, SafeDNSUniqueName(long), "exactly 63 chars should pass through")
+
+	long = strings.Repeat("a", 70)
+	result := SafeDNSUniqueName(long)
+	assert.Assert(t, len(result) <= 63, "expected <= 63 chars, got %d", len(result))
+	assert.Assert(t, !strings.HasSuffix(result, "-"), "unexpected trailing hyphen: %q", result)
+
+	assert.Equal(t, result, SafeDNSUniqueName(long), "same input should produce same output")
+
+	a := SafeDNSUniqueName("something-long-enough-to-trigger-truncation-aaaaaaaa")
+	b := SafeDNSUniqueName("something-long-enough-to-trigger-truncation-bbbbbbbb")
+	assert.Assert(t, a != b, "different inputs should produce different results")
+
+	assert.Equal(t, "", SafeDNSUniqueName(""), "empty string should stay empty")
+}
+
 func TestServiceDNSNames(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()

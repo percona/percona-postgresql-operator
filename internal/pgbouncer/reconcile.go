@@ -25,7 +25,7 @@ func ConfigMap(
 	inCluster *v1beta1.PostgresCluster,
 	outConfigMap *corev1.ConfigMap,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}
@@ -47,14 +47,16 @@ func Secret(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inRoot *pki.RootCertificateAuthority,
 	inSecret *corev1.Secret,
+	inUserSecret *corev1.Secret,
 	inService *corev1.Service,
 	outSecret *corev1.Secret,
 	// frontendCertManagerSecret is the cert-manager-managed TLS secret for the
 	// PgBouncer frontend. When non-nil, its tls.crt/tls.key are used instead
 	// of generating a certificate with the internal PKI.
 	frontendCertManagerSecret *corev1.Secret,
+	additionalCAs [][]byte,
 ) error {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return nil
 	}
@@ -76,7 +78,7 @@ func Secret(ctx context.Context,
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey] = authFileContents(password)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
 	}
@@ -84,20 +86,26 @@ func Secret(ctx context.Context,
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		if frontendCertManagerSecret != nil {
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+				outSecret.Data[certFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
 			}
 			if err == nil {
 				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
 				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
 			}
+		} else if inRoot == nil {
+			err = errors.New("waiting for cert-manager to issue pgbouncer frontend certificate")
 		} else {
 			leaf := &pki.LeafCertificate{}
 			var dnsNames []string
-			dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
-			if err != nil {
-				return errors.Wrap(err, "get service dns names")
+			var dnsFQDN string
+
+			if err == nil {
+				dnsNames, err = naming.ServiceDNSNames(ctx, inService, inCluster.Spec.ClusterServiceDNSSuffix)
+				if err != nil {
+					return errors.Wrap(err, "get service dns names")
+				}
+				dnsFQDN = dnsNames[0]
 			}
-			dnsFQDN := dnsNames[0]
 
 			if err == nil {
 				// Unmarshal and validate the stored leaf. These first errors can
@@ -122,7 +130,36 @@ func Secret(ctx context.Context,
 		}
 	}
 
+	// K8SPG-952: Append any additional CAs to the PgBouncer frontend CA
+	// bundle so PgBouncer also trusts them when verifying client
+	// certificates. Entries keep their given order so identical inputs
+	// always produce identical bundle bytes.
+	if err == nil && len(additionalCAs) > 0 {
+		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
+		for _, ca := range additionalCAs {
+			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
+				bundle = append(bundle, '\n')
+			}
+			bundle = append(bundle, ca...)
+		}
+		outSecret.Data[certFrontendAuthoritySecretKey] = bundle
+	}
+
 	return err
+}
+
+// frontendAuthorityCert returns the CA certificate bytes to trust for the
+// PgBouncer frontend certificate. It prefers the internal PKI root, which is
+// nil when an external cert-manager issuer is in use; in that case, it falls
+// back to the "ca.crt" that cert-manager writes into the frontend Secret.
+func frontendAuthorityCert(inRoot *pki.RootCertificateAuthority, frontendCertManagerSecret *corev1.Secret) ([]byte, error) {
+	if inRoot != nil {
+		return inRoot.Certificate.MarshalText()
+	}
+	if ca := frontendCertManagerSecret.Data[tlsAuthoritySecretKey]; len(ca) > 0 {
+		return ca, nil
+	}
+	return nil, errors.New("external issuer did not return a CA certificate for pgbouncer frontend")
 }
 
 // Pod populates a PodSpec with the container and volumes needed to run PgBouncer.
@@ -134,7 +171,7 @@ func Pod(
 	inSecret *corev1.Secret,
 	outPod *corev1.PodSpec,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}
@@ -144,9 +181,10 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append([]corev1.VolumeProjection{},
+		Sources: append(append(append([]corev1.VolumeProjection{},
 			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret),
+			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}
@@ -264,7 +302,7 @@ func PostgreSQL(
 	inCluster *v1beta1.PostgresCluster,
 	outHBAs *postgres.HBAs,
 ) {
-	if inCluster.Spec.Proxy == nil || inCluster.Spec.Proxy.PGBouncer == nil {
+	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
 		return
 	}

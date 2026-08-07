@@ -24,6 +24,35 @@ func TestPerconaPGCluster_Default(t *testing.T) {
 	new(PerconaPGCluster).Default()
 }
 
+func TestPerconaPGCluster_DefaultBackupsEnabled(t *testing.T) {
+	t.Run("nil is defaulted to true for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.True(t, *cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("nil is left untouched for CRVersion < 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = "3.0.0"
+		cr.Default()
+
+		assert.Nil(t, cr.Spec.Backups.Enabled)
+	})
+
+	t.Run("explicit false is preserved for CRVersion >= 3.1.0", func(t *testing.T) {
+		cr := new(PerconaPGCluster)
+		cr.Spec.CRVersion = version.Version()
+		cr.Spec.Backups.Enabled = new(false)
+		cr.Default()
+
+		require.NotNil(t, cr.Spec.Backups.Enabled)
+		assert.False(t, *cr.Spec.Backups.Enabled)
+	})
+}
+
 func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	trueVal := true
 	falseVal := false
@@ -114,6 +143,46 @@ func TestPerconaPGCluster_Proxy(t *testing.T) {
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
 		assert.Equal(t, cr.Spec.CRVersion, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion])
 	})
+}
+
+func TestPGProxySpec_PGBouncerEnabled(t *testing.T) {
+	tests := map[string]struct {
+		spec     *PGProxySpec
+		expected bool
+	}{
+		"nil proxy": {
+			spec:     nil,
+			expected: false,
+		},
+		"nil PgBouncer": {
+			spec:     &PGProxySpec{},
+			expected: false,
+		},
+		"replicas unspecified": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{},
+			},
+			expected: true,
+		},
+		"zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(0))},
+			},
+			expected: false,
+		},
+		"non-zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(1))},
+			},
+			expected: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.spec.PGBouncerEnabled())
+		})
+	}
 }
 
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
@@ -501,6 +570,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			if tt.assertClusterFunc != nil {
 				tt.assertClusterFunc(t, crunchyCluster, tt.expectedPerconaPGCluster)
 			}
+		})
+	}
+}
+
+// K8SPG-440
+func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
+	extraVolumes := []crunchyv1beta1.ExtraVolume{
+		{
+			Name: "fts-dicts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+				},
+			},
+			Mounts: []crunchyv1beta1.ExtraVolumeMount{
+				{MountPath: "/pgdata/dicts", ReadOnly: true},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		spec PGInstanceSetSpec
+		want []crunchyv1beta1.ExtraVolume
+	}{
+		"forwards extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1", ExtraVolumes: extraVolumes},
+			want: extraVolumes,
+		},
+		"no extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1"},
+			want: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.spec.ToCrunchy()
+			assert.Equal(t, tc.want, got.ExtraVolumes)
 		})
 	}
 }

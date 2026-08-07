@@ -15,71 +15,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
-func TestFetchKeyCommand(t *testing.T) {
-
-	spec1 := v1beta1.PostgresClusterSpec{}
-	assert.Assert(t, FetchKeyCommand(&spec1) == "")
-
-	spec2 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec2) == "")
-
-	spec3 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{
-			DynamicConfiguration: map[string]any{},
-		},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec3) == "")
-
-	spec4 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{
-			DynamicConfiguration: map[string]any{
-				"postgresql": map[string]any{},
-			},
-		},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec4) == "")
-
-	spec5 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{
-			DynamicConfiguration: map[string]any{
-				"postgresql": map[string]any{
-					"parameters": map[string]any{},
-				},
-			},
-		},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec5) == "")
-
-	spec6 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{
-			DynamicConfiguration: map[string]any{
-				"postgresql": map[string]any{
-					"parameters": map[string]any{
-						"encryption_key_command": "",
-					},
-				},
-			},
-		},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec6) == "")
-
-	spec7 := v1beta1.PostgresClusterSpec{
-		Patroni: &v1beta1.PatroniSpec{
-			DynamicConfiguration: map[string]any{
-				"postgresql": map[string]any{
-					"parameters": map[string]any{
-						"encryption_key_command": "echo mykey",
-					},
-				},
-			},
-		},
-	}
-	assert.Assert(t, FetchKeyCommand(&spec7) == "echo mykey")
-
-}
-
 func TestPGAdminContainerImage(t *testing.T) {
 	cluster := &v1beta1.PostgresCluster{}
 
@@ -202,17 +137,17 @@ func TestPostgresContainerImage(t *testing.T) {
 }
 
 func TestVerifyImageValues(t *testing.T) {
-	t.Run("crunchy-postgres", func(t *testing.T) {
+	t.Run("postgres", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		t.Setenv("RELATED_IMAGE_POSTGRES_14", "")
 		os.Unsetenv("RELATED_IMAGE_POSTGRES_14")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-postgres")
+		assert.ErrorContains(t, err, "postgres")
 	})
 
-	t.Run("crunchy-postgres-gis", func(t *testing.T) {
+	t.Run("postgres-gis", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		cluster.Spec.PostGISVersion = "3.3"
@@ -220,10 +155,10 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_POSTGRES_14_GIS_3.3")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-postgres-gis")
+		assert.ErrorContains(t, err, "postgres-gis")
 	})
 
-	t.Run("crunchy-pgbackrest-enabled", func(t *testing.T) {
+	t.Run("pgbackrest-enabled", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		enabled := true
@@ -232,10 +167,10 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_PGBACKREST")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-pgbackrest")
+		assert.ErrorContains(t, err, "pgbackrest")
 	})
 
-	t.Run("crunchy-pgbackrest-disabled", func(t *testing.T) {
+	t.Run("pgbackrest-disabled", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		enabled := false
@@ -244,10 +179,10 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_PGBACKREST")
 
 		err := VerifyImageValues(cluster)
-		assert.Assert(t, !strings.Contains(err.Error(), "crunchy-pgbackrest"))
+		assert.Assert(t, !strings.Contains(err.Error(), "pgbackrest"))
 	})
 
-	t.Run("crunchy-pgbouncer", func(t *testing.T) {
+	t.Run("pgbouncer", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
@@ -257,10 +192,10 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_PGBOUNCER")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-pgbouncer")
+		assert.ErrorContains(t, err, "pgbouncer")
 	})
 
-	t.Run("crunchy-pgadmin4", func(t *testing.T) {
+	t.Run("pgadmin4", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		cluster.Spec.UserInterface = &v1beta1.UserInterfaceSpec{
@@ -270,10 +205,10 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_PGADMIN")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-pgadmin4")
+		assert.ErrorContains(t, err, "pgadmin4")
 	})
 
-	t.Run("crunchy-postgres-exporter", func(t *testing.T) {
+	t.Run("postgres-exporter", func(t *testing.T) {
 		cluster := &v1beta1.PostgresCluster{}
 		cluster.Spec.PostgresVersion = 14
 		cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
@@ -285,7 +220,7 @@ func TestVerifyImageValues(t *testing.T) {
 		os.Unsetenv("RELATED_IMAGE_PGEXPORTER")
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-postgres-exporter")
+		assert.ErrorContains(t, err, "postgres-exporter")
 	})
 
 	t.Run("multiple missing images", func(t *testing.T) {
@@ -307,11 +242,11 @@ func TestVerifyImageValues(t *testing.T) {
 		}
 
 		err := VerifyImageValues(cluster)
-		assert.ErrorContains(t, err, "crunchy-postgres-gis")
-		assert.ErrorContains(t, err, "crunchy-pgbackrest")
-		assert.ErrorContains(t, err, "crunchy-pgbouncer")
-		assert.ErrorContains(t, err, "crunchy-pgadmin4")
-		assert.ErrorContains(t, err, "crunchy-postgres-exporter")
+		assert.ErrorContains(t, err, "postgres-gis")
+		assert.ErrorContains(t, err, "pgbackrest")
+		assert.ErrorContains(t, err, "pgbouncer")
+		assert.ErrorContains(t, err, "pgadmin4")
+		assert.ErrorContains(t, err, "postgres-exporter")
 	})
 
 	t.Run("all images set", func(t *testing.T) {

@@ -50,6 +50,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
@@ -256,6 +257,25 @@ func (r *Reconciler) Reconcile(
 		}
 	}
 
+	// K8SPG-1045
+	if err == nil {
+		if err = r.reconcileTLSCondition(ctx, cluster); err != nil {
+			return runtime.ErrorWithBackoff(err)
+		}
+
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady, metav1.ConditionFalse) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:               v1beta1.PostgresClusterProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Paused",
+				Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
+				ObservedGeneration: cluster.GetGeneration(),
+			})
+			return runtime.ErrorWithBackoff(patchClusterStatus())
+		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+	}
+
 	pgHBAs := postgres.NewHBAs()
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
@@ -290,6 +310,12 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.SetUser {
 		setuser.PostgreSQLParameters(&pgParameters)
 	}
+
+	// pg_tde should be removed from shared libraries only after extension is dropped
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		pgtde.PostgreSQLParameters(cluster, &pgParameters)
+	}
+
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
 
@@ -300,7 +326,7 @@ func (r *Reconciler) Reconcile(
 		rootCA, err = r.reconcileRootCertificate(ctx, cluster)
 	}
 
-	if err == nil && rootCA != nil {
+	if err == nil {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
 			log.V(1).Info("failed to check if root CA is cert-manager managed, will retry on next reconcile",
@@ -429,7 +455,10 @@ func (r *Reconciler) Reconcile(
 	}
 
 	if err == nil {
-		err = r.reconcilePostgresDatabases(ctx, cluster, instances)
+		err = r.reconcilePostgresDatabases(ctx, cluster, instances, patchClusterStatus)
+	}
+	if err == nil {
+		err = r.reconcilePGTDEProviders(ctx, cluster, instances, patchClusterStatus)
 	}
 	if err == nil {
 		err = r.reconcilePostgresUsers(ctx, cluster, instances)
@@ -571,6 +600,15 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 
 	r.Cache = mgr.GetCache()
 
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&v1beta1.PostgresCluster{},
+		v1beta1.IndexFieldPGBouncerUserSecrets,
+		v1beta1.PGBouncerUserSecretsIndexerFunc,
+	); err != nil {
+		return err
+	}
+
 	// K8SPG-712: Allow overriding default configurations
 	configMapPredicate := builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -599,7 +637,12 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Watches(&corev1.Secret{}, r.watchClusterSecrets(), builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			return hasCluster
+		}))).
 		Watches(&corev1.Pod{}, r.watchPods()).
+		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},
 			r.controllerRefHandlerFuncs()) // watch all StatefulSets
 

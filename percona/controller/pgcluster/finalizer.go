@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -19,8 +20,6 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
-
-type finalizerFunc func(context.Context, *v2.PerconaPGCluster) error
 
 func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
@@ -154,6 +153,13 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 	return nil
 }
 
+// repoNameRegex constrains pgBackRest repo names to the exact set repo1..repo4.
+// The CRD schema pattern is validated at admission, but repo names are also
+// interpolated into a shell command executed inside the database pod (see
+// deleteBackups). This Go-side check is defense-in-depth against a stored object
+// that bypasses admission validation, preventing shell command injection.
+var repoNameRegex = regexp.MustCompile(`^repo[1-4]$`)
+
 func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
@@ -182,6 +188,9 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		if !repoNameRegex.MatchString(repo.Name) {
+			return errors.Errorf("invalid repo name %q: must match ^repo[1-4]$", repo.Name)
+		}
 		cmd := []string{"bash", "-ceu", "--", fmt.Sprintf(pgBackrestCmd, strings.TrimPrefix(repo.Name, "repo"))}
 		if err := r.PodExec(ctx, cr.Namespace, pod.Name, "database", nil, &stdout, &stderr, cmd...); err != nil {
 			return errors.Wrapf(err, "delete backups, stderr: %s", stdout.String()+" "+stderr.String())
@@ -212,19 +221,7 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	return nil
 }
 
-func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
-	type finalizerEntry struct {
-		name string
-		fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
-	}
-
-	finalizers := []finalizerEntry{
-		{pNaming.FinalizerDeletePVC, r.deletePVCAndSecrets},
-		{pNaming.FinalizerDeleteSSL, r.deleteTLSSecrets},
-		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
-		{pNaming.FinalizerDeleteBackups, r.deleteBackups},
-	}
-
+func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaPGCluster, finalizers []finalizerEntry) error {
 	for _, entry := range finalizers {
 		if _, err := controller.RunFinalizer(ctx, r.Client, cr, entry.name, entry.fn); err != nil {
 			return errors.Wrapf(err, "run finalizer %s", entry.name)
@@ -232,4 +229,34 @@ func (r *PGClusterReconciler) runFinalizers(ctx context.Context, cr *v2.PerconaP
 	}
 
 	return nil
+}
+
+type finalizerEntry struct {
+	name string
+	fn   controller.FinalizerFunc[*v2.PerconaPGCluster]
+}
+
+// prePostgresClusterDeletionFinalizers returns finalizers that must run while the
+// PostgresCluster still exists (e.g. operations that require running pods or
+// cluster resources such as stopping watchers and deleting backups from repos).
+func (r *PGClusterReconciler) prePostgresClusterDeletionFinalizers() []finalizerEntry {
+	return []finalizerEntry{
+		{pNaming.FinalizerStopWatchers, r.stopExternalWatchers},
+		{pNaming.FinalizerDeleteBackups, r.deleteBackups},
+	}
+}
+
+func (r *PGClusterReconciler) postPostgresClusterDeletionFinalizers() []finalizerEntry {
+	return []finalizerEntry{
+		{pNaming.FinalizerDeletePVC, r.deletePVCAndSecrets},
+		{pNaming.FinalizerDeleteSSL, r.deleteTLSSecrets},
+	}
+}
+
+func (r *PGClusterReconciler) runPrePostgresClusterDeletionFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	return r.runFinalizers(ctx, cr, r.prePostgresClusterDeletionFinalizers())
+}
+
+func (r *PGClusterReconciler) runPostPostgresClusterDeletionFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	return r.runFinalizers(ctx, cr, r.postPostgresClusterDeletionFinalizers())
 }

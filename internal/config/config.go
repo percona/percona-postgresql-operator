@@ -21,26 +21,6 @@ func defaultFromEnv(value, key string) string {
 	return value
 }
 
-// FetchKeyCommand returns the fetch_key_cmd value stored in the encryption_key_command
-// variable used to enable TDE.
-func FetchKeyCommand(spec *v1beta1.PostgresClusterSpec) string {
-	if spec.Patroni != nil {
-		if spec.Patroni.DynamicConfiguration != nil {
-			configuration := spec.Patroni.DynamicConfiguration
-			if configuration != nil {
-				if postgresql, ok := configuration["postgresql"].(map[string]any); ok {
-					if parameters, ok := postgresql["parameters"].(map[string]any); ok {
-						if parameters["encryption_key_command"] != nil {
-							return fmt.Sprintf("%s", parameters["encryption_key_command"])
-						}
-					}
-				}
-			}
-		}
-	}
-	return ""
-}
-
 // Red Hat Marketplace requires operators to use environment variables be used
 // for any image other than the operator itself. Those variables must start with
 // "RELATED_IMAGE_" so that OSBS can transform their tag values into digests
@@ -139,29 +119,29 @@ func VerifyImageValues(cluster *v1beta1.PostgresCluster) error {
 	dataSourceRestore := cluster.Spec.DataSource != nil && cluster.Spec.DataSource.PostgresCluster != nil
 	// K8SPG-710: Image check will fail without a backup section in PostgresCluster
 	if (cluster.BackupSpecFound() && backupsEnabled || dataSourceRestore) && PGBackRestContainerImage(cluster) == "" {
-		images = append(images, "crunchy-pgbackrest")
+		images = append(images, "pgbackrest")
 	}
 	if PGAdminContainerImage(cluster) == "" &&
 		cluster.Spec.UserInterface != nil &&
 		cluster.Spec.UserInterface.PGAdmin != nil {
-		images = append(images, "crunchy-pgadmin4")
+		images = append(images, "pgadmin4")
 	}
 	if PGBouncerContainerImage(cluster) == "" &&
 		cluster.Spec.Proxy != nil &&
 		cluster.Spec.Proxy.PGBouncer != nil {
-		images = append(images, "crunchy-pgbouncer")
+		images = append(images, "pgbouncer")
 	}
 	if PGExporterContainerImage(cluster) == "" &&
 		cluster.Spec.Monitoring != nil &&
 		cluster.Spec.Monitoring.PGMonitor != nil &&
 		cluster.Spec.Monitoring.PGMonitor.Exporter != nil {
-		images = append(images, "crunchy-postgres-exporter")
+		images = append(images, "postgres-exporter")
 	}
 	if PostgresContainerImage(cluster) == "" {
 		if cluster.Spec.PostGISVersion != "" {
-			images = append(images, "crunchy-postgres-gis")
+			images = append(images, "postgres-gis")
 		} else {
-			images = append(images, "crunchy-postgres")
+			images = append(images, "postgres")
 		}
 	}
 
