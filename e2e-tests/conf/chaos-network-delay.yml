@@ -3,30 +3,23 @@ kind: NetworkChaos
 metadata:
   name: chaos-source-target-delay
 spec:
-  action: netem
+  action: bandwidth
   mode: all
 
   selector:
     namespaces:
       - test-namespace
     labelSelectors:
-      # Cluster affected by the network delay
       app.kubernetes.io/instance: standby-cluster
-      postgres-operator.crunchydata.com/role: primary
 
   direction: to
 
-  # Cluster sending the data to the standby cluster, which will be affected by the network delay
   externalTargets:
     - source-cluster-ha.test-namespace.svc.cluster.local
 
-  delay:
-    latency: "3s"
-    jitter: "2500ms"
-    correlation: "10"
-
-  loss:
-    loss: "30"
-    correlation: "25"
-
+  bandwidth:
+    rate: "1kbps"
+    limit: 1024
+    buffer: 1500
+    
   duration: "20m"

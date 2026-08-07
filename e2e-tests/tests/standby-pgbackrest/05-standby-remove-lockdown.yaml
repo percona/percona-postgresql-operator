@@ -6,4 +6,4 @@ commands:
       set -o errexit
       set -o xtrace
 
-      kubectl delete networkpolicy block-external-egress -n ${NAMESPACE} --wait=true
+      kubectl delete networkpolicy --all -n ${NAMESPACE} --wait=true

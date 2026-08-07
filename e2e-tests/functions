@@ -936,16 +936,30 @@ function network_delay() {
 	yq eval '
 		.metadata.name = "chaos-source-target-delay-'"${RANDOM}"'" |
 		.metadata.namespace = "'"${ns}"'" |
-		.spec.action = "netem" |
 		.spec.selector.namespaces = ["'"${ns}"'"] |
 		.spec.selector.labelSelectors."app.kubernetes.io/instance" = "'"${source_instance}"'" |
-		.spec.direction = "to" |
 		.spec.externalTargets = [
 			"'"${target_service}.${ns}.svc.cluster.local"'"
 		] |
 		del(.spec.target)
 	' "${TESTS_CONFIG_DIR}/chaos-network-delay.yml" \
 		| kubectl apply --namespace "${ns}" -f -
+	
+	sleep 5
+}
+
+function network_policy_block_external() {
+	local ns=$1
+	local source_instance=$2
+
+	yq eval '
+		.metadata.name = "network-policy-block-external-'"${RANDOM}"'" |
+		.metadata.namespace = "'"${ns}"'" |
+		.spec.podSelector.matchLabels."app.kubernetes.io/instance" = "'"${source_instance}"'"
+	' "${TESTS_CONFIG_DIR}/network-policy-block-external.yml" \
+		| kubectl apply --namespace "${ns}" -f -
+
+	sleep 5
 }
 
 function block_external_egress() {
