@@ -100,7 +100,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 6
+  observedGeneration: 4
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
