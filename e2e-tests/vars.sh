@@ -62,7 +62,8 @@ function detect_k8s_platform() {
 }
 
 if [[ -z ${PLATFORM:-} ]]; then
-	export PLATFORM="$(detect_k8s_platform)"
+	PLATFORM="$(detect_k8s_platform)"
+	export PLATFORM
 fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
