@@ -32,7 +32,7 @@ function detect_k8s_platform() {
 		set +o xtrace
 	fi
 
-	if [[ -n "${PLATFORM:-}" ]]; then
+	if [[ -n ${PLATFORM:-} ]]; then
 		detected_platform="${PLATFORM}"
 	elif kubectl get namespace openshift-kube-apiserver >/dev/null 2>&1; then
 		detected_platform="openshift"
@@ -56,12 +56,12 @@ function detect_k8s_platform() {
 
 	echo "${detected_platform}"
 
-	if [[ "${xtrace_enabled}" == true ]]; then
+	if [[ ${xtrace_enabled} == true ]]; then
 		set -o xtrace
 	fi
 }
 
-if [[ -z "${PLATFORM:-}" ]]; then
+if [[ -z ${PLATFORM:-} ]]; then
 	export PLATFORM="$(detect_k8s_platform)"
 fi
 
