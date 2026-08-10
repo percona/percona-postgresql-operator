@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 240
+commands:
+
+  # Check that the PGBouncerPaused condition is set to True in the status of the PerconaPGCluster CR.
+  - script: |-
+      [ "$(kubectl -n "${NAMESPACE}" get pg pgbouncer -o yaml \
+        | yq '[.status.conditions[] | select(.type == "PGBouncerPaused") | .status] | join(",")')" = "True" ]
+  # Check that the pgbouncer ConfigMap contains the key pgbouncer-paused, this is what persists the pause across restarts.
+  - script: |-
+      [ "$(kubectl -n "${NAMESPACE}" get configmap pgbouncer-pgbouncer -o yaml \
+        | yq '.data.pgbouncer-paused // ""')" = "1" ]

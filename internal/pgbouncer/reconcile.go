@@ -6,6 +6,7 @@ package pgbouncer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -15,10 +16,30 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+// crunchyBinVolumeMount is where the PgBouncer container finds the
+// operator binaries installed by the init container.
+var crunchyBinVolumeMount = corev1.VolumeMount{
+	Name:      pNaming.CrunchyBinVolumeName,
+	MountPath: pNaming.CrunchyBinVolumePath,
+}
+
+// crunchyBinVolume is the volume the init container installs the
+// operator binaries into.
+var crunchyBinVolume = corev1.Volume{
+	Name: pNaming.CrunchyBinVolumeName,
+	VolumeSource: corev1.VolumeSource{
+		EmptyDir: &corev1.EmptyDirVolumeSource{},
+	},
+}
 
 // ConfigMap populates the PgBouncer ConfigMap.
 func ConfigMap(
@@ -39,6 +60,16 @@ func ConfigMap(
 		outConfigMap.Data[hbaFileConfigMapKey] = pgbouncerHBAFileContents(inCluster)
 	} else {
 		delete(outConfigMap.Data, hbaFileConfigMapKey)
+	}
+
+	// This ConfigMap key allows us to preserve pause state across restarts.
+	// PAUSE is an in-memory operation only. The key must be removed once the
+	// cluster is resumed, otherwise the marker outlives the pause and the next
+	// restart would pause a cluster the user has already resumed.
+	if inCluster.CompareVersion("3.1.0") >= 0 && inCluster.Spec.Proxy.PGBouncerPaused() {
+		outConfigMap.Data[pausedConfigMapKey] = PausedValue
+	} else {
+		delete(outConfigMap.Data, pausedConfigMapKey)
 	}
 }
 
@@ -75,12 +106,26 @@ func Secret(ctx context.Context,
 		err = errors.WithStack(err)
 	}
 
+	var adminPassword string
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		adminPassword = string(inSecret.Data[AdminPasswordSecretKey])
+
+		if err == nil && len(adminPassword) == 0 {
+			adminPassword, err = util.GenerateASCIIPassword(32)
+			err = errors.WithStack(err)
+		}
+	}
+
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, adminPassword, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
+
+		if len(adminPassword) > 0 {
+			outSecret.Data[AdminPasswordSecretKey] = []byte(adminPassword)
+		}
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
@@ -170,6 +215,7 @@ func Pod(
 	inPostgreSQLCertificate *corev1.SecretProjection,
 	inSecret *corev1.Secret,
 	outPod *corev1.PodSpec,
+	initImage string,
 ) {
 	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
@@ -182,7 +228,7 @@ func Pod(
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
 		Sources: append(append(append([]corev1.VolumeProjection{},
-			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
+			podConfigFiles(inCluster, inConfigMap, inSecret)...),
 			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
 				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
@@ -226,6 +272,44 @@ func Pod(
 		})
 	}
 
+	logVolumeMount := corev1.VolumeMount{
+		Name: logVolumeName, MountPath: logDirectory,
+	}
+	logVolume := corev1.Volume{Name: logVolumeMount.Name}
+	logVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		container.Env = append(container.Env, []corev1.EnvVar{
+			{
+				Name: AdminPasswordEnvVar,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: inSecret.Name,
+						},
+						Key: AdminPasswordSecretKey,
+					},
+				},
+			},
+			{
+				Name:  PGBouncerPortEnvVar,
+				Value: fmt.Sprintf("%d", *inCluster.Spec.Proxy.PGBouncer.Port),
+			},
+		}...)
+		container.VolumeMounts = append(container.VolumeMounts, logVolumeMount, crunchyBinVolumeMount)
+
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{startupBinaryPath},
+				},
+			},
+			TimeoutSeconds:   startup.PauseTimeoutSeconds + 5,
+			PeriodSeconds:    10,
+			FailureThreshold: 3,
+		}
+	}
+
 	// TODO container.LivenessProbe?
 	// TODO container.ReadinessProbe?
 
@@ -261,6 +345,24 @@ func Pod(
 	outPod.Containers = []corev1.Container{container, reloader}
 
 	outPod.Volumes = []corev1.Volume{configVolume}
+
+	// The init container installs the operator binaries into the
+	// shared bin volume before the PgBouncer container starts.
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		outPod.Volumes = append(outPod.Volumes, logVolume, crunchyBinVolume)
+
+		outPod.InitContainers = []corev1.Container{
+			k8s.InitContainer(
+				inCluster,
+				naming.ContainerPGBouncer,
+				initImage,
+				inCluster.Spec.ImagePullPolicy,
+				initialize.RestrictedSecurityContext(true),
+				container.Resources,
+				nil,
+			),
+		}
+	}
 
 	// If the PGBouncerSidecars feature gate is enabled and custom pgBouncer
 	// sidecars are defined, add the defined container to the Pod.
