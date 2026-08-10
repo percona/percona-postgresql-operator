@@ -3,6 +3,7 @@
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 CERT_MANAGER_VER="1.20.2"
+CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-tests"
 CHAOS_MESH_VER="2.5.1"
 BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
@@ -1296,21 +1297,41 @@ function wait_cluster_consistency() {
 	done
 }
 
-function deploy_cert_manager() {
-	local install_marker="${TEMP_DIR}/cert-manager-installed-by-test"
+function is_cert_manager_installed() {
+	kubectl get deployment cert-manager -n cert-manager >/dev/null 2>&1
+}
 
-	if kubectl get deployment cert-manager -n cert-manager >/dev/null 2>&1; then
-		echo 'cert-manager is already installed'
-		return
+function is_cert_manager_installed_by_test() {
+	local namespace
+	is_cert_manager_installed || return 1
+
+	namespace="$(kubectl get namespace cert-manager \
+		--selector "${CERT_MANAGER_TEST_LABEL}" -o name 2>/dev/null || true)"
+
+	[[ -n ${namespace} ]]
+}
+
+function deploy_cert_manager() {
+	if is_cert_manager_installed; then
+		if ! is_cert_manager_installed_by_test; then
+			echo 'cert-manager is present without the test label; leaving it unchanged'
+			return
+		fi
+
+		echo 'cert-manager installed by the tests is present; destroying and redeploying'
 	fi
 
-	mkdir -p "${TEMP_DIR}"
-	touch "${install_marker}"
+	destroy_cert_manager
 
 	echo 'deploy cert manager'
 	kubectl create namespace cert-manager || :
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
 	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false >/dev/null 2>&1 || :
+	kubectl label namespace cert-manager \
+		"${CERT_MANAGER_TEST_LABEL}" --overwrite
+	kubectl label deployment -n cert-manager \
+		cert-manager cert-manager-webhook cert-manager-cainjector \
+		"${CERT_MANAGER_TEST_LABEL}" --overwrite
 
 	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
 		--for=condition=available \
@@ -1334,16 +1355,13 @@ function deploy_cert_manager() {
 }
 
 function destroy_cert_manager() {
-	local install_marker="${TEMP_DIR}/cert-manager-installed-by-test"
-
-	if [[ ! -f ${install_marker} ]]; then
+	if ! is_cert_manager_installed_by_test; then
 		echo 'cert-manager was not installed by this test'
 		return
 	fi
 
 	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml >/dev/null 2>&1 || :
 	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
-	rm -f "${install_marker}"
 }
 
 function get_container_image() {
