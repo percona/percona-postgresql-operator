@@ -514,7 +514,7 @@ copy_custom_extensions_form_aws() {
 		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
 		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
 		AWS_DEFAULT_REGION=eu-central-1 \
-		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
+		/usr/bin/aws --endpoint-url https://s3.eu-central-1.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
 
 		AWS_ACCESS_KEY_ID='${access_key}' \
 		AWS_SECRET_ACCESS_KEY='${secret_key}' \
