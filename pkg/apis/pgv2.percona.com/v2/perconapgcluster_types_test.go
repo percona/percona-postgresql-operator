@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
@@ -602,8 +601,8 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					CRVersion:       version.Version(),
 					PostgresVersion: 18,
 					Extensions: ExtensionsSpec{
-						PGCron:  BuiltInExtensionSpec{Enabled: ptr.To(true)},
-						SetUser: BuiltInExtensionSpec{Enabled: ptr.To(false)},
+						PGCron:  BuiltInExtensionSpec{Enabled: new(true)},
+						SetUser: BuiltInExtensionSpec{Enabled: new(false)},
 						// pg_cron is listed here as well: an explicit builtin
 						// flag wins, the user asked the operator to manage it
 						Custom: []CustomExtensionSpec{
@@ -645,7 +644,7 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					CRVersion:       version.Version(),
 					PostgresVersion: 18,
 					Extensions: ExtensionsSpec{
-						PGCron: BuiltInExtensionSpec{Enabled: ptr.To(true)},
+						PGCron: BuiltInExtensionSpec{Enabled: new(true)},
 					},
 					InstanceSets: PGInstanceSets{
 						{
@@ -708,8 +707,8 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 				Spec: crunchyv1beta1.PostgresClusterSpec{
 					Extensions: crunchyv1beta1.ExtensionsSpec{
-						PGCron:  ptr.To(false),
-						SetUser: ptr.To(true),
+						PGCron:  new(false),
+						SetUser: new(true),
 					},
 				},
 			},

@@ -5,7 +5,7 @@ metadata:
 spec:
   # pg_cron moves from a custom extension to a builtin one: the operator takes
   # over its lifecycle, but the extension and its data must survive the move.
-  # Dropping it here used to be the default behaviour, because the extension
+  # Dropping it here used to be the default behavior, because the extension
   # disappears from the custom list.
   extensions:
     pg_cron:
