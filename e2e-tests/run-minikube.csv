@@ -6,7 +6,7 @@ finalizers
 init-deploy
 one-pod
 operator-self-healing
-pgbouncer-mtls
+pgbouncer
 scaling
 scheduled-backup
 self-healing

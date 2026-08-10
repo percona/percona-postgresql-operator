@@ -472,6 +472,37 @@ get_pgbouncer_host() {
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" -o jsonpath={.data.pgbouncer-host} | base64 -d
 }
 
+list_pgbouncer_pods() {
+	local cluster=${1}
+
+	kubectl -n "${NAMESPACE}" get pods \
+		--selector=postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/role=pgbouncer \
+		-o jsonpath='{.items[*].metadata.name}'
+}
+
+get_pod_ip() {
+	local pod=${1}
+
+	kubectl -n "${NAMESPACE}" get "pod/${pod}" -o jsonpath='{.status.podIP}'
+}
+
+check_pgbouncer_connect() {
+	local cluster=${1}
+	local user=${2}
+	local host=${3}
+	local db=${4:-postgres}
+	local secret_name="${cluster}-pguser-${user}"
+
+	local password port out
+	password=$(get_psql_user_pass "${secret_name}")
+	port=$(kubectl -n "${NAMESPACE}" get "secret/${secret_name}" -o jsonpath='{.data.pgbouncer-port}' | base64 -d)
+
+	out=$(timeout 20 kubectl -n "${NAMESPACE}" exec "$(get_client_pod)" -- \
+		bash -c "printf 'SELECT 1\n' | PGPASSWORD='${password}' PGCONNECT_TIMEOUT=10 psql -v ON_ERROR_STOP=1 -tAq -h ${host} -p ${port} -U ${user} -d ${db}") || return 1
+
+	[[ $(tr -d '[:space:]' <<<"${out}") == "1" ]]
+}
+
 get_psql_user_host() {
 	local secret_name=${1}
 

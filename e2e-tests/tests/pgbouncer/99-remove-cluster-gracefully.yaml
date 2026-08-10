@@ -4,11 +4,11 @@ delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
   metadata:
-    name: pgbouncer-mtls
+    name: pgbouncer
 - apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
   metadata:
-    name: pgbouncer-mtls
+    name: pgbouncer
 commands:
   - script: |-
       set -o errexit
