@@ -12,12 +12,14 @@ commands:
       until
         json=$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o json) &&
         state=$(printf '%s' "$json" | jq -r '.status.state // empty') &&
+        lagBytes=$(printf '%s' "$json" | jq -r '.status.standby.lagBytes // empty') &&
+        lagLastComputedAt=$(printf '%s' "$json" | jq -r '.status.standby.lagLastComputedAt // empty') &&
         condStatus=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .status') &&
         condReason=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .reason') &&
         [ "$state" = "ready" ] &&
         [ "$condStatus" = "False" ] &&
         [ "$condReason" = "LagNotDetected" ]
       do
-        echo "Waiting lag fix, clusterState=$state, status=$condStatus reason=$condReason"
+        echo "Waiting lag fix, clusterState=$state, lagBytes=$lagBytes, lagLastComputedAt=$lagLastComputedAt, status=$condStatus, reason=$condReason"
         sleep "$interval"
       done

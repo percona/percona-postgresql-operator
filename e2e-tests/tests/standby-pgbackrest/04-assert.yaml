@@ -10,6 +10,7 @@ commands:
         json=$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o json) &&
         state=$(printf '%s' "$json" | jq -r '.status.state // empty') &&
         lagBytes=$(printf '%s' "$json" | jq -r '.status.standby.lagBytes // empty') &&
+        lagLastComputedAt=$(printf '%s' "$json" | jq -r '.status.standby.lagLastComputedAt // empty') &&
         condStatus=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .status') &&
         condReason=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .reason') &&
         condMsg=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .message') &&
@@ -18,6 +19,6 @@ commands:
         [ "$condReason" = "LagDetected" ] &&
         [ "$condMsg" = "WAL is lagging by $lagBytes bytes (threshold: 1024 bytes)" ]
       do
-        echo "Waiting cluster lag, clusterState=$state, status=$condStatus, reason=$condReason, message=$condMsg"
+        echo "Waiting cluster lag, clusterState=$state, lagBytes=$lagBytes, lagLastComputedAt=$lagLastComputedAt, status=$condStatus, reason=$condReason, message=$condMsg"
         sleep "$interval"
       done

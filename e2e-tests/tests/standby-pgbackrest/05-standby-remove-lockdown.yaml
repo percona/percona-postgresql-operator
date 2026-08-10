@@ -6,4 +6,12 @@ commands:
       set -o errexit
       set -o xtrace
 
-      kubectl delete networkpolicy --all -n ${NAMESPACE} --wait=true
+      source ../../functions
+
+      primary=$(kubectl get pod -n "${NAMESPACE}" \
+        -l app.kubernetes.io/instance=standby-cluster,postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+      endpoint=$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o json \
+        | jq -r '.spec.backups.pgbackrest.repos[] | select(.name == "repo1") | .s3.endpoint')
+
+      network_unblock_storage_endpoint "${NAMESPACE}" "${primary}" "${endpoint}"

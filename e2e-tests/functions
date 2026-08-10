@@ -951,18 +951,58 @@ function network_delay() {
 	sleep 5
 }
 
-function network_policy_block_external() {
+function chaos_daemon_exec_in_pod_network_namespace() {
 	local ns=$1
-	local source_instance=$2
+	local pod=$2
+	local container=$3
+	local node
+	local container_id
+	local daemon
+	shift 3
 
-	yq eval '
-		.metadata.name = "network-policy-block-external-'"${RANDOM}"'" |
-		.metadata.namespace = "'"${ns}"'" |
-		.spec.podSelector.matchLabels."app.kubernetes.io/instance" = "'"${source_instance}"'"
-	' "${TESTS_CONFIG_DIR}/network-policy-block-external.yml" \
-		| kubectl apply --namespace "${ns}" -f -
+	node=$(kubectl get pod "${pod}" --namespace "${ns}" -o jsonpath='{.spec.nodeName}')
+	container_id=$(kubectl get pod "${pod}" --namespace "${ns}" -o json \
+		| jq -r --arg container "${container}" '.status.containerStatuses[] | select(.name == $container) | .containerID' \
+		| cut -d/ -f3)
+	daemon=$(kubectl get pod --namespace "${ns}" \
+		--selector='app.kubernetes.io/component=chaos-daemon' \
+		--field-selector="spec.nodeName=${node}" \
+		-o jsonpath='{.items[0].metadata.name}')
+
+	# The variables in this script are expanded inside the chaos-daemon container.
+	# shellcheck disable=SC2016
+	kubectl exec --namespace "${ns}" "${daemon}" -- sh -eu -c '
+		netns=$(grep -l "$1" /proc/[0-9]*/cgroup | head -n1)
+		netns=${netns%/cgroup}/ns/net
+		shift
+		exec nsexec --net "$netns" "$@"
+	' sh "${container_id}" "$@"
+}
+
+function network_block_storage_endpoint() {
+	local ns=$1
+	local primary=$2
+	local endpoint=$3
+
+	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+		iptables -I OUTPUT 1 -p tcp --dport 443 \
+		-m string --algo bm --string "${endpoint}" \
+		-m comment --comment pgo-e2e-block-storage \
+		-j REJECT --reject-with tcp-reset
 
 	sleep 5
+}
+
+function network_unblock_storage_endpoint() {
+	local ns=$1
+	local primary=$2
+	local endpoint=$3
+
+	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+		iptables -D OUTPUT -p tcp --dport 443 \
+		-m string --algo bm --string "${endpoint}" \
+		-m comment --comment pgo-e2e-block-storage \
+		-j REJECT --reject-with tcp-reset
 }
 
 function block_external_egress() {
