@@ -10,16 +10,22 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
+	pgbmock "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer/mock"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -261,8 +267,10 @@ ownerReferences:
 		cluster.Spec.Proxy.PGBouncer.Service = &v1beta1.ServiceSpec{
 			Metadata: &v1beta1.Metadata{
 				Annotations: map[string]string{"c": "v3"},
-				Labels: map[string]string{"d": "v4",
-					"postgres-operator.crunchydata.com/cluster": "wrongName"},
+				Labels: map[string]string{
+					"d": "v4",
+					"postgres-operator.crunchydata.com/cluster": "wrongName",
+				},
 			},
 		}
 
@@ -346,12 +354,15 @@ ownerReferences:
 		NodePort    *int32
 		Expect      func(testing.TB, *corev1.Service, error)
 	}{
-		{Description: "ClusterIP with Port 32000", Type: "ClusterIP",
+		{
+			Description: "ClusterIP with Port 32000", Type: "ClusterIP",
 			NodePort: new(int32(32000)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.ErrorContains(t, err, "NodePort cannot be set with type ClusterIP on Service \"pg7-pgbouncer\"")
 				assert.Assert(t, service == nil)
-			}},
-		{Description: "NodePort with Port 32001", Type: "NodePort",
+			},
+		},
+		{
+			Description: "NodePort with Port 32001", Type: "NodePort",
 			NodePort: new(int32(32001)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeNodePort)
@@ -363,8 +374,10 @@ ownerReferences:
   protocol: TCP
   targetPort: pgbouncer
 `))
-			}},
-		{Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
+			},
+		},
+		{
+			Description: "LoadBalancer with Port 32002", Type: "LoadBalancer",
 			NodePort: new(int32(32002)), Expect: func(t testing.TB, service *corev1.Service, err error) {
 				assert.NilError(t, err)
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
@@ -376,7 +389,8 @@ ownerReferences:
   protocol: TCP
   targetPort: pgbouncer
 `))
-			}},
+			},
+		},
 	}
 
 	for _, test := range typesAndPort {
@@ -770,4 +784,154 @@ func TestReconcilePGBouncerDisruptionBudget(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestReconcilePause(t *testing.T) {
+	ctx := t.Context()
+
+	const adminPassword = "some-admin-password"
+	const podIP = "10.0.0.1"
+	const port = int32(5432)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "hippo-pgbouncer"},
+		Data: map[string][]byte{
+			pgbouncer.AdminPasswordSecretKey: []byte(adminPassword),
+		},
+	}
+
+	pgBouncerPod := func(cluster *v1beta1.PostgresCluster) client.Object {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cluster.Namespace,
+				Name:      cluster.Name + "-pgbouncer-abcd",
+				Labels: map[string]string{
+					naming.LabelCluster: cluster.Name,
+					naming.LabelRole:    naming.RolePGBouncer,
+				},
+			},
+			Status: corev1.PodStatus{PodIP: podIP},
+		}
+	}
+
+	setPausedCondition := func(cluster *v1beta1.PostgresCluster) {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGBouncerPaused,
+			Status:  metav1.ConditionTrue,
+			Reason:  "Paused",
+			Message: "pgbouncer is paused",
+		})
+	}
+
+	newCluster := func() *v1beta1.PostgresCluster {
+		cluster := testCluster()
+		cluster.SetLabels(map[string]string{
+			v1beta1.LabelVersion: "3.1.0",
+		})
+		cluster.Spec.Proxy.PGBouncer.Replicas = new(int32(1))
+		cluster.Spec.Proxy.PGBouncer.Port = new(port)
+		return cluster
+	}
+
+	testCases := []struct {
+		desc     string
+		cr       func() *v1beta1.PostgresCluster
+		mocks    func(m *pgbmock.AdminClient)
+		assertPG func(t *testing.T, cluster *v1beta1.PostgresCluster)
+	}{
+		{
+			desc: "pauses",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := newCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {
+				m.On("Pause", mock.Anything).Return(nil).Once()
+				m.On("Close").Return(nil).Once()
+			},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.IsStatusConditionTrue(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused))
+			},
+		},
+		{
+			desc: "resumes",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := newCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(false)
+				setPausedCondition(cluster)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {
+				m.On("Resume", mock.Anything).Return(nil).Once()
+				m.On("Close").Return(nil).Once()
+			},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.FindStatusCondition(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused) == nil,
+					"the condition should be removed, not set to false")
+			},
+		},
+		{
+			desc: "steady state resumed",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := newCluster()
+				cluster.Namespace = "ns1"
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.FindStatusCondition(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused) == nil)
+			},
+		},
+		{
+			desc: "steady state paused",
+			cr: func() *v1beta1.PostgresCluster {
+				cluster := newCluster()
+				cluster.Namespace = "ns1"
+				cluster.Spec.Proxy.PGBouncer.Paused = new(true)
+				setPausedCondition(cluster)
+				return cluster
+			},
+			mocks: func(m *pgbmock.AdminClient) {},
+			assertPG: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
+				assert.Assert(t, meta.IsStatusConditionTrue(
+					cluster.Status.Conditions, v1beta1.PGBouncerPaused))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			admin := pgbmock.NewAdminClient(t)
+			tc.mocks(admin)
+
+			cluster := tc.cr()
+			cl := fake.NewClientBuilder().WithObjects(pgBouncerPod(cluster)).Build()
+
+			r := &Reconciler{
+				Client: cl,
+				newPGBouncerAdmin: func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+					assert.Equal(t, opts.User, pgbouncer.AdminUser)
+					assert.Equal(t, opts.Password, adminPassword)
+					assert.Equal(t, opts.Port, strconv.Itoa(int(port)))
+
+					if opts.Host != podIP {
+						return nil, errors.Errorf("no pgbouncer Pod has IP %q", opts.Host)
+					}
+					return admin, nil
+				},
+			}
+
+			assert.NilError(t, r.reconcilePGBouncerPause(ctx, secret, cluster))
+
+			if tc.assertPG != nil {
+				tc.assertPG(t, cluster)
+			}
+		})
+	}
 }

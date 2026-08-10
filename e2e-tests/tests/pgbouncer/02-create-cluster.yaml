@@ -10,7 +10,7 @@ commands:
       # Require verified client certificates on PgBouncer frontend
       # connections. additionalTrustedCAs is intentionally NOT set yet;
       # only the operator-generated CA is trusted at this point.
-      get_cr "pgbouncer-mtls" ${RANDOM} \
+      get_cr "pgbouncer" ${RANDOM} \
         | yq '.spec.proxy.pgBouncer.config.global.client_tls_sslmode="verify-ca"' \
         | kubectl -n "${NAMESPACE}" apply -f -
     timeout: 10

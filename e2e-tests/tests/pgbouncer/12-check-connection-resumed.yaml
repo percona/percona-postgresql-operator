@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      connect_every_pod() {
+        local pods pod ip
+        pods=$(list_pgbouncer_pods pgbouncer)
+        [[ -n ${pods} ]] || return 1
+
+        for pod in ${pods}; do
+          ip=$(get_pod_ip "${pod}")
+          [[ -n ${ip} ]] || return 1
+          check_pgbouncer_connect pgbouncer pgbouncer "${ip}" || return 1
+        done
+      }
+
+      retry 12 10 connect_every_pod
+    timeout: 300
