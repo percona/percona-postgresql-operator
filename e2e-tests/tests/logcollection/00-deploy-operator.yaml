@@ -1,0 +1,27 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+    - script: |-
+          set -o errexit
+          set -o xtrace
+          
+          source ../../functions
+          init_temp_dir # do this only in the first TestStep
+          
+          deploy_operator
+          deploy_client
+
+          kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+
+          # Self-signed cert with CN=minio-service so fluent-bit can verify TLS.
+          openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout "${TEMP_DIR}/minio.key" \
+            -out "${TEMP_DIR}/minio.crt" \
+            -subj "/CN=minio-service"
+          kubectl -n "${NAMESPACE}" create secret generic minio-tls \
+            --from-file=public.crt="${TEMP_DIR}/minio.crt" \
+            --from-file=private.key="${TEMP_DIR}/minio.key"
+
+          deploy_minio minio-service minio-tls
+      

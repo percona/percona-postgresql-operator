@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -158,6 +157,14 @@ func clusterYAML(
 		},
 	}
 
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		postgresqlSection := root["postgresql"].(map[string]any)
+		postgresqlSection["bin_name"] = map[string]any{
+			"pg_basebackup": "pg_tde_basebackup",
+			"pg_rewind":     "pg_tde_rewind",
+		}
+	}
+
 	if !ClusterBootstrapped(cluster) {
 		// Patroni has not yet bootstrapped. Populate the "bootstrap.dcs" field to
 		// facilitate it. When Patroni is already bootstrapped, this field is ignored.
@@ -202,14 +209,6 @@ func DynamicConfiguration(
 	postgresql := map[string]any{
 		// TODO(cbandy): explain this. requires an archive, perhaps.
 		"use_slots": false,
-	}
-
-	// When TDE is configured, override the pg_rewind binary name to point
-	// to the wrapper script.
-	if config.FetchKeyCommand(&cluster.Spec) != "" {
-		postgresql["bin_name"] = map[string]any{
-			"pg_rewind": "/tmp/pg_rewind_tde.sh",
-		}
 	}
 
 	if section, ok := root["postgresql"].(map[string]any); ok {
@@ -649,11 +648,6 @@ func instanceYAML(
 
 				// NOTE(cbandy): The "--waldir" option was introduced in PostgreSQL v10.
 				"waldir=" + postgres.WALDirectory(cluster, instance),
-			}
-
-			// Append the encryption key command, if provided.
-			if ekc := config.FetchKeyCommand(&cluster.Spec); ekc != "" {
-				initdb = append(initdb, fmt.Sprintf("encryption-key-command=%s", ekc))
 			}
 
 			// Populate some "bootstrap" fields to initialize the cluster.

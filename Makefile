@@ -9,9 +9,7 @@ KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
-# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
-CRD_OPTIONS ?= crd:crdVersions='v1'
-CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
+CRD_OPTIONS ?= crd:crdVersions='v1',maxDescLen=0
 
 ##@ General
 
@@ -149,17 +147,25 @@ check-envtest-existing: createnamespaces
 		$(GO_TEST) -count=1 -cover -p=1 -tags=envtest ./...
 	kubectl delete -k ./config/dev
 
+.PHONY: go-fix
+go-fix: ## Run go fix on all packages
+	$(GO) fix ./...
+
 ##@ Generate
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-generate: kustomize
-generate: generate-crd
-generate: generate-deepcopy
-generate: generate-rbac
-generate: generate-manager
-generate: generate-bundle
-generate: generate-cw
+	$(MAKE) go-fix
+	$(MAKE) generate-all
+
+.PHONY: generate-all
+generate-all: kustomize
+generate-all: generate-crd
+generate-all: generate-deepcopy
+generate-all: generate-rbac
+generate-all: generate-manager
+generate-all: generate-bundle
+generate-all: generate-cw
 
 .PHONY: generate-crunchy-crd
 generate-crunchy-crd: ## Generate crd
@@ -203,10 +209,6 @@ generate-rbac: ## Generate rbac
 .PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
-
-.PHONY: generate-crd-without-description
-generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
-generate-crd-without-description: kustomize generate-crd
 
 .PHONY: generate-percona-crd
 generate-percona-crd:
@@ -336,7 +338,7 @@ release: generate license
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM3_CLIENT)#}" deploy/cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
@@ -407,8 +409,6 @@ after-release-versions:
 		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=$(IMAGE_TAG_BASE):main-pgbouncer19#" \
 		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=$(IMAGE_TAG_BASE):main-pgbackrest19#" \
 		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
-		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:dev-latest#" \
-		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:dev-latest#" \
-		-e "s#^IMAGE_PMM3_CLIENT=.*#IMAGE_PMM3_CLIENT=perconalab/pmm-client:3-dev-latest#" \
-		-e "s#^IMAGE_PMM3_SERVER=.*#IMAGE_PMM3_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
+		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest#" \
 		e2e-tests/release_versions

@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      kubectl -n "${NAMESPACE}" patch perconapgcluster pgbouncer --type=merge \
+        -p '{"spec":{"proxy":{"pgBouncer":{"paused":true}}}}'
+    timeout: 30

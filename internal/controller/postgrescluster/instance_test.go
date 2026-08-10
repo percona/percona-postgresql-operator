@@ -1432,6 +1432,21 @@ func TestDeleteInstance(t *testing.T) {
 	}
 }
 
+// pgTDECluster returns a cluster with the given pg_tde settings, for the
+// TDEWALEncryptionAnnotation cases of TestGenerateInstanceStatefulSetIntent.
+func pgTDECluster(enabled, walEncryption bool) *v1beta1.PostgresCluster {
+	cluster := testCluster()
+	cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+		Enabled:       enabled,
+		WALEncryption: walEncryption,
+		Vault: &v1beta1.PGTDEVaultSpec{
+			Host:        "https://vault.local:8200",
+			TokenSecret: v1beta1.PGTDESecretObjectReference{Name: "vault", Key: "token"},
+		},
+	}
+	return cluster
+}
+
 func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 	type intentParams struct {
 		cluster                    *v1beta1.PostgresCluster
@@ -1716,6 +1731,35 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
   topologyKey: kubernetes.io/hostname
   whenUnsatisfiable: ScheduleAnyway
 `))
+		},
+	}, {
+		// K8SPG-911
+		name: "pg_tde disabled",
+		ip: intentParams{
+			cluster: pgTDECluster(false, false),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			_, ok := ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation]
+			assert.Assert(t, !ok)
+		},
+	}, {
+		// K8SPG-911
+		name: "pg_tde enabled without WAL encryption",
+		ip: intentParams{
+			cluster: pgTDECluster(true, false),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			assert.Equal(t, ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation], "false")
+		},
+	}, {
+		// K8SPG-911: toggling WAL encryption has to change the Pod template so
+		// the Pods are recreated with the new pg_tde.wal_encrypt value.
+		name: "pg_tde enabled with WAL encryption",
+		ip: intentParams{
+			cluster: pgTDECluster(true, true),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			assert.Equal(t, ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation], "true")
 		},
 	}} {
 		t.Run(test.name, func(t *testing.T) {

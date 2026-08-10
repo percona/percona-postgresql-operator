@@ -1,0 +1,28 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      pods=$(list_pgbouncer_pods pgbouncer)
+      if [[ -z ${pods} ]]; then
+        echo "ERROR: no pgbouncer pods found"
+        exit 1
+      fi
+
+      for pod in ${pods}; do
+        ip=$(get_pod_ip "${pod}")
+        if [[ -z ${ip} ]]; then
+          echo "ERROR: pgbouncer pod ${pod} has no IP address"
+          exit 1
+        fi
+
+        if check_pgbouncer_connect pgbouncer pgbouncer "${ip}"; then
+          echo "ERROR: paused pgbouncer ${pod} must not serve connections"
+          exit 1
+        fi
+      done
+    timeout: 180

@@ -55,6 +55,59 @@ func AdditionalConfigVolumeMount() corev1.VolumeMount {
 	}
 }
 
+// PGTDEVolumeMount returns the name and mount path of the token and certificates for KMS.
+func PGTDEVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      naming.PGTDEVolume,
+		MountPath: naming.PGTDEMountPath,
+		ReadOnly:  true,
+	}
+}
+
+// PGTDEVolume returns the projected volume for pg_tde Vault secrets (token and optional CA cert).
+func PGTDEVolume(vault *v1beta1.PGTDEVaultSpec) corev1.Volume {
+	volume := corev1.Volume{
+		Name: naming.PGTDEVolume,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: new(int32(0o600)),
+				Sources: []corev1.VolumeProjection{
+					{Secret: &corev1.SecretProjection{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: vault.TokenSecret.Name,
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  vault.TokenSecret.Key,
+								Path: vault.TokenSecret.Key,
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	if vault.HasCA() {
+		volume.Projected.Sources = append(
+			volume.Projected.Sources, corev1.VolumeProjection{
+				Secret: &corev1.SecretProjection{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: vault.CASecret.Name,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  vault.CASecret.Key,
+							Path: vault.CASecret.Key,
+						},
+					},
+				},
+			})
+	}
+
+	return volume
+}
+
 // InstancePod initializes outInstancePod with the database container and the
 // volumes needed by PostgreSQL.
 func InstancePod(ctx context.Context,
@@ -158,6 +211,11 @@ func InstancePod(ctx context.Context,
 		downwardAPIVolumeMount,
 	}
 
+	pgTDEVolumeMount := PGTDEVolumeMount()
+	if inCluster.Spec.Extensions.PGTDE.Vault != nil {
+		dbContainerMounts = append(dbContainerMounts, pgTDEVolumeMount)
+	}
+
 	if HugePages2MiRequested(inCluster) {
 		dbContainerMounts = append(dbContainerMounts, corev1.VolumeMount{
 
@@ -236,6 +294,9 @@ func InstancePod(ctx context.Context,
 		dataVolume,
 		downwardAPIVolume,
 	}
+	if vault := inCluster.Spec.Extensions.PGTDE.Vault; vault != nil {
+		outInstancePod.Volumes = append(outInstancePod.Volumes, PGTDEVolume(vault))
+	}
 
 	if HugePages2MiRequested(inCluster) {
 		outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
@@ -305,6 +366,24 @@ func InstancePod(ctx context.Context,
 		container.VolumeMounts = append(container.VolumeMounts, walVolumeMount)
 		startup.VolumeMounts = append(startup.VolumeMounts, walVolumeMount)
 		outInstancePod.Volumes = append(outInstancePod.Volumes, walVolume)
+	}
+
+	// K8SPG-440: mount user-defined extra volumes into the PostgreSQL container.
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		for _, extraVolume := range inInstanceSpec.ExtraVolumes {
+			outInstancePod.Volumes = append(outInstancePod.Volumes, corev1.Volume{
+				Name:         extraVolume.Name,
+				VolumeSource: extraVolume.VolumeSource,
+			})
+			for _, mount := range extraVolume.Mounts {
+				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+					Name:      extraVolume.Name,
+					MountPath: mount.MountPath,
+					SubPath:   mount.SubPath,
+					ReadOnly:  mount.ReadOnly,
+				})
+			}
+		}
 	}
 
 	outInstancePod.Containers = []corev1.Container{container, reloader}

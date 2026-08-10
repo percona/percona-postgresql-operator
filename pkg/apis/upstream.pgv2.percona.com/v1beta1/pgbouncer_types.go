@@ -158,6 +158,9 @@ type PGBouncerPodSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 	// K8SPG-833
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// If set, pauses pgbouncer connections.
+	Paused *bool `json:"paused,omitempty"`
 }
 
 // PGBouncerSidecars defines the configuration for pgBouncer sidecar containers
