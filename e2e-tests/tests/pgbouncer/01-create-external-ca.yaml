@@ -18,7 +18,7 @@ commands:
       openssl req -nodes -newkey rsa:2048 \
         -keyout "${TEMP_DIR}/client.key" \
         -out "${TEMP_DIR}/client.csr" \
-        -subj "/CN=pgbouncer-mtls"
+        -subj "/CN=pgbouncer"
 
       openssl x509 -req -days 365 \
         -in "${TEMP_DIR}/client.csr" \

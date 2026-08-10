@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 240
+commands:
+  # Check that the condition is removed
+  - script: |-
+      [ "$(kubectl -n "${NAMESPACE}" get pg pgbouncer -o yaml \
+        | yq '[.status.conditions[] | select(.type == "PGBouncerPaused")] | length')" = "0" ]
+
+  # ConfigMap marker should go as well
+  - script: |-
+      [ "$(kubectl -n "${NAMESPACE}" get configmap pgbouncer-pgbouncer -o yaml \
+        | yq '.data | has("pgbouncer-paused")')" = "false" ]

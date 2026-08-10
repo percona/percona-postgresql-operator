@@ -24,7 +24,7 @@ monitoring
 one-pod
 repo-host-autogrow
 operator-self-healing
-pgbouncer-mtls
+pgbouncer
 pg-tde
 pg-tde-wal-encrypt
 pitr
