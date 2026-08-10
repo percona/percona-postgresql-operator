@@ -1,18 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 180
-commands:
-  - script: |-
-      set -o errexit
-      set -o pipefail
-
-      kubectl -n "${NAMESPACE}" get perconapgcluster cert-management-policy -o json \
-        | jq -e '
-            .status.conditions |
-            any(.[]; .type == "ReadyForBackup" and .status == "False" and .reason == "PGBackRestRepoHostReady") and
-            any(.[]; .type == "TLSSecretsReady" and .status == "False" and .reason == "TLSSecretsMissing") and
-            any(.[]; .type == "Progressing" and .status == "False" and .reason == "Paused")
-          ' >/dev/null
+resourceRefs:
+  - apiVersion: pgv2.percona.com/v2
+    kind: PerconaPGCluster
+    name: cert-management-policy
+    ref: cluster
+assertAll:
+  - celExpr: cluster.status.conditions.exists(c, c.type == "ReadyForBackup" && c.status == "False" && c.reason == "PGBackRestRepoHostReady")
+    message: ReadyForBackup should be False with reason PGBackRestRepoHostReady
+  - celExpr: cluster.status.conditions.exists(c, c.type == "TLSSecretsReady" && c.status == "False" && c.reason == "TLSSecretsMissing")
+    message: TLSSecretsReady should be False with reason TLSSecretsMissing
+  - celExpr: cluster.status.conditions.exists(c, c.type == "Progressing" && c.status == "False" && c.reason == "Paused")
+    message: Progressing should be False with reason Paused
 ---
 kind: StatefulSet
 apiVersion: apps/v1
