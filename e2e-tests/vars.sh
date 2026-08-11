@@ -38,6 +38,13 @@ else
 	export PG_VER="${PG_VER:-18}"
 fi
 
+export ARCH="${ARCH:-}"
+if [[ -z ${ARCH} ]]; then
+	node_arches=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.labels.kubernetes\.io/arch}{"\n"}{end}' 2>/dev/null | sort -u)
+	if [[ ${node_arches} == "arm64" ]]; then
+		export ARCH=arm64
+	fi
+fi
 export PG_DISTRIBUTION="${PG_DISTRIBUTION:-}"
 
 if [[ $PG_DISTRIBUTION == "community" ]]; then
@@ -61,6 +68,7 @@ export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
 export MINIO_VER="5.4.0"
 export VAULT_VER="0.32.0"
+export IMAGE_AWS_CLI=${IMAGE_AWS_CLI:-"docker.io/amazon/aws-cli:2.34.60"}
 
 # Add 'docker.io' for images that are provided without registry
 export REGISTRY_NAME="docker.io"
