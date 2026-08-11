@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval 'del(.spec.logcollector.enabled)' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
+
