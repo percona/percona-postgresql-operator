@@ -18,6 +18,7 @@ import (
 	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcileLogRotate(t *testing.T) {
@@ -219,4 +220,115 @@ func TestExtraConfigRollsPods(t *testing.T) {
 	hash2 := hashOf(cr2)
 
 	assert.NotEqual(t, hash1, hash2, "config hash should change when extraConfig contents change")
+}
+
+func TestResolveDefaultEnabled(t *testing.T) {
+	const (
+		clusterName = "test-cluster"
+		namespace   = "default"
+	)
+
+	require.NoError(t, v2.AddToScheme(scheme.Scheme))
+	require.NoError(t, crunchyv1beta1.AddToScheme(scheme.Scheme))
+
+	newCR := func(enabled *bool) *v2.PerconaPGCluster {
+		return &v2.PerconaPGCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+			Spec: v2.PerconaPGClusterSpec{
+				CRVersion: version.Version(),
+				LogCollector: &v2.LogCollectorSpec{
+					Enabled: enabled,
+					Image:   "log-test-image",
+				},
+				InstanceSets: v2.PGInstanceSets{{Name: "instance1"}},
+			},
+		}
+	}
+
+	postgresClusterWithSidecar := &crunchyv1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+		Spec: crunchyv1beta1.PostgresClusterSpec{
+			InstanceSets: []crunchyv1beta1.PostgresInstanceSetSpec{
+				{
+					Containers: []corev1.Container{
+						{Name: "logs"},
+					},
+				},
+			},
+		},
+	}
+
+	postgresClusterWithoutSidecar := &crunchyv1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+		Spec: crunchyv1beta1.PostgresClusterSpec{
+			InstanceSets: []crunchyv1beta1.PostgresInstanceSetSpec{
+				{
+					Containers: []corev1.Container{},
+				},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		cr              *v2.PerconaPGCluster
+		existingCluster *crunchyv1beta1.PostgresCluster
+		wantEnabled     *bool
+	}{
+		"nil LogCollector is left unchanged": {
+			cr: &v2.PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec: v2.PerconaPGClusterSpec{
+					CRVersion:    version.Version(),
+					LogCollector: nil,
+					InstanceSets: v2.PGInstanceSets{{Name: "instance1"}},
+				},
+			},
+			wantEnabled: nil,
+		},
+		"explicit true is not overridden": {
+			cr:          newCR(new(true)),
+			wantEnabled: new(true),
+		},
+		"explicit false is not overridden": {
+			cr:          newCR(new(false)),
+			wantEnabled: new(false),
+		},
+		"new cluster defaults to enabled": {
+			cr:          newCR(nil),
+			wantEnabled: new(true),
+		},
+		"existing cluster with sidecar preserves enabled": {
+			cr:              newCR(nil),
+			existingCluster: postgresClusterWithSidecar,
+			wantEnabled:     new(true),
+		},
+		"existing cluster without sidecar preserves disabled": {
+			cr:              newCR(nil),
+			existingCluster: postgresClusterWithoutSidecar,
+			wantEnabled:     new(false),
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+			if tt.existingCluster != nil {
+				builder = builder.WithObjects(tt.existingCluster)
+			}
+			c := builder.Build()
+
+			err := resolveDefaultEnabled(t.Context(), c, tt.cr)
+			require.NoError(t, err)
+
+			if tt.cr.Spec.LogCollector == nil {
+				return
+			}
+			if tt.wantEnabled == nil {
+				assert.Nil(t, tt.cr.Spec.LogCollector.Enabled)
+			} else {
+				require.NotNil(t, tt.cr.Spec.LogCollector.Enabled)
+				assert.Equal(t, *tt.wantEnabled, *tt.cr.Spec.LogCollector.Enabled)
+			}
+		})
+	}
 }
