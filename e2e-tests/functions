@@ -301,7 +301,7 @@ function deploy_s3_secrets() {
 	local repo_auth=""
 	local secret_args=()
 
-	if [[ $platform == "doks" || $platform == "digitalocean" ]]; then
+	if [[ $platform == "doks" ]]; then
 		key=$(yq eval 'select(.metadata.name=="*spaces*").data.ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
 		secret=$(yq eval 'select(.metadata.name=="*spaces*").data.SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
 		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
@@ -372,15 +372,12 @@ function get_cr() {
 
 	local platform="${PLATFORM}"
 	local platform_config="${platform}"
-	if [[ ${platform} == "digitalocean" ]]; then
-		platform_config="doks"
-	fi
 	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
 	local platform_cr_file="$TEST_CONFIG_DIR/${cr_name}-${platform_config}.yaml"
 	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
 	if [[ -f $platform_cr_file ]]; then
 		cr_file=$platform_cr_file
-	elif [[ ($platform == "doks" || $platform == "digitalocean") && -f $spaces_cr_file ]]; then
+	elif [[ ($platform == "doks") && -f $spaces_cr_file ]]; then
 		cr_file=$spaces_cr_file
 	fi
 
@@ -1562,7 +1559,7 @@ function deploy_volume_snapshot_class() {
 		aks)
 			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-aks.yaml"
 			;;
-		doks | digitalocean)
+		doks)
 			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-do.yaml"
 			;;
 		eks)
@@ -1594,7 +1591,7 @@ function get_volume_snapshot_class() {
 		aks)
 			echo "aks-snapshot-class"
 			;;
-		doks | digitalocean)
+		doks)
 			echo "do-block-storage"
 			;;
 		eks)
@@ -1917,7 +1914,7 @@ function enable_hugepages() {
 		rancher)
 			enable_hugepages_rancher "${hugepage_count}"
 			;;
-		doks | digitalocean)
+		doks)
 			enable_hugepages_doks "${hugepage_count}"
 			;;
 		*)
@@ -2042,7 +2039,7 @@ function get_available_k8s_versions() {
 	local versions=""
 
 	case "$platform" in
-		doks | digitalocean)
+		doks)
 			versions=$(doctl kubernetes options versions -o json \
 				| jq -r '.[].slug')
 			;;
@@ -2076,7 +2073,7 @@ function create_k8s_cluster() {
 
 	case "$platform" in
 
-		doks | digitalocean)
+		doks)
 			echo "Creating DOKS cluster: $name ($version)"
 			creation_time=$(date +%s)
 			doctl kubernetes cluster create "$name" \
@@ -2134,7 +2131,7 @@ function upgrade_k8s_cluster() {
 	local platform="${PLATFORM}"
 
 	case "$platform" in
-		doks | digitalocean)
+		doks)
 			echo "Upgrading DOKS cluster: $name to $version"
 			doctl kubernetes cluster upgrade "$name" \
 				--version "$version"
@@ -2170,7 +2167,7 @@ function delete_k8s_cluster() {
 	local region="$3"
 
 	case "$platform" in
-		doks | digitalocean)
+		doks)
 			echo "Deleting DOKS cluster: $name"
 			cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
 			# Dangerous includes LoadBalancers, Volumes and all resources related to the cluster
@@ -2196,7 +2193,7 @@ function get_k8s_cluster_name() {
 	local platform="${1:-${PLATFORM}}"
 
 	case "$platform" in
-		doks | digitalocean)
+		doks)
 			local nodepool_id="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.doks\.digitalocean\.com/node-pool-id}')"
 			doctl kubernetes cluster list -o json \
 				| jq -r --arg id "$nodepool_id" \
@@ -2218,7 +2215,7 @@ function get_k8s_cluster_version() {
 	local platform="${2:-${PLATFORM}}"
 
 	case "$platform" in
-		doks | digitalocean)
+		doks)
 			doctl kubernetes cluster get "$name" --output json \
 				| jq -r '.[0].version'
 			;;
