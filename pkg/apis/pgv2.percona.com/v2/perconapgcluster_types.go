@@ -349,11 +349,6 @@ func (cr *PerconaPGCluster) SetExtensionDefaults() {
 	if cr.Spec.Extensions.PGRepack.Enabled == nil {
 		cr.Spec.Extensions.PGRepack.Enabled = new(false)
 	}
-	// pg_cron and set_user are deliberately not defaulted: an unset flag has to
-	// stay unset so the operator can tell "the user never asked for this
-	// extension" apart from "the user asked to remove it". Defaulting to false
-	// would drop an extension the user installed on their own (as a custom
-	// extension or by hand) and destroy its data, e.g. the cron.job rows.
 
 	// for backward compatibility, delete after 3.4.0
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
@@ -548,10 +543,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.PGRepack.Enabled != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
 	}
-	// ToCrunchy mutates the PostgresCluster stored in etcd, so an unset flag has
-	// to clear the previously stored value: nil tells the upstream controller to
-	// leave the extension alone, and a stale false left behind would keep
-	// dropping an extension the user no longer wants managed
+
 	if cr.Spec.Extensions.PGCron.Enabled != nil {
 		postgresCluster.Spec.Extensions.PGCron = new(*cr.Spec.Extensions.PGCron.Enabled)
 	} else {

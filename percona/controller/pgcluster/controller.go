@@ -784,23 +784,15 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 }
 
 // builtInExtensionEnabled reports whether the extension is currently enabled via
-// spec.extensions.<extension>. The names are the ones used in CREATE EXTENSION,
-// which is also what spec.extensions.custom holds and what
-// disableCustomExtensionsInDB passes to DROP EXTENSION.
+// spec.extensions.<extension>. Only pg_cron and set_user are listed: they became
+// manageable as builtin in this release, so a cluster upgraded from an older
+// operator can still run them as custom extensions and migrate. The names are
+// the ones used in CREATE EXTENSION, which is also what spec.extensions.custom
+// holds and what disableCustomExtensionsInDB passes to DROP EXTENSION.
 func builtInExtensionEnabled(cr *v2.PerconaPGCluster, name string) bool {
 	extensions := cr.Spec.Extensions
 
 	switch name {
-	case "pg_stat_monitor":
-		return ptr.Deref(extensions.PGStatMonitor.Enabled, false)
-	case "pg_stat_statements":
-		return ptr.Deref(extensions.PGStatStatements.Enabled, false)
-	case "pgaudit":
-		return ptr.Deref(extensions.PGAudit.Enabled, false)
-	case "vector":
-		return ptr.Deref(extensions.PGVector.Enabled, false)
-	case "pg_repack":
-		return ptr.Deref(extensions.PGRepack.Enabled, false)
 	case "pg_cron":
 		return ptr.Deref(extensions.PGCron.Enabled, false)
 	case "set_user":
