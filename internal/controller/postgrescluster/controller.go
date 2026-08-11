@@ -40,6 +40,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/config"
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -82,6 +83,7 @@ type Reconciler struct {
 	Controller                   controller.Controller
 	Cache                        cache.Cache
 	certManagerWatchesRegistered atomic.Bool
+	newPGBouncerAdmin            func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error)
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -312,8 +314,8 @@ func (r *Reconciler) Reconcile(
 	}
 
 	// pg_tde should be removed from shared libraries only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
-		pgtde.PostgreSQLParameters(&pgParameters)
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		pgtde.PostgreSQLParameters(cluster, &pgParameters)
 	}
 
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
@@ -587,6 +589,12 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		r.PodExec, err = runtime.NewPodExecutor(mgr.GetConfig())
 		if err != nil {
 			return err
+		}
+	}
+
+	if r.newPGBouncerAdmin == nil {
+		r.newPGBouncerAdmin = func(o pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+			return pgbruntime.NewAdminClient(o)
 		}
 	}
 

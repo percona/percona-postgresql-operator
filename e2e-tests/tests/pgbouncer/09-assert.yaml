@@ -1,0 +1,24 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 420
+commands:
+  # Check that the startup probe paused pgbouncer
+  - script: |-
+      set -o errexit
+
+      source ../../functions
+
+      pods=$(list_pgbouncer_pods pgbouncer)
+
+      count=0
+      for pod in ${pods}; do
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c pgbouncer -- cat /var/logs/startup.log \
+          | grep -q 'paused pgbouncer connections'
+        count=$((count + 1))
+      done
+      [ "${count}" -eq 3 ]
+
+  # Condition should still be set
+  - script: |-
+      [ "$(kubectl -n "${NAMESPACE}" get pg pgbouncer -o yaml \
+        | yq '[.status.conditions[] | select(.type == "PGBouncerPaused") | .status] | join(",")')" = "True" ]

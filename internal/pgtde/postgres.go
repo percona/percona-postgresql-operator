@@ -114,9 +114,17 @@ func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.Even
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
-func PostgreSQLParameters(outParameters *postgres.Parameters) {
+func PostgreSQLParameters(cluster *crunchyv1beta1.PostgresCluster, outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
-	outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
+
+	canEnableWALEncryption := meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled) &&
+		meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+
+	if cluster.Spec.Extensions.PGTDE.WALEncryption && canEnableWALEncryption {
+		outParameters.Mandatory.Add("pg_tde.wal_encrypt", "on")
+	} else {
+		outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
+	}
 }
 
 // VaultCredentialPaths returns the standard volume mount paths for the vault

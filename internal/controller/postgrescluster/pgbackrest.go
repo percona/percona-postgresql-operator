@@ -1355,13 +1355,16 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		"--repo=" + regexRepoIndex.FindString(repoName),
 	}...)
 
-	var deltaOptFound, foundTarget bool
+	var deltaOptFound, foundTarget, foundRestoreCommand bool
 	for _, opt := range opts {
 		switch {
 		case strings.Contains(opt, "--target"):
 			foundTarget = true
 		case strings.Contains(opt, "--delta"):
 			deltaOptFound = true
+		case strings.Contains(opt, "restore_command"),
+			strings.Contains(opt, "restore-command"):
+			foundRestoreCommand = true
 		}
 	}
 	if !deltaOptFound {
@@ -1384,11 +1387,18 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 		opts = append(opts, "--target-action=promote")
 	}
 
-	for i, instanceSpec := range cluster.Spec.InstanceSets {
-		if instanceSpec.Name == instanceSetName {
-			opts = append(opts, "--link-map=pg_wal="+postgres.WALDirectory(cluster,
-				&cluster.Spec.InstanceSets[i]))
+	var instanceSet *v1beta1.PostgresInstanceSetSpec
+	for i := range cluster.Spec.InstanceSets {
+		if cluster.Spec.InstanceSets[i].Name == instanceSetName {
+			instanceSet = &cluster.Spec.InstanceSets[i]
+			opts = append(opts, "--link-map=pg_wal="+postgres.WALDirectory(cluster, instanceSet))
 		}
+	}
+
+	if cluster.Spec.Extensions.PGTDE.WALEncryption && !foundRestoreCommand {
+		opts = append(opts, `'--recovery-option=restore_command=`+
+			pgbackrest.WALEncryptRestoreCommand(
+				" --repo="+regexRepoIndex.FindString(repoName))+`'`)
 	}
 
 	// Check to see if huge pages have been requested in the spec. If they have, include 'huge_pages = try'
@@ -1400,8 +1410,8 @@ func (r *Reconciler) reconcileRestoreJob(ctx context.Context,
 
 	// NOTE (andrewlecuyer): Forcing users to put each argument separately might prevent the need
 	// to do any escaping or use eval.
-	cmd := pgbackrest.RestoreCommand(pgdata, hugePagesSetting,
-		pgtablespaceVolumes, cluster.Spec.Extensions.PGTDE.Enabled, strings.Join(opts, " "))
+	cmd := pgbackrest.RestoreCommand(cluster, instanceSet, pgdata, hugePagesSetting,
+		pgtablespaceVolumes, strings.Join(opts, " "))
 
 	// create the volume resources required for the postgres data directory
 	dataVolumeMount := postgres.DataVolumeMount()
@@ -2757,6 +2767,8 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	backupJob.ObjectMeta = naming.PGBackRestBackupJob(postgresCluster)
 	if currentBackupJob != nil {
 		backupJob.ObjectMeta.Name = currentBackupJob.ObjectMeta.Name
+		// K8SPG-1125: Prevent restoring Job labels removed by finishBackup.
+		backupJob.ResourceVersion = currentBackupJob.ResourceVersion
 	}
 
 	var labels, annotations map[string]string

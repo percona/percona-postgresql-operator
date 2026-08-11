@@ -9,9 +9,7 @@ KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
-# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
-CRD_OPTIONS ?= crd:crdVersions='v1'
-CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
+CRD_OPTIONS ?= crd:crdVersions='v1',maxDescLen=0
 
 ##@ General
 
@@ -211,10 +209,6 @@ generate-rbac: ## Generate rbac
 .PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
-
-.PHONY: generate-crd-without-description
-generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
-generate-crd-without-description: kustomize generate-crd
 
 .PHONY: generate-percona-crd
 generate-percona-crd:

@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # K8SPG-911: enable WAL encryption now that pg_tde has a key to encrypt it with,
+      # which is what step 01 waited for. pg_tde.wal_encrypt is only read at startup, so
+      # this rolls the instance Pods.
+      kubectl -n "${NAMESPACE}" patch pg major-upgrade-17-to-18 --type=merge \
+        -p '{"spec":{"extensions":{"pg_tde":{"walEncryption":true}}}}'

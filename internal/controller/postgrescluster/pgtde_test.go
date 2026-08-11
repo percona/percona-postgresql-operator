@@ -7,6 +7,8 @@ package postgrescluster
 import (
 	"context"
 	"io"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -116,9 +118,7 @@ func tdeInstance(annotations map[string]string) *Instance {
 			}},
 		},
 	}
-	for k, v := range annotations {
-		pod.Annotations[k] = v
-	}
+	maps.Copy(pod.Annotations, annotations)
 
 	return &Instance{
 		Name: "instance1-abcd",
@@ -1275,12 +1275,7 @@ func failPatch(t *testing.T) func() error {
 
 // argsContain reports whether command contains arg.
 func argsContain(command []string, arg string) bool {
-	for _, c := range command {
-		if c == arg {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(command, arg)
 }
 
 func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {

@@ -266,8 +266,12 @@ func (s *PGTDEVaultSpec) HasCA() bool {
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.walEncryption) || !self.walEncryption || (has(self.enabled) && self.enabled)",message="pg_tde must be enabled to enable WAL encryption"
 type PGTDESpec struct {
 	Enabled bool `json:"enabled,omitempty"`
+
+	// Encrypt write-ahead log segments. Requires pg_tde.enabled to be true.
+	WALEncryption bool `json:"walEncryption,omitempty"`
 
 	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
 }
@@ -575,6 +579,8 @@ const (
 	// does not influence shared_preload_libraries or Pod contents; it exists
 	// so a stalled credential change is visible to the user.
 	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
+
+	PGBouncerPaused = "PGBouncerPaused"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -789,6 +795,10 @@ func (s *PostgresProxySpec) Default() {
 // K8SPG-1062
 func (s *PostgresProxySpec) PGBouncerEnabled() bool {
 	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
+}
+
+func (s *PostgresProxySpec) PGBouncerPaused() bool {
+	return s != nil && s.PGBouncer != nil && s.PGBouncer.Paused != nil && *s.PGBouncer.Paused
 }
 
 type RegistrationRequirementStatus struct {
