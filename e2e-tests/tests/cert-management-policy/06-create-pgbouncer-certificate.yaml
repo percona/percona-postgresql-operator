@@ -1,0 +1,51 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      pgbouncer="${cluster}-pgbouncer"
+      pgbouncer_names=(
+        "${pgbouncer}.${NAMESPACE}.svc.cluster.local"
+        "${pgbouncer}.${NAMESPACE}.svc"
+        "${pgbouncer}.${NAMESPACE}"
+        "$pgbouncer"
+      )
+      issue_certificate pgbouncer \
+        "$pgbouncer" serverAuth "${pgbouncer_names[@]}"
+
+      # TODO: In userProvidedOnly mode, the operator should generate everything
+      # in this Secret except the user-provided certificates.
+      pgbouncer_password="datalake"
+      pgbouncer_admin_password="pgbouncer-admin-password"
+      pgbouncer_verifier='SCRAM-SHA-256$4096:aDFwcDBwNHJ0eTIwMjA=$xHkOo65LX9eBB8a6v+axqvs3+aMBTH0sCT7w/Nxzh5M=:PXuFoeJNuAGSeExskYSqkwUyiUJu8LPC9DgwDWQ9ARQ='
+      pgbouncer_users=$(printf \
+        '"_crunchypgbouncer" "%s"\n"_crunchypgbounceradmin" "%s"\n' \
+        "$pgbouncer_password" "$pgbouncer_admin_password")
+
+      kubectl -n "$NAMESPACE" create secret generic "${cluster}-pgbouncer" \
+        --from-file=pgbouncer-frontend.ca-roots="$TEMP_DIR/root-ca.crt" \
+        --from-file=pgbouncer-frontend.crt="$TEMP_DIR/pgbouncer.crt" \
+        --from-file=pgbouncer-frontend.key="$TEMP_DIR/pgbouncer.key" \
+        --from-literal=pgbouncer-password="$pgbouncer_password" \
+        --from-literal=pgbouncer-verifier="$pgbouncer_verifier" \
+        --from-literal=pgbouncer-admin-password="$pgbouncer_admin_password" \
+        --from-literal=pgbouncer-users.txt="$pgbouncer_users" \
+        --dry-run=client -o yaml \
+        | kubectl label --local -f - -o yaml \
+          postgres-operator.crunchydata.com/cluster="$cluster" \
+        | kubectl -n "$NAMESPACE" apply -f -
+
+      secret="${cluster}-pgbouncer"
+      checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+        | jq --compact-output --sort-keys '.data' \
+        | sha256sum | awk '{print $1}')
+      kubectl -n "$NAMESPACE" annotate secret "$secret" \
+        e2e.percona.com/secret-checksum="$checksum" \
+        --overwrite
