@@ -358,6 +358,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
 	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	// K8SPG-1045: operator should keep user-provided CA bundle as-is in the userProvidedOnly mode
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		pgBouncer.CustomTLSSecret == nil {
+		return nil, nil
+	}
 	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
 		return nil, nil
 	}
