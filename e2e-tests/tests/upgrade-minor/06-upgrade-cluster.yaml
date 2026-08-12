@@ -26,6 +26,8 @@ commands:
           .spec.image = "'${target_image_postgresql}'" |
           .spec.proxy.pgBouncer.image = "'${target_image_pgbouncer}'" |
           .spec.backups.pgbackrest.image = "'${target_image_backrest}'"' "${TEMP_DIR}/cr_lower.yaml"
+      add_arch_to_pg "${TEMP_DIR}/cr_lower.yaml" >"${TEMP_DIR}/cr_lower.yaml.arch"
+      mv "${TEMP_DIR}/cr_lower.yaml.arch" "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
       sleep 7 # wait for reconcile loop
 

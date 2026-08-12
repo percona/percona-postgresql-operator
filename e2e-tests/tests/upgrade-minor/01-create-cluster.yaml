@@ -19,7 +19,7 @@ commands:
       # if the lower version of operator doesn't have new PG version we will use lower PG version
       # but in that case not the intended target PG database image will be tested
       # (this should happen once a year on major PG version release, but only for this latest version)
-      if [ $pg_exists -eq 0 ]; then
+      if [[ ${pg_exists:-0} =~ ^[0-9]+$ && $pg_exists -eq 0 && $pg_ver =~ ^[0-9]+$ ]]; then
           pg_ver=$((pg_ver - 1))
       fi
       echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
@@ -42,4 +42,6 @@ commands:
           .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'" |
           .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
           .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
+      add_arch_to_pg "${TEMP_DIR}/cr_lower.yaml" >"${TEMP_DIR}/cr_lower.yaml.arch"
+      mv "${TEMP_DIR}/cr_lower.yaml.arch" "${TEMP_DIR}/cr_lower.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

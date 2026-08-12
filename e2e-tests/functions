@@ -390,7 +390,7 @@ deploy_minio() {
 
 	# create bucket
 	aws_cli "$access_key" "$secret_key" us-east-1 \
-		aws --endpoint-url "${endpoint_url}" ${aws_extra_args} s3 mb s3://operator-testing
+		--endpoint-url "${endpoint_url}" ${aws_extra_args} s3 mb s3://operator-testing
 }
 
 aws_cli() {
@@ -406,11 +406,35 @@ aws_cli() {
 		--env="AWS_ACCESS_KEY_ID=${access_key}"
 		--env="AWS_SECRET_ACCESS_KEY=${secret_key}"
 		--env="AWS_DEFAULT_REGION=${region}"
+		--env="AWS_EC2_METADATA_DISABLED=true"
 	)
 	if arch_scheduling_enabled; then
 		run_args+=(--overrides="$(arch_run_overrides)")
 	fi
-	kubectl "${run_args[@]}" --command -- "$@"
+
+	if [[ ${1:-} == bash || ${1:-} == /bin/bash ]]; then
+		[[ $1 == bash ]] && shift && set -- /bin/bash "$@"
+		kubectl "${run_args[@]}" --command -- "$@"
+	else
+		kubectl "${run_args[@]}" -- "$@"
+	fi
+}
+
+copy_custom_extensions_form_aws() {
+	set +o xtrace
+
+	local minio_key minio_secret
+	minio_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	minio_secret="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	aws_cli "$(get_aws_access_key_id aws-s3-secret)" "$(get_aws_access_key aws-s3-secret)" us-east-1 \
+		bash -c "
+			aws s3 cp s3://pg-extensions/ /tmp/pg-ext/ --recursive &&
+			AWS_ACCESS_KEY_ID='${minio_key}' AWS_SECRET_ACCESS_KEY='${minio_secret}' AWS_DEFAULT_REGION=us-east-1 \
+				aws --endpoint-url http://minio-service:9000 s3 cp /tmp/pg-ext/ s3://operator-testing/ --recursive
+		"
+
+	set -o xtrace
 }
 
 get_repo_auth() {
@@ -489,7 +513,7 @@ deploy_client() {
 }
 
 deploy_cmctl() {
-	envsubst < "${TESTS_CONFIG_DIR}/cmctl.yml" | add_arch_to_podspecs - | kubectl -n "${NAMESPACE}" apply -f -
+	envsubst '${NAMESPACE}' < "${TESTS_CONFIG_DIR}/cmctl.yml" | add_arch_to_podspecs - | kubectl -n "${NAMESPACE}" apply -f -
 	kubectl -n "${NAMESPACE}" wait deployment cmctl --for=condition=available --timeout=60s
 }
 
@@ -666,24 +690,6 @@ get_instance_set_pods() {
 	local instance=${1:-instance1}
 
 	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
-}
-
-copy_custom_extensions_form_aws() {
-	set +o xtrace
-
-	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
-	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
-
-	aws_cli "$(get_aws_access_key_id aws-s3-secret)" "$(get_aws_access_key aws-s3-secret)" eu-central-1 \
-		bash -c "
-		aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
-
-		AWS_ACCESS_KEY_ID='${access_key}' \
-		AWS_SECRET_ACCESS_KEY='${secret_key}' \
-		AWS_DEFAULT_REGION=us-east-1 \
-		aws --endpoint-url http://minio-service:9000 s3 cp /tmp/ s3://operator-testing/ --recursive
-	  "
-	set -o xtrace
 }
 
 get_psql_pod_host() {
