@@ -10,9 +10,9 @@ commands:
 
       cluster="cert-management-policy"
 
-      # TODO: The user should know the PostgresCluster UID after the cluster is
-      # created so that the pgBackRest client certificate can use it.
-      pgbackrest_client="pgbackrest@pending"
+      cluster_uid=$(kubectl -n "$NAMESPACE" get postgrescluster "$cluster" \
+        -o jsonpath='{.metadata.uid}')
+      pgbackrest_client="pgbackrest@${cluster_uid}"
       issue_certificate pgbackrest-client \
         "$pgbackrest_client" clientAuth "$pgbackrest_client"
 
@@ -34,3 +34,11 @@ commands:
         | kubectl label --local -f - -o yaml \
           postgres-operator.crunchydata.com/cluster="$cluster" \
         | kubectl -n "$NAMESPACE" apply -f -
+
+      secret="${cluster}-pgbackrest"
+      checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+        | jq --compact-output --sort-keys '.data' \
+        | sha256sum | awk '{print $1}')
+      kubectl -n "$NAMESPACE" annotate secret "$secret" \
+        e2e.percona.com/secret-checksum="$checksum" \
+        --overwrite
