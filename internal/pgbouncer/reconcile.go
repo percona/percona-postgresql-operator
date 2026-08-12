@@ -129,13 +129,19 @@ func Secret(ctx context.Context,
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		if frontendCertManagerSecret != nil {
+		if inCluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+			// In userProvidedOnly mode, the certificates should be the only
+			// user-managed values in the secret. We should preserve them.
+			outSecret.Data[CertFrontendAuthoritySecretKey] = inSecret.Data[CertFrontendAuthoritySecretKey]
+			outSecret.Data[CertFrontendPrivateKeySecretKey] = inSecret.Data[CertFrontendPrivateKeySecretKey]
+			outSecret.Data[CertFrontendSecretKey] = inSecret.Data[CertFrontendSecretKey]
+		} else if frontendCertManagerSecret != nil {
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
+				outSecret.Data[CertFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
 			}
 			if err == nil {
-				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
-				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
+				outSecret.Data[CertFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
+				outSecret.Data[CertFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
 			}
 		} else if inRoot == nil {
 			err = errors.New("waiting for cert-manager to issue pgbouncer frontend certificate")
@@ -156,21 +162,21 @@ func Secret(ctx context.Context,
 				// Unmarshal and validate the stored leaf. These first errors can
 				// be ignored because they result in an invalid leaf which is then
 				// correctly regenerated.
-				_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
-				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
+				_ = leaf.Certificate.UnmarshalText(inSecret.Data[CertFrontendSecretKey])
+				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[CertFrontendPrivateKeySecretKey])
 
 				leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
 				err = errors.WithStack(err)
 			}
 
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+				outSecret.Data[CertFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
 			}
 			if err == nil {
-				outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
+				outSecret.Data[CertFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
 			}
 			if err == nil {
-				outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+				outSecret.Data[CertFrontendSecretKey], err = leaf.Certificate.MarshalText()
 			}
 		}
 	}
@@ -179,15 +185,17 @@ func Secret(ctx context.Context,
 	// bundle so PgBouncer also trusts them when verifying client
 	// certificates. Entries keep their given order so identical inputs
 	// always produce identical bundle bytes.
-	if err == nil && len(additionalCAs) > 0 {
-		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
+	if err == nil && len(additionalCAs) > 0 &&
+		(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret != nil ||
+			inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly) {
+		bundle := outSecret.Data[CertFrontendAuthoritySecretKey]
 		for _, ca := range additionalCAs {
 			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
 				bundle = append(bundle, '\n')
 			}
 			bundle = append(bundle, ca...)
 		}
-		outSecret.Data[certFrontendAuthoritySecretKey] = bundle
+		outSecret.Data[CertFrontendAuthoritySecretKey] = bundle
 	}
 
 	return err
@@ -227,10 +235,11 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append(append([]corev1.VolumeProjection{},
-			podConfigFiles(inCluster, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
-				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
+		Sources: append(
+			append(append([]corev1.VolumeProjection{},
+				podConfigFiles(inCluster, inConfigMap, inSecret)...),
+				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

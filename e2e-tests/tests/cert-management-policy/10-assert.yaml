@@ -11,6 +11,14 @@ commands:
         echo "Certificate resources were generated in userProvidedOnly mode: $certificates" >&2
         exit 1
       fi
+
+      kubectl -n "$NAMESPACE" get secret cert-management-policy-pgbouncer -o json \
+        | jq -e '
+          .data."pgbouncer-password" != null and
+          .data."pgbouncer-verifier" != null and
+          .data."pgbouncer-admin-password" != null and
+          .data."pgbouncer-users.txt" != null
+        '
 resourceRefs:
   - apiVersion: pgv2.percona.com/v2
     kind: PerconaPGCluster

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
@@ -127,7 +128,14 @@ func TestReconcileTLSCondition(t *testing.T) {
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
-			&corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)},
+			&corev1.Secret{
+				ObjectMeta: naming.ClusterPGBouncer(cluster),
+				Data: map[string][]byte{
+					pgbouncer.CertFrontendAuthoritySecretKey:  []byte("ca"),
+					pgbouncer.CertFrontendSecretKey:           []byte("cert"),
+					pgbouncer.CertFrontendPrivateKeySecretKey: []byte("key"),
+				},
+			},
 		}
 
 		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}
@@ -137,6 +145,48 @@ func TestReconcileTLSCondition(t *testing.T) {
 		assert.Equal(t, condition.Reason, "TLSSecretsFound")
 		assert.Equal(t, condition.Message, "")
 		assert.Equal(t, condition.ObservedGeneration, int64(13))
+	})
+
+	t.Run("PgBouncer secret has missing certificate data", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Namespace = "postgres-operator"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		cluster.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-root-ca"},
+		}
+		cluster.Spec.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-postgres-tls"},
+		}
+		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
+		}
+
+		objects := []client.Object{
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-root-ca", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
+			&corev1.Secret{
+				ObjectMeta: naming.ClusterPGBouncer(cluster),
+				Data: map[string][]byte{
+					pgbouncer.CertFrontendAuthoritySecretKey: []byte("ca"),
+					pgbouncer.CertFrontendSecretKey:          nil,
+				},
+			},
+		}
+
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionFalse)
+		assert.Equal(t, condition.Reason, "TLSSecretsInvalid")
+		assert.Equal(t, condition.Message, "Invalid user-provided TLS secrets: "+
+			naming.ClusterPGBouncer(cluster).Name+
+			" (missing or empty keys: "+pgbouncer.CertFrontendSecretKey+", "+
+			pgbouncer.CertFrontendPrivateKeySecretKey+"). "+
+			"certManagementPolicy is userProvidedOnly")
 	})
 }
 

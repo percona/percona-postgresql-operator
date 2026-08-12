@@ -215,6 +215,46 @@ func TestSecretAdminPassword(t *testing.T) {
 	})
 }
 
+func TestSecretUserProvidedOnly(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	cluster := new(v1beta1.PostgresCluster)
+	cluster.SetLabels(map[string]string{naming.LabelVersion: "3.1.0"})
+	cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+		PGBouncer: new(v1beta1.PGBouncerPodSpec),
+	}
+	cluster.Spec.TLS = &v1beta1.TLSSpec{
+		CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+	}
+	assert.NilError(t, cluster.Default(ctx, nil))
+
+	existing := &corev1.Secret{Data: map[string][]byte{
+		"pgbouncer-frontend.ca-roots": []byte("user-ca"),
+		"pgbouncer-frontend.crt":      []byte("user-cert"),
+		"pgbouncer-frontend.key":      []byte("user-key"),
+	}}
+	intent := new(corev1.Secret)
+
+	require.NoError(t, Secret(ctx, cluster, nil, existing, nil,
+		new(corev1.Service), intent, nil, [][]byte{[]byte("additional-ca")}))
+
+	assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], []byte("user-ca"))
+	assert.DeepEqual(t, intent.Data["pgbouncer-frontend.crt"], []byte("user-cert"))
+	assert.DeepEqual(t, intent.Data["pgbouncer-frontend.key"], []byte("user-key"))
+	assert.Equal(t, len(intent.Data["pgbouncer-password"]), 32)
+	assert.Assert(t, len(intent.Data["pgbouncer-verifier"]) > 0)
+	assert.Equal(t, len(intent.Data["pgbouncer-admin-password"]), 32)
+	assert.Assert(t, len(intent.Data["pgbouncer-users.txt"]) > 0)
+
+	// Operator-managed credentials remain stable on later reconciles.
+	existing.Data = intent.Data
+	before := intent.DeepCopy()
+	require.NoError(t, Secret(ctx, cluster, nil, existing, nil,
+		new(corev1.Service), intent, nil, [][]byte{[]byte("additional-ca")}))
+	assert.DeepEqual(t, intent, before)
+}
+
 func TestSecretAdditionalCAs(t *testing.T) {
 	t.Parallel()
 

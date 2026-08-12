@@ -251,6 +251,8 @@ func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cl
 // When the root CA is internal but a stale Certificate CR was left by
 // K8SPG-1017, the CR is reconciled to update its ownerRef (K8SPG-1007
 // recovery) before populating the secret from the internal PKI.
+// In userProvidedOnly mode, the operator preserves the user-provided
+// certificates.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
@@ -278,7 +280,6 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 		if !secretFound {
 			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
 		}
-		return existing, nil
 	}
 	var userSecret *corev1.Secret
 	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil && ref.Name != "" {
@@ -793,7 +794,8 @@ func listPGBouncerPods(ctx context.Context, cl client.Client, cluster *v1beta1.P
 		return nil, errors.Wrap(err, "pgbouncer selector")
 	}
 	podList := &corev1.PodList{}
-	if err := cl.List(ctx, podList,
+	if err := cl.List(
+		ctx, podList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {
