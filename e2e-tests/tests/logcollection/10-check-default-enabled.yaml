@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster=logcollection
+      primary=$(get_pod_by_role ${cluster} primary name)
+
+      # Verify logcollector sidecar containers are present on the primary pod.
+      instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
+        -o 'jsonpath={.spec.containers[*].name}')
+      echo "Containers on primary: ${instance_containers}"
+      echo "${instance_containers}" | grep -qw logs
+      echo "${instance_containers}" | grep -qw logrotate

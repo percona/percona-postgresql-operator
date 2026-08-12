@@ -56,9 +56,26 @@ func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaP
 		return errors.Wrap(err, "get postgres cluster")
 	}
 
-	isNewCluster := k8serrors.IsNotFound(err)
-	cr.Spec.LogCollector.Enabled = &isNewCluster
+	var enabled bool
+	if k8serrors.IsNotFound(err) {
+		enabled = true
+	} else {
+		// preserve the existing state
+		enabled = hasLogCollectorSidecar(existing)
+	}
+	cr.Spec.LogCollector.Enabled = &enabled
 	return nil
+}
+
+func hasLogCollectorSidecar(pg *crunchyv1beta1.PostgresCluster) bool {
+	for i := range pg.Spec.InstanceSets {
+		for _, c := range pg.Spec.InstanceSets[i].Containers {
+			if c.Name == containerName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func wireSidecars(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {
