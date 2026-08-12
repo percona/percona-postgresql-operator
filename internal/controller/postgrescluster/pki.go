@@ -94,16 +94,17 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 	}
 
 	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
-		var requiredKeys []string
-		if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-			requiredKeys = []string{
+		customTLSSecret := cluster.Spec.Proxy.PGBouncer.CustomTLSSecret
+		if customTLSSecret == nil {
+			if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name,
 				pgbouncer.CertFrontendAuthoritySecretKey,
 				pgbouncer.CertFrontendSecretKey,
 				pgbouncer.CertFrontendPrivateKeySecretKey,
+			); err != nil {
+				return errors.Wrap(err, "check PgBouncer TLS secret")
 			}
-		}
-		if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name, requiredKeys...); err != nil {
-			return errors.Wrap(err, "check PgBouncer TLS secret")
+		} else if err := checkSecret(customTLSSecret, naming.ClusterPGBouncer(cluster).Name); err != nil {
+			return errors.Wrap(err, "check custom PgBouncer TLS secret")
 		}
 	}
 

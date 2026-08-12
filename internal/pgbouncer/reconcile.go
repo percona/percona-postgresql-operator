@@ -185,6 +185,11 @@ func Secret(ctx context.Context,
 	// bundle so PgBouncer also trusts them when verifying client
 	// certificates. Entries keep their given order so identical inputs
 	// always produce identical bundle bytes.
+	//
+	// K8SPG-1045: Add additional CAs when the certManagementPolicy is auto
+	// or when a custom pgbouncer tls secret is configured.
+	// In userProvidedOnly mode without a custom Secret, operator should
+	// keep the user-provided CA bundle unchanged.
 	if err == nil && len(additionalCAs) > 0 &&
 		(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret != nil ||
 			inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly) {

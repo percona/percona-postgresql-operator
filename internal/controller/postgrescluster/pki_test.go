@@ -76,6 +76,9 @@ func TestReconcileTLSCondition(t *testing.T) {
 		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
 		}
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-pgbouncer-tls"},
+		}
 
 		instance := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 			Name:      "hippo-instance1-abcd",
@@ -101,7 +104,7 @@ func TestReconcileTLSCondition(t *testing.T) {
 			naming.PostgresTLSSecret(cluster).Name,
 			"custom-replication",
 			naming.PGBackRestSecret(cluster).Name,
-			naming.ClusterPGBouncer(cluster).Name,
+			"custom-pgbouncer-tls",
 			naming.InstanceCertificates(instance).Name,
 		}, ", ")+". certManagementPolicy is userProvidedOnly")
 	})
@@ -122,20 +125,16 @@ func TestReconcileTLSCondition(t *testing.T) {
 		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
 		}
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-pgbouncer-tls"},
+		}
 
 		objects := []client.Object{
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-root-ca", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
-			&corev1.Secret{
-				ObjectMeta: naming.ClusterPGBouncer(cluster),
-				Data: map[string][]byte{
-					pgbouncer.CertFrontendAuthoritySecretKey:  []byte("ca"),
-					pgbouncer.CertFrontendSecretKey:           []byte("cert"),
-					pgbouncer.CertFrontendPrivateKeySecretKey: []byte("key"),
-				},
-			},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-pgbouncer-tls", Namespace: cluster.Namespace}},
 		}
 
 		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}

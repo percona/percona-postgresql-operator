@@ -276,7 +276,8 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
-	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		if !secretFound {
 			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
 		}
@@ -290,7 +291,8 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	var frontendCertManagerSecret *corev1.Secret
-	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
+	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil &&
+		cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
 			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
