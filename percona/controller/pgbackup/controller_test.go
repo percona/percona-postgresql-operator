@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
@@ -33,30 +32,30 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 	ctx := feature.NewContext(t.Context(), gate)
 
 	tests := []struct {
-		name          string
-		deleteCluster bool
-		snapshot      bool
-		expectedError string
+		name                   string
+		deleteBackupsFinalizer bool
+		snapshot               bool
+		expectedError          string
 	}{
 		{
-			name:          "cluster is deleted",
-			deleteCluster: true,
+			name:          "cluster without delete-backups finalizer is deleted",
 			expectedError: "PerconaPGCluster test-cluster is not found",
 		},
 		{
-			name:          "cluster is terminating",
-			expectedError: "PerconaPGCluster test-cluster is being deleted",
+			name:                   "cluster with delete-backups finalizer is terminating",
+			deleteBackupsFinalizer: true,
+			expectedError:          "PerconaPGCluster test-cluster is being deleted",
 		},
 		{
-			name:          "cluster is deleted during snapshot",
-			deleteCluster: true,
+			name:          "cluster without delete-backups finalizer is deleted during snapshot",
 			snapshot:      true,
 			expectedError: "PerconaPGCluster test-cluster is not found",
 		},
 		{
-			name:          "cluster is terminating during snapshot",
-			snapshot:      true,
-			expectedError: "PerconaPGCluster test-cluster is being deleted",
+			name:                   "cluster with delete-backups finalizer is terminating during snapshot",
+			deleteBackupsFinalizer: true,
+			snapshot:               true,
+			expectedError:          "PerconaPGCluster test-cluster is being deleted",
 		},
 	}
 
@@ -64,7 +63,9 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster, err := readDefaultCR("test-cluster", "test-namespace")
 			require.NoError(t, err)
-			cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			if tt.deleteBackupsFinalizer {
+				cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			}
 			if tt.snapshot {
 				cluster.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
 					Mode:      v2.VolumeSnapshotModeOffline,
@@ -120,11 +121,6 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 			cl, err := buildFakeClient(ctx, cluster, objects...)
 			require.NoError(t, err)
 			require.NoError(t, cl.Delete(ctx, cluster))
-			if tt.deleteCluster {
-				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
-				cluster.Finalizers = nil
-				require.NoError(t, cl.Update(ctx, cluster))
-			}
 
 			r := &PGBackupReconciler{Client: cl}
 			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
@@ -145,13 +141,17 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 				}, new(coordinationv1.Lease))
 				assert.True(t, k8serrors.IsNotFound(err))
 			} else {
-				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+				assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
 
-				job := new(batchv1.Job)
-				require.NoError(t, cl.Get(ctx, client.ObjectKey{
+				err = cl.Get(ctx, client.ObjectKey{
 					Name: backup.Status.JobName, Namespace: backup.Namespace,
-				}, job))
-				assert.False(t, controllerutil.ContainsFinalizer(job, pNaming.FinalizerKeepJob))
+				}, new(batchv1.Job))
+				assert.True(t, k8serrors.IsNotFound(err))
+
+				_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+				require.NoError(t, err)
+				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
 			}
 		})
 	}
