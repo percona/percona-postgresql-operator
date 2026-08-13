@@ -380,6 +380,7 @@ spec:
     pgBouncer:
       replicas: 3
       image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+#      paused: true
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
