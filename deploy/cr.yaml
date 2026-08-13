@@ -380,6 +380,7 @@ spec:
     pgBouncer:
       replicas: 3
       image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+#      paused: true
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -896,6 +897,7 @@ spec:
 #      enabled: false
 #    pg_tde:
 #      enabled: false
+#      walEncryption: false
 #      vault:
 #        host: https://vault-service:8200
 #        mountPath: tde
