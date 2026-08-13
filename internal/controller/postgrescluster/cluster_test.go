@@ -853,10 +853,18 @@ func TestReconcileClusterReplicaService(t *testing.T) {
 	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
 
 	cluster.Spec.InstanceSets[0].Replicas = new(int32(1))
+	cluster.Spec.InstanceSets = append(cluster.Spec.InstanceSets, cluster.Spec.InstanceSets[0])
+	cluster.Spec.InstanceSets[1].Name = "instance2"
 	_, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
 	assert.NilError(t, err)
 
 	service = &corev1.Service{ObjectMeta: naming.ClusterReplicaService(cluster)}
 	err = cc.Get(ctx, client.ObjectKeyFromObject(service), service)
 	assert.Assert(t, apierrors.IsNotFound(err), "expected replica Service to be deleted")
+
+	cluster.Spec.InstanceSets[0].Replicas = nil
+	cluster.Spec.InstanceSets[1].Replicas = new(int32(2))
+	service, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
 }

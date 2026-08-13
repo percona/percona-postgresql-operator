@@ -270,11 +270,14 @@ func (r *Reconciler) reconcileClusterReplicaService(
 
 	// K8SPG-1062
 	if err == nil {
-		var replicas int32
+		hasReplicas := false
 		for _, set := range cluster.Spec.InstanceSets {
-			replicas += *set.Replicas
+			if set.Replicas != nil && *set.Replicas > 1 {
+				hasReplicas = true
+				break
+			}
 		}
-		if replicas <= 1 {
+		if !hasReplicas {
 			key := client.ObjectKeyFromObject(service)
 			err = errors.WithStack(r.Client.Get(ctx, key, service))
 			if err == nil {
