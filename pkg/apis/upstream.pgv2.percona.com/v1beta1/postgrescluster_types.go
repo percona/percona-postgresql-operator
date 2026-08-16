@@ -283,8 +283,10 @@ type ExtensionsSpec struct {
 	PGStatStatements bool `json:"pgStatStatements,omitempty"`
 	PGVector         bool `json:"pgvector,omitempty"`
 	PGRepack         bool `json:"pgRepack,omitempty"`
-	// tri-state: nil means the user never asked for the extension, so the
-	// operator must leave it alone instead of dropping it
+	// tri-state: nil means the CR does not express a desired state for the
+	// extension, so the operator must neither create nor drop it and preserves
+	// whatever state already exists in the database; false means drop it;
+	// true means create and manage it
 	PGCron  *bool `json:"pgCron,omitempty"`
 	SetUser *bool `json:"setUser,omitempty"`
 
