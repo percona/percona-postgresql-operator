@@ -50,8 +50,9 @@ func TestGetAdditionalTrustedCAs(t *testing.T) {
 	customCA := []byte("-----BEGIN CERTIFICATE-----\nCCCC\n-----END CERTIFICATE-----\n")
 
 	for name, data := range map[string]map[string][]byte{
-		"ca-one": {"ca.crt": ca1},
-		"ca-two": {"ca.crt": ca2},
+		"ca-one":          {"ca.crt": ca1},
+		"ca-two":          {"ca.crt": ca2},
+		"ca-without-cert": {},
 		"custom-tls": {
 			"my-ca":   customCA,
 			"tls.crt": []byte("cert"),
@@ -78,6 +79,20 @@ func TestGetAdditionalTrustedCAs(t *testing.T) {
 		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, cas, [][]byte{ca1, ca2})
+	})
+
+	t.Run("UserProvidedOnlyWithoutCustomTLSIgnoresReferences", func(t *testing.T) {
+		cluster := cluster.DeepCopy()
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
+			{Name: "ca-without-cert"},
+		}
+
+		cas, err := reconciler.getAdditionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Equal(t, len(cas), 0)
 	})
 
 	// K8SPG-952: in manual TLS mode the frontend CA file is built solely

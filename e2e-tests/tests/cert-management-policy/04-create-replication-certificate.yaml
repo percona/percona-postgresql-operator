@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      issue_certificate replication _crunchyrepl clientAuth _crunchyrepl
+
+      kubectl -n "$NAMESPACE" create secret generic "${cluster}-replication-cert" \
+        --from-file=tls.crt="$TEMP_DIR/replication.crt" \
+        --from-file=tls.key="$TEMP_DIR/replication.key" \
+        --from-file=ca.crt="$TEMP_DIR/root-ca.crt" \
+        --dry-run=client -o yaml \
+        | kubectl label --local -f - -o yaml \
+          postgres-operator.crunchydata.com/cluster="$cluster" \
+        | kubectl -n "$NAMESPACE" apply -f -
+
+      secret="${cluster}-replication-cert"
+      checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+        | jq --compact-output --sort-keys '.data' \
+        | sha256sum | awk '{print $1}')
+      kubectl -n "$NAMESPACE" annotate secret "$secret" \
+        e2e.percona.com/secret-checksum="$checksum" \
+        --overwrite

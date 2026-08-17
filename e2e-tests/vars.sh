@@ -31,8 +31,10 @@ fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
+# Extract major PG version from IMAGE_POSTGRESQL when PG_VER is unset.
+# Matches: -ppgN-postgres | -postgresN-community | *:N / *:N.x
 if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
-	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*-(ppg|postgres)([0-9]+).*/\2/')
+	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -nE 's/.*(-ppg|-postgres|:)([0-9]+)([.-]|$).*/\2/p')
 	export PG_VER="${pg_version_value}"
 else
 	export PG_VER="${PG_VER:-18}"
