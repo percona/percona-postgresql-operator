@@ -164,6 +164,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 	statuses := make([]v2.LogicalReplicaStatus, 0, len(cr.Spec.LogicalReplicas)+len(deferred))
 	statuses = append(statuses, deferred...)
 	requeue := len(deferred) > 0
+
 	for i := range cr.Spec.LogicalReplicas {
 		spec := &cr.Spec.LogicalReplicas[i]
 
@@ -179,11 +180,18 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 			status.Message = err.Error()
 		}
 
+		statuses = append(statuses, *status)
+
+		// bootstrap logical replicas one by one
+		// otherwise we might think primary has enough free slots
+		// even when it hasn't to accomodate all pending replicas
+		if status.State == v2.LogicalReplicaStateBootstrapping {
+			return true, r.updateLogicalReplicaStatus(ctx, cr, statuses, &readiness)
+		}
+
 		if !logicalReplicaSettled(status) {
 			requeue = true
 		}
-
-		statuses = append(statuses, *status)
 	}
 
 	return requeue, r.updateLogicalReplicaStatus(ctx, cr, statuses, &readiness)
