@@ -20,46 +20,50 @@ import (
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
 
-// sourceRestore is what a restore of the cluster means for its logical
-// replicas.
-type sourceRestore struct {
-	// InFlight means a restore has been asked for and has not finished, so the
-	// primary is about to go away or already has.
-	InFlight bool
+type suspension struct {
+	Needed bool
 
-	// DataReplaced means the restore has passed the point where the cluster could
-	// still be put back the way it was.
-	DataReplaced bool
+	// Invalidate communicates that logical replication can not continue
+	// User needs to fix it by re-seeding the replica
+	Invalidate bool
+
+	Reason  string
+	Message string
 }
 
-// observeSourceRestore reports what the restores of this cluster mean for its
-// logical replicas.
-//
-// It never looks at the restore Job: both prepareForRestore and this operator's
-// own PGBackRestRestore.Start blank status.pgbackrest.restore, so anything
-// derived from it is ambiguous exactly while a restore is starting.
-func (r *PGClusterReconciler) observeSourceRestore(
-	ctx context.Context, cr *v2.PerconaPGCluster,
-) (sourceRestore, error) {
-	restore := sourceRestore{}
+// shouldSuspendLogicalReplicas reports the need of suspending logical replicas
+// and the reason for suspension
+func (r *PGClusterReconciler) shouldSuspendLogicalReplicas(ctx context.Context, cr *v2.PerconaPGCluster) (suspension, error) {
+	s := suspension{}
+
+	if cr.IsPaused() {
+		s.Needed = true
+		s.Reason = v2.LogicalReplicaReasonClusterPaused
+		s.Message = "the cluster is paused"
+	}
 
 	// Set by PGBackRestRestore.Start before anything is torn down and cleared by
 	// DisableRestore on every terminal outcome. The earliest signal there is, and
 	// both edges write this CR, so the controller is woken for free.
 	if enabled := cr.Spec.Backups.PGBackRest.Restore; enabled != nil &&
 		enabled.Enabled != nil && *enabled.Enabled {
-		restore.InFlight = true
+		s.Needed = true
+		s.Reason = v2.LogicalReplicaReasonSourceRestoring
+		s.Message = "the cluster is being restored in place"
 	}
 	if cr.GetAnnotations()[naming.PGBackRestRestore] != "" {
-		restore.InFlight = true
+		s.Needed = true
+		s.Reason = v2.LogicalReplicaReasonSourceRestoring
+		s.Message = "the cluster is being restored in place"
 	}
 
 	// Raised by prepareForRestore as it deletes the instance runners. Nothing
 	// removes it when a restore fails, which is right: a half-restored data
 	// directory invalidates a replica just as thoroughly as a finished one.
-	if meta.IsStatusConditionTrue(cr.Status.Conditions,
-		postgrescluster.ConditionPGBackRestRestoreProgressing) {
-		restore.DataReplaced = true
+	if meta.IsStatusConditionTrue(cr.Status.Conditions, postgrescluster.ConditionPGBackRestRestoreProgressing) {
+		s.Invalidate = true
+		s.Reason = v2.LogicalReplicaReasonSourceRestored
+		s.Message = "logical replica invalidated by a restore of the cluster"
 	}
 
 	// The only signal that covers a snapshot restore with no point-in-time
@@ -68,7 +72,7 @@ func (r *PGClusterReconciler) observeSourceRestore(
 	// not find the slots missing either.
 	restores := &v2.PerconaPGRestoreList{}
 	if err := r.Client.List(ctx, restores, client.InNamespace(cr.Namespace)); err != nil {
-		return restore, errors.Wrap(err, "list restores")
+		return s, errors.Wrap(err, "list restores")
 	}
 
 	for i := range restores.Items {
@@ -83,27 +87,23 @@ func (r *PGClusterReconciler) observeSourceRestore(
 		// the two signals above in the same pass that moves it out of this state.
 		switch pgRestore.Status.State {
 		case v2.RestoreRunning:
-			restore.InFlight = true
-			restore.DataReplaced = true
+			s.Needed = true
+			s.Invalidate = true
+			s.Reason = v2.LogicalReplicaReasonSourceRestored
+			s.Message = "logical replica invalidated by a restore of the cluster"
 		case v2.RestoreStarting:
-			restore.InFlight = true
+			s.Needed = true
+			s.Reason = v2.LogicalReplicaReasonSourceRestoring
+			s.Message = "the cluster is being restored in place"
 		default:
 		}
 	}
 
-	return restore, nil
+	return s, nil
 }
 
-// suspendLogicalReplicas stops every logical replica for the duration of a
-// restore of the cluster they replicate. See
-// [v2.LogicalReplicaReasonSourceRestored] for why they cannot keep running.
-//
-// Whether they can be resumed afterwards is deliberately not decided here: a
-// restore that fails before it touches the data directory leaves them perfectly
-// valid. Nothing is destroyed and nothing is forgotten.
-func (r *PGClusterReconciler) suspendLogicalReplicas(
-	ctx context.Context, cr *v2.PerconaPGCluster, restore sourceRestore,
-) error {
+// suspendLogicalReplicas stops every logical replica
+func (r *PGClusterReconciler) suspendLogicalReplicas(ctx context.Context, cr *v2.PerconaPGCluster, s suspension) error {
 	log := logging.FromContext(ctx).WithName("LogicalReplication")
 
 	// Driven by the status rather than the spec: a replica removed from the
@@ -113,7 +113,6 @@ func (r *PGClusterReconciler) suspendLogicalReplicas(
 	statuses := make([]v2.LogicalReplicaStatus, 0, len(cr.Status.LogicalReplicas))
 	for i := range cr.Status.LogicalReplicas {
 		status := cr.Status.LogicalReplicas[i].DeepCopy()
-		status.Reason = v2.LogicalReplicaReasonSourceRestoring
 
 		if err := r.scaleLogicalReplica(ctx, cr, status.Name, 0); err != nil {
 			return errors.Wrapf(err, "stop logical replica %q", status.Name)
@@ -122,11 +121,11 @@ func (r *PGClusterReconciler) suspendLogicalReplicas(
 		switch {
 		case status.SeededAt != nil:
 			status.State = v2.LogicalReplicaStateSuspended
-			status.Message = "the cluster is being restored in place"
+			status.Reason = s.Reason
+			status.Message = s.Message
 
-			if restore.DataReplaced && status.InvalidatedAt == nil {
-				log.Info("logical replica invalidated by a restore of the cluster",
-					"logicalReplica", status.Name)
+			if s.Invalidate && status.InvalidatedAt == nil {
+				log.Info("logical replica invalidated by a restore of the cluster", "logicalReplica", status.Name)
 				status.InvalidatedAt = new(metav1.Now())
 			}
 
@@ -140,20 +139,18 @@ func (r *PGClusterReconciler) suspendLogicalReplicas(
 			}
 
 			status.State = v2.LogicalReplicaStateBootstrapping
-			status.Message = "the bootstrap was cancelled because the cluster is being restored in place"
+			status.Message = "the bootstrap was cancelled because the logical replica is suspended"
 			status.Databases = nil
 		}
 
 		statuses = append(statuses, *status)
 	}
 
-	// Synthesised rather than observed: observePrimaryReadiness execs on a
-	// primary that a restore has taken away, and the answer is known anyway.
 	readiness := metav1.Condition{
 		Type:    pNaming.ConditionReadyForLogicalReplication,
 		Status:  metav1.ConditionFalse,
-		Reason:  v2.LogicalReplicaReasonSourceRestoring,
-		Message: "the cluster is being restored in place; logical replicas are stopped",
+		Reason:  s.Reason,
+		Message: s.Message,
 	}
 
 	return r.updateLogicalReplicaStatus(ctx, cr, statuses, &readiness)

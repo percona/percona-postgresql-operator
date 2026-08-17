@@ -121,15 +121,12 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 		return false, nil
 	}
 
-	// Must come first: a restore deletes the instance StatefulSets, so the state
-	// gate below would skip the teardown too. No requeue - both ends of a restore
-	// write this CR or a PerconaPGRestore, and this controller watches both.
-	restore, err := r.observeSourceRestore(ctx, cr)
+	suspension, err := r.shouldSuspendLogicalReplicas(ctx, cr)
 	if err != nil {
 		return false, errors.Wrap(err, "observe restore")
 	}
-	if restore.InFlight {
-		return false, r.suspendLogicalReplicas(ctx, cr, restore)
+	if suspension.Needed {
+		return false, r.suspendLogicalReplicas(ctx, cr, suspension)
 	}
 
 	// Runs even when the section is empty: that is the case where the last

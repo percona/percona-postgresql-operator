@@ -286,6 +286,10 @@ type LogicalReplicaSpec struct {
 	Expose *ServiceExpose `json:"expose,omitempty"`
 }
 
+func (cr *PerconaPGCluster) IsPaused() bool {
+	return cr.Spec.Pause != nil && *cr.Spec.Pause == true
+}
+
 // LogicalReplicaBootstrapMethod selects how the data volume of a logical
 // replica is seeded with a physical copy of the primary, before
 // pg_createsubscriber converts it into a subscriber.
@@ -890,6 +894,8 @@ const (
 	// everything the bootstrap needs; the ReadyForLogicalReplication condition
 	// says which prerequisite is missing.
 	LogicalReplicaReasonPrimaryNotReady = "PrimaryNotReady"
+
+	LogicalReplicaReasonClusterPaused = "ClusterPaused"
 
 	LogicalReplicaReasonSourceRestoring = "SourceRestoring"
 

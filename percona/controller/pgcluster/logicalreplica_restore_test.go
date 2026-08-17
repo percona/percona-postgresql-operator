@@ -15,12 +15,14 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
@@ -49,16 +51,35 @@ func pgRestoreFor(cr *v2.PerconaPGCluster, name string, state v2.PGRestoreState)
 	}
 }
 
-func TestObserveSourceRestore(t *testing.T) {
+func TestShouldSuspendLogicalReplicas(t *testing.T) {
 	for _, tt := range []struct {
-		name         string
-		mutate       func(*v2.PerconaPGCluster)
-		restores     []*v2.PerconaPGRestore
-		inFlight     bool
-		dataReplaced bool
+		name       string
+		mutate     func(*v2.PerconaPGCluster)
+		restores   []*v2.PerconaPGRestore
+		needed     bool
+		invalidate bool
+		reason     string
+		message    string
 	}{
 		{
 			name: "nothing in progress",
+		},
+		{
+			// A paused cluster has no primary to replicate from, but nothing
+			// has touched the data directory, so the replicas stay valid.
+			name: "a paused cluster",
+			mutate: func(cr *v2.PerconaPGCluster) {
+				cr.Spec.Pause = new(true)
+			},
+			needed:  true,
+			reason:  v2.LogicalReplicaReasonClusterPaused,
+			message: "the cluster is paused",
+		},
+		{
+			name: "an unpaused cluster",
+			mutate: func(cr *v2.PerconaPGCluster) {
+				cr.Spec.Pause = new(false)
+			},
 		},
 		{
 			name: "the spec flag alone",
@@ -69,7 +90,9 @@ func TestObserveSourceRestore(t *testing.T) {
 					Enabled: new(true),
 				}
 			},
-			inFlight: true,
+			needed:  true,
+			reason:  v2.LogicalReplicaReasonSourceRestoring,
+			message: "the cluster is being restored in place",
 		},
 		{
 			name: "a disabled spec flag is not a restore",
@@ -84,7 +107,9 @@ func TestObserveSourceRestore(t *testing.T) {
 			mutate: func(cr *v2.PerconaPGCluster) {
 				cr.Annotations = map[string]string{naming.PGBackRestRestore: "restore1"}
 			},
-			inFlight: true,
+			needed:  true,
+			reason:  v2.LogicalReplicaReasonSourceRestoring,
+			message: "the cluster is being restored in place",
 		},
 		{
 			// With no restore left in flight this is a restore that failed:
@@ -99,20 +124,39 @@ func TestObserveSourceRestore(t *testing.T) {
 					Reason: "ReadyForRestore",
 				}}
 			},
-			dataReplaced: true,
+			invalidate: true,
+			reason:     v2.LogicalReplicaReasonSourceRestored,
+			message:    "logical replica invalidated by a restore of the cluster",
 		},
 		{
 			// The only signal that covers a snapshot restore with no
 			// point-in-time recovery, which never sets the two above.
 			name:     "a starting restore",
 			restores: []*v2.PerconaPGRestore{{}},
-			inFlight: true,
+			needed:   true,
+			reason:   v2.LogicalReplicaReasonSourceRestoring,
+			message:  "the cluster is being restored in place",
 		},
 		{
-			name:         "a running restore",
-			restores:     []*v2.PerconaPGRestore{{}},
-			inFlight:     true,
-			dataReplaced: true,
+			name:       "a running restore",
+			restores:   []*v2.PerconaPGRestore{{}},
+			needed:     true,
+			invalidate: true,
+			reason:     v2.LogicalReplicaReasonSourceRestored,
+			message:    "logical replica invalidated by a restore of the cluster",
+		},
+		{
+			// A restore of a paused cluster: the restore is the more specific
+			// answer, and the only one that invalidates.
+			name: "a running restore of a paused cluster",
+			mutate: func(cr *v2.PerconaPGCluster) {
+				cr.Spec.Pause = new(true)
+			},
+			restores:   []*v2.PerconaPGRestore{{}},
+			needed:     true,
+			invalidate: true,
+			reason:     v2.LogicalReplicaReasonSourceRestored,
+			message:    "logical replica invalidated by a restore of the cluster",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,7 +177,7 @@ func TestObserveSourceRestore(t *testing.T) {
 			}
 			if len(tt.restores) > 0 {
 				state := v2.RestoreStarting
-				if tt.dataReplaced {
+				if tt.invalidate {
 					state = v2.RestoreRunning
 				}
 				objs = append(objs, pgRestoreFor(cr, "current", state))
@@ -143,17 +187,35 @@ func TestObserveSourceRestore(t *testing.T) {
 			require.NoError(t, err)
 			r := &PGClusterReconciler{Client: cl}
 
-			restore, err := r.observeSourceRestore(t.Context(), cr)
+			s, err := r.shouldSuspendLogicalReplicas(t.Context(), cr)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.inFlight, restore.InFlight, "InFlight")
-			assert.Equal(t, tt.dataReplaced, restore.DataReplaced, "DataReplaced")
+			assert.Equal(t, tt.needed, s.Needed, "Needed")
+			assert.Equal(t, tt.invalidate, s.Invalidate, "Invalidate")
+			assert.Equal(t, tt.reason, s.Reason, "Reason")
+			assert.Equal(t, tt.message, s.Message, "Message")
 		})
 	}
 }
 
 func TestSuspendLogicalReplicas(t *testing.T) {
 	spec := v2.LogicalReplicaSpec{Name: "analytics"}
+
+	// What shouldSuspendLogicalReplicas reports for a restore that has started
+	// but has not yet touched the data directory.
+	restoring := suspension{
+		Needed:  true,
+		Reason:  v2.LogicalReplicaReasonSourceRestoring,
+		Message: "the cluster is being restored in place",
+	}
+
+	// ... and once it has, which is what invalidates a replica.
+	restored := suspension{
+		Needed:     true,
+		Invalidate: true,
+		Reason:     v2.LogicalReplicaReasonSourceRestored,
+		Message:    "logical replica invalidated by a restore of the cluster",
+	}
 
 	statefulSet := func(cr *v2.PerconaPGCluster) *appsv1.StatefulSet {
 		return &appsv1.StatefulSet{
@@ -196,8 +258,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restoring))
 
 		sts := new(appsv1.StatefulSet)
 		require.NoError(t, cl.Get(t.Context(), client.ObjectKeyFromObject(statefulSet(cr)), sts))
@@ -216,6 +277,54 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		assert.Equal(t, []string{"cluster1"}, status.Databases)
 	})
 
+	t.Run("a paused cluster suspends without invalidating", func(t *testing.T) {
+		// Pausing takes the primary away just as a restore does, but it leaves
+		// the data directory alone, so unpausing brings the replica back.
+		paused := suspension{
+			Needed:  true,
+			Reason:  v2.LogicalReplicaReasonClusterPaused,
+			Message: "the cluster is paused",
+		}
+
+		cr := restoreTestCluster(t, spec)
+		cr.Spec.Pause = new(true)
+		cr.Status.LogicalReplicas = []v2.LogicalReplicaStatus{{
+			Name:      spec.Name,
+			State:     v2.LogicalReplicaStateReady,
+			Databases: []string{"cluster1"},
+			SeededAt:  new(metav1.Now()),
+		}}
+
+		cl, err := buildFakeClient(t.Context(), cr, statefulSet(cr), dataVolume(cr))
+		require.NoError(t, err)
+		r := &PGClusterReconciler{Client: cl}
+
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, paused))
+
+		sts := new(appsv1.StatefulSet)
+		require.NoError(t, cl.Get(t.Context(), client.ObjectKeyFromObject(statefulSet(cr)), sts))
+		assert.Equal(t, int32(0), *sts.Spec.Replicas)
+
+		status := recorded(t, cl, cr)
+		assert.Equal(t, v2.LogicalReplicaStateSuspended, status.State)
+		assert.Equal(t, v2.LogicalReplicaReasonClusterPaused, status.Reason)
+		assert.Equal(t, paused.Message, status.Message)
+		assert.Nil(t, status.InvalidatedAt, "a pause destroys nothing")
+		assert.NotNil(t, status.SeededAt)
+
+		// The condition says why, so unpausing is all it takes to undo this.
+		updated := new(v2.PerconaPGCluster)
+		require.NoError(t, cl.Get(t.Context(),
+			client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, updated))
+
+		condition := meta.FindStatusCondition(updated.Status.Conditions,
+			pNaming.ConditionReadyForLogicalReplication)
+		require.NotNil(t, condition)
+		assert.Equal(t, metav1.ConditionFalse, condition.Status)
+		assert.Equal(t, v2.LogicalReplicaReasonClusterPaused, condition.Reason)
+		assert.Equal(t, paused.Message, condition.Message)
+	})
+
 	t.Run("a seeded replica is invalidated once the data is replaced", func(t *testing.T) {
 		cr := restoreTestCluster(t, spec)
 		cr.Status.LogicalReplicas = []v2.LogicalReplicaStatus{{
@@ -229,8 +338,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true, DataReplaced: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restored))
 
 		assert.NotNil(t, recorded(t, cl, cr).InvalidatedAt)
 	})
@@ -255,8 +363,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true, DataReplaced: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restored))
 
 		err = cl.Get(t.Context(), client.ObjectKeyFromObject(job), new(batchv1.Job))
 		assert.True(t, apierrors.IsNotFound(err), "the bootstrap job must be deleted: %v", err)
@@ -291,8 +398,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true, DataReplaced: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restored))
 
 		require.NoError(t, cl.Get(t.Context(), client.ObjectKeyFromObject(dataVolume(cr)),
 			new(corev1.PersistentVolumeClaim)))
@@ -315,8 +421,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true, DataReplaced: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restored))
 
 		require.NoError(t, cl.Get(t.Context(), client.ObjectKeyFromObject(dataVolume(cr)),
 			new(corev1.PersistentVolumeClaim)))
@@ -337,8 +442,7 @@ func TestSuspendLogicalReplicas(t *testing.T) {
 		require.NoError(t, err)
 		r := &PGClusterReconciler{Client: cl}
 
-		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr,
-			sourceRestore{InFlight: true}))
+		require.NoError(t, r.suspendLogicalReplicas(t.Context(), cr, restoring))
 
 		assert.Equal(t, []string{"cluster1"}, recorded(t, cl, cr).Databases)
 	})
@@ -371,6 +475,14 @@ func TestRestoreDoesNotErrorWhenReplicaRemoved(t *testing.T) {
 		client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, updated))
 	require.Len(t, updated.Status.LogicalReplicas, 1,
 		"the teardown is deferred, not forgotten")
+
+	// The spec flag is the earliest restore signal and the only one set here, so
+	// it has to name a reason of its own: the API server rejects an empty one.
+	condition := meta.FindStatusCondition(updated.Status.Conditions,
+		pNaming.ConditionReadyForLogicalReplication)
+	require.NotNil(t, condition)
+	assert.Equal(t, v2.LogicalReplicaReasonSourceRestoring, condition.Reason)
+	assert.NotEmpty(t, condition.Message)
 }
 
 // TestCleanupDefersWithoutPrimary covers the WAL leak: a replica whose teardown
