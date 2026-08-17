@@ -217,6 +217,8 @@ type PerconaPGClusterSpec struct {
 	LogicalReplicas LogicalReplicas `json:"logicalReplicas,omitempty"`
 }
 
+// +listType=map
+// +listMapKey=name
 type LogicalReplicas []LogicalReplicaSpec
 
 // ToCrunchy projects the logical replicas onto the Crunchy spec, which needs
@@ -244,6 +246,7 @@ type LogicalReplicaSpec struct {
 
 	// Databases to replicate. When empty, every database in the cluster except
 	// the templates and "postgres" is replicated.
+	// +listType=set
 	// +optional
 	Databases []crunchyv1beta1.PostgresIdentifier `json:"databases,omitempty"`
 
