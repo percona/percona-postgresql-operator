@@ -68,8 +68,7 @@ func TestDisableInPostgreSQL(t *testing.T) {
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, disableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, disableInPostgreSQL(t.Context(), exec))
 }
 
 func TestPostgreSQLParameters(t *testing.T) {
@@ -507,7 +506,6 @@ func TestAddVaultProvider(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -521,7 +519,7 @@ func TestAddVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.Equal(t, expected, addVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("does not interpret stderr", func(t *testing.T) {
@@ -534,7 +532,6 @@ func TestAddVaultProvider(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -544,7 +541,7 @@ func TestAddVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.NilError(t, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.NilError(t, addVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -640,8 +637,7 @@ func TestSetDefaultKey(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
-		assert.Equal(t, expected, setDefaultKey(ctx, exec, clusterID))
+		assert.Equal(t, expected, setDefaultKey(t.Context(), exec, clusterID))
 	})
 }
 
@@ -670,7 +666,6 @@ func TestChangeVaultProvider(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -684,7 +679,7 @@ func TestChangeVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.Equal(t, expected, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.Equal(t, expected, changeVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -698,7 +693,6 @@ func TestChangeVaultProvider(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -708,7 +702,7 @@ func TestChangeVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.NilError(t, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.NilError(t, changeVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 }
 

@@ -1567,8 +1567,7 @@ func TestReconcilePGTDEStandby(t *testing.T) {
 		cluster.Spec.Standby = nil
 
 		r := &Reconciler{
-			Recorder: events.NewRecorder(t, runtime.Scheme),
-			PodExec:  execResponder(&calls, answer(true, nil)),
+			PodExec: execResponder(&calls, answer(true, nil)),
 		}
 
 		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
@@ -1585,8 +1584,7 @@ func TestReconcilePGTDEStandby(t *testing.T) {
 		instance := tdeInstance(nil)
 
 		r := &Reconciler{
-			Recorder: events.NewRecorder(t, runtime.Scheme),
-			PodExec:  execResponder(&calls, answer(true, nil)),
+			PodExec: execResponder(&calls, answer(true, nil)),
 		}
 
 		r.reconcilePGTDEStandby(ctx, cluster, &observedInstances{forCluster: []*Instance{instance}})
