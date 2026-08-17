@@ -1,0 +1,62 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      SOURCE=start-from-volumes
+      PRIMARY=$(get_pod_by_role "${SOURCE}" primary name)
+      [ -n "${PRIMARY}" ] || PRIMARY=$(get_pod_by_role "${SOURCE}" master name)
+      [ -n "${PRIMARY}" ] || { echo "primary pod not found" >&2; exit 1; }
+
+      PVC=$(kubectl -n "${NAMESPACE}" get pod "${PRIMARY}" \
+        -o jsonpath='{.spec.volumes[?(@.name=="postgres-data")].persistentVolumeClaim.claimName}')
+      PV=$(kubectl -n "${NAMESPACE}" get pvc "${PVC}" -o jsonpath='{.spec.volumeName}')
+      [ -n "${PVC}" ] && [ -n "${PV}" ]
+
+      kubectl patch pv "${PV}" --type merge -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+
+      kubectl -n "${NAMESPACE}" get pvc "${PVC}" -o json \
+        | jq 'del(
+            .metadata.uid,
+            .metadata.resourceVersion,
+            .metadata.generation,
+            .metadata.creationTimestamp,
+            .metadata.ownerReferences,
+            .metadata.finalizers,
+            .metadata.managedFields,
+            .status
+          )
+          | .metadata.annotations |= ((. // {}) | del(
+            ."pv.kubernetes.io/bind-completed",
+            ."pv.kubernetes.io/bound-by-controller",
+            ."volume.beta.kubernetes.io/storage-provisioner",
+            ."volume.kubernetes.io/storage-provisioner",
+            ."volume.kubernetes.io/selected-node"
+          ))' > "${TEMP_DIR}/source-pvc.json"
+
+      kubectl -n "${NAMESPACE}" delete perconapgcluster "${SOURCE}" --wait=true
+      wait_for_delete "perconapgcluster/${SOURCE}"
+      wait_for_delete "postgrescluster/${SOURCE}"
+
+      kubectl patch pv "${PV}" --type=json -p='[{"op":"remove","path":"/spec/claimRef"}]' || true
+      attempt=0
+      while [ "${attempt}" -lt 24 ]; do
+        phase=$(kubectl get pv "${PV}" -o jsonpath='{.status.phase}')
+        [ "${phase}" = "Available" ] && break
+        attempt=$((attempt + 1))
+        sleep 5
+      done
+      [ "${phase}" = "Available" ]
+
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/source-pvc.json"
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${PVC}" --timeout=120s
+
+      kubectl create configmap -n "${NAMESPACE}" volume-source \
+        --from-literal=pvc-name="${PVC}" \
+        --from-literal=pv-name="${PV}" \
+        --from-literal=directory="pg${PG_VER}"

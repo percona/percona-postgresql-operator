@@ -294,6 +294,30 @@ func (observed *observedInstances) writablePod(container string) (*corev1.Pod, *
 	return nil, nil
 }
 
+// standbyLeaderPod finds the instance Patroni reports as the standby leader:
+// the one replaying from a source outside this cluster. Unlike writablePod it
+// deliberately accepts an instance in recovery, so callers must send it only
+// statements that read.
+func (observed *observedInstances) standbyLeaderPod(container string) (*corev1.Pod, *Instance) {
+	if observed == nil {
+		return nil, nil
+	}
+
+	for _, instance := range observed.forCluster {
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			continue
+		}
+		if len(instance.Pods) != 1 || !patroni.PodIsStandbyLeader(instance.Pods[0]) {
+			continue
+		}
+		if running, known := instance.IsRunning(container); running && known {
+			return instance.Pods[0], instance
+		}
+	}
+
+	return nil, nil
+}
+
 // runningPods returns the Pod of every non-terminating instance whose named
 // container is running, and whether that accounts for every instance in the
 // cluster. Callers that must reach the whole cluster, rather than any one
