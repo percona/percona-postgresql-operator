@@ -1,0 +1,59 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+      primary=$(kubectl -n "$NAMESPACE" get pod \
+        -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+      [[ -n "$primary" ]]
+
+      postgres_secret_fingerprint=$(kubectl -n "$NAMESPACE" get secret \
+        "${cluster}-cluster-cert" -o jsonpath='{.data.tls\.crt}' \
+        | base64 -d \
+        | openssl x509 -noout -fingerprint -sha256 \
+        | sed 's/.*=//' \
+        | tr -d ':[:space:]')
+      postgres_served_fingerprint=$(kubectl -n "$NAMESPACE" exec "$primary" -c database -- \
+        bash -c "timeout 20 openssl s_client -connect ${cluster}-primary:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
+        | tr -d ':[:space:]')
+
+      if [[ "$postgres_served_fingerprint" != "$postgres_secret_fingerprint" ]]; then
+        echo "PostgreSQL is not serving the user-provided certificate" >&2
+        echo "Secret: $postgres_secret_fingerprint" >&2
+        echo "Served: $postgres_served_fingerprint" >&2
+        exit 1
+      fi
+
+      pgbouncer_secret_fingerprint=$(kubectl -n "$NAMESPACE" get secret \
+        "${cluster}-pgbouncer" -o jsonpath='{.data.pgbouncer-frontend\.crt}' \
+        | base64 -d \
+        | openssl x509 -noout -fingerprint -sha256 \
+        | sed 's/.*=//' \
+        | tr -d ':[:space:]')
+      pgbouncer_served_fingerprint=$(kubectl -n "$NAMESPACE" exec "$primary" -c database -- \
+        bash -c "timeout 20 openssl s_client -connect ${cluster}-pgbouncer:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
+        | tr -d ':[:space:]')
+
+      if [[ "$pgbouncer_served_fingerprint" != "$pgbouncer_secret_fingerprint" ]]; then
+        echo "PgBouncer is not serving the user-provided frontend certificate" >&2
+        echo "Secret: $pgbouncer_secret_fingerprint" >&2
+        echo "Served: $pgbouncer_served_fingerprint" >&2
+        exit 1
+      fi
+
+      replication_connections=$(kubectl -n "$NAMESPACE" exec "$primary" -c database -- \
+        psql -d postgres -Atqc \
+        "SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_replication r ON s.pid = r.pid WHERE s.ssl = true AND s.client_dn LIKE '%CN=_crunchyrepl%';")
+      replication_connections=$(tr -d '[:space:]' <<<"$replication_connections")
+      if [[ "$replication_connections" != "2" ]]; then
+        echo "Expected two SSL replication connections using the user-provided _crunchyrepl identity, got: $replication_connections" >&2
+        exit 1
+      fi

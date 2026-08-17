@@ -251,6 +251,8 @@ func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cl
 // When the root CA is internal but a stale Certificate CR was left by
 // K8SPG-1017, the CR is reconciled to update its ownerRef (K8SPG-1007
 // recovery) before populating the secret from the internal PKI.
+// In userProvidedOnly mode, the operator preserves the user-provided
+// certificates.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
@@ -274,11 +276,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
-	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		if !secretFound {
 			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
 		}
-		return existing, nil
 	}
 	var userSecret *corev1.Secret
 	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil && ref.Name != "" {
@@ -289,7 +291,8 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	var frontendCertManagerSecret *corev1.Secret
-	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
+	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil &&
+		cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
 			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
@@ -355,6 +358,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
 	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	// K8SPG-1045: operator should keep user-provided CA bundle as-is in the userProvidedOnly mode
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		pgBouncer.CustomTLSSecret == nil {
+		return nil, nil
+	}
 	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
 		return nil, nil
 	}
@@ -793,7 +801,8 @@ func listPGBouncerPods(ctx context.Context, cl client.Client, cluster *v1beta1.P
 		return nil, errors.Wrap(err, "pgbouncer selector")
 	}
 	podList := &corev1.PodList{}
-	if err := cl.List(ctx, podList,
+	if err := cl.List(
+		ctx, podList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {

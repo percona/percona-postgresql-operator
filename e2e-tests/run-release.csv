@@ -41,6 +41,7 @@ standby-pgbackrest
 standby-streaming
 start-from-backup
 start-from-backup-tde
+start-from-volumes
 tablespaces
 telemetry-transfer
 upgrade-consistency

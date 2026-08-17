@@ -24,9 +24,9 @@ const (
 	certFrontendPrivateKeyProjectionPath = "~postgres-operator/frontend-tls.key"
 	certFrontendProjectionPath           = "~postgres-operator/frontend-tls.crt"
 
-	certFrontendAuthoritySecretKey  = "pgbouncer-frontend.ca-roots"
-	certFrontendPrivateKeySecretKey = "pgbouncer-frontend.key"
-	certFrontendSecretKey           = "pgbouncer-frontend.crt"
+	CertFrontendAuthoritySecretKey  = "pgbouncer-frontend.ca-roots"
+	CertFrontendPrivateKeySecretKey = "pgbouncer-frontend.key"
+	CertFrontendSecretKey           = "pgbouncer-frontend.crt"
 )
 
 // backendAuthority creates a volume projection of the PostgreSQL server
@@ -78,15 +78,15 @@ func frontendCertificate(
 			},
 			Items: []corev1.KeyToPath{
 				{
-					Key:  certFrontendAuthoritySecretKey,
+					Key:  CertFrontendAuthoritySecretKey,
 					Path: certFrontendAuthorityProjectionPath,
 				},
 				{
-					Key:  certFrontendPrivateKeySecretKey,
+					Key:  CertFrontendPrivateKeySecretKey,
 					Path: certFrontendPrivateKeyProjectionPath,
 				},
 				{
-					Key:  certFrontendSecretKey,
+					Key:  CertFrontendSecretKey,
 					Path: certFrontendProjectionPath,
 				},
 			},
@@ -156,7 +156,7 @@ func frontendCertificate(
 					Name: secret.Name,
 				},
 				Items: []corev1.KeyToPath{{
-					Key:  certFrontendAuthoritySecretKey,
+					Key:  CertFrontendAuthoritySecretKey,
 					Path: certFrontendAuthorityProjectionPath,
 				}},
 			},
