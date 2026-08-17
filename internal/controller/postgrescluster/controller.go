@@ -460,6 +460,11 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		err = r.reconcilePostgresDatabases(ctx, cluster, instances, patchClusterStatus)
 	}
+	// K8SPG-911: the two reconcilers around this one need a writable instance.
+	// A standby has none, so its pg_tde status comes from what it reports.
+	if err == nil {
+		r.reconcilePGTDEStandby(ctx, cluster, instances)
+	}
 	if err == nil {
 		err = r.reconcilePGTDEProviders(ctx, cluster, instances, patchClusterStatus)
 	}
