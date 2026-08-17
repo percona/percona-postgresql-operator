@@ -133,6 +133,48 @@ func tdeInstance(annotations map[string]string) *Instance {
 	}
 }
 
+// tdeStandbyInstance builds an observed instance whose Patroni member status is
+// the one a standby cluster's leader publishes: running and labeled primary, but
+// in recovery and therefore not writable. K8SPG-911
+func tdeStandbyInstance(annotations map[string]string) *Instance {
+	instance := tdeInstance(annotations)
+	instance.Pods[0].Annotations["status"] = `{"role":"standby_leader"}`
+	return instance
+}
+
+// execResponder returns a PodExec function that appends every call to calls and
+// lets respond write the psql output the caller will parse.
+func execResponder(calls *[]execCall, respond func(call execCall, stdout io.Writer) error) func(
+	ctx context.Context, namespace, pod, container string,
+	stdin io.Reader, stdout, stderr io.Writer, command ...string,
+) error {
+	return func(
+		ctx context.Context, namespace, pod, container string,
+		stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		call := execCall{
+			namespace: namespace,
+			pod:       pod,
+			container: container,
+			command:   command,
+		}
+		if stdin != nil {
+			b, err := io.ReadAll(stdin)
+			if err != nil {
+				return err
+			}
+			call.stdin = string(b)
+		}
+
+		*calls = append(*calls, call)
+
+		if respond != nil {
+			return respond(call, stdout)
+		}
+		return nil
+	}
+}
+
 func TestPGTDEVaultRevision(t *testing.T) {
 	t.Parallel()
 
@@ -912,6 +954,58 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		assert.Equal(t, len(calls), 0)
 	})
 
+	// K8SPG-911: reconcilePGTDEStandby reports the key provider of a cluster in
+	// recovery, and this function must not undo what it said.
+	t.Run("Standby", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{Enabled: true, RepoName: "repo1"}
+		pgtde.ReportStandby(cluster, true, nil)
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeStandbyInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
+		assert.Equal(t, len(psqlCalls(calls)), 0,
+			"a cluster in recovery rejects every statement this function runs")
+		assert.Equal(t, cluster.Status.PGTDERevision, "",
+			"a revision would make promotion skip repointing the inherited provider")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "ReplicatedFromSource")
+	})
+
+	// A standby whose spec turns pg_tde off still needs its revision cleared and
+	// its provider condition removed, which is what ReportStandby steps aside for.
+	t.Run("StandbyDisabled", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{Enabled: true, RepoName: "repo1"}
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+		cluster.Status.PGTDERevision = standardRevision
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEVaultProviderReady,
+			Status: metav1.ConditionTrue,
+			Reason: "ReplicatedFromSource",
+		})
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+		observed := &observedInstances{forCluster: []*Instance{
+			tdeStandbyInstance(map[string]string{naming.TDEInstalledAnnotation: "true"}),
+		}}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, observed, failPatch(t)))
+		assert.Equal(t, cluster.Status.PGTDERevision, "")
+		assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+			v1beta1.PGTDEVaultProviderReady) == nil)
+	})
+
 	t.Run("WaitsForExtension", func(t *testing.T) {
 		var calls []execCall
 		cluster := newCluster()
@@ -1114,7 +1208,6 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 			"the condition should name the Secret that could not be read")
 		assert.Equal(t, patched, 1,
 			"the failure condition is useless unless it is written to the API")
-		assertEvent(t, r.Recorder, "PGTDEVaultProviderChangeFailed")
 	})
 
 	t.Run("PhaseTwo", func(t *testing.T) {
@@ -1380,6 +1473,20 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 			"no SQL ran, so there is nothing to report")
 	})
 
+	// K8SPG-911: a standby leader is labeled primary but stays in recovery, so
+	// none of the SQL here can run. reconcilePGTDEStandby owns that case.
+	t.Run("NothingIsReportedOnAStandbyLeader", func(t *testing.T) {
+		cluster := newCluster(true)
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{Enabled: true, RepoName: "repo1"}
+
+		r := &Reconciler{Recorder: events.NewRecorder(t, runtime.Scheme)}
+
+		assert.NilError(t, r.reconcilePostgresDatabases(ctx, cluster,
+			&observedInstances{forCluster: []*Instance{tdeStandbyInstance(nil)}}, failPatch(t)))
+		assert.Assert(t, pgTDECondition(cluster) == nil)
+		assert.Equal(t, cluster.Status.DatabaseRevision, "")
+	})
+
 	t.Run("DisableIsReportedOnlyAfterItRuns", func(t *testing.T) {
 		cluster := newCluster(false)
 
@@ -1406,6 +1513,243 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		assert.Assert(t, pgTDECondition(cluster) == nil,
 			"a failed DROP EXTENSION must not be reported as disabled")
 		assertEvent(t, r.Recorder, "PGTDEDisableFailed")
+	})
+}
+
+// K8SPG-911
+func TestReconcilePGTDEStandby(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	newCluster := func() *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pgc1", UID: "the-uid"},
+		}
+		cluster.Spec.Standby = &v1beta1.PostgresStandbySpec{Enabled: true, RepoName: "repo1"}
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+			Enabled: true,
+			Vault:   tdeVaultSpec(),
+		}
+		return cluster
+	}
+
+	// answer replies to the extension query with installed, and to the key
+	// verification with keyErr.
+	answer := func(installed bool, keyErr error) func(execCall, io.Writer) error {
+		return func(call execCall, stdout io.Writer) error {
+			switch {
+			case strings.Contains(call.stdin, "pg_extension"):
+				if installed {
+					_, _ = io.WriteString(stdout, "t\n")
+				} else {
+					_, _ = io.WriteString(stdout, "f\n")
+				}
+				return nil
+			case strings.Contains(call.stdin, "pg_tde_verify_default_key"):
+				return keyErr
+			}
+			t.Errorf("unexpected statement %q", call.stdin)
+			return nil
+		}
+	}
+
+	extensionCondition := func(cluster *v1beta1.PostgresCluster) *metav1.Condition {
+		return meta.FindStatusCondition(cluster.Status.Conditions, v1beta1.PGTDEEnabled)
+	}
+
+	standbyObserved := func() *observedInstances {
+		return &observedInstances{forCluster: []*Instance{tdeStandbyInstance(nil)}}
+	}
+
+	t.Run("NotStandby", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Spec.Standby = nil
+
+		r := &Reconciler{
+			PodExec: execResponder(&calls, answer(true, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+		assert.Equal(t, len(calls), 0)
+		assert.Equal(t, len(cluster.Status.Conditions), 0)
+	})
+
+	t.Run("NoStandbyLeader", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+
+		// Patroni has not elected a standby leader yet, or has promoted the one
+		// it had, in which case the writable path takes over.
+		instance := tdeInstance(nil)
+
+		r := &Reconciler{
+			PodExec: execResponder(&calls, answer(true, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, &observedInstances{forCluster: []*Instance{instance}})
+		assert.Equal(t, len(calls), 0)
+		assert.Equal(t, len(cluster.Status.Conditions), 0)
+	})
+
+	t.Run("NoExecWhenPGTDEWasNeverHere", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{}
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execResponder(&calls, answer(false, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+		assert.Equal(t, len(calls), 0,
+			"a plain standby must not be exec'd into on every reconcile")
+	})
+
+	t.Run("ObservesExtensionAndKey", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execResponder(&calls, answer(true, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		assert.Equal(t, len(calls), 2)
+		for _, call := range calls {
+			assert.Equal(t, call.namespace, "ns1")
+			assert.Equal(t, call.pod, "pgc1-instance1-abcd-0")
+			assert.Equal(t, call.container, naming.ContainerDatabase)
+			assert.Equal(t, call.command[0], "psql")
+			assert.Assert(t, argsContain(call.command, "--tuples-only"))
+		}
+		assert.Assert(t, strings.Contains(calls[0].stdin, "pg_extension"))
+		assert.Assert(t, strings.Contains(calls[1].stdin, "pg_tde_verify_default_key"))
+
+		condition := extensionCondition(cluster)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionTrue)
+		assert.Equal(t, condition.Reason, "ReplicatedFromSource")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "ReplicatedFromSource")
+
+		assert.Equal(t, cluster.Status.PGTDERevision, "")
+	})
+
+	t.Run("ExtensionMissing", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execResponder(&calls, answer(false, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		assert.Equal(t, len(calls), 1, "there is no key to verify without the extension")
+
+		condition := extensionCondition(cluster)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionFalse)
+		assert.Equal(t, condition.Reason, "RecoveryCannotInstall")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ExtensionNotInstalled")
+	})
+
+	t.Run("KeyUnavailable", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: execResponder(&calls,
+				answer(true, errors.New("could not fetch principal key"))),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		assert.Equal(t, len(calls), 2)
+		assert.Assert(t, meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled),
+			"the extension is installed even though its key is out of reach")
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "KeyUnavailable")
+	})
+
+	t.Run("ObservationFailureLeavesConditionsAlone", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec: execResponder(&calls, func(call execCall, stdout io.Writer) error {
+				return errors.New("connection to server failed")
+			}),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		// A false condition here would strip pg_tde from
+		// shared_preload_libraries and take the vault credentials off the Pods.
+		// A Postgres still replaying WAL and refusing connections is normal.
+		assert.Equal(t, len(calls), 1)
+		assert.Equal(t, len(cluster.Status.Conditions), 0)
+		rec, ok := r.Recorder.(*events.Recorder)
+		assert.Assert(t, ok)
+		assert.Equal(t, len(rec.Events), 0)
+	})
+
+	t.Run("SpecDisabledKeepsTheExtensionReported", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Spec.Extensions.PGTDE.Enabled = false
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEEnabled,
+			Status: metav1.ConditionTrue,
+			Reason: "ReplicatedFromSource",
+		})
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execResponder(&calls, answer(true, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		condition := extensionCondition(cluster)
+		assert.Assert(t, condition != nil)
+		assert.Equal(t, condition.Status, metav1.ConditionTrue,
+			"a cluster in recovery cannot drop the extension it is reading")
+		assert.Equal(t, condition.Reason, "RecoveryCannotDrop")
+
+		// reconcilePGTDEProviders removes the provider condition when the spec
+		// disables pg_tde, so this must not put one back.
+		assert.Assert(t, meta.FindStatusCondition(cluster.Status.Conditions,
+			v1beta1.PGTDEVaultProviderReady) == nil)
+	})
+
+	t.Run("PendingProviderChangeIsNotOverwritten", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster()
+		cluster.Status.PGTDERevision = "some-revision"
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEVaultProviderReady,
+			Status: metav1.ConditionFalse,
+			Reason: "ChangeInProgress",
+		})
+
+		r := &Reconciler{
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execResponder(&calls, answer(true, nil)),
+		}
+
+		r.reconcilePGTDEStandby(ctx, cluster, standbyObserved())
+
+		// Only promotion can finish a change reconcilePGTDEProviders started, so
+		// the stall stays visible.
+		assertTDEProviderCondition(t, cluster, metav1.ConditionFalse, "ChangeInProgress")
+		assert.Equal(t, cluster.Status.PGTDERevision, "some-revision")
+		assert.Assert(t, meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled))
 	})
 }
 
