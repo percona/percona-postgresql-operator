@@ -378,8 +378,7 @@ spec:
 
 #  logicalReplicas:
 #  - name: analytics
-#    databases:
-#    - cluster1
+#    databases: []  # empty = all non-template databases except "postgres"
 #    bootstrapMethod: pgbackrest
 #    dataVolumeClaimSpec:
 #      accessModes:
