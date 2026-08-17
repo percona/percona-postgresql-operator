@@ -1,0 +1,44 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      cluster_uid=$(kubectl -n "$NAMESPACE" get postgrescluster "$cluster" \
+        -o jsonpath='{.metadata.uid}')
+      pgbackrest_client="pgbackrest@${cluster_uid}"
+      issue_certificate pgbackrest-client \
+        "$pgbackrest_client" clientAuth "$pgbackrest_client"
+
+      repo_name="${cluster}-repo-host-0.${cluster}-pods"
+      issue_certificate pgbackrest-repo \
+        "${cluster}-repo-host" serverAuth \
+        "${repo_name}.${NAMESPACE}.svc.cluster.local" \
+        "${repo_name}.${NAMESPACE}.svc" \
+        "${repo_name}.${NAMESPACE}" \
+        "$repo_name"
+
+      kubectl -n "$NAMESPACE" create secret generic "${cluster}-pgbackrest" \
+        --from-file=pgbackrest.ca-roots="$TEMP_DIR/root-ca.crt" \
+        --from-file=pgbackrest-client.crt="$TEMP_DIR/pgbackrest-client.crt" \
+        --from-file=pgbackrest-client.key="$TEMP_DIR/pgbackrest-client.key" \
+        --from-file=pgbackrest-repo-host.crt="$TEMP_DIR/pgbackrest-repo.crt" \
+        --from-file=pgbackrest-repo-host.key="$TEMP_DIR/pgbackrest-repo.key" \
+        --dry-run=client -o yaml \
+        | kubectl label --local -f - -o yaml \
+          postgres-operator.crunchydata.com/cluster="$cluster" \
+        | kubectl -n "$NAMESPACE" apply -f -
+
+      secret="${cluster}-pgbackrest"
+      checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+        | jq --compact-output --sort-keys '.data' \
+        | sha256sum | awk '{print $1}')
+      kubectl -n "$NAMESPACE" annotate secret "$secret" \
+        e2e.percona.com/secret-checksum="$checksum" \
+        --overwrite

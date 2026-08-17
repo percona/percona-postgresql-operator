@@ -49,3 +49,6 @@ updates:
       go-openapi:
         patterns:
           - "github.com/go-openapi/*"
+      opentelemetry:
+        patterns:
+          - "go.opentelemetry.io/*"
