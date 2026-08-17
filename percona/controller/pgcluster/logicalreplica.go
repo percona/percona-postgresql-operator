@@ -116,9 +116,8 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 		return false, nil
 	}
 
-	// Fast path: no API calls for clusters that never used the feature.
 	if len(cr.Spec.LogicalReplicas) == 0 && len(cr.Status.LogicalReplicas) == 0 {
-		return false, nil
+		return false, r.updateLogicalReplicaStatus(ctx, cr, cr.Status.LogicalReplicas, nil)
 	}
 
 	suspension, err := r.shouldSuspendLogicalReplicas(ctx, cr)
@@ -158,7 +157,6 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 	log := logging.FromContext(ctx).WithName("LogicalReplication")
 	ctx = logging.NewContext(ctx, log)
 
-	// Once per reconcile: cluster-wide, and it costs an exec.
 	readiness := r.observePrimaryReadiness(ctx, cr)
 
 	// Replicas whose teardown could not be finished keep their status entry:
