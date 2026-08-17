@@ -736,6 +736,7 @@ func TestUpdateConditions(t *testing.T) {
 			require.NotNil(t, condition, "ClusterIsReadyForBackup condition should be set")
 			assert.Equal(t, tt.expectedReadyForBackupStatus, condition.Status, "ClusterIsReadyForBackup status mismatch")
 			assert.Equal(t, tt.expectedReadyForBackupReason, condition.Reason, "ClusterIsReadyForBackup reason mismatch")
+			assert.Equal(t, cr.Generation, condition.ObservedGeneration, "ClusterIsReadyForBackup generation mismatch")
 
 			// Verify synced conditions
 			for _, expected := range tt.expectedSyncedConditions {

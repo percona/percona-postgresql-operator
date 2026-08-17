@@ -1080,6 +1080,11 @@ func (cr *PostgresCluster) BackupSpecFound() bool {
 	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
 }
 
+// IsStandby returns whether this cluster replays WAL from a source outside of itself.
+func (cr *PostgresCluster) IsStandby() bool {
+	return cr.Spec.Standby != nil && cr.Spec.Standby.Enabled
+}
+
 // K8SPG-864
 type SidecarPVC struct {
 	Name string `json:"name"`
