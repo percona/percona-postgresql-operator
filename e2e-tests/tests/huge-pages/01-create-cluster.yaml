@@ -10,7 +10,14 @@ commands:
 
       set -o xtrace
       enable_hugepages $PLATFORM
+
+      hugepages_affinity='.'
+      if [[ ${PLATFORM} == "aks" || ${PLATFORM} == "doks" || ${PLATFORM} == "rancher" ]]; then
+        hugepages_affinity='.spec.instances[0].affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "hugepages", "operator": "In", "values": ["enabled"]}]}]'
+      fi
+
       get_cr \
+        | yq "${hugepages_affinity}" \
         | yq '.spec.instances[0].resources.limits.hugepages-2Mi = "2Gi"' \
         | yq '.spec.proxy.pgBouncer.replicas=1' \
         | yq '.spec.instances[].replicas=1' \

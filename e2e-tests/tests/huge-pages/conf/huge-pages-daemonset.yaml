@@ -26,7 +26,7 @@ spec:
             - name: HUGEPAGE_COUNT
               value: "1024"
             - name: NODE_SERVICE
-              value: rke2-agent
+              value: node-agent
           command:
             - sh
             - -c

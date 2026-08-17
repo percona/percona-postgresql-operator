@@ -1694,36 +1694,41 @@ function enable_hugepages_doks() {
 function enable_hugepages_rancher() {
 	local hugepage_count=$1
 
+	ensure_rancher_hugepages_node
+
 	if verify_hugepages_on_labeled_nodes; then
-		echo "Hugepages are already configured on RKE2 workers"
+		echo "Hugepages are already configured on the selected RKE2 worker"
 		return 0
 	fi
 
-	ensure_rancher_hugepages_nodes
 	configure_hugepages_on_labeled_nodes RKE2 "${hugepage_count}" rke2-agent 15m
 }
 
-function ensure_rancher_hugepages_nodes() {
-	local nodes
-	nodes=$(kubectl get nodes -l node-role.kubernetes.io/worker -o name 2>/dev/null)
+function ensure_rancher_hugepages_node() {
+	local node
+	node=$(kubectl get nodes -l node-role.kubernetes.io/worker \
+		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 
-	if [ -z "${nodes}" ]; then
-		nodes=$(kubectl get nodes \
+	if [ -z "${node}" ]; then
+		node=$(kubectl get nodes \
 			-l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' \
-			-o name 2>/dev/null)
+			-o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 	fi
 
-	if [ -z "${nodes}" ]; then
+	if [ -z "${node}" ]; then
 		echo "RKE2: No worker nodes found"
 		return 1
 	fi
 
-	local node
-	for node in ${nodes}; do
-		kubectl label "${node}" hugepages=enabled --overwrite
+	local labeled_node
+	for labeled_node in $(kubectl get nodes -l hugepages=enabled -o name 2>/dev/null); do
+		if [[ ${labeled_node} != "node/${node}" ]]; then
+			kubectl label "${labeled_node}" hugepages-
+		fi
 	done
 
-	kubectl wait node -l hugepages=enabled --for=condition=Ready --timeout=15m
+	kubectl label "node/${node}" hugepages=enabled --overwrite
+	kubectl wait "node/${node}" --for=condition=Ready --timeout=15m
 }
 
 function ensure_doks_hugepages_nodepool() {
