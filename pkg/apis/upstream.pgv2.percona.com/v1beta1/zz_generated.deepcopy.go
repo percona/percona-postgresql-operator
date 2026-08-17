@@ -2327,6 +2327,11 @@ func (in *PostgresInstanceSetSpec) DeepCopyInto(out *PostgresInstanceSetSpec) {
 		*out = new(corev1.PersistentVolumeClaimSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.LogVolumeClaimSpec != nil {
+		in, out := &in.LogVolumeClaimSpec, &out.LogVolumeClaimSpec
+		*out = new(corev1.PersistentVolumeClaimSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.TablespaceVolumes != nil {
 		in, out := &in.TablespaceVolumes, &out.TablespaceVolumes
 		*out = make([]TablespaceVolume, len(*in))

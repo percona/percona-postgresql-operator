@@ -86,6 +86,9 @@ tdeunlink() (
 	// walMountPath is where to mount the optional WAL volume.
 	walMountPath = "/pgwal"
 
+	// logMountPath is where to mount the optional log volume.
+	logMountPath = "/pglogs"
+
 	// downwardAPIPath is where to mount the downwardAPI volume.
 	downwardAPIPath = "/etc/database-containerinfo"
 
@@ -458,6 +461,37 @@ func startupCommand(
 
 			// When a pgwal volume is removed, the symlink will be broken; force pgbackrest to recreate spool-path.
 			return `if [[ ! -e "/pgdata/pgbackrest-spool" ]];then rm -rf /pgdata/pgbackrest-spool;fi`
+		}(),
+
+		// K8SPG-1086: When a pglogs volume is removed, the symlinks will be broken;
+		// remove them so PostgreSQL and pgBackRest recreate real directories on
+		// the data volume.
+		func() string {
+			if cluster.CompareVersion("3.1.0") < 0 {
+				return "remove"
+			}
+
+			return `if [[ ! -e "/pgdata/logs/postgres" ]];then rm -rf "/pgdata/logs/postgres";fi`
+		}(),
+
+		// K8SPG-1086: When a pglogs volume is mounted, link the log directories on the data
+		func() string {
+			if cluster.CompareVersion("3.1.0") < 0 {
+				return "remove"
+			}
+
+			return `if [[ ! -e "${pgbrLog_directory}" ]];then rm -rf "${pgbrLog_directory}";fi`
+		}(),
+
+		// K8SPG-1086: When a pglogs volume is mounted, link the log directories on the data
+		// volume to it. Existing real directories are replaced with symlinks only during this
+		// transition; logs are expendable. An existing symlink is left as is.
+		func() string {
+			if cluster.CompareVersion("3.1.0") < 0 {
+				return "remove"
+			}
+
+			return `if [[ -d "/pglogs" ]];then install --directory --mode=0775 "/pglogs/postgres" "/pglogs/pgbackrest/log";if [[ ! -L "/pgdata/logs/postgres" ]];then mkdir -p "/pgdata/logs" && rm -rf "/pgdata/logs/postgres" && ln --symbolic "/pglogs/postgres" "/pgdata/logs/postgres";fi;if [[ ! -L "${pgbrLog_directory}" ]];then mkdir -p "${pgbrLog_directory%/*}" && rm -rf "${pgbrLog_directory}" && ln --symbolic "/pglogs/pgbackrest/log" "${pgbrLog_directory}";fi;fi`
 		}(),
 
 		func() string {

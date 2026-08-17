@@ -530,7 +530,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.Users = users
 
-	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
+	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy(cr.Spec.CRVersion)
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
 	postgresCluster.Spec.Extensions.PGTDE = cr.Spec.Extensions.PGTDE
@@ -1113,11 +1113,11 @@ type SecretsSpec struct {
 // +kubebuilder:validation:MinItems=1
 type PGInstanceSets []PGInstanceSetSpec
 
-func (p PGInstanceSets) ToCrunchy() []crunchyv1beta1.PostgresInstanceSetSpec {
+func (p PGInstanceSets) ToCrunchy(version string) []crunchyv1beta1.PostgresInstanceSetSpec {
 	set := make([]crunchyv1beta1.PostgresInstanceSetSpec, len(p))
 
 	for i, inst := range p {
-		set[i] = inst.ToCrunchy()
+		set[i] = inst.ToCrunchy(version)
 	}
 
 	return set
@@ -1218,6 +1218,11 @@ type PGInstanceSetSpec struct {
 	// +optional
 	WALVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"walVolumeClaimSpec,omitempty"`
 
+	// K8SPG-1086
+	// Defines a separate PersistentVolumeClaim for PostgreSQL and pgBackRest logs.
+	// +optional
+	LogVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"logVolumeClaimSpec,omitempty"`
+
 	// Defines a PersistentVolumeClaim for PostgreSQL data.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 	// +kubebuilder:validation:Required
@@ -1248,8 +1253,8 @@ type PGInstanceSetSpec struct {
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
-func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
-	return crunchyv1beta1.PostgresInstanceSetSpec{
+func (p PGInstanceSetSpec) ToCrunchy(version string) crunchyv1beta1.PostgresInstanceSetSpec {
+	set := crunchyv1beta1.PostgresInstanceSetSpec{
 		Metadata:                  p.Metadata,
 		Name:                      p.Name,
 		Affinity:                  p.Affinity,
@@ -1274,6 +1279,14 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
 	}
+
+	// K8SPG-1086
+	currVersion, err := gover.NewVersion(version)
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("3.1.0"))) {
+		set.LogVolumeClaimSpec = p.LogVolumeClaimSpec
+	}
+
+	return set
 }
 
 type ServiceExpose struct {

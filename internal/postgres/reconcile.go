@@ -37,6 +37,12 @@ func WALVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{Name: "postgres-wal", MountPath: walMountPath}
 }
 
+// K8SPG-1086
+// LogVolumeMount returns the name and mount path of the PostgreSQL log volume.
+func LogVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{Name: "postgres-logs", MountPath: logMountPath}
+}
+
 // DownwardAPIVolumeMount returns the name and mount path of the DownwardAPI volume.
 func DownwardAPIVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
@@ -114,7 +120,7 @@ func InstancePod(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inInstanceSpec *v1beta1.PostgresInstanceSetSpec,
 	inClusterCertificates, inClientCertificates *corev1.SecretProjection,
-	inDataVolume, inWALVolume *corev1.PersistentVolumeClaim,
+	inDataVolume, inWALVolume, inLogVolume *corev1.PersistentVolumeClaim,
 	inTablespaceVolumes []*corev1.PersistentVolumeClaim,
 	outInstancePod *corev1.PodSpec,
 ) {
@@ -384,6 +390,25 @@ func InstancePod(ctx context.Context,
 				})
 			}
 		}
+	}
+
+	// K8SPG-1086: Mount the log PVC whenever it exists. The startup command
+	// links the log directories on the data volume to this volume.
+	if inLogVolume != nil {
+		logVolumeMount := LogVolumeMount()
+		logVolume := corev1.Volume{
+			Name: logVolumeMount.Name,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: inLogVolume.Name,
+					ReadOnly:  false,
+				},
+			},
+		}
+
+		container.VolumeMounts = append(container.VolumeMounts, logVolumeMount)
+		startup.VolumeMounts = append(startup.VolumeMounts, logVolumeMount)
+		outInstancePod.Volumes = append(outInstancePod.Volumes, logVolume)
 	}
 
 	outInstancePod.Containers = []corev1.Container{container, reloader}
