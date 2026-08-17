@@ -19,6 +19,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -47,8 +48,9 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 	}
 
 	var missing []string
+	var invalid []string
 
-	checkSecret := func(projection *corev1.SecretProjection, secretName string) error {
+	checkSecret := func(projection *corev1.SecretProjection, secretName string, requiredKeys ...string) error {
 		if projection != nil {
 			secretName = projection.Name
 		}
@@ -62,6 +64,17 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 		}
 		if k8serrors.IsNotFound(err) {
 			missing = append(missing, secret.Name)
+			return nil
+		}
+
+		var emptyKeys []string
+		for _, key := range requiredKeys {
+			if len(secret.Data[key]) == 0 {
+				emptyKeys = append(emptyKeys, key)
+			}
+		}
+		if len(emptyKeys) > 0 {
+			invalid = append(invalid, secret.Name+" (missing or empty keys: "+strings.Join(emptyKeys, ", ")+")")
 		}
 
 		return nil
@@ -81,8 +94,17 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 	}
 
 	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
-		if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name); err != nil {
-			return errors.Wrap(err, "check PgBouncer TLS secret")
+		customTLSSecret := cluster.Spec.Proxy.PGBouncer.CustomTLSSecret
+		if customTLSSecret == nil {
+			if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name,
+				pgbouncer.CertFrontendAuthoritySecretKey,
+				pgbouncer.CertFrontendSecretKey,
+				pgbouncer.CertFrontendPrivateKeySecretKey,
+			); err != nil {
+				return errors.Wrap(err, "check PgBouncer TLS secret")
+			}
+		} else if err := checkSecret(customTLSSecret, naming.ClusterPGBouncer(cluster).Name); err != nil {
+			return errors.Wrap(err, "check custom PgBouncer TLS secret")
 		}
 	}
 
@@ -109,6 +131,13 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 	if len(missing) > 0 {
 		cond.Message = "Missing user-provided TLS secrets: " + strings.Join(missing, ", ") + ". certManagementPolicy is userProvidedOnly"
 		cond.Reason = "TLSSecretsMissing"
+		cond.Status = metav1.ConditionFalse
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+	if len(invalid) > 0 {
+		cond.Message = "Invalid user-provided TLS secrets: " + strings.Join(invalid, ", ") + ". certManagementPolicy is userProvidedOnly"
+		cond.Reason = "TLSSecretsInvalid"
 		cond.Status = metav1.ConditionFalse
 		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
 		return nil

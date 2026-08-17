@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 240
+---
+apiVersion: upstream.pgv2.percona.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: cert-management-policy
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cert-management-policy-repo-host
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: cert-management-policy
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
