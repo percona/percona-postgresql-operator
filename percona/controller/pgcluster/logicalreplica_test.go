@@ -921,7 +921,7 @@ func TestObservePrimaryReadiness(t *testing.T) {
 		cond := r.observePrimaryReadiness(t.Context(), cr)
 
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-		assert.Equal(t, logicalreplica.ReasonRestartPending, cond.Reason)
+		assert.Equal(t, "RestartPending", cond.Reason)
 		assert.False(t, rec.called, "a pending restart is decided before the query")
 	})
 
@@ -947,34 +947,33 @@ func TestObservePrimaryReadiness(t *testing.T) {
 	t.Run("one unmet prerequisite", func(t *testing.T) {
 		cr := newCluster()
 		rec := new(execRecorder)
-		r := newReconciler(t, cr, rec, logicalreplica.ReasonReplicationHBAMissing, nil,
+		r := newReconciler(t, cr, rec, "ReplicationHBAMissing", nil,
 			primaryPodForCluster(cr), logicalReplicaUserSecret(cr))
 
 		cond := r.observePrimaryReadiness(t.Context(), cr)
 
 		assert.Equal(t, metav1.ConditionFalse, cond.Status)
-		assert.Equal(t, logicalreplica.ReasonReplicationHBAMissing, cond.Reason)
+		assert.Equal(t, "ReplicationHBAMissing", cond.Reason)
 		assert.Equal(t,
-			logicalreplica.PrimaryReadinessMessage(logicalreplica.ReasonReplicationHBAMissing),
+			logicalreplica.PrimaryReadinessMessage("ReplicationHBAMissing"),
 			cond.Message)
 	})
 
 	t.Run("several unmet prerequisites", func(t *testing.T) {
 		cr := newCluster()
 		rec := new(execRecorder)
-		r := newReconciler(t, cr, rec,
-			logicalreplica.ReasonRestartPending+","+logicalreplica.ReasonReplicationHBAMissing, nil,
+		r := newReconciler(t, cr, rec, "RestartPending,ReplicationHBAMissing", nil,
 			primaryPodForCluster(cr), logicalReplicaUserSecret(cr))
 
 		cond := r.observePrimaryReadiness(t.Context(), cr)
 
 		// The reason is the first, but the message has to name all of them: the
 		// user fixes them together.
-		assert.Equal(t, logicalreplica.ReasonRestartPending, cond.Reason)
+		assert.Equal(t, "RestartPending", cond.Reason)
 		assert.Contains(t, cond.Message,
-			logicalreplica.PrimaryReadinessMessage(logicalreplica.ReasonRestartPending))
+			logicalreplica.PrimaryReadinessMessage("RestartPending"))
 		assert.Contains(t, cond.Message,
-			logicalreplica.PrimaryReadinessMessage(logicalreplica.ReasonReplicationHBAMissing))
+			logicalreplica.PrimaryReadinessMessage("ReplicationHBAMissing"))
 	})
 
 	t.Run("primary cannot be queried", func(t *testing.T) {
@@ -1484,7 +1483,7 @@ func TestUpdateLogicalReplicaStatus(t *testing.T) {
 		require.NoError(t, r.updateLogicalReplicaStatus(t.Context(), cr, statuses, &metav1.Condition{
 			Type:    pNaming.ConditionReadyForLogicalReplication,
 			Status:  metav1.ConditionFalse,
-			Reason:  logicalreplica.ReasonReplicationHBAMissing,
+			Reason:  "ReplicationHBAMissing",
 			Message: "first",
 		}))
 
@@ -1506,13 +1505,13 @@ func TestUpdateLogicalReplicaStatus(t *testing.T) {
 		require.NoError(t, r.updateLogicalReplicaStatus(t.Context(), cr, statuses, &metav1.Condition{
 			Type:    pNaming.ConditionReadyForLogicalReplication,
 			Status:  metav1.ConditionFalse,
-			Reason:  logicalreplica.ReasonRestartPending,
+			Reason:  "RestartPending",
 			Message: "second",
 		}))
 
 		cond := meta.FindStatusCondition(read().Status.Conditions,
 			pNaming.ConditionReadyForLogicalReplication)
-		assert.Equal(t, logicalreplica.ReasonRestartPending, cond.Reason)
+		assert.Equal(t, "RestartPending", cond.Reason)
 		assert.Equal(t, "second", cond.Message)
 		assert.True(t, before.Equal(&cond.LastTransitionTime))
 	})

@@ -18,7 +18,7 @@ const (
 	// ReplicationUser must match v2.UserLogicalReplication.
 	ReplicationUser = "logicalrepl"
 
-	OutputPlugin = "pgoutput"
+	outputPlugin = "pgoutput"
 
 	// maxIdentifierLength is PostgreSQL's NAMEDATALEN-1.
 	maxIdentifierLength = 63
@@ -32,11 +32,11 @@ const (
 // Reasons reported by [PrimaryReadinessQuery], rendered by
 // [PrimaryReadinessMessage].
 const (
-	ReasonPrimaryInRecovery       = "PrimaryInRecovery"
-	ReasonWALLevelNotLogical      = "WALLevelNotLogical"
+	reasonPrimaryInRecovery       = "PrimaryInRecovery"
+	reasonWALLevelNotLogical      = "WALLevelNotLogical"
+	reasonReplicationRoleNotReady = "ReplicationRoleNotReady"
+	reasonReplicationHBAMissing   = "ReplicationHBAMissing"
 	ReasonRestartPending          = "RestartPending"
-	ReasonReplicationRoleNotReady = "ReplicationRoleNotReady"
-	ReasonReplicationHBAMissing   = "ReplicationHBAMissing"
 )
 
 // PrimaryReadinessQuery returns a query whose single column lists, comma
@@ -70,11 +70,11 @@ func PrimaryReadinessQuery() string {
   ) AS c(n, name, satisfied)
  WHERE NOT c.satisfied;`,
 		postgres.QuoteLiteral(ReplicationUser),
-		postgres.QuoteLiteral(ReasonPrimaryInRecovery),
-		postgres.QuoteLiteral(ReasonWALLevelNotLogical),
+		postgres.QuoteLiteral(reasonPrimaryInRecovery),
+		postgres.QuoteLiteral(reasonWALLevelNotLogical),
 		postgres.QuoteLiteral(ReasonRestartPending),
-		postgres.QuoteLiteral(ReasonReplicationRoleNotReady),
-		postgres.QuoteLiteral(ReasonReplicationHBAMissing),
+		postgres.QuoteLiteral(reasonReplicationRoleNotReady),
+		postgres.QuoteLiteral(reasonReplicationHBAMissing),
 		postgres.QuoteLiteral(hbaOrigin),
 		postgres.QuoteLiteral(hbaAuthMethod))
 }
@@ -97,15 +97,15 @@ func ParsePrimaryReadinessReasons(stdout string) []string {
 // condition message.
 func PrimaryReadinessMessage(reason string) string {
 	switch reason {
-	case ReasonPrimaryInRecovery:
+	case reasonPrimaryInRecovery:
 		return "the primary is in recovery; pg_createsubscriber needs a writable publisher"
-	case ReasonWALLevelNotLogical:
+	case reasonWALLevelNotLogical:
 		return `"wal_level" is not "logical"; set it back via spec.patroni.dynamicConfiguration`
 	case ReasonRestartPending:
 		return "PostgreSQL has a parameter change pending a restart, which would cut off the bootstrap"
-	case ReasonReplicationRoleNotReady:
+	case reasonReplicationRoleNotReady:
 		return "the " + ReplicationUser + " role has not been created yet"
-	case ReasonReplicationHBAMissing:
+	case reasonReplicationHBAMissing:
 		return "the pg_hba rules that let " + ReplicationUser + " reach the primary have not been written yet"
 	default:
 		return reason
@@ -151,7 +151,7 @@ func IgnoreSlotsMatchers(inCluster *v1beta1.PostgresCluster) []any {
 
 	return []any{map[string]any{
 		"type":   "logical",
-		"plugin": OutputPlugin,
+		"plugin": outputPlugin,
 	}}
 }
 

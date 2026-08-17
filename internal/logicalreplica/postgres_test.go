@@ -77,8 +77,8 @@ func TestPrimaryReadinessQuery(t *testing.T) {
 	// Every reason the parser can report has to be one the caller knows how to
 	// render, and each has to be reachable.
 	for _, reason := range []string{
-		ReasonPrimaryInRecovery, ReasonWALLevelNotLogical, ReasonRestartPending,
-		ReasonReplicationRoleNotReady, ReasonReplicationHBAMissing,
+		reasonPrimaryInRecovery, reasonWALLevelNotLogical, ReasonRestartPending,
+		reasonReplicationRoleNotReady, reasonReplicationHBAMissing,
 	} {
 		assert.Equal(t, strings.Count(query, postgres.QuoteLiteral(reason)), 1, reason)
 		assert.Assert(t, PrimaryReadinessMessage(reason) != reason, reason)
@@ -161,7 +161,7 @@ func TestIgnoreSlotsMatchers(t *testing.T) {
 	matcher, ok := matchers[0].(map[string]any)
 	assert.Assert(t, ok)
 	assert.Equal(t, matcher["type"], "logical")
-	assert.Equal(t, matcher["plugin"], OutputPlugin)
+	assert.Equal(t, matcher["plugin"], outputPlugin)
 	_, hasName := matcher["name"]
 	assert.Assert(t, !hasName)
 }
