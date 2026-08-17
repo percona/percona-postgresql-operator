@@ -19,6 +19,72 @@ func TestPostgresClusterWebhooks(t *testing.T) {
 	var _ webhook.CustomDefaulter = &PostgresCluster{}
 }
 
+func TestPostgresClusterHasReplicas(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *PostgresCluster
+		expected bool
+	}{
+		{
+			name: "nil cluster",
+		},
+		{
+			name:    "no instance sets",
+			cluster: &PostgresCluster{},
+		},
+		{
+			name: "replicas unset",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{{}},
+			}},
+		},
+		{
+			name: "zero replicas",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{{Replicas: new(int32)}},
+			}},
+		},
+		{
+			name: "one replica",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{{Replicas: new(int32(1))}},
+			}},
+		},
+		{
+			name: "multiple instance sets without replicas",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{
+					{Replicas: new(int32(1))},
+					{Replicas: nil},
+				},
+			}},
+		},
+		{
+			name: "instance set with replicas",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{{Replicas: new(int32(2))}},
+			}},
+			expected: true,
+		},
+		{
+			name: "replicas in later instance set",
+			cluster: &PostgresCluster{Spec: PostgresClusterSpec{
+				InstanceSets: []PostgresInstanceSetSpec{
+					{Replicas: nil},
+					{Replicas: new(int32(3))},
+				},
+			}},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.cluster.HasReplicas(), test.expected)
+		})
+	}
+}
+
 func TestPostgresClusterDefault(t *testing.T) {
 	ctx := context.Background()
 	t.Run("TypeMeta", func(t *testing.T) {

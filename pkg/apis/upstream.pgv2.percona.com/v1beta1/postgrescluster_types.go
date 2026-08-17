@@ -208,6 +208,20 @@ type PostgresClusterSpec struct {
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
+func (cluster *PostgresCluster) HasReplicas() bool {
+	if cluster == nil {
+		return false
+	}
+
+	for _, set := range cluster.Spec.InstanceSets {
+		if set.Replicas != nil && *set.Replicas > 1 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (cluster *PostgresCluster) PGBouncerUserSecrets() []string {
 	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
 		return nil
