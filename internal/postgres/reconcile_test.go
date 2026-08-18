@@ -15,7 +15,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -69,7 +68,7 @@ func TestInstancePod(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
-		naming.LabelVersion: version.Version(),
+		naming.LabelVersion: "3.2.0",
 	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)
@@ -917,7 +916,7 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	cluster.Spec.ImagePullPolicy = corev1.PullAlways
 	cluster.Spec.PostgresVersion = 11
 	cluster.SetLabels(map[string]string{
-		naming.LabelVersion: version.Version(),
+		naming.LabelVersion: "3.2.0",
 	})
 
 	dataVolume := new(corev1.PersistentVolumeClaim)

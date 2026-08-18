@@ -1557,7 +1557,7 @@ func (p PGInstanceSetSpec) ToCrunchy(version string) crunchyv1beta1.PostgresInst
 
 	// K8SPG-1086
 	currVersion, err := gover.NewVersion(version)
-	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("3.1.0"))) {
+	if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("3.2.0"))) {
 		set.LogVolumeClaimSpec = p.LogVolumeClaimSpec
 	}
 

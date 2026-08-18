@@ -394,7 +394,7 @@ func InstancePod(ctx context.Context,
 
 	// K8SPG-1086: Mount the log PVC whenever it exists. The startup command
 	// links the log directories on the data volume to this volume.
-	if inCluster.CompareVersion("3.1.0") >= 0 && inLogVolume != nil {
+	if inCluster.CompareVersion("3.2.0") >= 0 && inLogVolume != nil {
 		logVolumeMount := LogVolumeMount()
 		logVolume := corev1.Volume{
 			Name: logVolumeMount.Name,

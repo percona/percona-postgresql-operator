@@ -467,7 +467,7 @@ func startupCommand(
 		// remove them so PostgreSQL recreate real directories on
 		// the data volume.
 		func() string {
-			if cluster.CompareVersion("3.1.0") < 0 {
+			if cluster.CompareVersion("3.2.0") < 0 {
 				return "remove"
 			}
 
@@ -478,7 +478,7 @@ func startupCommand(
 		// remove them so pgBackRest recreate real directories on
 		// the data volume.
 		func() string {
-			if cluster.CompareVersion("3.1.0") < 0 {
+			if cluster.CompareVersion("3.2.0") < 0 {
 				return "remove"
 			}
 
@@ -489,7 +489,7 @@ func startupCommand(
 		// volume to it. Existing real directories are replaced with symlinks only during this
 		// transition; logs are expendable. An existing symlink is left as is.
 		func() string {
-			if cluster.CompareVersion("3.1.0") < 0 {
+			if cluster.CompareVersion("3.2.0") < 0 {
 				return "remove"
 			}
 

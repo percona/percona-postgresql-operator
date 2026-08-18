@@ -646,9 +646,9 @@ func TestPGInstanceSetSpec_ToCrunchyLogVolume(t *testing.T) {
 		},
 	}
 
-	assert.Nil(t, spec.ToCrunchy("3.0.0").LogVolumeClaimSpec,
-		"logVolumeClaimSpec should be ignored below CRVersion 3.1.0")
-	assert.NotNil(t, spec.ToCrunchy("3.1.0").LogVolumeClaimSpec)
+	assert.Nil(t, spec.ToCrunchy("3.1.0").LogVolumeClaimSpec,
+		"logVolumeClaimSpec should be ignored below CRVersion 3.2.0")
+	assert.NotNil(t, spec.ToCrunchy("3.2.0").LogVolumeClaimSpec)
 }
 
 func TestValidateDynamicConfiguration(t *testing.T) {

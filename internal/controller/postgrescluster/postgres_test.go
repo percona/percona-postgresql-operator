@@ -933,6 +933,7 @@ func TestReconcilePostgresLogVolume(t *testing.T) {
 	cluster := testCluster()
 	ns := setupNamespace(t, tClient)
 	cluster.Namespace = ns.Name
+	cluster.SetLabels(map[string]string{naming.LabelVersion: "3.2.0"})
 
 	assert.NilError(t, tClient.Create(ctx, cluster))
 	t.Cleanup(func() { assert.Check(t, tClient.Delete(ctx, cluster)) })
