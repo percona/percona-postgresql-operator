@@ -3,8 +3,10 @@ kind: TestStep
 delete:
 - apiVersion: pgv2.percona.com/v2
   kind: PerconaPGCluster
-  name: start-from-backup-tde-source
+  metadata:
+    name: start-from-backup-tde-source
 - apiVersion: upstream.pgv2.percona.com/v1beta1
   kind: PostgresCluster
-  name: start-from-backup-tde-source
+  metadata:
+    name: start-from-backup-tde-source
 timeout: 300
