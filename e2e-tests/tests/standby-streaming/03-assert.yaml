@@ -63,19 +63,43 @@ commands:
       condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].reason}')
       condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].message}')
       condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].observedGeneration}')
-      test "$condStatus" = "True"
-      test "$condReason" = "ReplicatedFromSource"
-      test "$condMsg" = "pg_tde arrived with the data replicated from the source cluster"
-      test "$condGen" = "1"
+      if [[ "${condStatus}" != "True" ]]; then
+        echo "expected PGTDEEnabled status True, got ${condStatus}"
+        exit 1
+      fi
+      if [[ "${condReason}" != "ReplicatedFromSource" ]]; then
+        echo "expected PGTDEEnabled reason ReplicatedFromSource, got ${condReason}"
+        exit 1
+      fi
+      if [[ "${condMsg}" != "pg_tde arrived with the data replicated from the source cluster" ]]; then
+        echo "expected PGTDEEnabled message 'pg_tde arrived with the data replicated from the source cluster', got ${condMsg}"
+        exit 1
+      fi
+      if [[ "${condGen}" != "1" ]]; then
+        echo "expected PGTDEEnabled observedGeneration 1, got ${condGen}"
+        exit 1
+      fi
 
       condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
       condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
       condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].message}')
       condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].observedGeneration}')
-      test "$condStatus" = "True"
-      test "$condReason" = "ReplicatedFromSource"
-      test "$condMsg" = "pg_tde fetched its principal key using the replicated key provider"
-      test "$condGen" = "1"
+      if [[ "${condStatus}" != "True" ]]; then
+        echo "expected PGTDEVaultProviderReady status True, got ${condStatus}"
+        exit 1
+      fi
+      if [[ "${condReason}" != "ReplicatedFromSource" ]]; then
+        echo "expected PGTDEVaultProviderReady reason ReplicatedFromSource, got ${condReason}"
+        exit 1
+      fi
+      if [[ "${condMsg}" != "pg_tde fetched its principal key using the replicated key provider" ]]; then
+        echo "expected PGTDEVaultProviderReady message 'pg_tde fetched its principal key using the replicated key provider', got ${condMsg}"
+        exit 1
+      fi
+      if [[ "${condGen}" != "1" ]]; then
+        echo "expected PGTDEVaultProviderReady observedGeneration 1, got ${condGen}"
+        exit 1
+      fi
 ---
 apiVersion: apps/v1
 kind: StatefulSet
