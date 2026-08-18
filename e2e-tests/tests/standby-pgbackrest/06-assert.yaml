@@ -11,5 +11,11 @@ commands:
       condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].status}')
       condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].reason}')
       condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].message}')
-      test "$condStatus" = "False"
-      test "$condReason" = "LagNotDetected"
+      if [[ "${condStatus}" != "False" ]]; then
+        echo "expected StandbyLagging status False, got ${condStatus}"
+        exit 1
+      fi
+      if [[ "${condReason}" != "LagNotDetected" ]]; then
+        echo "expected StandbyLagging reason LagNotDetected, got ${condReason}"
+        exit 1
+      fi

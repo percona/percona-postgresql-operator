@@ -11,6 +11,15 @@ commands:
       condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].status}')
       condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].reason}')
       condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="StandbyLagging")].message}')
-      test "$condStatus" = "True"
-      test "$condReason" = "LagDetected"
-      test "$condMsg" = "WAL is lagging by $lagBytes bytes (threshold: 1024 bytes)"
+      if [[ "${condStatus}" != "True" ]]; then
+        echo "expected StandbyLagging status True, got ${condStatus}"
+        exit 1
+      fi
+      if [[ "${condReason}" != "LagDetected" ]]; then
+        echo "expected StandbyLagging reason LagDetected, got ${condReason}"
+        exit 1
+      fi
+      if [[ "${condMsg}" != "WAL is lagging by ${lagBytes} bytes (threshold: 1024 bytes)" ]]; then
+        echo "expected StandbyLagging message 'WAL is lagging by ${lagBytes} bytes (threshold: 1024 bytes)', got ${condMsg}"
+        exit 1
+      fi
