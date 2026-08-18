@@ -313,3 +313,14 @@ func TestMetadataGetAnnotations(t *testing.T) {
 		})
 	}
 }
+
+func TestIsStandby(t *testing.T) {
+	var cluster PostgresCluster
+	assert.Assert(t, !cluster.IsStandby(), "expected no standby spec to mean no standby")
+
+	cluster.Spec.Standby = &PostgresStandbySpec{RepoName: "repo1"}
+	assert.Assert(t, !cluster.IsStandby(), "expected a disabled standby spec to mean no standby")
+
+	cluster.Spec.Standby.Enabled = true
+	assert.Assert(t, cluster.IsStandby())
+}

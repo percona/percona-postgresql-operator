@@ -155,8 +155,8 @@ go-fix: ## Run go fix on all packages
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-	$(MAKE) go-fix
 	$(MAKE) generate-all
+	$(MAKE) go-fix
 
 .PHONY: generate-all
 generate-all: kustomize

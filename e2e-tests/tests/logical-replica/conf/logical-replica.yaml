@@ -1,0 +1,17 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+spec:
+  instances:
+  - name: instance1
+    replicas: 2
+    dataVolumeClaimSpec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+  # This test covers both bootstrap methods and an in-place restore of the
+  # cluster, so it keeps the pgBackRest repository both of those read from.
+  proxy:
+    pgBouncer:
+      replicas: 1

@@ -1,0 +1,56 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+      statefulsets=$(kubectl -n "$NAMESPACE" get statefulset \
+        -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/data=postgres \
+        -o json)
+      jq -e '.items | length == 3' <<<"$statefulsets" >/dev/null
+      instances=$(jq -r '.items[].metadata.name' <<<"$statefulsets" | sort)
+
+      for instance in $instances; do
+        instance_service=$(kubectl -n "$NAMESPACE" get statefulset "$instance" \
+          -o jsonpath='{.spec.serviceName}')
+        instance_name="${instance}-0.${instance_service}"
+        instance_names=(
+          "${instance_name}.${NAMESPACE}.svc.cluster.local"
+          "${instance_name}.${NAMESPACE}.svc"
+          "${instance_name}.${NAMESPACE}"
+          "$instance_name"
+        )
+
+        issue_certificate "$instance" \
+          "${instance}-0" serverAuth \
+          "${instance_names[@]}"
+        cp "$TEMP_DIR/${instance}.key" "$TEMP_DIR/${instance}.patroni.crt-combined"
+        cat "$TEMP_DIR/${instance}.crt" >>"$TEMP_DIR/${instance}.patroni.crt-combined"
+
+        kubectl -n "$NAMESPACE" create secret generic "${instance}-certs" \
+          --from-file=dns.crt="$TEMP_DIR/${instance}.crt" \
+          --from-file=dns.key="$TEMP_DIR/${instance}.key" \
+          --from-file=patroni.ca-roots="$TEMP_DIR/root-ca.crt" \
+          --from-file=patroni.crt-combined="$TEMP_DIR/${instance}.patroni.crt-combined" \
+          --from-file=pgbackrest-server.crt="$TEMP_DIR/${instance}.crt" \
+          --from-file=pgbackrest-server.key="$TEMP_DIR/${instance}.key" \
+          --dry-run=client -o yaml \
+          | kubectl label --local -f - -o yaml \
+            postgres-operator.crunchydata.com/cluster="$cluster" \
+            postgres-operator.crunchydata.com/instance="$instance" \
+            postgres-operator.crunchydata.com/instance-set=instance1 \
+          | kubectl -n "$NAMESPACE" apply -f -
+
+        secret="${instance}-certs"
+        checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+          | jq --compact-output --sort-keys '.data' \
+          | sha256sum | awk '{print $1}')
+        kubectl -n "$NAMESPACE" annotate secret "$secret" \
+          e2e.percona.com/secret-checksum="$checksum" \
+          --overwrite
+      done
