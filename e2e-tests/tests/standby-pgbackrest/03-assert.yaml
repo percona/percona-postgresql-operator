@@ -115,7 +115,7 @@ metadata:
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v1beta1
+  - apiVersion: postgres-operator.crunchydata.com/v1beta1
     blockOwnerDeletion: true
     controller: true
     kind: PostgresCluster
@@ -135,7 +135,7 @@ metadata:
     postgres-operator.crunchydata.com/cluster: standby-cluster
     postgres-operator.crunchydata.com/role: pgbouncer
   ownerReferences:
-    - apiVersion: upstream.pgv2.percona.com/v1beta1
+    - apiVersion: postgres-operator.crunchydata.com/v1beta1
       kind: PostgresCluster
       name: standby-cluster
       controller: true
@@ -146,7 +146,7 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
-apiVersion: upstream.pgv2.percona.com/v1beta1
+apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: standby-cluster
