@@ -21,6 +21,7 @@ major-upgrade-17-to-18
 ldap
 ldap-tls
 logcollection
+log-volume
 monitoring
 one-pod
 repo-host-autogrow
@@ -38,6 +39,7 @@ standby-streaming
 start-from-backup
 start-from-volumes
 tablespaces
+wal-volume
 telemetry-transfer
 upgrade-consistency
 upgrade-minor
