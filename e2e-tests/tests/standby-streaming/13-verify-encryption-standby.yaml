@@ -1,0 +1,106 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o xtrace
+      set -o errexit
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri standby-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-extension-standby --from-literal=pg_tde_extension="$result"
+
+      # verify encryption of database created before switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp"
+
+      # After switchover the standby uses its own PostgresCluster uid in the TDE key.
+      assert_pg_tde_key_info_uid \
+        "$(get_psql_uri standby-cluster postgres)/myapp" \
+        standby-cluster
+
+      # verify encryption of second database created after switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable2');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby2 --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2"
+
+      assert_pg_tde_key_info_uid \
+        "$(get_psql_uri standby-cluster postgres)/myapp2" \
+        standby-cluster
+
+      # After switchover standby-cluster is the primary, so archive_command is live.
+      pgversion=$(kubectl -n ${NAMESPACE} get pg standby-cluster -o jsonpath='{.spec.postgresVersion}')
+      primary=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
+      replica=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
+
+      if [[ $(kubectl -n ${NAMESPACE} exec ${primary} -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
+        echo "pg_tde.wal_encrypt is not enabled in ${primary} after switchover"
+        exit 1
+      fi
+
+      for pod in $(kubectl -n ${NAMESPACE} get pods -o name \
+        --selector=postgres-operator.crunchydata.com/cluster=standby-cluster,postgres-operator.crunchydata.com/data=postgres); do
+        annotation=$(kubectl -n ${NAMESPACE} get ${pod} -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
+        if [[ ${annotation} != "true" ]]; then
+          echo "${pod} is not annotated for WAL encryption: ${annotation}"
+          exit 1
+        fi
+
+        target=$(kubectl -n ${NAMESPACE} exec ${pod} -c database -- readlink /pgdata/pg_tde)
+        if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
+          echo "${pod} does not link the pg_tde keyring: ${target}"
+          exit 1
+        fi
+        if ! kubectl -n ${NAMESPACE} exec ${pod} -c database -- test -d /pgdata/pg_tde; then
+          echo "${pod} pg_tde keyring link does not resolve"
+          exit 1
+        fi
+      done
+
+      archive_command=$(kubectl -n ${NAMESPACE} exec ${primary} -c database -- psql -t -A -c 'SHOW archive_command;')
+      if [[ ${archive_command} != 'pg_tde_archive_decrypt %f %p "pgbackrest --stanza=db archive-push %%p"'* ]]; then
+        echo "archive_command doesn't start with the pg_tde_archive_decrypt wrapper in ${primary}: ${archive_command}"
+        exit 1
+      fi
+
+      if [[ ${archive_command} != *'pg_tde_waldump'* ]]; then
+        echo "archive_command doesn't use pg_tde_waldump in ${primary}: ${archive_command}"
+        exit 1
+      fi
+
+      restore_command=$(kubectl -n ${NAMESPACE} exec ${replica} -c database -- psql -t -A -c 'SHOW restore_command;')
+      if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
+        echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${replica}: ${restore_command}"
+        exit 1
+      fi
+
+      for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
+        conf=$(kubectl get -n ${NAMESPACE} cm standby-cluster-pgbackrest-config -o yaml | yq '.data."'"${key}"'"')
+        if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
+          echo "no checksum-page in ${key}"
+          exit 1
+        fi
+      done
+
+      instance_conf=$(kubectl get -n ${NAMESPACE} cm standby-cluster-pgbackrest-config -o yaml | yq '.data."pgbackrest_instance.conf"')
+      if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
+        echo "archive-async is not disabled in pgbackrest_instance.conf"
+        exit 1
+      fi
+
