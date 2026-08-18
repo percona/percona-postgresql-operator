@@ -139,7 +139,7 @@ func (r *PGClusterReconciler) suspendLogicalReplicas(ctx context.Context, cr *v2
 			}
 
 			status.State = v2.LogicalReplicaStateBootstrapping
-			status.Message = "the bootstrap was cancelled because the logical replica is suspended"
+			status.Message = "the bootstrap was canceled because the logical replica is suspended"
 			status.Databases = nil
 		}
 

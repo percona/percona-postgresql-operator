@@ -184,7 +184,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicas(
 
 		// bootstrap logical replicas one by one
 		// otherwise we might think primary has enough free slots
-		// even when it hasn't to accomodate all pending replicas
+		// even when it hasn't to accommodate all pending replicas
 		if status.State == v2.LogicalReplicaStateBootstrapping {
 			return true, r.updateLogicalReplicaStatus(ctx, cr, statuses, &readiness)
 		}
@@ -602,7 +602,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaPVC(
 	// and report success, and the bootstrap Job would then mount a volume that
 	// disappears from under it - or the old data, which the Job refuses to seed
 	// over. A replica removed from the spec and added straight back, or a
-	// cancelled bootstrap, opens that window.
+	// canceled bootstrap, opens that window.
 	existing := &corev1.PersistentVolumeClaim{}
 	switch err := r.Client.Get(ctx, client.ObjectKeyFromObject(pvc), existing); {
 	case err == nil && existing.DeletionTimestamp != nil:

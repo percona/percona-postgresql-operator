@@ -170,12 +170,15 @@ var _ = Describe("Logical replicas", Ordered, func() {
 		}}
 
 		for _, reason := range []string{
-			"PrimaryPodNotFound", "ReplicationSecretMissing", "PrimaryUnreachable", "PrimaryReady",
-			logicalreplica.ReasonPrimaryInRecovery,
-			logicalreplica.ReasonWALLevelNotLogical,
-			logicalreplica.ReasonRestartPending,
-			logicalreplica.ReasonReplicationRoleNotReady,
-			logicalreplica.ReasonReplicationHBAMissing,
+			"PrimaryPodNotFound",
+			"ReplicationSecretMissing",
+			"PrimaryUnreachable",
+			"PrimaryReady",
+			"PrimaryInRecovery",
+			"WALLevelNotLogical",
+			"RestartPending",
+			"ReplicationRoleNotReady",
+			"ReplicationHBAMissing",
 		} {
 			Expect(r.updateLogicalReplicaStatus(ctx, cr, statuses, &metav1.Condition{
 				Type:    pNaming.ConditionReadyForLogicalReplication,

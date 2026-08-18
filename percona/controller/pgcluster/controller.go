@@ -137,7 +137,7 @@ func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service
 }
 
 // watchJobs enqueues the cluster of a Job whose status changed, as long as the
-// Job carries ownerLabel. Every Job the operator creates is labelled with its
+// Job carries ownerLabel. Every Job the operator creates is labeled with its
 // cluster, so LabelCluster alone would wake the reconciler for all of them.
 func (r *PGClusterReconciler) watchJobs(ownerLabel string) handler.TypedFuncs[*batchv1.Job, reconcile.Request] {
 	return handler.TypedFuncs[*batchv1.Job, reconcile.Request]{

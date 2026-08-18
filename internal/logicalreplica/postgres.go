@@ -180,7 +180,7 @@ func DisableOnErrorSQL(replica, db string) string {
 }
 
 // identifier folds the given parts to [a-z0-9_], caps the result at
-// NAMEDATALEN-1, and always appends a hash so that names which sanitise or
+// NAMEDATALEN-1, and always appends a hash so that names which sanitize or
 // truncate alike stay distinct.
 func identifier(prefix, replica, db string) string {
 	sum := sha256.Sum256([]byte(replica + "\x00" + db))
