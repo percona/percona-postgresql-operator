@@ -174,6 +174,14 @@ type PostgresClusterSpec struct {
 	// +optional
 	Standby *PostgresStandbySpec `json:"standby,omitempty"`
 
+	// Logical replicas of this cluster, managed by the Percona layer. Only the
+	// names are mirrored here: this layer uses their presence to render the
+	// pg_hba rules for the logical replication user and Patroni's ignore_slots.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	LogicalReplicas []LogicalReplicaSpec `json:"logicalReplicas,omitempty"`
+
 	// A list of group IDs applied to the process of a container. These can be
 	// useful when accessing shared file systems with constrained permissions.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
@@ -831,6 +839,16 @@ type PostgresStandbySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1024
 	Port *int32 `json:"port,omitempty"`
+}
+
+// LogicalReplicaSpec is the projection of a Percona logical replica onto this
+// spec. The Percona layer owns the full definition and the whole lifecycle of
+// the replica; only what this layer needs to render server configuration is
+// carried over.
+type LogicalReplicaSpec struct {
+	// Name of the logical replica.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 }
 
 // UserInterfaceSpec is a union of the supported PostgreSQL user interfaces.
