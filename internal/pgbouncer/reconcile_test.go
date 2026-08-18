@@ -14,6 +14,7 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -213,6 +214,85 @@ func TestSecretAdminPassword(t *testing.T) {
 		assert.Assert(t, !strings.Contains(string(intent.Data["pgbouncer-users.txt"]),
 			"_crunchypgbounceradmin"))
 	})
+}
+
+func TestSecretCertManagementPolicy(t *testing.T) {
+	t.Parallel()
+
+	root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+
+	tests := []struct {
+		name          string
+		policy        v1beta1.CertManagementPolicy
+		customTLS     bool
+		expectTLSData bool
+	}{
+		{
+			name:          "auto generates TLS data in the operator Secret",
+			policy:        v1beta1.CertManagementAuto,
+			expectTLSData: true,
+		},
+		{
+			name:      "auto with custom TLS leaves TLS data out of the operator Secret",
+			policy:    v1beta1.CertManagementAuto,
+			customTLS: true,
+		},
+		{
+			name:          "user provided only preserves TLS data",
+			policy:        v1beta1.CertManagementUserProvidedOnly,
+			expectTLSData: true,
+		},
+		{
+			name:      "user provided only with custom TLS does not generate TLS data",
+			policy:    v1beta1.CertManagementUserProvidedOnly,
+			customTLS: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			cluster := new(v1beta1.PostgresCluster)
+			cluster.Spec.Proxy = &v1beta1.PostgresProxySpec{
+				PGBouncer: new(v1beta1.PGBouncerPodSpec),
+			}
+			cluster.Spec.TLS = &v1beta1.TLSSpec{CertManagementPolicy: tt.policy}
+			if tt.customTLS {
+				cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "custom-pgbouncer-tls"},
+				}
+			}
+			assert.NilError(t, cluster.Default(ctx, nil))
+
+			existing := &corev1.Secret{Data: map[string][]byte{
+				"pgbouncer-frontend.ca-roots": []byte("user-ca"),
+				"pgbouncer-frontend.crt":      []byte("user-cert"),
+				"pgbouncer-frontend.key":      []byte("user-key"),
+			}}
+			intent := new(corev1.Secret)
+			service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns1", Name: "some-name",
+			}}
+
+			err := Secret(ctx, cluster, root, existing, nil,
+				service, intent, nil, nil)
+			require.NoError(t, err)
+
+			assert.Assert(t, len(intent.Data["pgbouncer-password"]) != 0)
+			assert.Assert(t, len(intent.Data["pgbouncer-verifier"]) != 0)
+			assert.Assert(t, len(intent.Data["pgbouncer-users.txt"]) != 0)
+
+			for _, key := range []string{
+				"pgbouncer-frontend.ca-roots",
+				"pgbouncer-frontend.crt",
+				"pgbouncer-frontend.key",
+			} {
+				_, found := intent.Data[key]
+				assert.Equal(t, found, tt.expectTLSData, key)
+			}
+		})
+	}
 }
 
 func TestSecretAdditionalCAs(t *testing.T) {

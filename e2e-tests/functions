@@ -56,8 +56,8 @@ function deploy_operator() {
 		create_namespace $OPERATOR_NS
 		cw_prefix="cw-"
 	fi
-	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
 	local disable_telemetry=true
 	if [ "${test_name}" == "telemetry-transfer" ]; then
@@ -77,8 +77,8 @@ function update_operator() {
 		cw_prefix="cw-"
 	fi
 
-	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
-	retry 5 5 kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/crd.yaml"
+	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply --server-side --force-conflicts -f "${DEPLOY_DIR}/${cw_prefix}rbac.yaml"
 
 	local disable_telemetry=true
 	if [ "${test_name}" == "telemetry-transfer" ]; then
@@ -363,18 +363,14 @@ function get_client_pod() {
 }
 
 function get_cr() {
-	local cr_name=$1
+	local cr_name=${1:-"${test_name}"}
 	local repo_path=$2
 	local source_path=$3
-	if [ -z "$cr_name" ]; then
-		cr_name=${test_name}
-	fi
-
 	local platform="${PLATFORM}"
-	local platform_config="${platform}"
 	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
-	local platform_cr_file="$TEST_CONFIG_DIR/${cr_name}-${platform_config}.yaml"
+	local platform_cr_file="$TEST_CONFIG_DIR/${cr_name}-${platform}.yaml"
 	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
+
 	if [[ -f $platform_cr_file ]]; then
 		cr_file=$platform_cr_file
 	elif [[ ($platform == "doks") && -f $spaces_cr_file ]]; then
@@ -478,7 +474,7 @@ function list_pgbouncer_pods() {
 		-o jsonpath='{.items[*].metadata.name}'
 }
 
-get_pod_ip() {
+function get_pod_ip() {
 	local pod=${1}
 
 	kubectl -n "${NAMESPACE}" get "pod/${pod}" -o jsonpath='{.status.podIP}'
@@ -1032,16 +1028,6 @@ function network_unblock_storage_endpoint() {
 		-m string --algo bm --string "${endpoint}" \
 		-m comment --comment pgo-e2e-block-storage \
 		-j REJECT --reject-with tcp-reset
-}
-
-function block_external_egress() {
-	local ns="$1"
-	local cluster="$2"
-	local file="${TESTS_CONFIG_DIR}/block-external-egress.yml"
-
-	sed \
-		-e "s#test-cluster#${cluster}#g" \
-		"$file" | kubectl apply --namespace "${ns}" -f -
 }
 
 function wait_deployment() {
@@ -2279,11 +2265,8 @@ function vault_tls() {
 	local secret_name=$name
 	local csr_name=vault-csr-${RANDOM}
 	local csr_signer
-	local platform="${PLATFORM}"
 
-	echo "Detected platform: ${platform}"
-
-	case ${platform} in
+	case ${PLATFORM} in
 		eks)
 			csr_signer="beta.eks.amazonaws.com/app-serving"
 			;;
@@ -2309,6 +2292,7 @@ function vault_tls() {
 			 .spec.signerName = strenv(CSR_SIGNER)' \
 		"${TESTS_CONFIG_DIR}/vault-csr.yaml" >${tmp_dir}/csr.yaml
 
+	kubectl delete csr ${csr_name} --ignore-not-found
 	kubectl create -f ${tmp_dir}/csr.yaml
 	sleep 10
 	kubectl certificate approve ${csr_name}
@@ -2396,4 +2380,60 @@ function start_vault() {
 	kubectl -n "${NAMESPACE}" create secret generic vault-secret \
 		--from-literal=token=${token} \
 		--from-file=ca.crt=${tmp_dir}/vault.ca
+}
+
+function issue_root_ca() {
+	openssl ecparam -name prime256v1 -genkey \
+		-noout -out "$TEMP_DIR/root-ca.key"
+	openssl req -new -x509 \
+		-key "$TEMP_DIR/root-ca.key" \
+		-days 3650 \
+		-sha384 \
+		-config "$TESTS_CONFIG_DIR/tls-root-ca.conf" \
+		-out "$TEMP_DIR/root-ca.crt"
+	openssl verify \
+		-CAfile "$TEMP_DIR/root-ca.crt" \
+		"$TEMP_DIR/root-ca.crt"
+}
+
+function issue_certificate() {
+	local name="$1"
+	local common_name="$2"
+	local purpose="$3"
+	shift 3
+
+	if ((${#common_name} > 64)); then
+		printf 'certificate Common Name exceeds 64 characters: %s\n' \
+			"$common_name" >&2
+		return 1
+	fi
+
+	awk -v common_name="$common_name" -v purpose="$purpose" '
+		{sub("<common-name>", common_name); sub("<purpose>", purpose); print}
+	' "$TESTS_CONFIG_DIR/tls-certificate.conf" >"$TEMP_DIR/${name}.conf"
+
+	local index=1
+	local dns_name
+	for dns_name in "$@"; do
+		printf 'DNS.%d = %s\n' "$index" "$dns_name" \
+			>>"$TEMP_DIR/${name}.conf"
+		index=$((index + 1))
+	done
+
+	openssl ecparam -name prime256v1 -genkey \
+		-noout -out "$TEMP_DIR/${name}.key"
+	openssl req -new \
+		-key "$TEMP_DIR/${name}.key" \
+		-out "$TEMP_DIR/${name}.csr" \
+		-config "$TEMP_DIR/${name}.conf"
+	openssl x509 -req \
+		-in "$TEMP_DIR/${name}.csr" \
+		-CA "$TEMP_DIR/root-ca.crt" \
+		-CAkey "$TEMP_DIR/root-ca.key" \
+		-CAcreateserial \
+		-days 365 \
+		-sha384 \
+		-extensions extensions \
+		-extfile "$TEMP_DIR/${name}.conf" \
+		-out "$TEMP_DIR/${name}.crt"
 }

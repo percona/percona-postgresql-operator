@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      CLONE=start-from-volumes-clone
+      PVC=$(kubectl -n "${NAMESPACE}" get configmap volume-source -o jsonpath='{.data.pvc-name}')
+      DIR=$(kubectl -n "${NAMESPACE}" get configmap volume-source -o jsonpath='{.data.directory}')
+
+      get_cr "${CLONE}" "${RANDOM}" \
+        | yq eval '
+            .spec.proxy.pgBouncer.replicas=1 |
+            .spec.instances[].replicas=1 |
+            .spec.dataSource.volumes.pgDataVolume.pvcName="'"${PVC}"'" |
+            .spec.dataSource.volumes.pgDataVolume.directory="'"${DIR}"'"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
