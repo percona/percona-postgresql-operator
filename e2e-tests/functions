@@ -562,7 +562,7 @@ function copy_custom_extensions_form_aws() {
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+	retry 2 20 kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
 		--image=perconalab/awscli \
 		--restart=Never -- \
 		bash -c "
