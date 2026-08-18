@@ -2,6 +2,8 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 480
 commands:
+  - script: |-
+      kubectl wait --for=jsonpath='{.metadata.annotations.pgv2\.percona\.com/replication-main-site}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
   - timeout: 60
     script: |
       set -o errexit
@@ -37,6 +39,10 @@ commands:
       restore_command=$(kubectl -n ${NAMESPACE} exec ${standby_leader} -c database -- psql -t -A -c 'SHOW restore_command;')
       if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
         echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${standby_leader}: ${restore_command}"
+        exit 1
+      fi
+      if [[ ${restore_command} != *'--repo=1'* ]]; then
+        echo "restore_command doesn't target repo1 in ${standby_leader}: ${restore_command}"
         exit 1
       fi
 
@@ -75,8 +81,8 @@ commands:
         echo "expected PGTDEEnabled message 'pg_tde arrived with the data replicated from the source cluster', got ${condMsg}"
         exit 1
       fi
-      if [[ "${condGen}" != "1" ]]; then
-        echo "expected PGTDEEnabled observedGeneration 1, got ${condGen}"
+      if [[ "${condGen}" != "2" ]]; then
+        echo "expected PGTDEEnabled observedGeneration 2, got ${condGen}"
         exit 1
       fi
 
@@ -96,8 +102,8 @@ commands:
         echo "expected PGTDEVaultProviderReady message 'pg_tde fetched its principal key using the replicated key provider', got ${condMsg}"
         exit 1
       fi
-      if [[ "${condGen}" != "1" ]]; then
-        echo "expected PGTDEVaultProviderReady observedGeneration 1, got ${condGen}"
+      if [[ "${condGen}" != "2" ]]; then
+        echo "expected PGTDEVaultProviderReady observedGeneration 2, got ${condGen}"
         exit 1
       fi
 ---
