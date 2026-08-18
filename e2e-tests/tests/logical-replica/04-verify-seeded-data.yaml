@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 120
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+
+      # The row predates both replicas, so it can only be there because the
+      # physical seed brought it along. This is what proves each bootstrap
+      # method copied the data directory correctly.
+      for replica in analytics reporting; do
+        REPLICA="logical-replica-lr-${replica}.${NAMESPACE}.svc"
+
+        data=$(run_psql \
+          '\c logical-replica \\\ SELECT id FROM lr_test ORDER BY id;' \
+          "postgres://postgres:${PASS}@${REPLICA}")
+
+        if [[ $(echo ${data} | xargs) != "1" ]]; then
+          echo "ERROR: expected the seeded row on ${replica}, got: ${data}"
+          exit 1
+        fi
+      done
