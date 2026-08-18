@@ -44,6 +44,7 @@ import (
 	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v2/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
@@ -283,6 +284,7 @@ func (r *Reconciler) Reconcile(
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
+	logicalreplica.PostgreSQLHBAs(cluster, &pgHBAs)
 
 	// K8SPG-554
 	if cluster.Spec.TLSOnly {

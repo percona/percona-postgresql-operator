@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 30
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr | kubectl -n "${NAMESPACE}" apply -f -

@@ -1,0 +1,41 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 30
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      # Both seeding methods against the same primary and the same database.
+      # The slot, publication and subscription names all carry the replica name,
+      # so the two never collide.
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["logical-replica"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            },
+            {
+              "name": "reporting",
+              "databases": ["logical-replica"],
+              "bootstrapMethod": "pg_basebackup",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'
