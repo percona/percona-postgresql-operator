@@ -9,5 +9,5 @@ commands:
       source ../../functions
       init_temp_dir
 
-      destroy_cert_manager
+      deploy_cert_manager
       deploy_operator

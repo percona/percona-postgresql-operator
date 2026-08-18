@@ -235,17 +235,22 @@ func AddConfigToRestorePod(
 	addConfigVolumeAndMounts(pod, append(sources, configmap, secret))
 }
 
+// ConfigVolumeMount returns the mount [AddConfigToRestorePod] adds to a Pod.
+func ConfigVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "pgbackrest-config",
+		MountPath: configDirectory,
+		ReadOnly:  true,
+	}
+}
+
 // addConfigVolumeAndMounts adds the config projections to pod as the
 // configuration volume. It mounts that volume to the database container and
 // all pgBackRest containers in pod.
 func addConfigVolumeAndMounts(
 	pod *corev1.PodSpec, config []corev1.VolumeProjection,
 ) {
-	configVolumeMount := corev1.VolumeMount{
-		Name:      "pgbackrest-config",
-		MountPath: configDirectory,
-		ReadOnly:  true,
-	}
+	configVolumeMount := ConfigVolumeMount()
 
 	configVolume := corev1.Volume{
 		Name: configVolumeMount.Name,

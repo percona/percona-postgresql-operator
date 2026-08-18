@@ -1,0 +1,102 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["logical-replica"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            },
+            {
+              "name": "nodb",
+              "databases": ["not-created-yet"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'
+
+      waiting_for_databases() {
+        local state reason
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="nodb")].state}')
+        reason=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="nodb")].reason}')
+
+        echo "logical replica nodb: state='${state}' reason='${reason}'"
+        [[ ${state} == "bootstrapping" && ${reason} == "WaitingForDatabases" ]]
+      }
+
+      retry 30 5 waiting_for_databases
+
+      kubectl -n "${NAMESPACE}" get pg logical-replica \
+        -o jsonpath='{.status.logicalReplicas[?(@.name=="nodb")].message}' \
+        | grep -q "not-created-yet"
+
+      test -z "$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+        -o jsonpath='{.status.logicalReplicas[?(@.name=="nodb")].databases}')"
+
+      test -z "$(kubectl -n "${NAMESPACE}" get job \
+        -l "pgv2.percona.com/logical-replica=nodb" -o name)"
+
+      test -z "$(kubectl -n "${NAMESPACE}" get pvc,statefulset,configmap \
+        -l "pgv2.percona.com/logical-replica=nodb" -o name)"
+
+      analytics_still_ready() {
+        local state
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].state}')
+
+        echo "logical replica analytics state: ${state}"
+        [[ ${state} == "ready" ]]
+      }
+
+      retry 12 5 analytics_still_ready
+
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["logical-replica"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'
+
+      status_entry_gone() {
+        local got
+        got=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="nodb")].name}')
+
+        echo "status entry for nodb: '${got}'"
+        [[ -z ${got} ]]
+      }
+
+      retry 30 5 status_entry_gone
