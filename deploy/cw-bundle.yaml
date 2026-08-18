@@ -13051,6 +13051,650 @@ spec:
                 required:
                 - image
                 type: object
+              logicalReplicas:
+                items:
+                  properties:
+                    affinity:
+                      properties:
+                        nodeAffinity:
+                          properties:
+                            preferredDuringSchedulingIgnoredDuringExecution:
+                              items:
+                                properties:
+                                  preference:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchFields:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  weight:
+                                    format: int32
+                                    type: integer
+                                required:
+                                - preference
+                                - weight
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            requiredDuringSchedulingIgnoredDuringExecution:
+                              properties:
+                                nodeSelectorTerms:
+                                  items:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchFields:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              required:
+                              - nodeSelectorTerms
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                        podAffinity:
+                          properties:
+                            preferredDuringSchedulingIgnoredDuringExecution:
+                              items:
+                                properties:
+                                  podAffinityTerm:
+                                    properties:
+                                      labelSelector:
+                                        properties:
+                                          matchExpressions:
+                                            items:
+                                              properties:
+                                                key:
+                                                  type: string
+                                                operator:
+                                                  type: string
+                                                values:
+                                                  items:
+                                                    type: string
+                                                  type: array
+                                                  x-kubernetes-list-type: atomic
+                                              required:
+                                              - key
+                                              - operator
+                                              type: object
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                          matchLabels:
+                                            additionalProperties:
+                                              type: string
+                                            type: object
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      matchLabelKeys:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      mismatchLabelKeys:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      namespaceSelector:
+                                        properties:
+                                          matchExpressions:
+                                            items:
+                                              properties:
+                                                key:
+                                                  type: string
+                                                operator:
+                                                  type: string
+                                                values:
+                                                  items:
+                                                    type: string
+                                                  type: array
+                                                  x-kubernetes-list-type: atomic
+                                              required:
+                                              - key
+                                              - operator
+                                              type: object
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                          matchLabels:
+                                            additionalProperties:
+                                              type: string
+                                            type: object
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      namespaces:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      topologyKey:
+                                        type: string
+                                    required:
+                                    - topologyKey
+                                    type: object
+                                  weight:
+                                    format: int32
+                                    type: integer
+                                required:
+                                - podAffinityTerm
+                                - weight
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            requiredDuringSchedulingIgnoredDuringExecution:
+                              items:
+                                properties:
+                                  labelSelector:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  matchLabelKeys:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  mismatchLabelKeys:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  namespaceSelector:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  namespaces:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  topologyKey:
+                                    type: string
+                                required:
+                                - topologyKey
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        podAntiAffinity:
+                          properties:
+                            preferredDuringSchedulingIgnoredDuringExecution:
+                              items:
+                                properties:
+                                  podAffinityTerm:
+                                    properties:
+                                      labelSelector:
+                                        properties:
+                                          matchExpressions:
+                                            items:
+                                              properties:
+                                                key:
+                                                  type: string
+                                                operator:
+                                                  type: string
+                                                values:
+                                                  items:
+                                                    type: string
+                                                  type: array
+                                                  x-kubernetes-list-type: atomic
+                                              required:
+                                              - key
+                                              - operator
+                                              type: object
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                          matchLabels:
+                                            additionalProperties:
+                                              type: string
+                                            type: object
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      matchLabelKeys:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      mismatchLabelKeys:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      namespaceSelector:
+                                        properties:
+                                          matchExpressions:
+                                            items:
+                                              properties:
+                                                key:
+                                                  type: string
+                                                operator:
+                                                  type: string
+                                                values:
+                                                  items:
+                                                    type: string
+                                                  type: array
+                                                  x-kubernetes-list-type: atomic
+                                              required:
+                                              - key
+                                              - operator
+                                              type: object
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                          matchLabels:
+                                            additionalProperties:
+                                              type: string
+                                            type: object
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      namespaces:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      topologyKey:
+                                        type: string
+                                    required:
+                                    - topologyKey
+                                    type: object
+                                  weight:
+                                    format: int32
+                                    type: integer
+                                required:
+                                - podAffinityTerm
+                                - weight
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            requiredDuringSchedulingIgnoredDuringExecution:
+                              items:
+                                properties:
+                                  labelSelector:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  matchLabelKeys:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  mismatchLabelKeys:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  namespaceSelector:
+                                    properties:
+                                      matchExpressions:
+                                        items:
+                                          properties:
+                                            key:
+                                              type: string
+                                            operator:
+                                              type: string
+                                            values:
+                                              items:
+                                                type: string
+                                              type: array
+                                              x-kubernetes-list-type: atomic
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  namespaces:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  topologyKey:
+                                    type: string
+                                required:
+                                - topologyKey
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                      type: object
+                    bootstrapMethod:
+                      default: pgbackrest
+                      enum:
+                      - pgbackrest
+                      - pg_basebackup
+                      type: string
+                    dataVolumeClaimSpec:
+                      properties:
+                        accessModes:
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        dataSource:
+                          properties:
+                            apiGroup:
+                              type: string
+                            kind:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - kind
+                          - name
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        dataSourceRef:
+                          properties:
+                            apiGroup:
+                              type: string
+                            kind:
+                              type: string
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          required:
+                          - kind
+                          - name
+                          type: object
+                        resources:
+                          properties:
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              type: object
+                          type: object
+                        selector:
+                          properties:
+                            matchExpressions:
+                              items:
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        storageClassName:
+                          type: string
+                        volumeAttributesClassName:
+                          type: string
+                        volumeMode:
+                          type: string
+                        volumeName:
+                          type: string
+                      type: object
+                    databases:
+                      items:
+                        maxLength: 63
+                        minLength: 1
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    expose:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        loadBalancerClass:
+                          type: string
+                        loadBalancerSourceRanges:
+                          items:
+                            type: string
+                          type: array
+                        nodePort:
+                          format: int32
+                          type: integer
+                        type:
+                          default: ClusterIP
+                          enum:
+                          - ClusterIP
+                          - NodePort
+                          - LoadBalancer
+                          type: string
+                      type: object
+                    metadata:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
+                    name:
+                      maxLength: 20
+                      pattern: ^[a-z][a-z0-9-]*[a-z0-9]$
+                      type: string
+                    priorityClassName:
+                      type: string
+                    resources:
+                      properties:
+                        claims:
+                          items:
+                            properties:
+                              name:
+                                type: string
+                              request:
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          type: object
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          type: object
+                      type: object
+                    tolerations:
+                      items:
+                        properties:
+                          effect:
+                            type: string
+                          key:
+                            type: string
+                          operator:
+                            type: string
+                          tolerationSeconds:
+                            format: int64
+                            type: integer
+                          value:
+                            type: string
+                        type: object
+                      type: array
+                  required:
+                  - dataVolumeClaimSpec
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               metadata:
                 properties:
                   annotations:
@@ -16134,6 +16778,15 @@ spec:
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
                 !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)'
+            - message: spec.logicalReplicas requires spec.postgresVersion >= 17
+              rule: '!has(self.logicalReplicas) || size(self.logicalReplicas) == 0
+                || self.postgresVersion >= 17'
+            - message: spec.logicalReplicas[].bootstrapMethod must be 'pg_basebackup'
+                when spec.backups.enabled is false
+              rule: '!has(self.logicalReplicas) || size(self.logicalReplicas) == 0
+                || !has(self.backups) || !has(self.backups.enabled) || self.backups.enabled
+                || self.logicalReplicas.all(r, has(r.bootstrapMethod) && r.bootstrapMethod
+                == ''pg_basebackup'')'
           status:
             properties:
               conditions:
@@ -16178,6 +16831,34 @@ spec:
                 items:
                   type: string
                 type: array
+              logicalReplicas:
+                items:
+                  properties:
+                    databases:
+                      items:
+                        type: string
+                      type: array
+                    invalidatedAt:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    name:
+                      type: string
+                    reason:
+                      type: string
+                    seededAt:
+                      format: date-time
+                      type: string
+                    state:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               observedGeneration:
                 format: int64
                 type: integer
@@ -31204,6 +31885,18 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              logicalReplicas:
+                items:
+                  properties:
+                    name:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               metadata:
                 properties:
                   annotations:
@@ -35591,9 +36284,7 @@ rules:
   - ""
   resources:
   - configmaps
-  - pods
-  - secrets
-  - serviceaccounts
+  - persistentvolumeclaims
   - services
   verbs:
   - create
@@ -35601,6 +36292,7 @@ rules:
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -35632,20 +36324,31 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - persistentvolumeclaims
+  - pods
+  - secrets
+  - serviceaccounts
   verbs:
   - create
   - delete
   - get
   - list
   - patch
-  - update
   - watch
 - apiGroups:
   - apps
   resources:
   - deployments
   - replicasets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - apps
+  resources:
   - statefulsets
   verbs:
   - create
@@ -35653,6 +36356,7 @@ rules:
   - get
   - list
   - patch
+  - update
   - watch
 - apiGroups:
   - batch

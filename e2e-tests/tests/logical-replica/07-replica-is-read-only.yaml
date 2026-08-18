@@ -1,0 +1,43 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 60
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      # Reads work.
+      run_psql \
+        '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
+        "postgres://postgres:${PASS}@${REPLICA}"
+
+      # Writes do not: the replica defaults to read-only, because diverging it
+      # from the primary breaks apply on the first conflicting row.
+      if run_psql \
+        '\c logical-replica \\\ INSERT INTO lr_test (id) VALUES (99);' \
+        "postgres://postgres:${PASS}@${REPLICA}"; then
+        echo "ERROR: the logical replica accepted a write but should be read-only"
+        exit 1
+      fi
+
+      # Replication itself is unaffected by default_transaction_read_only: the
+      # apply worker does not go through the executor, which enforces it.
+      # 05-stream-new-data already proved a post-conversion row arrives; assert
+      # the write above did not land either.
+      data=$(run_psql \
+        '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
+        "postgres://postgres:${PASS}@${REPLICA}")
+
+      if [[ $(echo ${data} | xargs) != "2" ]]; then
+        echo "ERROR: expected 2 rows on the logical replica, got: ${data}"
+        exit 1
+      fi
