@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 60
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      # Seeded before the logical replica exists, so these rows can only reach
+      # it through the backup the bootstrap Job restores.
+      run_psql \
+        'CREATE DATABASE \"logical-replica\";' \
+        "postgres://postgres:${PASS}@${HOST}"
+
+      run_psql \
+        '\c logical-replica \\\ CREATE TABLE IF NOT EXISTS lr_test (id int PRIMARY KEY);' \
+        "postgres://postgres:${PASS}@${HOST}"
+
+      run_psql \
+        '\c logical-replica \\\ INSERT INTO lr_test (id) VALUES (1);' \
+        "postgres://postgres:${PASS}@${HOST}"
