@@ -1623,7 +1623,7 @@ func (r *Reconciler) reconcilePostgresLogVolume(
 	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 ) (*corev1.PersistentVolumeClaim, error) {
-	if instanceSpec.LogVolumeClaimSpec == nil {
+	if cluster.CompareVersion("3.1.0") < 0 ||  instanceSpec.LogVolumeClaimSpec == nil {
 		return nil, nil
 	}
 

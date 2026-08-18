@@ -464,7 +464,7 @@ func startupCommand(
 		}(),
 
 		// K8SPG-1086: When a pglogs volume is removed, the symlinks will be broken;
-		// remove them so PostgreSQL and pgBackRest recreate real directories on
+		// remove them so PostgreSQL recreate real directories on
 		// the data volume.
 		func() string {
 			if cluster.CompareVersion("3.1.0") < 0 {
@@ -474,7 +474,9 @@ func startupCommand(
 			return `if [[ ! -e "/pgdata/logs/postgres" ]];then rm -rf "/pgdata/logs/postgres";fi`
 		}(),
 
-		// K8SPG-1086: When a pglogs volume is mounted, link the log directories on the data
+		// K8SPG-1086: When a pglogs volume is removed, the symlinks will be broken;
+		// remove them so pgBackRest recreate real directories on
+		// the data volume.
 		func() string {
 			if cluster.CompareVersion("3.1.0") < 0 {
 				return "remove"
