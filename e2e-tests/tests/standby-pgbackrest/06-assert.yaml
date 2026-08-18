@@ -5,10 +5,8 @@ commands:
   - script: |-
       set -o errexit
       interval=5
-      max_wait=420
-      elapsed=0
 
-      while true; do
+      until [[ "$state" = "ready" ]] && [[ "$condStatus" = "False" ]] && [[ "$condReason" = "LagNotDetected" ]]; do
         json=$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o json)
         state=$(printf '%s' "$json" | jq -r '.status.state // empty')
         lagBytes=$(printf '%s' "$json" | jq -r '.status.standby.lagBytes // empty')
@@ -17,17 +15,8 @@ commands:
         condReason=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .reason')
         condMsg=$(printf '%s' "$json" | jq -r '.status.conditions[]? | select(.type == "StandbyLagging") | .message')
 
-        if [[ "$state" = "ready" ]] && [[ "$condStatus" = "False" ]] && [[ "$condReason" = "LagNotDetected" ]]; then
-          echo "Standby lag cleared as expected: state=$state lagBytes=$lagBytes status=$condStatus reason=$condReason"
-          break
-        fi
-
-        if [[ $elapsed -ge $max_wait ]]; then
-          echo "timeout waiting standby lag recovery: state=$state lagBytes=$lagBytes lagLastComputedAt=$lagLastComputedAt status=$condStatus reason=$condReason message=$condMsg"
-          exit 1
-        fi
-
-        echo "waiting standby lag recovery: state=$state lagBytes=$lagBytes lagLastComputedAt=$lagLastComputedAt status=$condStatus reason=$condReason message=$condMsg elapsed=${elapsed}s"
+        echo "waiting standby lag recovery: state=$state lagBytes=$lagBytes lagLastComputedAt=$lagLastComputedAt status=$condStatus reason=$condReason message=$condMsg"
         sleep "$interval"
-        elapsed=$((elapsed + interval))
       done
+
+      echo "Standby lag cleared as expected: state=$state lagBytes=$lagBytes status=$condStatus reason=$condReason"
