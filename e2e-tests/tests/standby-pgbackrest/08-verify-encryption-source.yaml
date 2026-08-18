@@ -1,0 +1,50 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+      set -o errexit
+
+      source ../../functions
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri source-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 08-verify-extension-source --from-literal=pg_tde_extension="$result"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri source-cluster postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 08-verify-encryption-source --from-literal=pg_tde_is_encrypted="$result"
+
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_psql_uri source-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 08-verify-wal-encryption-source --from-literal=pg_tde_wal_encrypt="$result"
+
+      archiving_healthy=$(run_psql_command \
+        "SELECT last_failed_time IS NULL OR last_archived_time > last_failed_time FROM pg_stat_archiver;" \
+        "$(get_psql_uri source-cluster postgres)" | xargs)
+      if [[ ${archiving_healthy} != "t" ]]; then
+        echo "archive_command is failing on source-cluster:"
+        run_psql_command \
+          "SELECT * FROM pg_stat_archiver;" \
+          "$(get_psql_uri source-cluster postgres)"
+        exit 1
+      fi
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri source-cluster postgres)/myapp"
+
+      assert_pg_tde_key_info_uid \
+        "$(get_psql_uri source-cluster postgres)/myapp" \
+        source-cluster
+
+      data=$(run_psql_local \
+        '\c myapp \\\ SELECT * from myTable;' \
+        "$(get_psql_uri source-cluster postgres)")
+
+      kubectl create configmap -n "${NAMESPACE}" 08-verify-data-source --from-literal=data="${data}"

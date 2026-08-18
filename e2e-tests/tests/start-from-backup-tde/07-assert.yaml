@@ -2,16 +2,12 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 480
 commands:
-  - script: |-
+  - script: |
       set -o errexit
 
-      kubectl wait --for=condition=PGTDEEnabled --timeout=480s -n "${NAMESPACE}" pg/source-cluster
-      kubectl wait --for=condition=PGTDEVaultProviderReady --timeout=480s -n "${NAMESPACE}" pg/source-cluster
-
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].observedGeneration}')
+      condStatus=$(kubectl get pg -n "${NAMESPACE}" start-from-backup-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].status}')
+      condReason=$(kubectl get pg -n "${NAMESPACE}" start-from-backup-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].reason}')
+      condMsg=$(kubectl get pg -n "${NAMESPACE}" start-from-backup-tde -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].message}')
       if [[ "${condStatus}" != "True" ]]; then
         echo "expected PGTDEEnabled status True, got ${condStatus}"
         exit 1
@@ -24,38 +20,14 @@ commands:
         echo "expected PGTDEEnabled message 'pg_tde is enabled in PerconaPGCluster', got ${condMsg}"
         exit 1
       fi
-      if [[ "${condGen}" != "1" ]]; then
-        echo "expected PGTDEEnabled observedGeneration 1, got ${condGen}"
-        exit 1
-      fi
-
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].observedGeneration}')
-      if [[ "${condStatus}" != "True" ]]; then
-        echo "expected PGTDEVaultProviderReady status True, got ${condStatus}"
-        exit 1
-      fi
-      if [[ "${condReason}" != "Configured" ]]; then
-        echo "expected PGTDEVaultProviderReady reason Configured, got ${condReason}"
-        exit 1
-      fi
-      if [[ "${condMsg}" != "pg_tde vault key provider matches the spec" ]]; then
-        echo "expected PGTDEVaultProviderReady message 'pg_tde vault key provider matches the spec', got ${condMsg}"
-        exit 1
-      fi
-      if [[ "${condGen}" != "1" ]]; then
-        echo "expected PGTDEVaultProviderReady observedGeneration 1, got ${condGen}"
-        exit 1
-      fi
   - timeout: 60
     script: |
       set -o errexit
 
-      pgversion=$(kubectl -n ${NAMESPACE} get pg source-cluster -o jsonpath='{.spec.postgresVersion}')
-      primary=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=source-cluster -o jsonpath='{.items[0].metadata.name}')
-      replica=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=source-cluster -o jsonpath='{.items[0].metadata.name}')
+      cluster=start-from-backup-tde
+      pgversion=$(kubectl -n ${NAMESPACE} get pg ${cluster} -o jsonpath='{.spec.postgresVersion}')
+      primary=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster} -o jsonpath='{.items[0].metadata.name}')
+      replica=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=${cluster} -o jsonpath='{.items[0].metadata.name}')
 
       if [[ $(kubectl -n ${NAMESPACE} exec ${primary} -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
         echo "pg_tde.wal_encrypt is not enabled in ${primary}"
@@ -63,7 +35,7 @@ commands:
       fi
 
       for pod in $(kubectl -n ${NAMESPACE} get pods -o name \
-        --selector=postgres-operator.crunchydata.com/cluster=source-cluster,postgres-operator.crunchydata.com/data=postgres); do
+        --selector=postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/data=postgres); do
         annotation=$(kubectl -n ${NAMESPACE} get ${pod} -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
         if [[ ${annotation} != "true" ]]; then
           echo "${pod} is not annotated for WAL encryption: ${annotation}"
@@ -92,7 +64,6 @@ commands:
         exit 1
       fi
 
-      # restore_command is applied on replicas (primary SHOW is empty once settled)
       restore_command=$(kubectl -n ${NAMESPACE} exec ${replica} -c database -- psql -t -A -c 'SHOW restore_command;')
       if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
         echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${replica}: ${restore_command}"
@@ -100,50 +71,59 @@ commands:
       fi
 
       for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
-        conf=$(kubectl get -n ${NAMESPACE} cm source-cluster-pgbackrest-config -o yaml | yq '.data."'"${key}"'"')
+        conf=$(kubectl get -n ${NAMESPACE} cm ${cluster}-pgbackrest-config -o yaml | yq '.data."'"${key}"'"')
         if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
           echo "no checksum-page in ${key}"
           exit 1
         fi
       done
 
-      instance_conf=$(kubectl get -n ${NAMESPACE} cm source-cluster-pgbackrest-config -o yaml | yq '.data."pgbackrest_instance.conf"')
+      instance_conf=$(kubectl get -n ${NAMESPACE} cm ${cluster}-pgbackrest-config -o yaml | yq '.data."pgbackrest_instance.conf"')
       if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
         echo "archive-async is not disabled in pgbackrest_instance.conf"
         exit 1
       fi
 ---
-apiVersion: apps/v1
 kind: StatefulSet
+apiVersion: apps/v1
 metadata:
   labels:
-    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/cluster: start-from-backup-tde
     postgres-operator.crunchydata.com/data: postgres
     postgres-operator.crunchydata.com/instance-set: instance1
   ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v1beta1
-    blockOwnerDeletion: true
-    controller: true
-    kind: PostgresCluster
-    name: source-cluster
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
+      kind: PostgresCluster
+      name: start-from-backup-tde
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  template:
+    metadata:
+      annotations:
+        pgv2.percona.com/tde-installed: "true"
+        pgv2.percona.com/tde-wal-encryption: "true"
 status:
-  availableReplicas: 1
-  currentReplicas: 1
-  readyReplicas: 1
+  observedGeneration: 1
   replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
   updatedReplicas: 1
+  collisionCount: 0
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: source-cluster-pgbouncer
+  name: start-from-backup-tde-pgbouncer
   labels:
-    postgres-operator.crunchydata.com/cluster: source-cluster
+    postgres-operator.crunchydata.com/cluster: start-from-backup-tde
     postgres-operator.crunchydata.com/role: pgbouncer
+  annotations:
+    deployment.kubernetes.io/revision: '1'
   ownerReferences:
     - apiVersion: upstream.pgv2.percona.com/v1beta1
       kind: PostgresCluster
-      name: source-cluster
+      name: start-from-backup-tde
       controller: true
       blockOwnerDeletion: true
 status:
@@ -152,14 +132,30 @@ status:
   updatedReplicas: 3
   readyReplicas: 3
 ---
+kind: Job
+apiVersion: batch/v1
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: start-from-backup-tde
+    postgres-operator.crunchydata.com/pgbackrest: ''
+    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
+    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      controller: true
+      blockOwnerDeletion: true
+status:
+  succeeded: 1
+---
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: source-cluster
+  name: start-from-backup-tde
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: source-cluster
+      name: start-from-backup-tde
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -175,6 +171,9 @@ status:
     repos:
       - name: repo1
         stanzaCreated: true
+    restore:
+      finished: true
+      id: ~pgo-bootstrap-start-from-backup-tde
   proxy:
     pgBouncer:
       readyReplicas: 3
@@ -183,7 +182,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: source-cluster
+  name: start-from-backup-tde
 status:
   pgbouncer:
     ready: 3
@@ -196,3 +195,13 @@ status:
     ready: 3
     size: 3
   state: ready
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGRestore
+metadata:
+  name: start-from-backup-tde-bootstrap
+spec:
+  pgCluster: start-from-backup-tde
+  repoName: repo1
+status:
+  state: Succeeded
