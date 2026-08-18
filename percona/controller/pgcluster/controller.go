@@ -37,6 +37,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	perconaController "github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/extensions"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
@@ -745,25 +746,25 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 		return nil
 	}
 
-	log := logging.FromContext(ctx)
-
-	secret := new(corev1.Secret)
-	n := cr.UserMonitoring()
-
-	if err := r.Client.Get(ctx, types.NamespacedName{
-		Name:      n,
-		Namespace: cr.Namespace,
-	}, secret); err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.V(1).Info(fmt.Sprintf("Secret %s not found", n))
-			return nil
-		}
-		return errors.Wrap(err, "failed to get monitor user secret")
+	// K8SPG-945: create the monitoring user Secret ourselves rather than waiting
+	// for Crunchy, which writes user Secrets only after it reconciles the
+	// PostgresCluster we create below. Waiting would postpone the hash annotation
+	// to a later reconcile, once the StatefulSets already exist, redeploying every
+	// instance, and sometimes halfway through the Patroni bootstrap.
+	// Crunchy adopts the Secret we create and keeps its password, so
+	// the hash stays stable from here on.
+	secret, err := r.ensureMonitorUserSecret(ctx, cr)
+	if err != nil {
+		return err
 	}
 
 	secretString := fmt.Sprintln(secret.Data)
 	// #nosec G401
 	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+	if cr.CompareVersion("3.2.0") >= 0 {
+		// password is the only key mounted on the PMM container
+		currentHash = fmt.Sprintf("%x", md5.Sum(secret.Data["password"]))
+	}
 
 	for i := 0; i < len(cr.Spec.InstanceSets); i++ {
 		set := &cr.Spec.InstanceSets[i]
@@ -780,6 +781,60 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	}
 
 	return nil
+}
+
+func (r *PGClusterReconciler) ensureMonitorUserSecret(ctx context.Context, cr *v2.PerconaPGCluster) (*corev1.Secret, error) {
+	log := logging.FromContext(ctx)
+
+	nn := types.NamespacedName{
+		Name:      cr.UserMonitoring(),
+		Namespace: cr.Namespace,
+	}
+
+	secret := new(corev1.Secret)
+	err := r.Client.Get(ctx, nn, secret)
+	if err == nil {
+		return secret, nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return nil, errors.Wrap(err, "failed to get monitor user secret")
+	}
+
+	password, err := util.GenerateAlphaNumericPassword(util.DefaultGeneratedPasswordLength)
+	if err != nil {
+		return nil, errors.Wrap(err, "generate monitor user password")
+	}
+
+	secret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nn.Name,
+			Namespace: nn.Namespace,
+			Labels: map[string]string{
+				naming.LabelCluster:      cr.Name,
+				naming.LabelPostgresUser: v2.UserMonitoring,
+				naming.LabelRole:         naming.RolePostgresUser,
+			},
+		},
+		Data: map[string][]byte{
+			"password": []byte(password),
+		},
+	}
+
+	if err := r.Client.Create(ctx, secret); err != nil {
+		if !k8serrors.IsAlreadyExists(err) {
+			return nil, errors.Wrap(err, "create monitor user secret")
+		}
+
+		// Crunchy got there first, use what it wrote.
+		if err := r.Client.Get(ctx, nn, secret); err != nil {
+			return nil, errors.Wrap(err, "failed to get monitor user secret")
+		}
+		return secret, nil
+	}
+
+	log.V(1).Info(fmt.Sprintf("Created secret %s", nn.Name))
+
+	return secret, nil
 }
 
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {
