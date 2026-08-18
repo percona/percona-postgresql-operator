@@ -290,7 +290,7 @@ type LogicalReplicaSpec struct {
 }
 
 func (cr *PerconaPGCluster) IsPaused() bool {
-	return cr.Spec.Pause != nil && *cr.Spec.Pause == true
+	return cr.Spec.Pause != nil && *cr.Spec.Pause
 }
 
 // LogicalReplicaBootstrapMethod selects how the data volume of a logical
