@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -336,6 +337,17 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		if err := r.runPostPostgresClusterDeletionFinalizers(ctx, cr); err != nil {
 			return reconcile.Result{RequeueAfter: 5 * time.Second}, errors.Wrap(err, "run post-postgrescluster finalizers")
 		}
+
+		return reconcile.Result{}, nil
+	}
+
+	// doing it here so we can stop upstream controllers before this one reconciles anything
+	if ptr.Deref(cr.Spec.Unmanaged, false) {
+		if err := r.makePostgresClusterUnmanaged(ctx, postgresCluster); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "pause PostgresCluster")
+		}
+
+		log.Info("PerconaPGCluster is unmanaged. Skipping reconciliation", "cluster", cr.Name)
 
 		return reconcile.Result{}, nil
 	}
@@ -974,6 +986,21 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 	}
 
 	r.Watchers.Remove(watcherName)
+}
+
+func (r *PGClusterReconciler) makePostgresClusterUnmanaged(ctx context.Context, postgresCluster *v1beta1.PostgresCluster) error {
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	if ptr.Deref(postgresCluster.Spec.Paused, false) {
+		return nil
+	}
+
+	orig := postgresCluster.DeepCopy()
+	postgresCluster.Spec.Paused = new(true)
+
+	return r.Client.Patch(ctx, postgresCluster, client.MergeFrom(orig))
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {

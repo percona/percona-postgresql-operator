@@ -77,6 +77,10 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
+	if pgCluster.Spec.Unmanaged != nil && *pgCluster.Spec.Unmanaged {
+		return reconcile.Result{}, nil
+	}
+
 	if pgRestore.Spec.VolumeSnapshotBackupName != "" {
 		// Delegate to snapshot restore reconciliation
 		return snapshot.Reconcile(ctx, r.Client, r.PodExec, pgCluster, pgRestore)

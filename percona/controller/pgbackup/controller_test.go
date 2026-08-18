@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1183,6 +1184,84 @@ func TestFindBackupInPGBackrestInfo(t *testing.T) {
 			assert.Equal(t, tt.expectLabel, backup.Label, "backup.Label populates status.BackupName")
 			assert.Equal(t, tt.expectType, backup.Type, "backup.Type populates status.BackupType")
 			assert.Equal(t, tt.expectSize, backup.Info.Delta, "backup.Info.Delta populates status.Size")
+		})
+	}
+}
+
+func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name          string
+		unmanaged     *bool
+		expectedState v2.PGBackupState
+	}{
+		{
+			name:          "unmanaged cluster",
+			unmanaged:     new(true),
+			expectedState: v2.BackupNew,
+		},
+		{
+			name:          "managed cluster",
+			unmanaged:     new(false),
+			expectedState: v2.BackupStarting,
+		},
+		{
+			name:          "unmanaged is not set",
+			expectedState: v2.BackupStarting,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := readDefaultCR("test-cluster", "test-namespace")
+			require.NoError(t, err)
+			cluster.Spec.Unmanaged = tt.unmanaged
+
+			backup := &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: cluster.Namespace,
+				},
+				Spec: v2.PerconaPGBackupSpec{
+					PGCluster: cluster.Name,
+					RepoName:  new("repo1"),
+				},
+				Status: v2.PerconaPGBackupStatus{State: v2.BackupNew},
+			}
+
+			cl, err := buildFakeClient(ctx, cluster, backup)
+			require.NoError(t, err)
+
+			r := &PGBackupReconciler{Client: cl}
+			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+			require.NoError(t, err)
+
+			updated := new(v2.PerconaPGBackup)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.Equal(t, tt.expectedState, updated.Status.State)
+
+			updatedCluster := new(v2.PerconaPGCluster)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updatedCluster))
+
+			leaseErr := cl.Get(ctx, client.ObjectKey{
+				Name:      backupLeaseName(cluster.Name),
+				Namespace: cluster.Namespace,
+			}, new(coordinationv1.Lease))
+
+			if ptr.Deref(tt.unmanaged, false) {
+				assert.Empty(t, updated.Finalizers)
+				assert.Empty(t, updated.Status.Conditions)
+				assert.NotContains(t, updatedCluster.Annotations, pNaming.AnnotationBackupInProgress)
+				assert.NotContains(t, updatedCluster.Annotations, naming.PGBackRestBackup)
+				assert.True(t, k8serrors.IsNotFound(leaseErr))
+			} else {
+				assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+				assert.True(t, meta.IsStatusConditionTrue(updated.Status.Conditions, v2.ConditionBackupLeaseAcquired))
+				assert.Equal(t, backup.Name, updatedCluster.Annotations[pNaming.AnnotationBackupInProgress])
+				assert.Equal(t, backup.Name, updatedCluster.Annotations[naming.PGBackRestBackup])
+				assert.NoError(t, leaseErr)
+			}
 		})
 	}
 }
