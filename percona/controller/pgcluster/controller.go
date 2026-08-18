@@ -804,6 +804,7 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
 	if cr.CompareVersion("3.1.0") >= 0 {
 		// password is the only key mounted on the PMM container
+		// #nosec G401
 		currentHash = fmt.Sprintf("%x", md5.Sum(secret.Data["password"]))
 	}
 

@@ -3186,7 +3186,7 @@ var _ = Describe("Monitor user secret pre-creation", Ordered, func() {
 	})
 
 	It("should not change the hash annotation on later reconciles", func() {
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
