@@ -1343,11 +1343,17 @@ function deploy_cert_manager() {
 	destroy_cert_manager
 
 	echo 'deploy cert manager'
-	kubectl create namespace cert-manager || :
+	helm repo add jetstack https://charts.jetstack.io --force-update || :
+	helm repo update || :
+	retry 2 20 helm upgrade --install cert-manager jetstack/cert-manager \
+		--namespace cert-manager \
+		--create-namespace \
+		--version "${CERT_MANAGER_VER}" \
+		--set installCRDs=true \
+		--set "extraArgs={--enable-certificate-owner-ref=true}"
+
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false >/dev/null 2>&1 || :
-	kubectl label namespace cert-manager \
-		"${CERT_MANAGER_TEST_LABEL}" --overwrite
+	kubectl label namespace cert-manager "${CERT_MANAGER_TEST_LABEL}" --overwrite || :
 	kubectl label deployment -n cert-manager \
 		cert-manager cert-manager-webhook cert-manager-cainjector \
 		"${CERT_MANAGER_TEST_LABEL}" --overwrite
@@ -1379,7 +1385,7 @@ function destroy_cert_manager() {
 		return
 	fi
 
-	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml >/dev/null 2>&1 || :
+	helm uninstall cert-manager -n cert-manager >/dev/null 2>&1 || :
 	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
 }
 
