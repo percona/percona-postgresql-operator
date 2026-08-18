@@ -1,0 +1,73 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 900
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=Succeeded \
+        --timeout=600s pg-restore/logical-replica-restore-repo1
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=ready \
+        --timeout=300s pg/logical-replica
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      primary_row_count() {
+        local got
+        got=$(run_psql \
+          '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "rows on the primary: ${got} (want 2)"
+        [[ ${got} == "2" ]]
+      }
+
+      retry 30 5 primary_row_count
+
+      invalidated() {
+        local replica=$1
+        local state reason
+
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"${replica}\")].state}")
+        reason=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"${replica}\")].reason}")
+
+        echo "logical replica ${replica}: state=${state} reason=${reason}"
+        [[ ${state} == "broken" && ${reason} == "SourceRestored" ]]
+      }
+
+      for replica in analytics reporting; do
+        retry 30 5 invalidated "${replica}"
+
+        kubectl -n "${NAMESPACE}" get pg logical-replica -o json |
+          jq -e --arg name "${replica}" \
+            '.status.logicalReplicas[] | select(.name == $name) | .invalidatedAt != null' >/dev/null
+
+        replicas=$(kubectl -n "${NAMESPACE}" get statefulset "logical-replica-lr-${replica}" \
+          -o jsonpath='{.spec.replicas}')
+        if [[ ${replicas} != "0" ]]; then
+          echo "ERROR: an invalidated replica must stay stopped, got replicas: ${replicas}"
+          exit 1
+        fi
+      done
+
+      slots_gone() {
+        local got
+        got=$(run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin IS NOT NULL;" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "logical slots on the restored primary: ${got} (want 0)"
+        [[ ${got} == "0" ]]
+      }
+
+      retry 30 5 slots_gone

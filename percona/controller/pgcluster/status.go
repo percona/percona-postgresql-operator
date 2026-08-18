@@ -208,6 +208,7 @@ var perconaOwnedConditions = []string{
 	pNaming.ConditionClusterIsReadyForBackup,
 	pNaming.ConditionAPIGroupMigration,
 	pNaming.ConditionStandbyLagging,
+	pNaming.ConditionReadyForLogicalReplication,
 	v2.ConditionPMMReady,
 }
 
