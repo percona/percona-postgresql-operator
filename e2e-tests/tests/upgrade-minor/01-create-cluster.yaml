@@ -24,7 +24,7 @@ commands:
       fi
       echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
 
-      if [[ $OPENSHIFT ]]; then
+      if [[ "${PLATFORM}" == "openshift" ]]; then
           $sed -E -i "s|^( *image: *)(.*)|\1${REGISTRY_NAME_FULL}\2|" ${TEMP_DIR}/cr_lower.yaml
       fi
 

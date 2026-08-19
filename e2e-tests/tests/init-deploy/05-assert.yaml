@@ -1,6 +1,26 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 300
+commands:
+  - script: |
+      set +o xtrace
+
+      for secret in \
+        init-deploy-replication-cert \
+        init-deploy-cluster-cert \
+        init-deploy-cluster-ca-cert; do
+        until kubectl get secret "${secret}" -n "${NAMESPACE}" -o json 2>/dev/null \
+          | jq -e '
+              if any(.metadata.ownerReferences[]?; .kind == "PostgresCluster") then
+                .metadata.annotations["test-annotation"] == "test" and
+                .metadata.labels["test-label"] == "test"
+              else
+                true
+              end
+            ' >/dev/null; do
+          sleep 5
+        done
+      done
 ---
 apiVersion: v1
 kind: Secret
@@ -23,8 +43,6 @@ type: Opaque
 apiVersion: v1
 kind: Secret
 metadata:
-  annotations:
-    test-annotation: test
   labels:
     app.kubernetes.io/instance: init-deploy
     app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -32,9 +50,7 @@ metadata:
     app.kubernetes.io/part-of: percona-postgresql
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/cluster-certificate: replication-client-tls
-    test-label: test
   name: init-deploy-replication-cert
-type: Opaque
 ---
 apiVersion: v1
 kind: Secret
@@ -91,8 +107,6 @@ type: Opaque
 apiVersion: v1
 kind: Secret
 metadata:
-  annotations:
-    test-annotation: test
   labels:
     app.kubernetes.io/instance: init-deploy
     app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -100,23 +114,12 @@ metadata:
     app.kubernetes.io/part-of: percona-postgresql
     postgres-operator.crunchydata.com/cluster: init-deploy
     postgres-operator.crunchydata.com/cluster-certificate: postgres-tls
-    test-label: test
   name: init-deploy-cluster-cert
-type: Opaque
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  annotations:
-    test-annotation: test
-  labels:
-    test-label: test
   name: init-deploy-cluster-ca-cert
-  ownerReferences:
-  - apiVersion: upstream.pgv2.percona.com/v1beta1
-    kind: PostgresCluster
-    name: init-deploy
-type: Opaque
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -246,4 +249,3 @@ status:
   readyReplicas: 1
   replicas: 1
   updatedReplicas: 1
-
