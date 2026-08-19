@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      uri="postgres:$(get_psql_user_pass additional-volumes-pguser-postgres)@$(get_psql_user_host additional-volumes-pguser-postgres)"
+      uri=$(get_psql_uri additional-volumes postgres)
 
       run_psql_local \
         "CREATE TABLESPACE myts LOCATION '\''/tablespaces/myts/data'\'';" \

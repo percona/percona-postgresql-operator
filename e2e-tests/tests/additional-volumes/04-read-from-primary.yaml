@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      uri="postgres:$(get_psql_user_pass additional-volumes-pguser-postgres)@$(get_psql_user_host additional-volumes-pguser-postgres)"
+      uri=$(get_psql_uri additional-volumes postgres)
 
       data=$(run_psql_local \
         "select pg_tablespace_location(oid) from pg_tablespace where spcname = '\''myts'\'';" \
