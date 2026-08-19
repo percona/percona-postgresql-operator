@@ -1014,6 +1014,16 @@ type VolumeSnapshots struct {
 	// Ignored if mode is not offline.
 	// +optional
 	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
+
+	// Jobs allows configuration for all VolumeSnapshot jobs.
+	// +optional
+	Jobs *VolumeSnapshotJobSpec `json:"jobs,omitempty"`
+}
+
+type VolumeSnapshotJobSpec struct {
+	// Tolerations that will be applied on the VolumeSnapshot Job.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
