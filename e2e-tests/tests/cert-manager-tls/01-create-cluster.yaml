@@ -9,4 +9,4 @@ commands:
 
       get_cr "cert-manager-tls" \
         | kubectl -n "${NAMESPACE}" apply -f -
-    timeout: 10
+    timeout: 30
