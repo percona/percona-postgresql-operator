@@ -2463,11 +2463,11 @@ var _ = Describe("CR Validations", Ordered, func() {
 		})
 
 		When("creating a CR with invalid pg_tde configurations", func() {
-			It("should reject pg_tde enabled on PG < 17", func() {
+			It("should reject pg_tde enabled on PG < 16", func() {
 				cr, err := readDefaultCR("cr-validation-tde-5", ns)
 				Expect(err).NotTo(HaveOccurred())
 
-				cr.Spec.PostgresVersion = 16
+				cr.Spec.PostgresVersion = 15
 				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
 					Enabled: true,
 					Vault: &v1beta1.PGTDEVaultSpec{
@@ -2482,7 +2482,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 				err = k8sClient.Create(ctx, cr)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
-					"pg_tde is only supported for PG17 and above",
+					"pg_tde is only supported for PG16 and above",
 				))
 			})
 
