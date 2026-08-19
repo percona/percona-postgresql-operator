@@ -1,9 +1,9 @@
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGBackup
 metadata:
-  name: wal-volume-full
+  name: additional-volumes-full
 spec:
-  pgCluster: wal-volume
+  pgCluster: additional-volumes
   repoName: repo1
   options:
     - --type=full

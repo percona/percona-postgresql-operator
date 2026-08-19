@@ -1,3 +1,4 @@
+additional-volumes
 backup-enable-disable
 builtin-extensions
 cert-manager-tls
@@ -26,7 +27,6 @@ major-upgrade-17-to-18-postgis
 ldap
 ldap-tls
 logcollection
-log-volume
 monitoring
 one-pod
 repo-host-autogrow
@@ -44,8 +44,6 @@ standby-streaming
 start-from-backup
 start-from-volumes
 start-from-backup-tde
-tablespaces
-wal-volume
 telemetry-transfer
 upgrade-consistency
 upgrade-minor

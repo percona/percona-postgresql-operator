@@ -5,11 +5,11 @@ timeout: 180
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: log-volume
+  name: additional-volumes
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: log-volume
+      name: additional-volumes
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -27,7 +27,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: log-volume-restore
+      id: additional-volumes-restore
       succeeded: 1
   proxy:
     pgBouncer:
@@ -37,9 +37,9 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: log-volume-restore
+  name: additional-volumes-restore
 spec:
-  pgCluster: log-volume
+  pgCluster: additional-volumes
   repoName: repo1
 status:
   state: Succeeded

@@ -13,6 +13,11 @@ commands:
       get_cr \
         | yq eval '.spec.crVersion = "3.2.0"' - \
         | yq eval '
+            .spec.instances[0].walVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[0].walVolumeClaimSpec.resources.requests.storage="1Gi" |
             .spec.instances[0].logVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
-            .spec.instances[0].logVolumeClaimSpec.resources.requests.storage="1Gi"' - \
+            .spec.instances[0].logVolumeClaimSpec.resources.requests.storage="1Gi" |
+            .spec.instances[0].tablespaceVolumes[0].name="myts" |
+            .spec.instances[0].tablespaceVolumes[0].dataVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[0].tablespaceVolumes[0].dataVolumeClaimSpec.resources.requests.storage="1Gi"' - \
         | kubectl -n "${NAMESPACE}" apply -f -
