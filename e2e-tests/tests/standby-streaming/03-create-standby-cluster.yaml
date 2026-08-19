@@ -9,7 +9,6 @@ commands:
       source ../../functions
 
       get_cr "standby-cluster" \
-        | yq eval '.spec.instances[0].sidecars = [{"name": "netshoot", "image": "docker.io/nicolaka/netshoot:latest", "command": ["sleep", "infinity"], "securityContext": {"capabilities": {"add": ["NET_ADMIN", "NET_RAW"]}, "privileged": false}, "resources": {"limits": {"cpu": "100m", "memory": "128Mi"}}}]' - \
         | yq eval '.spec.standby.enabled = true' - \
         | yq eval ".spec.standby.host = \"source-cluster-ha.${NAMESPACE}.svc.cluster.local\"" - \
         | yq eval '.spec.standby.maxAcceptableLag = "1Ki"' - \
