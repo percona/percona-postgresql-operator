@@ -1,11 +1,11 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - timeout: 60
-    script: |-
+  - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
 
-      get_cr | kubectl -n "${NAMESPACE}" apply -f -
+      destroy_chaos_mesh
+    timeout: 180
