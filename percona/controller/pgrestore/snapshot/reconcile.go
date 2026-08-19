@@ -692,6 +692,12 @@ func generatePrepareJob(
 			},
 		},
 	}
+
+	if cluster.Spec.Backups.VolumeSnapshots != nil && cluster.Spec.Backups.VolumeSnapshots.Jobs != nil {
+		if len(cluster.Spec.Backups.VolumeSnapshots.Jobs.Tolerations) > 0 {
+			job.Spec.Template.Spec.Tolerations = cluster.Spec.Backups.VolumeSnapshots.Jobs.Tolerations
+		}
+	}
 }
 
 func buildPrepareJobVolumes(
