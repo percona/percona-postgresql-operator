@@ -12,7 +12,7 @@ spec:
   crVersion: 3.0.0
 #  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
-#    image: docker.io/percona/percona-postgresql-operator:3.0.0
+#    image: docker.io/perconalab/percona-postgresql-operator:3.0.0-custom-257
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -183,7 +183,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:18.3-2
+  image: docker.io/percona/percona-distribution-postgresql:18.4-4
   imagePullPolicy: Always
   postgresVersion: 18
 #  port: 5432
@@ -217,7 +217,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: docker.io/percona/percona-postgresql-operator:3.0.0
+#      image: docker.io/perconalab/percona-postgresql-operator:3.0.0-custom-257
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -492,7 +492,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/percona/percona-pgbackrest:2.58.0-1
+      image: docker.io/percona/percona-pgbackrest:2.58.0-5
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -500,7 +500,7 @@ spec:
 #      - secretRef:
 #          name: repo-host-env-secret
 #      initContainer:
-#        image: docker.io/percona/percona-postgresql-operator:3.0.0
+#        image: docker.io/perconalab/percona-postgresql-operator:3.0.0-custom-257
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -755,7 +755,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: docker.io/percona/percona-postgresql-operator:3.0.0
+#    image: docker.io/perconalab/percona-postgresql-operator:3.0.0-custom-257
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
