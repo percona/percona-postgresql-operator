@@ -1,4 +1,4 @@
-IMAGE_OPERATOR=percona/percona-postgresql-operator:2.9.0
+IMAGE_OPERATOR=perconalab/percona-postgresql-operator:2.9.0-custom-256
 
 IMAGE_POSTGRESQL14=percona/percona-distribution-postgresql:14.22-1
 IMAGE_PGBOUNCER14=percona/percona-pgbouncer:1.25.1-1
@@ -10,22 +10,22 @@ IMAGE_PGBOUNCER15=percona/percona-pgbouncer:1.25.1-1
 IMAGE_POSTGIS15=percona/percona-distribution-postgresql-with-postgis:15.17-1
 IMAGE_BACKREST15=percona/percona-pgbackrest:2.58.0-1
 
-IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16.13-1
+IMAGE_POSTGRESQL16=perconalab/percona-distribution-postgresql:16-psp
 IMAGE_PGBOUNCER16=percona/percona-pgbouncer:1.25.1-1
 IMAGE_POSTGIS16=percona/percona-distribution-postgresql-with-postgis:16.13-1
-IMAGE_BACKREST16=percona/percona-pgbackrest:2.58.0-1
+IMAGE_BACKREST16=percona/percona-pgbackrest:2.58.0-5
 
-IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17.9-1
+IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17.10-4
 IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.25.1-1
 IMAGE_POSTGIS17=percona/percona-distribution-postgresql-with-postgis:17.9-1
-IMAGE_BACKREST17=percona/percona-pgbackrest:2.58.0-1
+IMAGE_BACKREST17=percona/percona-pgbackrest:2.58.0-5
 
-IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18.3-1
+IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18.4-4
 IMAGE_PGBOUNCER18=percona/percona-pgbouncer:1.25.1-1
 IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18.3-1
-IMAGE_BACKREST18=percona/percona-pgbackrest:2.58.0-1
+IMAGE_BACKREST18=percona/percona-pgbackrest:2.58.0-5
 
-IMAGE_UPGRADE=percona/percona-postgresql-operator:2.9.0-upgrade
+IMAGE_UPGRADE=perconalab/percona-postgresql-operator:2.9.0-custom-256-upgrade
 
 IMAGE_PMM_CLIENT=percona/pmm-client:2.44.1-1
 IMAGE_PMM_SERVER=percona/pmm-server:2.44.1
