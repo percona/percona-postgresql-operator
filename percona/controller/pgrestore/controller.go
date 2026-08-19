@@ -10,6 +10,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -77,7 +78,7 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 	}
 
-	if pgCluster.Spec.Unmanaged != nil && *pgCluster.Spec.Unmanaged {
+	if ptr.Deref(pgCluster.Spec.Unmanaged, false) && pgRestore.DeletionTimestamp.IsZero() {
 		return reconcile.Result{}, nil
 	}
 

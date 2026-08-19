@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -27,21 +28,17 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		unmanaged     *bool
+		unmanaged     bool
 		expectedState v2.PGRestoreState
 	}{
 		{
 			name:          "unmanaged cluster",
-			unmanaged:     new(true),
+			unmanaged:     true,
 			expectedState: v2.RestoreNew,
 		},
 		{
 			name:          "managed cluster",
-			unmanaged:     new(false),
-			expectedState: v2.RestoreStarting,
-		},
-		{
-			name:          "unmanaged is not set",
+			unmanaged:     false,
 			expectedState: v2.RestoreStarting,
 		},
 	}
@@ -50,7 +47,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster, err := readDefaultCR("test-cluster", "test-namespace")
 			require.NoError(t, err)
-			cluster.Spec.Unmanaged = tt.unmanaged
+			cluster.Spec.Unmanaged = new(tt.unmanaged)
 
 			restore := &v2.PerconaPGRestore{
 				ObjectMeta: metav1.ObjectMeta{
@@ -78,7 +75,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 			updatedCluster := new(v2.PerconaPGCluster)
 			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updatedCluster))
 
-			if ptr.Deref(tt.unmanaged, false) {
+			if tt.unmanaged {
 				assert.Empty(t, updated.Finalizers)
 				assert.NotContains(t, updatedCluster.Annotations, naming.PGBackRestRestore)
 				assert.Nil(t, updatedCluster.Spec.Backups.PGBackRest.Restore)
@@ -90,6 +87,43 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileRunsFinalizersForUnmanagedCluster(t *testing.T) {
+	ctx := t.Context()
+
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+	cluster.Spec.Unmanaged = new(true)
+
+	restore := &v2.PerconaPGRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-restore",
+			Namespace:  cluster.Namespace,
+			Finalizers: []string{pNaming.FinalizerDeleteRestore},
+		},
+		Spec: v2.PerconaPGRestoreSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGRestoreStatus{State: v2.RestoreRunning},
+	}
+
+	cl, err := buildFakeClient(ctx, cluster, restore)
+	require.NoError(t, err)
+	require.NoError(t, cl.Delete(ctx, restore))
+
+	r := &PGRestoreReconciler{Client: cl}
+	_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(restore)})
+	require.NoError(t, err)
+
+	err = cl.Get(ctx, client.ObjectKeyFromObject(restore), new(v2.PerconaPGRestore))
+	assert.True(t, k8serrors.IsNotFound(err), "restore should be deleted after its finalizers ran")
+
+	updatedCluster := new(v2.PerconaPGCluster)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updatedCluster))
+	require.NotNil(t, updatedCluster.Spec.Backups.PGBackRest.Restore)
+	assert.False(t, ptr.Deref(updatedCluster.Spec.Backups.PGBackRest.Restore.Enabled, false))
 }
 
 func buildFakeClient(ctx context.Context, cr *v2.PerconaPGCluster, objs ...client.Object) (client.Client, error) {

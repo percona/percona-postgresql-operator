@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1193,21 +1192,17 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		unmanaged     *bool
+		unmanaged     bool
 		expectedState v2.PGBackupState
 	}{
 		{
 			name:          "unmanaged cluster",
-			unmanaged:     new(true),
+			unmanaged:     true,
 			expectedState: v2.BackupNew,
 		},
 		{
 			name:          "managed cluster",
-			unmanaged:     new(false),
-			expectedState: v2.BackupStarting,
-		},
-		{
-			name:          "unmanaged is not set",
+			unmanaged:     false,
 			expectedState: v2.BackupStarting,
 		},
 	}
@@ -1216,7 +1211,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster, err := readDefaultCR("test-cluster", "test-namespace")
 			require.NoError(t, err)
-			cluster.Spec.Unmanaged = tt.unmanaged
+			cluster.Spec.Unmanaged = new(tt.unmanaged)
 
 			backup := &v2.PerconaPGBackup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1249,7 +1244,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 				Namespace: cluster.Namespace,
 			}, new(coordinationv1.Lease))
 
-			if ptr.Deref(tt.unmanaged, false) {
+			if tt.unmanaged {
 				assert.Empty(t, updated.Finalizers)
 				assert.Empty(t, updated.Status.Conditions)
 				assert.NotContains(t, updatedCluster.Annotations, pNaming.AnnotationBackupInProgress)
@@ -1264,4 +1259,36 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileRunsFinalizersForUnmanagedCluster(t *testing.T) {
+	ctx := t.Context()
+
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+	cluster.Spec.Unmanaged = new(true)
+
+	backup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-backup",
+			Namespace:  cluster.Namespace,
+			Finalizers: []string{pNaming.FinalizerDeleteBackup},
+		},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+	}
+
+	cl, err := buildFakeClient(ctx, cluster, backup)
+	require.NoError(t, err)
+	require.NoError(t, cl.Delete(ctx, backup))
+
+	r := &PGBackupReconciler{Client: cl}
+	_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+	require.NoError(t, err)
+
+	err = cl.Get(ctx, client.ObjectKeyFromObject(backup), new(v2.PerconaPGBackup))
+	assert.True(t, k8serrors.IsNotFound(err))
 }

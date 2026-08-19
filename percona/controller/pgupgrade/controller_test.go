@@ -8,7 +8,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -22,18 +21,15 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		unmanaged *bool
+		unmanaged bool
 	}{
 		{
 			name:      "unmanaged cluster",
-			unmanaged: new(true),
+			unmanaged: true,
 		},
 		{
 			name:      "managed cluster",
-			unmanaged: new(false),
-		},
-		{
-			name: "unmanaged is not set",
+			unmanaged: false,
 		},
 	}
 
@@ -46,7 +42,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 				},
 				Spec: pgv2.PerconaPGClusterSpec{
 					PostgresVersion: 17,
-					Unmanaged:       tt.unmanaged,
+					Unmanaged:       new(tt.unmanaged),
 				},
 			}
 
@@ -76,7 +72,7 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 			pgUpgrade := new(crunchyv1beta1.PGUpgrade)
 			err = cl.Get(ctx, client.ObjectKeyFromObject(upgrade), pgUpgrade)
 
-			if ptr.Deref(tt.unmanaged, false) {
+			if tt.unmanaged {
 				assert.True(t, k8serrors.IsNotFound(err), "PGUpgrade should not be created for an unmanaged cluster")
 			} else {
 				require.NoError(t, err)

@@ -142,7 +142,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
-	if pgCluster != nil && ptr.Deref(pgCluster.Spec.Unmanaged, false) {
+	if pgCluster != nil && ptr.Deref(pgCluster.Spec.Unmanaged, false) && pgBackup.DeletionTimestamp.IsZero() {
 		return reconcile.Result{}, nil
 	}
 

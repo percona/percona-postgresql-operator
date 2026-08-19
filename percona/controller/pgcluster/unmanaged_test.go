@@ -20,20 +20,25 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 	ctx := t.Context()
 
 	tests := []struct {
-		name      string
-		unmanaged *bool
+		name             string
+		unmanaged        bool
+		expectedImage    string
+		expectedPause    bool
+		expectedWatchers int
 	}{
 		{
-			name:      "unmanaged cluster",
-			unmanaged: new(true),
+			name:             "unmanaged cluster",
+			unmanaged:        true,
+			expectedImage:    "image1",
+			expectedPause:    true,
+			expectedWatchers: 0,
 		},
 		{
-			name:      "managed cluster",
-			unmanaged: new(false),
-		},
-		{
-			name:      "unmanaged is not set",
-			unmanaged: nil,
+			name:             "managed cluster",
+			unmanaged:        false,
+			expectedImage:    "image2",
+			expectedPause:    false,
+			expectedWatchers: 1,
 		},
 	}
 
@@ -60,20 +65,16 @@ func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
 
 			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cr), cr))
 			cr.Spec.Image = "image2"
-			cr.Spec.Unmanaged = tt.unmanaged
+			cr.Spec.Unmanaged = new(tt.unmanaged)
 			require.NoError(t, cl.Update(ctx, cr))
 
 			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(cr)})
 			require.NoError(t, err)
 
 			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster))
-			if ptr.Deref(tt.unmanaged, false) {
-				assert.Equal(t, "image1", postgresCluster.Spec.Image)
-				assert.True(t, ptr.Deref(postgresCluster.Spec.Paused, false))
-			} else {
-				assert.Equal(t, "image2", postgresCluster.Spec.Image)
-				assert.False(t, ptr.Deref(postgresCluster.Spec.Paused, false))
-			}
+			assert.Equal(t, tt.expectedImage, postgresCluster.Spec.Image)
+			assert.Equal(t, tt.expectedPause, ptr.Deref(postgresCluster.Spec.Paused, false))
+			assert.Len(t, r.Watchers.Names(), tt.expectedWatchers)
 		})
 	}
 }

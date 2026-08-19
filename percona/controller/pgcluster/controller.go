@@ -347,6 +347,8 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, errors.Wrap(err, "pause PostgresCluster")
 		}
 
+		r.stopWALWatcher(ctx, cr)
+
 		log.Info("PerconaPGCluster is unmanaged. Skipping reconciliation", "cluster", cr.Name)
 
 		return reconcile.Result{}, nil
@@ -968,10 +970,15 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 		return
 	}
 
-	log := logging.FromContext(ctx)
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		return
 	}
+
+	r.stopWALWatcher(ctx, cr)
+}
+
+func (r *PGClusterReconciler) stopWALWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
+	log := logging.FromContext(ctx)
 
 	watcherName, _ := watcher.GetWALWatcher(cr)
 	if !r.Watchers.IsExist(watcherName) {
