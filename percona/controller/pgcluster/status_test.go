@@ -658,11 +658,6 @@ func TestUpdateConditions(t *testing.T) {
 			name: "percona owned conditions are kept when absent from postgres status",
 			crConditions: []metav1.Condition{
 				{
-					Type:   v2.ConditionPMMReady,
-					Status: metav1.ConditionTrue,
-					Reason: "PMMConfigured",
-				},
-				{
 					Type:   pNaming.ConditionAPIGroupMigration,
 					Status: metav1.ConditionTrue,
 					Reason: "APIGroupMigrationCompleted",
@@ -692,7 +687,6 @@ func TestUpdateConditions(t *testing.T) {
 				{Type: postgrescluster.ConditionReplicaCreate, Status: metav1.ConditionTrue, Reason: "test"},
 			},
 			expectedKeptConditions: []string{
-				v2.ConditionPMMReady,
 				pNaming.ConditionAPIGroupMigration,
 				pNaming.ConditionStandbyLagging,
 			},
