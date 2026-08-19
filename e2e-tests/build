@@ -7,7 +7,9 @@ exec 5>&2
 export BASH_XTRACEFD="5"
 
 ROOT_REPO=${ROOT_REPO:-${PWD}}
-source "${ROOT_REPO}/e2e-tests/vars.sh"
+GIT_BRANCH=${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
+VERSION=${VERSION:-$(echo "${GIT_BRANCH}" | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')}
+IMAGE=${IMAGE:-"perconalab/percona-postgresql-operator:${VERSION}"}
 
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT=$(git rev-parse HEAD)

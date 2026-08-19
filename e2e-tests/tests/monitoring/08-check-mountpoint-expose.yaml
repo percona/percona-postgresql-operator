@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      series_fetched=$(curl --insecure -G "https://admin:admin@$(get_service_ip monitoring-service)/prometheus/api/v1/query_range" \
+      series_fetched=$(execute_curl --insecure -G "https://admin:admin@$(get_service_ip monitoring-service)/prometheus/api/v1/query_range" \
            --data-urlencode "query=node_filesystem_free_bytes{mountpoint=\"/pgdata\"}" \
            --data-urlencode "start=$(($(date +%s) - 300))" \
            --data-urlencode "end=$(date +%s)" \

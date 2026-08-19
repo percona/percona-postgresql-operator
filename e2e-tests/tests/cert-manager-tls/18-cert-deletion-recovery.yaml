@@ -16,10 +16,12 @@ commands:
         cert-manager-tls-pgbackrest-repo-cert \
         cert-manager-tls-pgbackrest-client-cert
 
-      kubectl -n "$NAMESPACE" delete secret \
+      for secret_name in \
         cert-manager-tls-pgbouncer-frontend-tls \
         cert-manager-tls-pgbackrest-repo-tls \
-        cert-manager-tls-pgbackrest-client-tls
+        cert-manager-tls-pgbackrest-client-tls; do
+          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=60s
+      done
 
       verify_cert_recreated() {
           local cert_name="$1"
