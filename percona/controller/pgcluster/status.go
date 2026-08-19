@@ -168,12 +168,14 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) {
 	setClusterNotReadyCondition := func(status metav1.ConditionStatus, reason string) {
 		existing := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-		if existing == nil || existing.Status != status || existing.Reason != reason {
+		if existing == nil || existing.Status != status || existing.Reason != reason ||
+			existing.ObservedGeneration != cr.Generation {
 			_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 				Type:               pNaming.ConditionClusterIsReadyForBackup,
 				Status:             status,
 				LastTransitionTime: metav1.Now(),
 				Reason:             reason,
+				ObservedGeneration: cr.Generation,
 			})
 		}
 	}
@@ -206,6 +208,7 @@ var perconaOwnedConditions = []string{
 	pNaming.ConditionClusterIsReadyForBackup,
 	pNaming.ConditionAPIGroupMigration,
 	pNaming.ConditionStandbyLagging,
+	pNaming.ConditionReadyForLogicalReplication,
 	v2.ConditionPMMReady,
 }
 

@@ -90,7 +90,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())); err != nil {
 		return errors.Wrap(err, "unable to watch secrets")
 	}
-	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())); err != nil {
+	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchJobs(naming.LabelPGBackRestRepo))); err != nil {
 		return errors.Wrap(err, "unable to watch jobs")
 	}
 	if err := r.CrunchyController.Watch(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())); err != nil {
@@ -112,8 +112,10 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&corev1.ConfigMap{}, r.watchLogRotateExtraConfig()).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
-		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchBackupJobs())).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchJobs(naming.LabelPGBackRestRepo))).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchJobs(pNaming.LabelLogicalReplica))).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGBackup{}, r.watchPGBackups())).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &v2.PerconaPGRestore{}, r.watchPGRestores())).
 		WatchesRawSource(source.Channel(standbyClusterEvents, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
@@ -134,14 +136,16 @@ func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service
 	}
 }
 
-func (r *PGClusterReconciler) watchBackupJobs() handler.TypedFuncs[*batchv1.Job, reconcile.Request] {
+// watchJobs enqueues the cluster of a Job whose status changed, as long as the
+// Job carries ownerLabel. Every Job the operator creates is labeled with its
+// cluster, so LabelCluster alone would wake the reconciler for all of them.
+func (r *PGClusterReconciler) watchJobs(ownerLabel string) handler.TypedFuncs[*batchv1.Job, reconcile.Request] {
 	return handler.TypedFuncs[*batchv1.Job, reconcile.Request]{
 		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*batchv1.Job], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			labels := e.ObjectNew.GetLabels()
 			crName := labels[naming.LabelCluster]
-			repoName := labels[naming.LabelPGBackRestRepo]
 
-			if len(crName) != 0 && len(repoName) != 0 &&
+			if len(crName) != 0 && len(labels[ownerLabel]) != 0 &&
 				!reflect.DeepEqual(e.ObjectNew.Status, e.ObjectOld.Status) {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
@@ -167,6 +171,28 @@ func (r *PGClusterReconciler) watchPGBackups() handler.TypedFuncs[*v2.PerconaPGB
 				Namespace: pgBackup.GetNamespace(),
 				Name:      pgBackup.Spec.PGCluster,
 			}})
+		},
+	}
+}
+
+// watchPGRestores enqueues the cluster a restore targets.
+func (r *PGClusterReconciler) watchPGRestores() handler.TypedFuncs[*v2.PerconaPGRestore, reconcile.Request] {
+	enqueue := func(pgRestore *v2.PerconaPGRestore, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+		q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+			Namespace: pgRestore.GetNamespace(),
+			Name:      pgRestore.Spec.PGCluster,
+		}})
+	}
+
+	return handler.TypedFuncs[*v2.PerconaPGRestore, reconcile.Request]{
+		CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[*v2.PerconaPGRestore], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			enqueue(e.Object, q)
+		},
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*v2.PerconaPGRestore], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			enqueue(e.ObjectNew, q)
+		},
+		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*v2.PerconaPGRestore], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			enqueue(e.Object, q)
 		},
 	}
 }
@@ -277,6 +303,12 @@ func (r *PGClusterReconciler) watchSecrets() handler.TypedFuncs[*corev1.Secret, 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;list;update
 // +kubebuilder:rbac:groups="",resources="pods",verbs=create;delete
 // +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=create;update
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=delete;get;watch
+// +kubebuilder:rbac:groups="",resources="services",verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources="configmaps",verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs=delete;get;list;patch;watch
+// +kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgrestores,verbs=get;list;watch
 
 func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := logging.FromContext(ctx).WithValues("cluster", request.Name, "namespace", request.Namespace)
@@ -467,6 +499,15 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 			}, nil
 		}
 		return reconcile.Result{}, errors.Wrap(err, "reconcile owner ref migration status")
+	}
+
+	requeueLogicalReplicas, err := r.reconcileLogicalReplicas(ctx, cr, postgresCluster)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "reconcile logical replicas")
+	}
+
+	if requeueLogicalReplicas {
+		return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil

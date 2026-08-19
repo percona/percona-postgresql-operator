@@ -3,24 +3,21 @@
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 CERT_MANAGER_VER="1.20.2"
+CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-tests"
 CHAOS_MESH_VER="2.5.1"
 BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
-if oc get projects 2>/dev/null; then
-	OPENSHIFT=4
-fi
-
-init_temp_dir() {
+function init_temp_dir() {
 	rm -rf "$TEMP_DIR"
 	mkdir -p "$TEMP_DIR"
 }
 
-create_namespace() {
+function create_namespace() {
 	local namespace=$1
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		set -o pipefail
 		if [[ $OPERATOR_NS ]] && (oc get project "$OPERATOR_NS" -o json >/dev/null 2>&1 | jq -r '.metadata.name' >/dev/null 2>&1); then
 			oc delete --grace-period=0 --force=true project "$namespace" && sleep 120 || :
@@ -39,7 +36,7 @@ create_namespace() {
 	fi
 }
 
-check_operator_panic() {
+function check_operator_panic() {
 	local operator_pod=$(get_operator_pod)
 	local panic_log
 	panic_log=$(kubectl logs -n "${OPERATOR_NS:-$NAMESPACE}" "$operator_pod" -c operator | grep -A 100 "Observed a panic" || true)
@@ -50,7 +47,7 @@ check_operator_panic() {
 	fi
 }
 
-deploy_operator() {
+function deploy_operator() {
 	local cw_prefix=""
 
 	destroy_operator
@@ -73,7 +70,7 @@ deploy_operator() {
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
-update_operator() {
+function update_operator() {
 	local cw_prefix=""
 
 	if [[ $OPERATOR_NS ]]; then
@@ -92,7 +89,7 @@ update_operator() {
 		'{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
 }
 
-deploy_operator_gh() {
+function deploy_operator_gh() {
 	local git_tag="$1"
 	local cw_prefix=""
 
@@ -113,7 +110,7 @@ deploy_operator_gh() {
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
-remove_all_finalizers() {
+function remove_all_finalizers() {
 	resource_types=("pg-restore" "pg-backup" "pg")
 
 	for resource in "${resource_types[@]}"; do
@@ -130,7 +127,7 @@ remove_all_finalizers() {
 	done
 }
 
-wait_for_ready_containers() {
+function wait_for_ready_containers() {
 	local pod_prefix="$1"
 	local target_count="$2"
 	local namespace="${NAMESPACE}"
@@ -188,18 +185,18 @@ wait_for_ready_containers() {
 	return 1
 }
 
-destroy_operator() {
+function destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
 	if [[ $OPERATOR_NS ]]; then
 		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 || true
 	fi
 }
 
-get_operator_pod() {
+function get_operator_pod() {
 	echo $(kubectl get pods -n "${OPERATOR_NS:-$NAMESPACE}" --selector=app.kubernetes.io/name=percona-postgresql-operator -o jsonpath='{.items[].metadata.name}')
 }
 
-retry() {
+function retry() {
 	local max=$1
 	local delay=$2
 	shift 2 # cut delay and max args
@@ -207,15 +204,22 @@ retry() {
 
 	until "$@"; do
 		if [[ $n -ge $max ]]; then
-			echo "The command ${*} has failed after $n attempts."
+			local sanitized_command
+			sanitized_command=$(printf '%s' "${*}" | $sed -E \
+				-e "s/(AWS_ACCESS_KEY_ID=)'?[^' ]+'?/\1'***'/g" \
+				-e "s/(AWS_SECRET_ACCESS_KEY=)'?[^' ]+'?/\1'***'/g" \
+				-e "s/(ACCESS_KEY_ID=)'?[^' ]+'?/\1'***'/g" \
+				-e "s/(SECRET_ACCESS_KEY=)'?[^' ]+'?/\1'***'/g" \
+				-e "s/(AZURE_STORAGE_ACCOUNT_KEY=)'?[^' ]+'?/\1'***'/g")
+			echo "The command ${sanitized_command} has failed after $n attempts."
 			exit 1
 		fi
-		((n++))
-		sleep $delay
+		((n += 1))
+		sleep "$delay"
 	done
 }
 
-deploy_minio() {
+function deploy_minio() {
 	local name="${1:-"minio-service"}"
 	local tls_secret="${2:-}"
 	local access_key
@@ -228,7 +232,7 @@ deploy_minio() {
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	if [[ $(detect_k8s_platform) == "openshift" ]]; then
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		kubectl create serviceaccount "${service_account_name}" \
 			--namespace "${NAMESPACE}"
 		oc adm policy add-scc-to-user anyuid -z "${service_account_name}" -n "${NAMESPACE}"
@@ -281,30 +285,30 @@ deploy_minio() {
 		/usr/bin/aws --endpoint-url ${endpoint_url} ${aws_extra_args} s3 mb s3://operator-testing"
 }
 
-get_repo_auth() {
+function get_repo_auth() {
 	local repo=$1
 	local type=$2
 	local key=$3
 	local secret=$4
 
 	auth="${repo}-${type}-key=${key}\n${repo}-${type}-key-secret=${secret}"
-	if [[ "$type" == "azure" ]]; then
+	if [[ $type == "azure" ]]; then
 		auth="${repo}-${type}-account=${key}\n${repo}-${type}-key=${secret}"
-	elif [[ "$type" == "gcs" ]]; then
+	elif [[ $type == "gcs" ]]; then
 		auth="${repo}-${type}-key=${key}"
 	fi
 
 	echo "\n$auth"
 }
 
-deploy_s3_secrets() {
+function deploy_s3_secrets() {
 	set +o xtrace
 
-	local platform=${1:-$(detect_k8s_platform)}
+	local platform=${1:-${PLATFORM}}
 	local repo_auth=""
 	local secret_args=()
 
-	if [[ $platform == "digitalocean" ]]; then
+	if [[ $platform == "doks" ]]; then
 		key=$(yq eval 'select(.metadata.name=="*spaces*").data.ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
 		secret=$(yq eval 'select(.metadata.name=="*spaces*").data.SECRET_ACCESS_KEY' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
 		repo_auth+=$(get_repo_auth repo1 s3 $key $secret)
@@ -312,11 +316,11 @@ deploy_s3_secrets() {
 		case $test_name in
 			"demand-backup")
 				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
-			;;
+				;;
 			"scheduled-backup")
 				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
 				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
-			;;
+				;;
 		esac
 	else
 		key=$(yq eval 'select(.metadata.name=="*s3*").data.AWS_ACCESS_KEY_ID' "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d)
@@ -328,22 +332,22 @@ deploy_s3_secrets() {
 		case $test_name in
 			"demand-backup")
 				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
-			;;
+				;;
 			"scheduled-backup")
 				repo_auth+=$(get_repo_auth repo2 gcs "/etc/pgbackrest/conf.d/gcs-key.json")
 				repo_auth+=$(get_repo_auth repo3 azure $azure_key $azure_secret)
-				yq eval '.stringData["credentials.json"]' "$TESTS_CONFIG_DIR/cloud-secret-minio-gw.yml" > "$TEMP_DIR/gcs-key.json"
+				yq eval '.stringData["credentials.json"]' "$TESTS_CONFIG_DIR/cloud-secret-minio-gw.yml" >"$TEMP_DIR/gcs-key.json"
 				secret_args+=(--from-file=gcs-key.json="$TEMP_DIR/gcs-key.json")
-			;;
+				;;
 		esac
 	fi
 
-	printf "[global]%b" "$repo_auth" > "$TEMP_DIR/pgbackrest-secret.ini"
+	printf "[global]%b" "$repo_auth" >"$TEMP_DIR/pgbackrest-secret.ini"
 	secret_args+=(--from-file=cloud.conf="$TEMP_DIR/pgbackrest-secret.ini")
 	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
 
 	case $test_name in
-		"custom-extensions" | "builtin-extensions" | major-upgrade* )
+		"custom-extensions" | "builtin-extensions" | major-upgrade*)
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
 			;;
@@ -352,39 +356,36 @@ deploy_s3_secrets() {
 	set -o xtrace
 }
 
-deploy_client() {
+function deploy_client() {
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
 }
 
-deploy_cmctl() {
-	envsubst < "${TESTS_CONFIG_DIR}/cmctl.yml" | kubectl -n "${NAMESPACE}" apply -f -
+function deploy_cmctl() {
+	envsubst <"${TESTS_CONFIG_DIR}/cmctl.yml" | kubectl -n "${NAMESPACE}" apply -f -
 	kubectl -n "${NAMESPACE}" wait deployment cmctl --for=condition=available --timeout=60s
 }
 
-get_client_pod() {
+function get_client_pod() {
 	kubectl -n ${NAMESPACE} get pods --selector=name=pg-client -o 'jsonpath={.items[].metadata.name}'
 }
 
-get_cr() {
-	local cr_name=$1
+function get_cr() {
+	local cr_name=${1:-"${test_name}"}
 	local repo_path=$2
 	local source_path=$3
-	if [ -z "$cr_name" ]; then
-		cr_name=${test_name}
-	fi
-
-	local platform="$(detect_k8s_platform)"
+	local platform="${PLATFORM}"
 	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
+	local platform_cr_file="$TEST_CONFIG_DIR/${cr_name}-${platform}.yaml"
 	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
-	local aks_cr_file="$TEST_CONFIG_DIR/${cr_name}-aks.yaml"
-	if [[ $platform == "digitalocean" && -f "$spaces_cr_file" ]]; then
+
+	if [[ -f $platform_cr_file ]]; then
+		cr_file=$platform_cr_file
+	elif [[ ($platform == "doks") && -f $spaces_cr_file ]]; then
 		cr_file=$spaces_cr_file
-	elif [[ $platform == "aks" && -f "$aks_cr_file" ]]; then	
-		cr_file=$aks_cr_file
 	fi
 
 	local crs=("$DEPLOY_DIR/cr.yaml")
-	if [[ -f "$cr_file" ]]; then
+	if [[ -f $cr_file ]]; then
 		crs+=($cr_file)
 	fi
 
@@ -404,28 +405,28 @@ get_cr() {
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
 		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |
 		.spec.pmm.postgresParams = "--environment=dev-postgres"
-	' "${crs[@]}" > "$TEMP_DIR/cr.yaml"
+	' "${crs[@]}" >"$TEMP_DIR/cr.yaml"
 
 	$sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
 	fi
 
 	cat "$TEMP_DIR/cr.yaml"
 }
 
-run_comand_on_pod() {
+function run_comand_on_pod() {
 	local command=${1}
 
 	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
 		bash -c "$command"
 }
 
-run_psql_local() {
+function run_psql_local() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
@@ -434,7 +435,7 @@ run_psql_local() {
 		bash -c "printf '$command\n' | psql -v ON_ERROR_STOP=1 -t -q $driver://'$uri'"
 }
 
-run_psql() {
+function run_psql() {
 	local command=${1}
 	local uri=${2}
 	local password=${3}
@@ -443,22 +444,41 @@ run_psql() {
 		bash -c "printf '$command\n' | PGPASSWORD="\'$password\'" psql -v ON_ERROR_STOP=1 -t -q $uri"
 }
 
-run_psql_command() {
+function run_psql_command() {
 	local command=${1}
 	local uri=${2}
 	local driver=${3:-postgres}
-	
+
 	kubectl -n ${NAMESPACE} exec $(get_client_pod) -- \
 		psql -v ON_ERROR_STOP=1 -t -q "${driver}://${uri}" -c "${command}"
 }
 
-get_psql_user_pass() {
+# Fail unless pg_tde_key_info() contains global-master-key-<PostgresCluster metadata.uid>.
+assert_pg_tde_key_info_uid() {
+	local uri=${1}
+	local cluster=${2}
+
+	local uid
+	uid=$(kubectl -n "${NAMESPACE}" get postgrescluster "${cluster}" -o jsonpath='{.metadata.uid}')
+
+	echo "Showing TDE key info"
+	local key_info
+	key_info=$(run_psql_command "SELECT pg_tde_key_info();" "${uri}")
+	echo "${key_info}"
+
+	if [[ ${key_info} != *"global-master-key-${uid}"* ]]; then
+		echo "TDE key does not contain PostgresCluster ${cluster} uid ${uid}: ${key_info}"
+		exit 1
+	fi
+}
+
+function get_psql_user_pass() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.password | base64decode}}'
 }
 
-get_psql_uri() {
+function get_psql_uri() {
 	local cluster=$1
 	local user=$2
 	local secret_name="${cluster}-pguser-${user}"
@@ -466,13 +486,23 @@ get_psql_uri() {
 	echo "${user}:$(get_psql_user_pass ${secret_name})@$(get_psql_user_host ${secret_name})"
 }
 
-get_pgbouncer_host() {
+function get_standby_psql_uri() {
+	local standby_cluster=$1
+	local user=$2
+	local source_cluster=$3
+	local standby_secret_name="${standby_cluster}-pguser-${user}"
+	local source_secret_name="${source_cluster}-pguser-${user}"
+
+	echo "${user}:$(get_psql_user_pass ${source_secret_name})@$(get_psql_user_host ${standby_secret_name})"
+}
+
+function get_pgbouncer_host() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" -o jsonpath={.data.pgbouncer-host} | base64 -d
 }
 
-list_pgbouncer_pods() {
+function list_pgbouncer_pods() {
 	local cluster=${1}
 
 	kubectl -n "${NAMESPACE}" get pods \
@@ -480,13 +510,13 @@ list_pgbouncer_pods() {
 		-o jsonpath='{.items[*].metadata.name}'
 }
 
-get_pod_ip() {
+function get_pod_ip() {
 	local pod=${1}
 
 	kubectl -n "${NAMESPACE}" get "pod/${pod}" -o jsonpath='{.status.podIP}'
 }
 
-check_pgbouncer_connect() {
+function check_pgbouncer_connect() {
 	local cluster=${1}
 	local user=${2}
 	local host=${3}
@@ -503,48 +533,49 @@ check_pgbouncer_connect() {
 	[[ $(tr -d '[:space:]' <<<"${out}") == "1" ]]
 }
 
-get_psql_user_host() {
+function get_psql_user_host() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
 }
 
-get_aws_access_key() {
+function get_aws_access_key() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_SECRET_ACCESS_KEY | base64decode }}'
 }
 
-get_aws_access_key_id() {
+function get_aws_access_key_id() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_ACCESS_KEY_ID | base64decode }}'
 }
 
-get_psql_user_host() {
+function get_psql_user_host() {
 	local secret_name=${1}
 
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
 }
-get_instance_set_pods() {
+
+function get_instance_set_pods() {
 	local instance=${1:-instance1}
 
 	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
 }
 
-copy_custom_extensions_form_aws() {
+function copy_custom_extensions_form_aws() {
 	set +o xtrace
 
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+	retry 2 20 kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
 		--image=perconalab/awscli \
 		--restart=Never -- \
 		bash -c "
 		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
 		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
-		AWS_DEFAULT_REGION=eu-central-1 \
+		AWS_DEFAULT_REGION=us-east-1 \
 		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
 
 		AWS_ACCESS_KEY_ID='${access_key}' \
@@ -555,13 +586,13 @@ copy_custom_extensions_form_aws() {
 	set -o xtrace
 }
 
-get_psql_pod_host() {
+function get_psql_pod_host() {
 	local pod=${1}
 
 	echo "${pod}.${test_name}-pods.${NAMESPACE}.svc"
 }
 
-wait_pod() {
+function wait_pod() {
 	local pod=$1
 
 	set +o xtrace
@@ -587,7 +618,7 @@ wait_pod() {
 	set -o xtrace
 }
 
-get_service_ip() {
+function get_service_ip() {
 	local service=$1
 	while (kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.spec.type}' 2>&1 || :) | grep -q NotFound; do
 		sleep 1
@@ -603,7 +634,7 @@ get_service_ip() {
 	kubectl get service/$service -n "${NAMESPACE}" -o 'jsonpath={.status.loadBalancer.ingress[].hostname}'
 }
 
-get_version_images() {
+function get_version_images() {
 	local cr_version="$1"
 	local component="$2"
 	local release_versions_file="${TEMP_DIR}/release_version_${cr_version}"
@@ -615,14 +646,14 @@ get_version_images() {
 	grep -i ${component} $release_versions_file | cut -d'=' -f2
 }
 
-get_release_image() {
+function get_release_image() {
 	local key="$1"
 	local release_versions_file="${ROOT_REPO}/e2e-tests/release_versions"
 
 	grep -E "^${key}=" "$release_versions_file" | cut -d'=' -f2
 }
 
-wait_for_delete() {
+function wait_for_delete() {
 	local res="$1"
 
 	echo -n "$res - "
@@ -638,7 +669,7 @@ wait_for_delete() {
 	done
 }
 
-deploy_pmm_server() {
+function deploy_pmm_server() {
 	helm uninstall -n "${NAMESPACE}" monitoring || :
 	helm repo remove percona || :
 	kubectl delete clusterrole monitoring --ignore-not-found
@@ -646,7 +677,7 @@ deploy_pmm_server() {
 	helm repo add percona https://percona.github.io/percona-helm-charts/
 	helm repo update
 
-	if [[ $OPENSHIFT ]]; then
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		oc create sa pmm-server -n "$NAMESPACE"
 		oc adm policy add-scc-to-user privileged -z pmm-server -n "$NAMESPACE"
 
@@ -670,24 +701,40 @@ deploy_pmm_server() {
 		--force
 }
 
-retry() {
-	local max=$1
-	local delay=$2
-	shift 2 # cut delay and max args
-	local n=1
+function execute_curl() {
+	local name="curl-${RANDOM}"
+	local image="${CURL_IMAGE:-docker.io/alpine/curl:latest}"
+	local phase=""
+	local exit_status=0
 
-	until "$@"; do
-		if [[ $n -ge $max ]]; then
-			echo "The command '$@' has failed after $n attempts."
-			exit 1
+	kubectl run "$name" \
+		-n "$NAMESPACE" \
+		--restart=Never \
+		--image="$image" \
+		--command -- curl -sS "$@" >/dev/null
+
+	for _ in $(seq 1 60); do
+		phase=$(kubectl get pod "$name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+		if [[ $phase == "Succeeded" || $phase == "Failed" ]]; then
+			break
 		fi
-		((n++))
-		sleep $delay
+		sleep 1
 	done
+
+	kubectl logs "$name" -n "$NAMESPACE" || exit_status=$?
+	kubectl delete pod "$name" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+
+	if [[ $phase != "Succeeded" ]]; then
+		return 1
+	fi
+
+	return $exit_status
 }
 
-generate_pmm_server_token() {
+function generate_pmm_server_token() {
 	local key_name=$RANDOM
+	local endpoint
+	endpoint=$(get_service_ip monitoring-service)
 
 	local ADMIN_PASSWORD
 	ADMIN_PASSWORD=$(kubectl -n "${NAMESPACE}" get secret pmm-secret -o jsonpath="{.data.PMM_ADMIN_PASSWORD}" | base64 --decode)
@@ -698,11 +745,16 @@ generate_pmm_server_token() {
 	fi
 
 	local create_response create_status_code create_json_response
-	create_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' \
-		-d "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
+	create_response=$(execute_curl \
+		--insecure \
+		--silent \
+		--request POST \
+		--header 'Content-Type: application/json' \
+		--header 'Accept: application/json' \
+		--data "{\"name\":\"${key_name}\", \"role\":\"Admin\", \"isDisabled\":false}" \
 		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts" \
-		-w "\n%{http_code}")
+		--write-out '\n%{http_code}' \
+		"https://${endpoint}/graph/api/serviceaccounts")
 
 	create_status_code=$(echo "$create_response" | tail -n1)
 	create_json_response=$(echo "$create_response" | $sed '$ d')
@@ -722,11 +774,15 @@ generate_pmm_server_token() {
 	fi
 
 	local token_response token_status_code token_json_response
-	token_response=$(curl --insecure -s -X POST -H 'Content-Type: application/json' \
-		-d "{\"name\":\"${key_name}\"}" \
+	token_response=$(execute_curl \
+		--insecure \
+		--silent \
+		--request POST \
+		--header 'Content-Type: application/json' \
+		--data "{\"name\":\"${key_name}\"}" \
 		--user "admin:${ADMIN_PASSWORD}" \
-		"https://$(get_service_ip monitoring-service)/graph/api/serviceaccounts/${service_account_id}/tokens" \
-		-w "\n%{http_code}")
+		--write-out '\n%{http_code}' \
+		"https://${endpoint}/graph/api/serviceaccounts/${service_account_id}/tokens")
 
 	token_status_code=$(echo "$token_response" | tail -n1)
 	token_json_response=$(echo "$token_response" | $sed '$ d')
@@ -740,7 +796,7 @@ generate_pmm_server_token() {
 	echo "$token_json_response" | jq -r '.key'
 }
 
-get_metric_values() {
+function get_metric_values() {
 	local metric=$1
 	local instance=$2
 	local token=$3
@@ -750,7 +806,7 @@ get_metric_values() {
 
 	local wait_count=20
 	local retry=0
-	until [[ $(curl -s -k -H "Authorization: Bearer ${token}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
+	until [[ $(execute_curl -s -k -H "Authorization: Bearer ${token}" "https://$endpoint/graph/api/datasources/proxy/1/api/v1/query_range?query=min%28$metric%7Bnode_name%3D%7E%22$instance%22%7d%20or%20$metric%7Bnode_name%3D%7E%22$instance%22%7D%29&start=$start&end=$end&step=60" \
 		| jq '.data.result[0].values[][1]' \
 		| grep '^"[0-9]') ]]; do
 		sleep 2
@@ -763,55 +819,109 @@ get_metric_values() {
 	done
 }
 
-get_qan20_values() {
-	local instance=$1
+function get_qan20_values() {
 	local token=$2
-	local start=$($date -u "+%Y-%m-%dT%H:%M:%S" -d "-30 minute")
-	local end=$($date -u "+%Y-%m-%dT%H:%M:%S")
 	local endpoint=$(get_service_ip monitoring-service)
+	local period_start_from=$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')
+	local period_start_to=$($date -u '+%Y-%m-%dT%H:%M:%S%:z')
+	local payload
 
-	cat >payload.json <<EOF
-{
-   "columns":[
-	  "load",
-	  "num_queries",
-	  "query_time"
-   ],
-   "first_seen": false,
-   "group_by": "queryid",
-   "include_only_fields": [],
-   "keyword": "",
-   "labels": [
-	   {
-		   "key": "cluster",
-		   "value": ["postgresql"]
-   }],
-   "limit": 10,
-   "offset": 0,
-   "order_by": "-load",
-   "main_metric": "load",
-   "period_start_from": "$($date -u -d '-12 hour' '+%Y-%m-%dT%H:%M:%S%:z')",
-   "period_start_to": "$($date -u '+%Y-%m-%dT%H:%M:%S%:z')"
-}
-EOF
+	payload=$(jq \
+		--arg period_start_from "${period_start_from}" \
+		--arg period_start_to "${period_start_to}" \
+		'.period_start_from = $period_start_from | .period_start_to = $period_start_to' \
+		"${TEST_CONFIG_DIR}/qan20-payload.json")
 
-	curl -s -k -H "Authorization: Bearer ${token}" -XPOST -d @payload.json "https://$endpoint/v1/qan/metrics:getReport" \
+	execute_curl -s -k -H "Authorization: Bearer ${token}" -XPOST -d "${payload}" \
+		"https://$endpoint/v1/qan/metrics:getReport" \
 		| jq '.rows[].sparkline'
-	rm -f payload.json
 }
 
-deploy_chaos_mesh() {
+function get_cluster_runtime_version() {
+	local runtime_version
+
+	runtime_version=$(kubectl get nodes \
+		-o jsonpath='{.items[0].status.nodeInfo.containerRuntimeVersion}')
+
+	echo "${runtime_version}"
+}
+
+function get_cluster_runtime() {
+	local runtime_version
+
+	runtime_version=$(get_cluster_runtime_version)
+
+	case "$runtime_version" in
+		containerd://*)
+			echo "containerd"
+			;;
+		cri-o://*)
+			echo "crio"
+			;;
+		docker://*)
+			echo "docker"
+			;;
+		*)
+			echo "Unsupported container runtime: $runtime_version" >&2
+			return 1
+			;;
+	esac
+}
+
+function get_cluster_runtime_socket_path() {
+	local runtime_version
+
+	runtime_version=$(get_cluster_runtime_version)
+
+	case "$runtime_version" in
+		containerd://*-k3s*)
+			echo "/run/k3s/containerd/containerd.sock"
+			;;
+		containerd://*)
+			echo "/run/containerd/containerd.sock"
+			;;
+		cri-o://*)
+			echo "/var/run/crio/crio.sock"
+			;;
+		docker://*)
+			echo "/var/run/docker.sock"
+			;;
+		*)
+			echo "Unsupported container runtime: $runtime_version" >&2
+			return 1
+			;;
+	esac
+}
+
+function deploy_chaos_mesh() {
+	local runtime
+	local socket_path
+
 	destroy_chaos_mesh
 
-	helm repo add chaos-mesh https://charts.chaos-mesh.org
-	helm install chaos-mesh chaos-mesh/chaos-mesh --namespace=${NAMESPACE} --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock --set dashboard.create=false --version ${CHAOS_MESH_VER}
-	if [[ $OPENSHIFT ]]; then
-		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace=${NAMESPACE}
+	runtime=$(get_cluster_runtime)
+	socket_path=$(get_cluster_runtime_socket_path)
+
+	helm repo add chaos-mesh https://charts.chaos-mesh.org \
+		--force-update
+
+	helm install chaos-mesh chaos-mesh/chaos-mesh \
+		--namespace="${NAMESPACE}" \
+		--create-namespace \
+		--version="${CHAOS_MESH_VER}" \
+		--set chaosDaemon.runtime="${runtime}" \
+		--set chaosDaemon.socketPath="${socket_path}" \
+		--set dashboard.create=false
+
+	if [[ ${PLATFORM} == "openshift" ]]; then
+		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace="${NAMESPACE}"
+		kubectl rollout restart daemonset/chaos-daemon --namespace="${NAMESPACE}"
 	fi
-	sleep 10
+
+	kubectl rollout status daemonset/chaos-daemon --namespace="${NAMESPACE}" --timeout=120s
 }
 
-destroy_chaos_mesh() {
+function destroy_chaos_mesh() {
 	local chaos_mesh_ns=$(helm list --all-namespaces --filter chaos-mesh | tail -n1 | awk -F' ' '{print $2}' | $sed 's/NAMESPACE//')
 
 	if [ -n "${chaos_mesh_ns}" ]; then
@@ -835,7 +945,7 @@ destroy_chaos_mesh() {
 	timeout 30 kubectl delete clusterrole $(kubectl get clusterrole | grep 'chaos-mesh' | awk '{print $1}') || :
 }
 
-kill_pods() {
+function kill_pods() {
 	local ns=$1
 	local selector=$2
 	local pod_label=$3
@@ -858,7 +968,7 @@ kill_pods() {
 	sleep 5
 }
 
-failure_pod() {
+function failure_pod() {
 	local ns=$1
 	local pod=$2
 
@@ -870,7 +980,7 @@ failure_pod() {
 	sleep 5
 }
 
-network_loss() {
+function network_loss() {
 	local ns=$1
 	local pod=$2
 
@@ -882,7 +992,81 @@ network_loss() {
 	sleep 5
 }
 
-wait_deployment() {
+function network_delay() {
+	local ns=$1
+	local source_instance=$2
+	local target_service=$3
+
+	yq eval '
+		.metadata.name = "chaos-source-target-delay-'"${RANDOM}"'" |
+		.metadata.namespace = "'"${ns}"'" |
+		.spec.selector.namespaces = ["'"${ns}"'"] |
+		.spec.selector.labelSelectors."app.kubernetes.io/instance" = "'"${source_instance}"'" |
+		.spec.externalTargets = [
+			"'"${target_service}.${ns}.svc.cluster.local"'"
+		] |
+		del(.spec.target)
+	' "${TESTS_CONFIG_DIR}/chaos-network-delay.yml" \
+		| kubectl apply --namespace "${ns}" -f -
+
+	sleep 5
+}
+
+function chaos_daemon_exec_in_pod_network_namespace() {
+	local ns=$1
+	local pod=$2
+	local container=$3
+	local node
+	local container_id
+	local daemon
+	shift 3
+
+	node=$(kubectl get pod "${pod}" --namespace "${ns}" -o jsonpath='{.spec.nodeName}')
+	container_id=$(kubectl get pod "${pod}" --namespace "${ns}" -o json \
+		| jq -r --arg container "${container}" '.status.containerStatuses[] | select(.name == $container) | .containerID' \
+		| cut -d/ -f3)
+	daemon=$(kubectl get pod --namespace "${ns}" \
+		--selector='app.kubernetes.io/component=chaos-daemon' \
+		--field-selector="spec.nodeName=${node}" \
+		-o jsonpath='{.items[0].metadata.name}')
+
+	# The variables in this script are expanded inside the chaos-daemon container.
+	# shellcheck disable=SC2016
+	kubectl exec --namespace "${ns}" "${daemon}" -- sh -eu -c '
+		netns=$(grep -l "$1" /proc/[0-9]*/cgroup | head -n1)
+		netns=${netns%/cgroup}/ns/net
+		shift
+		exec nsexec --net "$netns" "$@"
+	' sh "${container_id}" "$@"
+}
+
+function network_block_storage_endpoint() {
+	local ns=$1
+	local primary=$2
+	local endpoint=$3
+
+	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+		iptables -I OUTPUT 1 -p tcp --dport 443 \
+		-m string --algo bm --string "${endpoint}" \
+		-m comment --comment pgo-e2e-block-storage \
+		-j REJECT --reject-with tcp-reset
+
+	sleep 5
+}
+
+function network_unblock_storage_endpoint() {
+	local ns=$1
+	local primary=$2
+	local endpoint=$3
+
+	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+		iptables -D OUTPUT -p tcp --dport 443 \
+		-m string --algo bm --string "${endpoint}" \
+		-m comment --comment pgo-e2e-block-storage \
+		-j REJECT --reject-with tcp-reset
+}
+
+function wait_deployment() {
 	local name=$1
 	local target_namespace=${2:-"$namespace"}
 
@@ -909,7 +1093,7 @@ wait_deployment() {
 	set -o xtrace
 }
 
-get_pod_by_role() {
+function get_pod_by_role() {
 	local cluster=${1}
 	local role=${2}
 	local parameter=${3}
@@ -926,7 +1110,7 @@ get_pod_by_role() {
 	echo "$(kubectl get pods --namespace ${NAMESPACE} --selector=postgres-operator.crunchydata.com/role=${role},postgres-operator.crunchydata.com/cluster=${cluster} -o 'jsonpath='${jsonpath}'')"
 }
 
-check_passwords_leak() {
+function check_passwords_leak() {
 	local secrets
 	local passwords
 	local pods
@@ -942,7 +1126,7 @@ check_passwords_leak() {
 	done) $secrets"
 	pods=$(kubectl -n "${NAMESPACE}" get pods -o name | awk -F "/" '{print $2}')
 
-	collect_logs() {
+	function collect_logs() {
 		local containers
 		local count
 
@@ -975,7 +1159,7 @@ check_passwords_leak() {
 	fi
 }
 
-get_backup_destination() {
+function get_backup_destination() {
 	local cluster=$1
 	local backup_name=$2
 
@@ -1014,7 +1198,7 @@ get_backup_destination() {
 	echo -n "$storage_type://$bucket$repo_path"
 }
 
-get_backup_name_by_job() {
+function get_backup_name_by_job() {
 	local job_name=$1
 
 	pgbackup_per_job=$(kubectl get pg-backup -n "$NAMESPACE" -o yaml \
@@ -1029,7 +1213,7 @@ get_backup_name_by_job() {
 		| yq ".items[] | select(.status.jobName==\"$job_name\").metadata.name"
 }
 
-check_jobs_and_pgbackups() {
+function check_jobs_and_pgbackups() {
 	local cluster=$1
 
 	job_names=()
@@ -1070,7 +1254,7 @@ check_jobs_and_pgbackups() {
 	done
 }
 
-restart_pg_pods() {
+function restart_pg_pods() {
 	local cluster=$1
 	local instance=$2
 
@@ -1081,20 +1265,19 @@ restart_pg_pods() {
 	done
 }
 
-get_updated_replicas() {
+function get_updated_replicas() {
 	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.status.updatedReplicas}'
 }
 
-# Function to get the desired number of replicas
-get_desired_replicas() {
+function get_desired_replicas() {
 	kubectl get statefulset "$1" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}'
 }
 
-get_ready_replicas() {
+function get_ready_replicas() {
 	kubectl get sts "$1" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}'
 }
 
-wait_sts_rollout() {
+function wait_sts_rollout() {
 	local sts=$1
 	local ready_replicas=$(get_ready_replicas $sts)
 	local updated_replicas=$(get_updated_replicas $sts)
@@ -1110,7 +1293,7 @@ wait_sts_rollout() {
 	done
 }
 
-wait_cluster_consistency() {
+function wait_cluster_consistency() {
 	local cluster_name=$1
 	local wait_time=${2:-32}
 
@@ -1133,13 +1316,47 @@ wait_cluster_consistency() {
 	done
 }
 
-deploy_cert_manager() {
+function is_cert_manager_installed() {
+	kubectl get deployment cert-manager -n cert-manager >/dev/null 2>&1
+}
+
+function is_cert_manager_installed_by_test() {
+	local namespace
+	is_cert_manager_installed || return 1
+
+	namespace="$(kubectl get namespace cert-manager \
+		--selector "${CERT_MANAGER_TEST_LABEL}" -o name 2>/dev/null || true)"
+
+	[[ -n ${namespace} ]]
+}
+
+function deploy_cert_manager() {
+	if is_cert_manager_installed; then
+		if ! is_cert_manager_installed_by_test; then
+			echo 'cert-manager is present without the test label; leaving it unchanged'
+			return
+		fi
+
+		echo 'cert-manager installed by the tests is present; destroying and redeploying'
+	fi
+
 	destroy_cert_manager
 
 	echo 'deploy cert manager'
-	kubectl create namespace cert-manager || :
+	helm repo add jetstack https://charts.jetstack.io --force-update || :
+	helm repo update || :
+	retry 2 20 helm upgrade --install cert-manager jetstack/cert-manager \
+		--namespace cert-manager \
+		--create-namespace \
+		--version "${CERT_MANAGER_VER}" \
+		--set installCRDs=true \
+		--set "extraArgs={--enable-certificate-owner-ref=true}"
+
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
-	kubectl apply -f "https://github.com/jetstack/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml" --validate=false >/dev/null 2>&1 || :
+	kubectl label namespace cert-manager "${CERT_MANAGER_TEST_LABEL}" --overwrite || :
+	kubectl label deployment -n cert-manager \
+		cert-manager cert-manager-webhook cert-manager-cainjector \
+		"${CERT_MANAGER_TEST_LABEL}" --overwrite
 
 	kubectl wait deployment cert-manager cert-manager-webhook cert-manager-cainjector \
 		--for=condition=available \
@@ -1162,22 +1379,27 @@ deploy_cert_manager() {
 	done
 }
 
-destroy_cert_manager() {
-	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v${CERT_MANAGER_VER}/cert-manager.yaml >/dev/null 2>&1 || :
+function destroy_cert_manager() {
+	if ! is_cert_manager_installed_by_test; then
+		echo 'cert-manager was not installed by this test'
+		return
+	fi
+
+	helm uninstall cert-manager -n cert-manager >/dev/null 2>&1 || :
 	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
 }
 
-get_container_image() {
+function get_container_image() {
 	local component=$1
 	local pgVersion=$2
 
 	if [[ ${IMAGE} == percona/* || ${IMAGE} == docker.io/percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
 		local key
 		case $component in
-			pgbouncer)  key="IMAGE_PGBOUNCER${pgVersion}" ;;
+			pgbouncer) key="IMAGE_PGBOUNCER${pgVersion}" ;;
 			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
-			postgis)    key="IMAGE_POSTGIS${pgVersion}" ;;
-			*)          key="IMAGE_POSTGRESQL${pgVersion}" ;;
+			postgis) key="IMAGE_POSTGIS${pgVersion}" ;;
+			*) key="IMAGE_POSTGRESQL${pgVersion}" ;;
 		esac
 		get_release_image "$key"
 		return
@@ -1201,7 +1423,7 @@ get_container_image() {
 	fi
 }
 
-get_postgresql_logs() {
+function get_postgresql_logs() {
 	local pgVersion=$1
 
 	for pod in $(kubectl get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
@@ -1215,7 +1437,7 @@ get_postgresql_logs() {
 	done
 }
 
-wait_for_generation() {
+function wait_for_generation() {
 	local resource="$1"
 	local target_generation="$2"
 
@@ -1234,279 +1456,396 @@ wait_for_generation() {
 	done
 }
 
-# Reads all environment variables from a pod (single kubectl exec call)
-get_envs_from_pod() {
-  local namespace=$1
-  local pod=$2
-  local container=$3
+function get_envs_from_pod() {
+	local namespace=$1
+	local pod=$2
+	local container=$3
 
-  if [ -n "$container" ]; then
-    kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
-  else
-    kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
-  fi
+	if [ -n "$container" ]; then
+		kubectl exec -n "$namespace" "$pod" -c "$container" -- printenv 2>/dev/null || true
+	else
+		kubectl exec -n "$namespace" "$pod" -- printenv 2>/dev/null || true
+	fi
 }
 
 # Verifies a single variable in given env content
-check_env_in_pod() {
-  local check_type=$1
-  local pod=$2
-  local var_name=$3
-  local expected_value=$4
-  local env_content=$5
+function check_env_in_pod() {
+	local check_type=$1
+	local pod=$2
+	local var_name=$3
+	local expected_value=$4
+	local env_content=$5
 
-  local actual_value
-  actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
+	local actual_value
+	actual_value=$(echo "$env_content" | grep -E "^${var_name}=" | cut -d'=' -f2- || true)
 
-  if [[ "$check_type" == "add" ]]; then
-    if [ "$actual_value" != "$expected_value" ]; then
-      echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
-      return 1
-    else
-      echo "OK: $var_name=$actual_value in $pod"
-    fi
-  elif [[ "$check_type" == "delete" ]]; then
-    if [ -n "$actual_value" ]; then
-      echo "ERROR: $var_name exists in $pod (should not exist)"
-      return 1
-    else
-      echo "OK: $var_name deleted in $pod"
-    fi
-  else
-    echo "ERROR: unknown check type '$check_type'"
-    return 1
-  fi
+	if [[ $check_type == "add" ]]; then
+		if [ "$actual_value" != "$expected_value" ]; then
+			echo "ERROR: $var_name in $pod — expected '$expected_value', got '${actual_value:-<missing>}'"
+			return 1
+		else
+			echo "OK: $var_name=$actual_value in $pod"
+		fi
+	elif [[ $check_type == "delete" ]]; then
+		if [ -n "$actual_value" ]; then
+			echo "ERROR: $var_name exists in $pod (should not exist)"
+			return 1
+		else
+			echo "OK: $var_name deleted in $pod"
+		fi
+	else
+		echo "ERROR: unknown check type '$check_type'"
+		return 1
+	fi
 }
 
 # Checks multiple env vars in one or more components
-check_envs_for_component() {
-  local check_type=$1      # add | delete
-  local component=$2       # instance | pgbouncer | repohost
-  local vars=("${@:3}")    # everything after the 2nd argument
+function check_envs_for_component() {
+	local check_type=$1   # add | delete
+	local component=$2    # instance | pgbouncer | repohost
+	local vars=("${@:3}") # everything after the 2nd argument
 
-  case "$component" in
-    instance)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER=""
-      ;;
-    pgbouncer)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbouncer"
-      ;;
-    repohost)
-      POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
-      CONTAINER="pgbackrest"
-      ;;
-    *)
-      echo "ERROR: unknown component '$component'"
-      return 1
-      ;;
-  esac
+	case "$component" in
+		instance)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER=""
+			;;
+		pgbouncer)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/role=pgbouncer -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbouncer"
+			;;
+		repohost)
+			POD=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/data=pgbackrest -o 'jsonpath={.items[0].metadata.name}')
+			CONTAINER="pgbackrest"
+			;;
+		*)
+			echo "ERROR: unknown component '$component'"
+			return 1
+			;;
+	esac
 
-  echo "Fetching environment variables for $component pod $POD..."
-  local env_content
-  env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
+	echo "Fetching environment variables for $component pod $POD..."
+	local env_content
+	env_content=$(get_envs_from_pod "${NAMESPACE}" "$POD" "$CONTAINER")
 
-  local errors=0
-  for var_entry in "${vars[@]}"; do
-    if [[ "$check_type" == "add" ]]; then
-      local var_name="${var_entry%%=*}"
-      local var_expected="${var_entry#*=}"
-      check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors+1))
-    else
-      check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors+1))
-    fi
-  done
+	local errors=0
+	for var_entry in "${vars[@]}"; do
+		if [[ $check_type == "add" ]]; then
+			local var_name="${var_entry%%=*}"
+			local var_expected="${var_entry#*=}"
+			check_env_in_pod add "$POD" "$var_name" "$var_expected" "$env_content" || errors=$((errors + 1))
+		else
+			check_env_in_pod delete "$POD" "$var_entry" "" "$env_content" || errors=$((errors + 1))
+		fi
+	done
 
-  if (( errors > 0 )); then
-    echo "$errors environment check(s) failed for component '$component'"
-    return 1
-  else
-    echo "All environment checks passed for component '$component'"
-  fi
-}
-
-detect_k8s_platform() {
-	local platform=""
-
-	if kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "gce://"; then
-		platform="gke"
-
-	elif oc get projects >/dev/null 2>&1; then
-		platform="openshift"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "aws://"; then
-		platform="eks"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "digitalocean://"; then
-		platform="digitalocean"
-
-	elif kubectl get nodes -o json | jq -r '.items[0].spec.providerID' | grep -q "azure://"; then
-		platform="aks"
-
+	if ((errors > 0)); then
+		echo "$errors environment check(s) failed for component '$component'"
+		return 1
 	else
-		platform="unknown"
+		echo "All environment checks passed for component '$component'"
 	fi
-
-	echo "${platform}"
 }
 
-ensure_ebs_gp3_storage_class() {
-	local platform=${1:-$(detect_k8s_platform)}
+function ensure_ebs_gp3_storage_class() {
+	local platform=${1:-${PLATFORM}}
 
-	if [[ "$platform" != "eks" && "$platform" != "openshift" ]]; then
+	if [[ $platform != "eks" && $platform != "openshift" ]]; then
 		return 0
 	fi
 
-	cat <<EOF | kubectl apply -f -
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: ebs-csi-gp3
-provisioner: ebs.csi.aws.com
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-parameters:
-  type: gp3
-EOF
+	kubectl apply -f "${TEST_CONFIG_DIR}/storage-class-ebs-gp3.yaml"
 }
 
-enable_hugepages() {
-	local platform=$1
-	local hugepage_count=${2:-1024}
+function setup_longhorn_backup_storage() {
+	local minio_service_name="${1:-minio-service}"
 
-	echo "Detected platform: ${platform}"
+	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+	deploy_minio "${minio_service_name}"
 
-	case ${platform} in
-		gke)
-			enable_hugepages_gke "${hugepage_count}"
+	yq '
+			.metadata.name = "minio-secret-longhorn" |
+			.stringData.AWS_ENDPOINTS = "http://'"${minio_service_name}.${NAMESPACE}"'.svc.cluster.local:9000"
+		' "${TESTS_CONFIG_DIR}/minio-secret.yml" \
+		| kubectl apply -n longhorn-system -f -
+
+	kubectl -n longhorn-system patch backuptargets.longhorn.io default \
+		--type=merge \
+		-p '{
+			"spec": {
+				"backupTargetURL": "s3://operator-testing@us-east-1/",
+				"credentialSecret": "minio-secret-longhorn"
+			}
+		}'
+}
+
+function deploy_volume_snapshot_class() {
+	local platform=${1:-${PLATFORM}}
+	local snapshot_class_file
+
+	case "$platform" in
+		aks)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-aks.yaml"
 			;;
-		openshift)
-			enable_hugepages_openshift "${hugepage_count}"
+		doks)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-do.yaml"
 			;;
 		eks)
-			enable_hugepages_eks "${hugepage_count}"
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-eks.yaml"
 			;;
-		aks)
-			enable_hugepages_aks "${hugepage_count}"
+		gke)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-gke.yaml"
 			;;
-		digitalocean)
-			enable_hugepages_doks "${hugepage_count}"
+		openshift)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-openshift.yaml"
+			;;
+		rancher)
+			setup_longhorn_backup_storage
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-rancher.yaml"
 			;;
 		*)
-			echo "Unknown platform, cannot configure hugepages"
+			echo "Unsupported Kubernetes environment for volume snapshot class: $platform"
 			return 1
+			;;
+	esac
+
+	kubectl apply -f "${snapshot_class_file}"
+}
+
+function get_volume_snapshot_class() {
+	local platform=${1:-${PLATFORM}}
+
+	case "$platform" in
+		aks)
+			echo "aks-snapshot-class"
+			;;
+		doks)
+			echo "do-block-storage"
+			;;
+		eks)
+			echo "eks-snapshot-class"
+			;;
+		gke)
+			echo "gke-snapshot-class"
+			;;
+		openshift)
+			echo "openshift-snapshot-class"
+			;;
+		rancher)
+			echo "longhorn-snapshot-class"
+			;;
+		*)
+			kubectl get volumesnapshotclass -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
 			;;
 	esac
 }
 
-enable_hugepages_gke() {
-  local hugepage_count=$1
-
-  echo "Hugepages configuration is now handled during cluster creation"
-  echo "Skipping runtime configuration for GKE"
-
-  echo "Verifying hugepages configuration..."
-  local node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-
-  if kubectl get node ${node_name} -o jsonpath='{.status.allocatable.hugepages-2Mi}' | grep -q '[0-9]'; then
-    echo "✓ Hugepages are already configured on nodes"
-    return 0
-  else
-    echo "✗ Warning: Hugepages not found in node allocatable resources"
-    return 1
-  fi
-}
-
-enable_hugepages_eks() {
-
-	echo "Configuring hugepages on EKS"
-
-	if verify_hugepages_on_nodes; then
-		echo "Hugepages already configured"
-		return 0
-	fi
-}
-
-enable_hugepages_doks() {
+function apply_hugepages_daemonset() {
 	local hugepage_count=$1
-  
-  if verify_hugepages_on_nodes; then
-		echo "Hugepages already configured"
-		return 0
-	fi
+	local node_service=$2
+	local manifest="${TEST_CONFIG_DIR}/huge-pages-daemonset.yaml"
+	local expression='(.spec.template.spec.containers[] | select(.name == "hugepages") | .env[] | select(.name == "HUGEPAGE_COUNT") | .value) = strenv(HUGEPAGE_COUNT) |
+		(.spec.template.spec.containers[] | select(.name == "hugepages") | .env[] | select(.name == "NODE_SERVICE") | .value) = strenv(NODE_SERVICE)'
 
-	cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: hugepages
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      app: hugepages
-  template:
-    metadata:
-      labels:
-        app: hugepages
-    spec:
-      hostPID: true
-      containers:
-      - name: hugepages
-        image: busybox
-        securityContext:
-          privileged: true
-        command:
-        - sh
-        - -c
-        - |
-          echo "Setting hugepages..."
-          echo 1024 > /proc/sys/vm/nr_hugepages
-          cat /proc/sys/vm/nr_hugepages
-          echo "Restarting Kubelet..."
-          nsenter -t 1 -m -u -i -n -p systemctl restart kubelet
-          echo "Done, sleeping..."
-          sleep infinity
-EOF
+	HUGEPAGE_COUNT="${hugepage_count}" NODE_SERVICE="${node_service}" \
+		yq "${expression}" "${manifest}" \
+		| kubectl apply -f -
+}
 
-	kubectl -n kube-system rollout status daemonset/hugepages --timeout=15m || {
-		echo "DOKS: DaemonSet rollout did not complete. Skipping test."
+function configure_hugepages_on_labeled_nodes() {
+	local platform=$1
+	local hugepage_count=$2
+	local node_service=$3
+	local rollout_timeout=${4:-15m}
+
+	apply_hugepages_daemonset "${hugepage_count}" "${node_service}"
+
+	kubectl -n kube-system rollout status daemonset/hugepages --timeout="${rollout_timeout}" || {
+		echo "${platform}: Hugepages DaemonSet rollout did not complete"
 		return 1
 	}
 
-	if verify_hugepages_on_nodes; then
-		echo "Hugepages successfully configured"
-	else
-		echo "Failed to configure hugepages"
-		return 1
-	fi
+	for _ in {1..60}; do
+		if verify_hugepages_on_labeled_nodes; then
+			echo "Hugepages successfully configured on ${platform} nodes"
+			return 0
+		fi
+		sleep 5
+	done
+
+	echo "${platform}: Hugepages capacity was not published by kubelet"
+	return 1
 }
 
-enable_hugepages_aks() {
-	local hugepage_count="${1:-2048}"
-	local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
-	local vm_size="${AKS_HUGEPAGES_VM_SIZE:-Standard_D4_v2}"
-	local node_count="${AKS_HUGEPAGES_NODE_COUNT:-1}"
+function verify_hugepages_on_labeled_nodes() {
+	local nodes
+	nodes=$(kubectl get nodes -l hugepages=enabled -o name 2>/dev/null)
 
-	echo "Checking hugepages on AKS..."
+	if [ -z "${nodes}" ]; then
+		echo "No nodes labeled with hugepages=enabled found"
+		return 1
+	fi
 
-	if verify_hugepages_on_nodes 2>/dev/null; then
-		echo "Hugepages already configured"
+	local node allocatable
+	for node in ${nodes}; do
+		allocatable=$(kubectl get "${node}" -o jsonpath='{.status.allocatable.hugepages-2Mi}')
+		if [ -z "${allocatable}" ] || [ "${allocatable}" = "0" ]; then
+			echo "No allocatable hugepages found on ${node}"
+			return 1
+		fi
+		echo "${node} has allocatable hugepages: ${allocatable}"
+	done
+}
+
+function enable_hugepages_gke() {
+	echo "Hugepages configuration is handled during GKE cluster creation"
+	verify_hugepages_on_nodes
+}
+
+function enable_hugepages_eks() {
+	echo "Verifying hugepages on EKS"
+	verify_hugepages_on_nodes
+}
+
+function enable_hugepages_doks() {
+	local hugepage_count=$1
+
+	if verify_hugepages_on_labeled_nodes; then
+		echo "Hugepages are already configured on DOKS nodes"
 		return 0
 	fi
 
-	local cluster_name
-	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
-	[[ -n $node_rg ]] || return 1
+	ensure_doks_hugepages_nodepool
+	configure_hugepages_on_labeled_nodes DOKS "${hugepage_count}" kubelet 15m
+}
 
-	aks_id="$(az aks list --subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
+function enable_hugepages_rancher() {
+	local hugepage_count=$1
+
+	ensure_rancher_hugepages_node
+
+	if verify_hugepages_on_labeled_nodes; then
+		echo "Hugepages are already configured on the selected RKE2 worker"
+		return 0
+	fi
+
+	configure_hugepages_on_labeled_nodes RKE2 "${hugepage_count}" rke2-agent 15m
+}
+
+function ensure_rancher_hugepages_node() {
+	local node
+	node=$(kubectl get nodes -l node-role.kubernetes.io/worker \
+		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+	if [ -z "${node}" ]; then
+		node=$(kubectl get nodes \
+			-l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' \
+			-o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+	fi
+
+	if [ -z "${node}" ]; then
+		echo "RKE2: No worker nodes found"
+		return 1
+	fi
+
+	local labeled_node
+	for labeled_node in $(kubectl get nodes -l hugepages=enabled -o name 2>/dev/null); do
+		if [[ ${labeled_node} != "node/${node}" ]]; then
+			kubectl label "${labeled_node}" hugepages-
+		fi
+	done
+
+	kubectl label "node/${node}" hugepages=enabled --overwrite
+	kubectl wait "node/${node}" --for=condition=Ready --timeout=15m
+}
+
+function ensure_doks_hugepages_nodepool() {
+	local nodepool_name="${DOKS_HUGEPAGES_NODEPOOL:-hp2m}"
+	local node_size="${DOKS_HUGEPAGES_NODE_SIZE:-s-4vcpu-16gb-amd}"
+	local node_count="${DOKS_HUGEPAGES_NODE_COUNT:-1}"
+	local cluster_name
+	local nodepool_id
+	local node_selector
+	local nodes
+	local actual_node_count=0
+	cluster_name=$(get_k8s_cluster_name doks)
+
+	if [ -z "${cluster_name}" ]; then
+		echo "DOKS: Could not determine the cluster name"
+		return 1
+	fi
+
+	if doctl kubernetes cluster node-pool get "${cluster_name}" "${nodepool_name}" >/dev/null 2>&1; then
+		echo "DOKS node pool '${nodepool_name}' already exists"
+	else
+		echo "Creating DOKS node pool '${nodepool_name}' (${node_size}, count=${node_count})"
+		doctl kubernetes cluster node-pool create "${cluster_name}" \
+			--name "${nodepool_name}" \
+			--size "${node_size}" \
+			--count "${node_count}" \
+			--label hugepages=enabled
+	fi
+
+	nodepool_id=$(doctl kubernetes cluster node-pool get \
+		"${cluster_name}" "${nodepool_name}" --output json \
+		| jq -r 'if type == "array" then .[0].id else .id end')
+
+	if [ -z "${nodepool_id}" ] || [ "${nodepool_id}" == "null" ]; then
+		echo "DOKS: Could not determine the ID of node pool '${nodepool_name}'"
+		return 1
+	fi
+
+	node_selector="doks.digitalocean.com/node-pool-id=${nodepool_id}"
+
+	for _ in {1..180}; do
+		nodes=$(kubectl get nodes -l "${node_selector}" -o name 2>/dev/null)
+		actual_node_count=$(printf '%s\n' "${nodes}" | awk 'NF { count++ } END { print count + 0 }')
+		if [ "${actual_node_count}" -ge "${node_count}" ]; then
+			break
+		fi
+		sleep 5
+	done
+
+	if [ "${actual_node_count}" -lt "${node_count}" ]; then
+		echo "DOKS: Expected ${node_count} nodes from '${nodepool_name}', found ${actual_node_count}"
+		return 1
+	fi
+
+	kubectl wait node -l "${node_selector}" --for=condition=Ready --timeout=15m
+
+	local node current_nodepool_id
+	for node in $(kubectl get nodes -l hugepages=enabled -o name 2>/dev/null); do
+		current_nodepool_id=$(kubectl get "${node}" -o jsonpath='{.metadata.labels.doks\.digitalocean\.com/node-pool-id}')
+		if [ "${current_nodepool_id}" != "${nodepool_id}" ]; then
+			kubectl label "${node}" hugepages-
+		fi
+	done
+
+	for node in ${nodes}; do
+		kubectl label "${node}" hugepages=enabled --overwrite
+	done
+}
+
+function ensure_aks_hugepages_nodepool() {
+	local nodepool_name="${AKS_HUGEPAGES_NODEPOOL:-hp2m}"
+	local vm_size="${AKS_HUGEPAGES_VM_SIZE:-Standard_D4_v2}"
+	local node_count="${AKS_HUGEPAGES_NODE_COUNT:-1}"
+	local subscription="${AZURE_SUBSCRIPTION:-eng-cloud-dev}"
+	local resource_group="${AKS_RG:-percona-operators}"
+	local cluster_name
+	local node_rg
+	local aks_id
+
+	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
+	[[ -n ${node_rg} ]] || return 1
+
+	aks_id="$(az aks list --subscription "${subscription}" \
 		--query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
 		-o tsv 2>/dev/null || true)"
-	[[ -n $aks_id ]] || return 1
+	[[ -n ${aks_id} ]] || return 1
 
 	cluster_name="$(echo "$aks_id" | $sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
-	[[ -n $cluster_name ]] || return 1
+	[[ -n ${cluster_name} ]] || return 1
 
 	if [[ -z ${cluster_name} ]]; then
 		echo "AKS: can't detect cluster name from node labels."
@@ -1516,11 +1855,11 @@ enable_hugepages_aks() {
 
 	echo "AKS cluster detected: ${cluster_name}"
 
-	if ! az aks nodepool show -g percona-operators --cluster-name "${cluster_name}" -n "${nodepool_name}" >/dev/null 2>&1; then
+	if ! az aks nodepool show --subscription "${subscription}" -g "${resource_group}" --cluster-name "${cluster_name}" -n "${nodepool_name}" >/dev/null 2>&1; then
 		echo "Creating nodepool '${nodepool_name}' (${vm_size}, count=${node_count}) with label hugepages=enabled..."
 		az aks nodepool add \
-			--subscription "${AZURE_SUBSCRIPTION:-eng-cloud-dev}" \
-			-g "${AKS_RG:-percona-operators}" \
+			--subscription "${subscription}" \
+			-g "${resource_group}" \
 			--cluster-name "${cluster_name}" \
 			-n "${nodepool_name}" \
 			--node-count "${node_count}" \
@@ -1536,78 +1875,25 @@ enable_hugepages_aks() {
 		echo "AKS: hugepages node(s) not ready in time. Skipping test."
 		return 1
 	}
+}
 
-	echo "Applying DaemonSet to allocate hugepages on hugepages=enabled nodes (HP_2M=${hugepage_count})..."
-	cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: hugepages-2mi-enable
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      app: hugepages-2mi-enable
-  template:
-    metadata:
-      labels:
-        app: hugepages-2mi-enable
-    spec:
-      nodeSelector:
-        hugepages: "enabled"
-      hostPID: true
-      tolerations:
-        - operator: Exists
-      containers:
-        - name: enable
-          image: busybox:${BUSYBOX_VER}
-          securityContext:
-            privileged: true
-          env:
-            - name: HP_2M
-              value: "${hugepage_count}"
-          command: ["/bin/sh","-c"]
-          args:
-            - |
-              set -eux
-              echo "Allocating \${HP_2M} hugepages (2Mi) on host..."
-              echo "\${HP_2M}" > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-              mkdir -p /host/etc/sysctl.d
-              echo "vm.nr_hugepages=\${HP_2M}" > /host/etc/sysctl.d/60-hugepages.conf
-              chroot /host /bin/sh -c "sysctl -w vm.nr_hugepages=\${HP_2M} || true; systemctl restart kubelet || true"
-              echo "Done. Sleeping..."
-              sleep infinity
-          volumeMounts:
-            - name: host-root
-              mountPath: /host
-            - name: sys
-              mountPath: /sys
-      volumes:
-        - name: host-root
-          hostPath:
-            path: /
-        - name: sys
-          hostPath:
-            path: /sys
-EOF
+function enable_hugepages_aks() {
+	local hugepage_count="${1:-2048}"
 
-	kubectl -n kube-system rollout status ds/hugepages-2mi-enable --timeout=10m || {
-		echo "AKS: DaemonSet rollout did not complete. Skipping test."
-		return 1
-	}
+	echo "Checking hugepages on AKS..."
 
-	echo "Re-checking hugepages on nodes..."
 	if verify_hugepages_on_nodes 2>/dev/null; then
-		echo "Hugepages configured successfully"
+		echo "Hugepages already configured"
 		return 0
 	fi
 
-	echo "AKS: Hugepages still not visible after configuration."
-	echo "Skipping hugepages test."
-	return 1
+	ensure_aks_hugepages_nodepool
+
+	echo "Applying DaemonSet to allocate hugepages on hugepages=enabled nodes (HP_2M=${hugepage_count})..."
+	configure_hugepages_on_labeled_nodes AKS "${hugepage_count}" kubelet 10m
 }
 
-enable_hugepages_openshift() {
+function enable_hugepages_openshift() {
 	local hugepage_count=$1
 
 	echo "Configuring hugepages on OpenShift"
@@ -1619,157 +1905,174 @@ enable_hugepages_openshift() {
 
 	echo "Creating MachineConfig..."
 
-	cat <<EOF | kubectl apply -f -
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: worker
-  name: 99-hugepages-worker
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-      - contents:
-          source: data:text/plain;charset=utf-8;base64,$(echo "vm.nr_hugepages = ${hugepage_count}" | base64 -w0)
-        mode: 0644
-        path: /etc/sysctl.d/99-hugepages.conf
-EOF
+	local hugepages_source
+	hugepages_source="data:text/plain;charset=utf-8;base64,$(printf 'vm.nr_hugepages = %s\n' "${hugepage_count}" | base64 | tr -d '\n')"
 
-    [ $? -eq 0 ] || return 1
+	HUGEPAGES_SOURCE="${hugepages_source}" yq \
+		'.spec.config.storage.files[0].contents.source = strenv(HUGEPAGES_SOURCE)' \
+		"${TEST_CONFIG_DIR}/huge-pages-openshift-machine-config.yaml" \
+		| kubectl apply -f - || return 1
 
-    echo "MachineConfig created"
-    echo "Waiting for worker pool to update (~10 minutes)..."
+	echo "MachineConfig created"
+	echo "Waiting for worker pool to update (~10 minutes)..."
 
-    kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
-        echo "Update taking longer than expected"
-        return 1
-    }
+	kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
+		echo "Update taking longer than expected"
+		return 1
+	}
 
-    echo "Worker pool updated"
+	echo "Worker pool updated"
 
-    sleep 10
-    verify_hugepages_on_nodes
+	sleep 10
+	verify_hugepages_on_nodes
 }
 
-verify_hugepages_on_nodes() {
-    echo "Verifying hugepages on nodes"
+function enable_hugepages() {
+	local platform=$1
+	local hugepage_count=${2:-1024}
 
-    # Get first worker node, fallback to first non-master, fallback to any node
-    local node_name=$(
-        kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-        kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-        kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
-    )
-
-    if [ -z "${node_name}" ]; then
-        echo "No nodes found"
-        return 1
-    fi
-
-    echo "Checking node: ${node_name}"
-
-    local hugepages_capacity=$(kubectl get node ${node_name} \
-        -o jsonpath='{.status.capacity.hugepages-2Mi}')
-
-    if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
-        echo "Node has hugepages capacity: ${hugepages_capacity}"
-        return 0
-    else
-        echo "No hugepages capacity found on node ${node_name}"
-        return 1
-    fi
+	case ${platform} in
+		gke)
+			enable_hugepages_gke "${hugepage_count}"
+			;;
+		openshift)
+			enable_hugepages_openshift "${hugepage_count}"
+			;;
+		eks)
+			enable_hugepages_eks "${hugepage_count}"
+			;;
+		aks)
+			enable_hugepages_aks "${hugepage_count}"
+			;;
+		rancher)
+			enable_hugepages_rancher "${hugepage_count}"
+			;;
+		doks)
+			enable_hugepages_doks "${hugepage_count}"
+			;;
+		*)
+			echo "Unknown platform, cannot configure hugepages"
+			return 1
+			;;
+	esac
 }
 
-verify_hugepages_in_pod() {
-    local pod_name=$1
-    local namespace=$2
-    local container=${3:-postgres}
+function verify_hugepages_on_nodes() {
+	echo "Verifying hugepages on nodes"
 
-    echo "Verifying hugepages in pod ${pod_name}"
+	# Get first worker node, fallback to first non-master, fallback to any node
+	local node_name=$(
+		kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
+			|| kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
+			|| kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
+	)
 
-    # Check /proc/meminfo
-    local hugepages_total=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
-        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+	if [ -z "${node_name}" ]; then
+		echo "No nodes found"
+		return 1
+	fi
 
-    local hugepages_free=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
-        grep HugePages_Free /proc/meminfo | awk '{print $2}')
+	echo "Checking node: ${node_name}"
 
-    echo "HugePages_Total: ${hugepages_total}"
-    echo "HugePages_Free: ${hugepages_free}"
+	local hugepages_capacity=$(kubectl get node ${node_name} \
+		-o jsonpath='{.status.capacity.hugepages-2Mi}')
 
-    if [ "${hugepages_total}" -gt 0 ]; then
-        echo "Hugepages are available in pod"
-        return 0
-    else
-        echo "No hugepages in pod"
-        return 1
-    fi
+	if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
+		echo "Node has hugepages capacity: ${hugepages_capacity}"
+		return 0
+	else
+		echo "No hugepages capacity found on node ${node_name}"
+		return 1
+	fi
 }
 
-verify_postgresql_hugepages_setting() {
-    local cluster_name=$1
-    local expected_value=${2:-try}
+function verify_hugepages_in_pod() {
+	local pod_name=$1
+	local namespace=$2
+	local container=${3:-postgres}
 
-    echo "Verifying PostgreSQL huge_pages setting..."
+	echo "Verifying hugepages in pod ${pod_name}"
 
-    local huge_pages=$(run_psql_local \
-        "SHOW huge_pages;" \
-        "postgres:$(get_psql_user_pass ${cluster_name}-pguser-postgres)@$(get_psql_user_host ${cluster_name}-pguser-postgres)")
+	# Check /proc/meminfo
+	local hugepages_total=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+		grep HugePages_Total /proc/meminfo | awk '{print $2}')
 
-    echo "huge_pages: ${huge_pages}"
+	local hugepages_free=$(kubectl exec ${pod_name} -n ${namespace} -c ${container} -- \
+		grep HugePages_Free /proc/meminfo | awk '{print $2}')
 
-    if [[ "${huge_pages}" == *"${expected_value}"* ]]; then
-        echo "PostgreSQL huge_pages is set to '${expected_value}'"
-        return 0
-    else
-        echo "PostgreSQL huge_pages not set to '${expected_value}' (value: ${huge_pages})"
-        return 1
-    fi
+	echo "HugePages_Total: ${hugepages_total}"
+	echo "HugePages_Free: ${hugepages_free}"
+
+	if [ "${hugepages_total}" -gt 0 ]; then
+		echo "Hugepages are available in pod"
+		return 0
+	else
+		echo "No hugepages in pod"
+		return 1
+	fi
 }
 
-verify_hugepages_usage() {
-    local pod_name=$1
-    local namespace=$2
-    local container=${3:-database}
+function verify_postgresql_hugepages_setting() {
+	local cluster_name=$1
+	local expected_value=${2:-try}
 
-    echo "Checking hugepages usage..."
+	echo "Verifying PostgreSQL huge_pages setting..."
 
-    kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages /proc/meminfo
+	local huge_pages=$(run_psql_local \
+		"SHOW huge_pages;" \
+		"postgres:$(get_psql_user_pass ${cluster_name}-pguser-postgres)@$(get_psql_user_host ${cluster_name}-pguser-postgres)")
 
-    local hugepages_total=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages_Total /proc/meminfo | awk '{print $2}')
+	echo "huge_pages: ${huge_pages}"
 
-    local hugepages_free=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
-        grep HugePages_Free /proc/meminfo | awk '{print $2}')
-
-    local hugepages_used=$((hugepages_total - hugepages_free))
-
-    echo ""
-    echo "HugePages usage:"
-    echo "  Total: ${hugepages_total}"
-    echo "  Used:  ${hugepages_used}"
-
-    if [ "${hugepages_used}" -gt 0 ]; then
-        echo "PostgreSQL is using hugepages"
-        return 0
-    else
-        echo "Hugepages available but NOT being used by PostgreSQL"
-        return 1
-    fi
+	if [[ ${huge_pages} == *"${expected_value}"* ]]; then
+		echo "PostgreSQL huge_pages is set to '${expected_value}'"
+		return 0
+	else
+		echo "PostgreSQL huge_pages not set to '${expected_value}' (value: ${huge_pages})"
+		return 1
+	fi
 }
 
-get_available_k8s_versions() {
+function verify_hugepages_usage() {
+	local pod_name=$1
+	local namespace=$2
+	local container=${3:-database}
+
+	echo "Checking hugepages usage..."
+
+	kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages /proc/meminfo
+
+	local hugepages_total=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages_Total /proc/meminfo | awk '{print $2}')
+
+	local hugepages_free=$(kubectl -n ${namespace} exec ${pod_name} -c ${container} -- \
+		grep HugePages_Free /proc/meminfo | awk '{print $2}')
+
+	local hugepages_used=$((hugepages_total - hugepages_free))
+
+	echo ""
+	echo "HugePages usage:"
+	echo "  Total: ${hugepages_total}"
+	echo "  Used:  ${hugepages_used}"
+
+	if [ "${hugepages_used}" -gt 0 ]; then
+		echo "PostgreSQL is using hugepages"
+		return 0
+	else
+		echo "Hugepages available but NOT being used by PostgreSQL"
+		return 1
+	fi
+}
+
+function get_available_k8s_versions() {
 	local offset="${1:-1}"
 	local platform="$2"
 	local region="$3"
 	local versions=""
 
 	case "$platform" in
-		digitalocean)
+		doks)
 			versions=$(doctl kubernetes options versions -o json \
 				| jq -r '.[].slug')
 			;;
@@ -1794,7 +2097,7 @@ get_available_k8s_versions() {
 	echo "$versions_sorted" | tail -n "$offset" | head -n 1
 }
 
-create_k8s_cluster() {
+function create_k8s_cluster() {
 	local name="$1"
 	local version="$2"
 	local platform="$3"
@@ -1803,7 +2106,7 @@ create_k8s_cluster() {
 
 	case "$platform" in
 
-		digitalocean)
+		doks)
 			echo "Creating DOKS cluster: $name ($version)"
 			creation_time=$(date +%s)
 			doctl kubernetes cluster create "$name" \
@@ -1855,13 +2158,13 @@ create_k8s_cluster() {
 	echo "Cluster $name created successfully"
 }
 
-upgrade_k8s_cluster() {
+function upgrade_k8s_cluster() {
 	local name="$1"
 	local version="$2"
-	local platform="$(detect_k8s_platform)"
+	local platform="${PLATFORM}"
 
 	case "$platform" in
-		digitalocean)
+		doks)
 			echo "Upgrading DOKS cluster: $name to $version"
 			doctl kubernetes cluster upgrade "$name" \
 				--version "$version"
@@ -1891,13 +2194,13 @@ upgrade_k8s_cluster() {
 	echo "Cluster $name upgraded to $version successfully"
 }
 
-delete_k8s_cluster() {
+function delete_k8s_cluster() {
 	local name="$1"
 	local platform="$2"
 	local region="$3"
 
 	case "$platform" in
-		digitalocean)
+		doks)
 			echo "Deleting DOKS cluster: $name"
 			cluster_id=$(doctl kubernetes cluster list --output json | jq -r --arg name "$name" '.[] | select(.name == $name) | .id')
 			# Dangerous includes LoadBalancers, Volumes and all resources related to the cluster
@@ -1919,11 +2222,11 @@ delete_k8s_cluster() {
 	echo "Cluster $name deleted successfully"
 }
 
-get_k8s_cluster_name() {
-	local platform="${1:-$(detect_k8s_platform)}"
+function get_k8s_cluster_name() {
+	local platform="${1:-${PLATFORM}}"
 
 	case "$platform" in
-		digitalocean)
+		doks)
 			local nodepool_id="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.doks\.digitalocean\.com/node-pool-id}')"
 			doctl kubernetes cluster list -o json \
 				| jq -r --arg id "$nodepool_id" \
@@ -1940,12 +2243,12 @@ get_k8s_cluster_name() {
 	esac
 }
 
-get_k8s_cluster_version() {
+function get_k8s_cluster_version() {
 	local name="$1"
-	local platform="${2:-$(detect_k8s_platform)}"
+	local platform="${2:-${PLATFORM}}"
 
 	case "$platform" in
-		digitalocean)
+		doks)
 			doctl kubernetes cluster get "$name" --output json \
 				| jq -r '.[0].version'
 			;;
@@ -1964,13 +2267,13 @@ get_k8s_cluster_version() {
 	esac
 }
 
-get_k8s_nodes_version() {
+function get_k8s_nodes_version() {
 	kubectl get nodes -o json \
 		| jq -r '.items[].status.nodeInfo.kubeletVersion' \
 		| sort -u
 }
 
-verify_k8s_cluster_version() {
+function verify_k8s_cluster_version() {
 	local cluster_name="$1"
 	local expected_version="$2"
 	local current_version="$(get_k8s_cluster_version "$cluster_name")"
@@ -1981,7 +2284,7 @@ verify_k8s_cluster_version() {
 	fi
 }
 
-verify_k8s_nodes_version() {
+function verify_k8s_nodes_version() {
 	local expected_version="$1"
 	local nodes_version="$(get_k8s_nodes_version)"
 	local expected_clean="$(echo "$expected_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" # Gets only Kubernetes version xx.xx.xx
@@ -2003,78 +2306,44 @@ function vault_tls() {
 	local namespace=$name
 	local secret_name=$name
 	local csr_name=vault-csr-${RANDOM}
-	local csr_api_ver="v1"
 	local csr_signer
-	local platform=$(detect_k8s_platform)
 
-	echo "Detected platform: ${platform}"
-
-	case ${platform} in
+	case ${PLATFORM} in
 		eks)
-			csr_signer="  signerName: beta.eks.amazonaws.com/app-serving"
+			csr_signer="beta.eks.amazonaws.com/app-serving"
 			;;
 		*)
-			csr_signer="  signerName: kubernetes.io/kubelet-serving"
+			csr_signer="kubernetes.io/kubelet-serving"
 			;;
 	esac
 
 	openssl genrsa -out ${tmp_dir}/vault.key 2048
-	cat <<EOF >${tmp_dir}/csr.conf
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
-[req_distinguished_name]
-[ v3_req ]
-basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-[alt_names]
-DNS.1 = ${service}
-DNS.2 = ${service}.${namespace}
-DNS.3 = ${service}.${namespace}.svc
-DNS.4 = ${service}.${namespace}.svc.cluster.local
-IP.1 = 127.0.0.1
-EOF
+	sed \
+		-e "s/<service>/${service}/g" \
+		-e "s/<namespace>/${namespace}/g" \
+		"${TESTS_CONFIG_DIR}/vault-csr.conf" >${tmp_dir}/csr.conf
 
 	openssl req -new -key ${tmp_dir}/vault.key -subj "/CN=system:node:${service}.${namespace}.svc;/O=system:nodes" -out ${tmp_dir}/server.csr -config ${tmp_dir}/csr.conf
 
-	cat <<EOF >${tmp_dir}/csr.yaml
-apiVersion: certificates.k8s.io/${csr_api_ver}
-kind: CertificateSigningRequest
-metadata:
-  name: ${csr_name}
-spec:
-  groups:
-  - system:authenticated
-  request: $(cat ${tmp_dir}/server.csr | base64 | tr -d '\n')
-${csr_signer}
-  usages:
-  - digital signature
-  - key encipherment
-  - server auth
-EOF
+	CSR_NAME="${csr_name}" \
+		CSR_REQUEST="$(base64 <${tmp_dir}/server.csr | tr -d '\n')" \
+		CSR_SIGNER="${csr_signer}" \
+		yq \
+		'.metadata.name = strenv(CSR_NAME) |
+			 .spec.request = strenv(CSR_REQUEST) |
+			 .spec.signerName = strenv(CSR_SIGNER)' \
+		"${TESTS_CONFIG_DIR}/vault-csr.yaml" >${tmp_dir}/csr.yaml
 
+	kubectl delete csr ${csr_name} --ignore-not-found
 	kubectl create -f ${tmp_dir}/csr.yaml
 	sleep 10
 	kubectl certificate approve ${csr_name}
 	kubectl get csr ${csr_name} -o jsonpath='{.status.certificate}' >${tmp_dir}/serverCert
 	openssl base64 -in ${tmp_dir}/serverCert -d -A -out ${tmp_dir}/vault.crt
 	kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d >${tmp_dir}/vault.ca
-	if [[ -n ${OPENSHIFT} ]]; then
-		if [[ "x$(kubectl get namespaces | awk '{print $1}' | grep openshift-kube-controller-manager-operator)" != "x" ]]; then
-			#Detecting openshift 4+
-			kubectl -n openshift-kube-controller-manager-operator get secret csr-signer -o jsonpath='{.data.tls\.crt}' \
-				| base64 -d >${tmp_dir}/vault.ca
-		else
-			local ca_secret_name=$(kubectl -n default get secrets \
-				| grep default \
-				| grep service-account-token \
-				| head -n 1 \
-				| awk {'print $1'})
-			kubectl -n default get secret ${ca_secret_name} -o jsonpath='{.data.ca\.crt}' \
-				| base64 -d >${tmp_dir}/vault.ca
-		fi
+	if [[ ${PLATFORM} == "openshift" ]]; then
+		kubectl -n openshift-kube-controller-manager-operator get secret csr-signer -o jsonpath='{.data.tls\.crt}' \
+			| base64 -d >${tmp_dir}/vault.ca
 	fi
 	kubectl create secret generic ${secret_name} \
 		--namespace ${namespace} \
@@ -2089,10 +2358,9 @@ function start_vault() {
 	local platform=kubernetes
 	local tmp_dir=$(mktemp -d)
 
-	if [[ -n ${OPENSHIFT} ]]; then
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		platform=openshift
 		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
-		local extra_args="--set server.image.repository=docker.io/hashicorp/vault --set injector.image.repository=docker.io/hashicorp/vault-k8s"
 	fi
 
 	create_namespace "$name" "skip_clean"
@@ -2100,48 +2368,26 @@ function start_vault() {
 	helm uninstall "$name" || :
 
 	echo "install Vault $name"
+	local values_file="${tmp_dir}/vault.values.yaml"
+	local values_template="${TESTS_CONFIG_DIR}/vault-values-no-tls.yaml"
 
-	if [ $protocol == "https" ]; then
-		vault_tls "${name}" ${tmp_dir}
-		helm install $name hashicorp/vault \
-			--disable-openapi-validation \
-			--version $VAULT_VER \
-			--namespace "$name" \
-			--set global.tlsDisable=false \
-			--set global.platform="${platform}" \
-			--set server.dataStorage.enabled=false \
-			--set server.standalone.enabled=true \
-			--set server.ha.raft.enabled=false \
-			--set server.extraVolumes[0].type=secret \
-			--set server.extraVolumes[0].name=$name \
-			--set server.extraEnvironmentVars.VAULT_CACERT=/vault/userconfig/$name/vault.ca \
-			$extra_args \
-			--set server.standalone.config=" \
-listener \"tcp\" {
-    address = \"[::]:8200\"
-    cluster_address = \"[::]:8201\"
-    tls_cert_file = \"/vault/userconfig/$name/vault.crt\"
-    tls_key_file  = \"/vault/userconfig/$name/vault.key\"
-    tls_client_ca_file = \"/vault/userconfig/$name/vault.ca\"
-}
-
-storage \"file\" {
-    path = \"/vault/data\"
-}"
-
-	else
-		helm install $name hashicorp/vault \
-			--disable-openapi-validation \
-			--version $VAULT_VER \
-			--namespace "$name" \
-			--set server.dataStorage.enabled=false \
-			--set server.standalone.enabled=true \
-			--set server.ha.raft.enabled=false \
-			$extra_args \
-			--set global.platform="${platform}"
+	if [[ ${protocol} == "https" ]]; then
+		vault_tls "${name}" "${tmp_dir}"
+		values_template="${TESTS_CONFIG_DIR}/vault-values-tls.yaml"
 	fi
 
-	if [[ -n ${OPENSHIFT} ]]; then
+	sed \
+		-e "s/<name>/${name}/g" \
+		-e "s/<platform>/${platform}/g" \
+		"${values_template}" >"${values_file}"
+
+	helm install $name hashicorp/vault \
+		--disable-openapi-validation \
+		--version $VAULT_VER \
+		--namespace "$name" \
+		--values "${values_file}"
+
+	if [[ ${PLATFORM} == "openshift" ]]; then
 		oc patch clusterrole $name-agent-injector-clusterrole --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 		oc adm policy add-scc-to-user privileged $name-agent-injector
 	fi
@@ -2176,4 +2422,60 @@ storage \"file\" {
 	kubectl -n "${NAMESPACE}" create secret generic vault-secret \
 		--from-literal=token=${token} \
 		--from-file=ca.crt=${tmp_dir}/vault.ca
+}
+
+function issue_root_ca() {
+	openssl ecparam -name prime256v1 -genkey \
+		-noout -out "$TEMP_DIR/root-ca.key"
+	openssl req -new -x509 \
+		-key "$TEMP_DIR/root-ca.key" \
+		-days 3650 \
+		-sha384 \
+		-config "$TESTS_CONFIG_DIR/tls-root-ca.conf" \
+		-out "$TEMP_DIR/root-ca.crt"
+	openssl verify \
+		-CAfile "$TEMP_DIR/root-ca.crt" \
+		"$TEMP_DIR/root-ca.crt"
+}
+
+function issue_certificate() {
+	local name="$1"
+	local common_name="$2"
+	local purpose="$3"
+	shift 3
+
+	if ((${#common_name} > 64)); then
+		printf 'certificate Common Name exceeds 64 characters: %s\n' \
+			"$common_name" >&2
+		return 1
+	fi
+
+	awk -v common_name="$common_name" -v purpose="$purpose" '
+		{sub("<common-name>", common_name); sub("<purpose>", purpose); print}
+	' "$TESTS_CONFIG_DIR/tls-certificate.conf" >"$TEMP_DIR/${name}.conf"
+
+	local index=1
+	local dns_name
+	for dns_name in "$@"; do
+		printf 'DNS.%d = %s\n' "$index" "$dns_name" \
+			>>"$TEMP_DIR/${name}.conf"
+		index=$((index + 1))
+	done
+
+	openssl ecparam -name prime256v1 -genkey \
+		-noout -out "$TEMP_DIR/${name}.key"
+	openssl req -new \
+		-key "$TEMP_DIR/${name}.key" \
+		-out "$TEMP_DIR/${name}.csr" \
+		-config "$TEMP_DIR/${name}.conf"
+	openssl x509 -req \
+		-in "$TEMP_DIR/${name}.csr" \
+		-CA "$TEMP_DIR/root-ca.crt" \
+		-CAkey "$TEMP_DIR/root-ca.key" \
+		-CAcreateserial \
+		-days 365 \
+		-sha384 \
+		-extensions extensions \
+		-extfile "$TEMP_DIR/${name}.conf" \
+		-out "$TEMP_DIR/${name}.crt"
 }

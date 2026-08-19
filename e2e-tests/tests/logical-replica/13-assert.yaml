@@ -1,0 +1,65 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 900
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      retry 60 10 bash -c '
+        state=$(kubectl -n "'"${NAMESPACE}"'" get pg logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"analytics\")].state}")
+        echo "logical replica analytics state: ${state}"
+        [[ ${state} == "ready" ]]
+      '
+
+      kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
+        -l "pgv2.percona.com/logical-replica=analytics" --timeout=120s
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+      REPLICA="logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      # Two rows, not three. Three would mean the old data volume survived and
+      # the replica merely resumed, which is the failure this covers: it would
+      # be serving changes the restored cluster no longer has.
+      replica_row_count() {
+        local want=$1
+        local got
+
+        got=$(run_psql \
+          '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
+          "postgres://postgres:${PASS}@${REPLICA}" | xargs)
+
+        echo "rows on analytics: ${got} (want ${want})"
+        [[ ${got} == "${want}" ]]
+      }
+
+      retry 30 5 replica_row_count 2
+
+      # A fresh slot on the restored primary, and no leftovers from the old ones.
+      one_slot() {
+        local got
+        got=$(run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin IS NOT NULL;" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "logical slots on the primary: ${got} (want 1)"
+        [[ ${got} == "1" ]]
+      }
+
+      retry 30 5 one_slot
+
+      # Written after the re-seed, so it can only arrive over the subscription
+      # pg_createsubscriber has just set up.
+      run_psql \
+        '\c logical-replica \\\ INSERT INTO lr_test (id) VALUES (4);' \
+        "postgres://postgres:${PASS}@${HOST}"
+
+      retry 30 5 replica_row_count 3
