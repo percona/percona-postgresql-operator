@@ -1835,23 +1835,22 @@ function ensure_aks_hugepages_nodepool() {
 	local cluster_name
 	local node_rg
 	local aks_id
+	local provider_id
 
-	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
-	[[ -n ${node_rg} ]] || return 1
+	provider_id="$(kubectl get nodes -o jsonpath='{.items[0].spec.providerID}')"
+	[[ -n "${provider_id}" ]] || { echo 'Missing provider id' && return 1; }
 
-	aks_id="$(az aks list --subscription "${subscription}" \
-		--query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
-		-o tsv 2>/dev/null || true)"
-	[[ -n ${aks_id} ]] || return 1
+	node_rg="${provider_id#*/resourceGroups/}"
+	node_rg="${node_rg%%/*}"
+	[[ -n "${node_rg}" ]] || { echo 'Missing resource group in provider id' && return 1; }
+
+	aks_id="$(az aks list --subscription="${subscription}" \
+		--query "[].[id,nodeResourceGroup]" \
+		-o tsv 2>/dev/null | awk -v target="${node_rg}" 'tolower($2)==tolower(target){print $1; exit}' || true)"
+	[[ -n ${aks_id} ]] || { echo "Missing AKS ID based on node resource group '${node_rg}' (subscription '${subscription}'). Check az account/subscription context and cluster ownership." && return 1; }
 
 	cluster_name="$(echo "$aks_id" | $sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
-	[[ -n ${cluster_name} ]] || return 1
-
-	if [[ -z ${cluster_name} ]]; then
-		echo "AKS: can't detect cluster name from node labels."
-		echo "Skipping hugepages test."
-		return 1
-	fi
+	[[ -n ${cluster_name} ]] || { echo 'Missing cluster name in AKS ID' && return 1; }
 
 	echo "AKS cluster detected: ${cluster_name}"
 
