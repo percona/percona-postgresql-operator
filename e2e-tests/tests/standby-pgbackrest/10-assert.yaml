@@ -10,8 +10,10 @@ commands:
       echo "Waiting for standby cluster to be ready"
       kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 
-      wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "Enabled" "pg_tde is enabled in PerconaPGCluster" "3"
-      wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "Configured" "pg_tde vault key provider matches the spec" "3"
+      if [[ ${PG_VER} -gt 17 ]]; then
+        wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "Enabled" "pg_tde is enabled in PerconaPGCluster" "3"
+        wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "Configured" "pg_tde vault key provider matches the spec" "3"
+      fi
 
       until assert_standby_promotion "standby-cluster"; do
         echo "Waiting standby promotion in standby cluster"

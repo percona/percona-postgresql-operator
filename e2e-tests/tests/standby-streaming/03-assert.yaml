@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -le 17 ]]; then
+        echo "Skipping TDE assertions for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
       echo "Waiting for standby cluster to be ready"
       kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 
@@ -15,7 +20,6 @@ commands:
 
       interval=5
       until assert_tde_state "standby-cluster" "true"; do
-        echo "Waiting PG TDE expected state in standby cluster"
         sleep "${interval}"
       done
 

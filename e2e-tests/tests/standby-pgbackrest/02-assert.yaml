@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -le 17 ]]; then
+        echo "Skipping TDE assertions for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
       echo "Waiting for source cluster to be ready"
       kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/source-cluster
 
@@ -14,7 +19,6 @@ commands:
       wait_pg_condition "source-cluster" "PGTDEVaultProviderReady" "True" "Configured" "pg_tde vault key provider matches the spec" "1"
 
       until assert_tde_state "source-cluster"; do
-        echo "Waiting PG TDE expected state in source cluster"
         sleep 5
       done
 

@@ -7,6 +7,12 @@ commands:
       set -o xtrace
 
       source ../../functions
+
+      if [[ ${PG_VER} -le 17 ]]; then
+        echo "ERROR: pg-tde requires PostgreSQL greater than 17; got ${PG_VER}"
+        exit 1
+      fi
+
       init_temp_dir # do this only in the first TestStep
 
       deploy_operator

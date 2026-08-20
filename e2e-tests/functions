@@ -705,7 +705,9 @@ function wait_pg_condition() {
 		message=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .message")
 		generation=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .observedGeneration")
 
-		echo "waiting ${cluster} ${condition}: status=${status} reason=${reason} generation=${generation} message=${message}"
+		echo "Waiting state: pg/${cluster} condition=${condition}"
+		echo "expected: status=${expected_status} reason=${expected_reason} generation=${expected_generation} message=${expected_message}"
+		echo "current: status=${status} reason=${reason} generation=${generation} message=${message}"
 
 		if (( timeout_seconds > 0 && elapsed >= timeout_seconds )); then
 			echo "timeout waiting for condition ${condition} expected status=${expected_status} reason=${expected_reason} generation=${expected_generation} on pg/${cluster} after ${timeout_seconds}s"
@@ -726,87 +728,108 @@ function wait_pg_condition() {
 	echo "${cluster} ${condition} reached expected values: status=${status} reason=${reason} generation=${generation}"
 }
 
+function assert_configmap_data() {
+	local name="$1"
+	local key="$2"
+	local expected="$3"
+	local namespace="${4:-$NAMESPACE}"
+	local current
+
+	current=$(kubectl -n "${namespace}" get configmap "${name}" -o json \
+		| jq -r --arg key "${key}" '.data[$key] // empty')
+	if [[ ${current} != "${expected}" ]]; then
+		echo "Waiting state: configmap/${name} key=${key}"
+		echo "expected: value=${expected}"
+		echo "current: value=${current:-<missing>}"
+		return 1
+	fi
+}
+
 function assert_tde_state() {
 	local cluster="$1"
 	local is_standby="${2:-false}"
-	local namespace="${3:-$NAMESPACE}"
 	local pgversion primary replica check_pod
 	local pod annotation target archive_command restore_command conf instance_conf
+	local wal_encrypt current repo_name
 
-	pgversion=$(kubectl -n "${namespace}" get pg "${cluster}" -o jsonpath='{.spec.postgresVersion}')
-	primary=$(kubectl -n "${namespace}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
+	pgversion=$(kubectl -n "${NAMESPACE}" get pg "${cluster}" -o jsonpath='{.spec.postgresVersion}')
+	primary=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
 	check_pod="${primary}"
 
 	if [[ "${is_standby}" != "true" ]]; then
-		replica=$(kubectl -n "${namespace}" get pods --selector="postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
+		replica=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
 	fi
 
-	if [[ $(kubectl -n "${namespace}" exec "${check_pod}" -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
-		echo "pg_tde.wal_encrypt is not enabled in ${check_pod}"
+	wal_encrypt=$(kubectl -n "${NAMESPACE}" exec "${check_pod}" -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;')
+	if [[ ${wal_encrypt} != "on" ]]; then
+		echo "Waiting state: pg_tde.wal_encrypt pod=${check_pod}; expected: value=on; current: value=${wal_encrypt}"
 		return 1
 	fi
 
-	for pod in $(kubectl -n "${namespace}" get pods -o name \
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -o name \
 		--selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/data=postgres"); do
-		annotation=$(kubectl -n "${namespace}" get "${pod}" -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
+		annotation=$(kubectl -n "${NAMESPACE}" get "${pod}" -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
 		if [[ ${annotation} != "true" ]]; then
-			echo "${pod} is not annotated for WAL encryption: ${annotation}"
+			echo "Waiting state: WAL encryption annotation pod=${pod}; expected: value=true; current: value=${annotation}"
 			return 1
 		fi
 
-		target=$(kubectl -n "${namespace}" exec "${pod}" -c database -- readlink /pgdata/pg_tde)
+		target=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- readlink /pgdata/pg_tde)
 		if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
-			echo "${pod} does not link the pg_tde keyring: ${target}"
+			echo "Waiting state: pg_tde keyring link pod=${pod}; expected: target=/pgdata/pg${pgversion}/pg_tde; current: target=${target}"
 			return 1
 		fi
-		if ! kubectl -n "${namespace}" exec "${pod}" -c database -- test -d /pgdata/pg_tde; then
-			echo "${pod} pg_tde keyring link does not resolve"
+		if ! kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- test -d /pgdata/pg_tde; then
+			echo "Waiting state: pg_tde keyring path pod=${pod}; expected: path=/pgdata/pg_tde exists; current: path=/pgdata/pg_tde does not exist"
 			return 1
 		fi
 	done
 
 	if [[ "${is_standby}" == "true" ]]; then
 		# Standby leader is labeled primary but stays in recovery, so restore_command is set there.
-		restore_command=$(kubectl -n "${namespace}" exec "${primary}" -c database -- psql -t -A -c 'SHOW restore_command;')
+		restore_command=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SHOW restore_command;')
 		if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
-			echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${primary}: ${restore_command}"
+			echo "Waiting state: restore_command wrapper pod=${primary}; expected: contains=pg_tde_restore_encrypt %f %p; current: value=${restore_command}"
 			return 1
 		fi
-		if [[ ${restore_command} != *'--repo=1'* ]]; then
-			echo "restore_command doesn't target repo1 in ${primary}: ${restore_command}"
+		repo_name=$(kubectl -n "${NAMESPACE}" get pg "${cluster}" -o jsonpath='{.spec.standby.repoName}')
+		if [[ -n ${repo_name} && ${restore_command} != *"--repo=${repo_name#repo}"* ]]; then
+			echo "Waiting state: restore_command repository pod=${primary}; expected: contains=--repo=${repo_name#repo}; current: value=${restore_command}"
 			return 1
 		fi
 	else
-		archive_command=$(kubectl -n "${namespace}" exec "${primary}" -c database -- psql -t -A -c 'SHOW archive_command;')
+		archive_command=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SHOW archive_command;')
 		if [[ ${archive_command} != 'pg_tde_archive_decrypt %f %p "pgbackrest --stanza=db archive-push %%p"'* ]]; then
-			echo "archive_command doesn't start with the pg_tde_archive_decrypt wrapper in ${primary}: ${archive_command}"
+			echo "Waiting state: archive_command wrapper pod=${primary}; expected: starts-with=pg_tde_archive_decrypt %f %p \"pgbackrest --stanza=db archive-push %%p\"; current: value=${archive_command}"
 			return 1
 		fi
 
 		if [[ ${archive_command} != *'pg_tde_waldump'* ]]; then
-			echo "archive_command doesn't use pg_tde_waldump in ${primary}: ${archive_command}"
+			echo "Waiting state: archive_command WAL inspection pod=${primary}; expected: contains=pg_tde_waldump; current: value=${archive_command}"
 			return 1
 		fi
 
 		# restore_command is applied on replicas (primary SHOW is empty once settled)
-		restore_command=$(kubectl -n "${namespace}" exec "${replica}" -c database -- psql -t -A -c 'SHOW restore_command;')
+		restore_command=$(kubectl -n "${NAMESPACE}" exec "${replica}" -c database -- psql -t -A -c 'SHOW restore_command;')
 		if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
-			echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${replica}: ${restore_command}"
+			echo "Waiting state: restore_command wrapper pod=${replica}; expected: contains=pg_tde_restore_encrypt %f %p; current: value=${restore_command}"
 			return 1
 		fi
 	fi
 
 	for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
-		conf=$(kubectl get -n "${namespace}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."'"${key}"'"')
+		conf=$(kubectl get -n "${NAMESPACE}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."'"${key}"'"')
 		if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
-			echo "no checksum-page in ${key}"
+			current=$(echo "${conf}" | grep '^checksum-page' || true)
+			echo "Waiting state: checksum-page config=${key}; expected: value=checksum-page = n; current: value=${current:-<missing>}"
 			return 1
 		fi
 	done
 
-	instance_conf=$(kubectl get -n "${namespace}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."pgbackrest_instance.conf"')
+	instance_conf=$(kubectl get -n "${NAMESPACE}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."pgbackrest_instance.conf"')
 	if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
-		echo "archive-async is not disabled in pgbackrest_instance.conf"
+		current=$(echo "${instance_conf}" | grep '^archive-async' || true)
+		echo "Waiting state: archive-async config=pgbackrest_instance.conf; expected: value=archive-async = n; current: value=${current:-<missing>}"
 		return 1
 	fi
 
