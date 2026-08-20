@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 
-	pgbmock "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer/mock"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
+	pgbmock "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime/pgbouncer/mock"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer/startup"
 )
 
 func TestPauseWanted(t *testing.T) {

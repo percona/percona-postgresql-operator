@@ -11,8 +11,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const finalizer = "crunchybridgecluster.postgres-operator.crunchydata.com/finalizer"
@@ -27,7 +27,7 @@ func (r *CrunchyBridgeClusterReconciler) handleDelete(
 	log := ctrl.LoggerFrom(ctx)
 
 	// If the CrunchyBridgeCluster isn't being deleted, add the finalizer
-	if crunchybridgecluster.ObjectMeta.DeletionTimestamp.IsZero() {
+	if crunchybridgecluster.ObjectMeta.DeletionTimestamp.IsZero() { //nolint:staticcheck //test data
 		if !controllerutil.ContainsFinalizer(crunchybridgecluster, finalizer) {
 			controllerutil.AddFinalizer(crunchybridgecluster, finalizer)
 			if err := r.Update(ctx, crunchybridgecluster); err != nil {

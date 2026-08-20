@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -25,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 )
 
 // self is a singleton Installation. See [InstallationReconciler].
@@ -192,7 +193,7 @@ func (r *InstallationReconciler) persist(
 	ctx context.Context, config *corev1apply.SecretApplyConfiguration,
 ) error {
 	data, err := json.Marshal(config)
-	apply := client.RawPatch(client.Apply.Type(), data)
+	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// [client.Client] decides where to write by looking at the underlying type,
 	// namespace, and name of its [client.Object] argument. That is also where

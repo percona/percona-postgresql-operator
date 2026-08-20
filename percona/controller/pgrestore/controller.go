@@ -16,13 +16,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
-	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/snapshot"
+	restoreutils "github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/utils"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (
