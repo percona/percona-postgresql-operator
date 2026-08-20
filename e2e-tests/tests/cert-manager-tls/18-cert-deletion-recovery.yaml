@@ -11,7 +11,7 @@ commands:
           local cert_name="$1"
 
           kubectl -n "$NAMESPACE" delete certificate "$cert_name" --wait=true --timeout=120s
-          retry 3 10 kubectl -n "$NAMESPACE" get certificate "$cert_name"
+          retry 6 5 kubectl -n "$NAMESPACE" get certificate "$cert_name"
           kubectl -n "$NAMESPACE" wait --for=condition=Ready "certificate/${cert_name}" --timeout=300s
       }
 
