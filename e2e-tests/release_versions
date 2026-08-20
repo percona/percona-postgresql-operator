@@ -26,7 +26,7 @@ IMAGE_POSTGIS18=perconalab/percona-postgresql-operator:main-ppg18-postgres-gis
 IMAGE_BACKREST18=perconalab/percona-postgresql-operator:main-pgbackrest18
 
 IMAGE_UPGRADE=perconalab/percona-postgresql-operator:main-upgrade
-IMAGE_LOGCOLLECTOR=perconalab/fluentbit:main-logcollector
+IMAGE_LOGCOLLECTOR=tratata/fluentbit:main-logcollector
 
 IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest
 IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest
