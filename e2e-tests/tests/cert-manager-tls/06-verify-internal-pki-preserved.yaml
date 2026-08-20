@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if is_cert_manager_installed && ! is_cert_manager_installed_by_test; then
+        echo "cert-manager is installed, but next steps requires it to be uninstalled. As not supported by Rancher, exiting."
+        exit 0
+      fi
+
       root_ca_annotation=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-cluster-cert \
         -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
 

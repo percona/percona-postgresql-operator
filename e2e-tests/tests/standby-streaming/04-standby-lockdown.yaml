@@ -1,0 +1,51 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # Lag detection runs every 5 minutes from lagLastComputedAt. Apply the
+      # rate limit ~30s before the next check so lag has time to show up.
+      # If that window is already gone, wait for the next real computation
+      # (lagLastComputedAt to change) and recalculate from the new timestamp.
+      interval=300
+      lead=30
+
+      while true; do
+        lag_last=$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o jsonpath='{.status.standby.lagLastComputedAt}')
+        if [ -z "${lag_last}" ]; then
+          echo "ERROR: status.standby.lagLastComputedAt is not set"
+          exit 1
+        fi
+
+        last_epoch=$($date -u -d "${lag_last}" +%s)
+        now_epoch=$($date -u +%s)
+        next_check=$((last_epoch + interval))
+        block_at=$((next_check - lead))
+
+        if [ "${block_at}" -gt "${now_epoch}" ]; then
+          sleep_secs=$((block_at - now_epoch))
+          echo "lagLastComputedAt=${lag_last} sleeping ${sleep_secs}s so the rate limit is in place ~30s before the next lag check"
+          sleep "${sleep_secs}"
+          break
+        fi
+
+        wait_secs=$((next_check - now_epoch))
+        if [ "${wait_secs}" -lt 1 ]; then
+          wait_secs=5
+        fi
+        echo "lagLastComputedAt=${lag_last} missed the 30s lead window; waiting ${wait_secs}s for the next computation"
+        sleep "${wait_secs}"
+
+        # Poll until the operator writes a new lagLastComputedAt.
+        until [ "$(kubectl get pg standby-cluster -n "${NAMESPACE}" -o jsonpath='{.status.standby.lagLastComputedAt}')" != "${lag_last}" ]; do
+          sleep 5
+        done
+      done
+
+      # Create NetworkChaos to delay standby traffic to the source cluster and induce lag.
+      network_delay "${NAMESPACE}" "standby-cluster" "source-cluster-ha"

@@ -16,4 +16,6 @@ commands:
         | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \
         | yq '.spec.extensions.pg_tde.vault.caSecret.name = "vault-secret"' \
         | yq '.spec.extensions.pg_tde.vault.caSecret.key = "ca.crt"' \
+        | yq '.spec.backups.pgbackrest.global."repo1-cipher-pass" = "JemA6x5xhHA677oKCUSuIiSRMsr3OowgsaCQJu5XuSn/wyOhf48o2QdS9wUwFwOG"' \
+        | yq '.spec.backups.pgbackrest.global."repo1-cipher-type" = "aes-256-cbc"' \
         | kubectl -n "${NAMESPACE}" apply -f -
