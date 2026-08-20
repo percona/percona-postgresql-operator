@@ -2625,6 +2625,8 @@ function stop_vault() {
 
 	helm uninstall "$name" --namespace "$vault_namespace" || :
 	kubectl delete csr "vault-csr-${name}" --ignore-not-found || :
+	kubectl delete mutatingwebhookconfiguration ${name}-agent-injector-cfg --ignore-not-found || :
+	kubectl delete clusterrole,clusterrolebinding -l app.kubernetes.io/instance=${name} --ignore-not-found || :
 	destroy_namespace "$vault_namespace" || :
 }
 
