@@ -17,7 +17,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
 	perconaPG "github.com/percona/percona-postgresql-operator/v3/percona/postgres"
-	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	pgv2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (
@@ -44,13 +44,13 @@ func GetLatestCommitGetter() LatestCommitGetter {
 	}
 }
 
-type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv3.PerconaPGCluster)
+type WALWatcher func(context.Context, client.Client, chan event.GenericEvent, chan event.DeleteEvent, *pgv2.PerconaPGCluster)
 
-func GetWALWatcher(cr *pgv3.PerconaPGCluster) (string, WALWatcher) {
+func GetWALWatcher(cr *pgv2.PerconaPGCluster) (string, WALWatcher) {
 	return cr.Namespace + "-" + cr.Name + "-wal-watcher", watchCommitTimestamps
 }
 
-func watchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv3.PerconaPGCluster) {
+func watchCommitTimestamps(ctx context.Context, cli client.Client, eventChan chan event.GenericEvent, stopChan chan event.DeleteEvent, cr *pgv2.PerconaPGCluster) {
 	log := logging.FromContext(ctx).WithName("WALWatcher")
 
 	if !cr.Spec.Backups.IsEnabled() {
@@ -94,7 +94,7 @@ func watchCommitTimestamps(ctx context.Context, cli client.Client, eventChan cha
 			ts, err := getLatestCommitTimestamp(ctx, cli, execCli, localCr, latestBackup)
 			if err != nil {
 				switch {
-				case errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv3.AppStateReady:
+				case errors.Is(err, PrimaryPodNotFound) && localCr.Status.State != pgv2.AppStateReady:
 					log.V(1).Info("Primary pod not found, skipping WAL watcher")
 				case errors.Is(err, LatestTimestampFileNotFound):
 					log.V(1).Info("Latest commit timestamp file not found", "file", LatestCommitTimestampFile)
@@ -167,7 +167,7 @@ func getLatestCommitTimestamp(ctx context.Context, cli client.Client, execCli *c
 	return &commitTsMeta, nil
 }
 
-func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv3.PerconaPGCluster, backup *pgv3.PerconaPGBackup) (time.Time, error) {
+func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv2.PerconaPGCluster, backup *pgv2.PerconaPGBackup) (time.Time, error) {
 	primary, err := perconaPG.GetPrimaryPod(ctx, cli, cr)
 	if err != nil {
 		return time.Time{}, errors.Wrap(PrimaryPodNotFound, err.Error())
@@ -180,7 +180,7 @@ func getBackupStartTimestamp(ctx context.Context, cli client.Client, cr *pgv3.Pe
 
 	for _, info := range pgbackrestInfo {
 		for _, b := range info.Backup {
-			if b.Annotation[pgv3.PGBackrestAnnotationJobName] == backup.Status.JobName {
+			if b.Annotation[pgv2.PGBackrestAnnotationJobName] == backup.Status.JobName {
 				return time.Unix(b.Timestamp.Start, 0), nil
 			}
 		}

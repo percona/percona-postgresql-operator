@@ -6,7 +6,7 @@ const (
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.  Also used to annotate the backup Job itself as needed to identify the backup
 	// ID associated with a specific manual backup Job.
-	AnnotationPGBackrestBackup = PrefixPerconaPGV3 + "pgbackrest-backup"
+	AnnotationPGBackrestBackup = PrefixPerconaPGV2 + "pgbackrest-backup"
 
 	// AnnotationPGBackrestBackupJobName is the annotation that is added to a PerconaPGClusterBackup.
 	// The value of the annotation will be a name of an existing backup job
@@ -20,19 +20,19 @@ const (
 	// restore.  The value of the annotation will be a unique identfier for a restore Job (e.g. a
 	// timestamp), which will be stored in the PostgresCluster status to properly track completion
 	// of the Job.
-	AnnotationPGBackRestRestore = PrefixPerconaPGV3 + "pgbackrest-restore"
+	AnnotationPGBackRestRestore = PrefixPerconaPGV2 + "pgbackrest-restore"
 
 	// AnnotationPMMSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case PMM credentials are rotated.
-	AnnotationPMMSecretHash = PrefixPerconaPGV3 + "pmm-secret-hash"
+	AnnotationPMMSecretHash = PrefixPerconaPGV2 + "pmm-secret-hash"
 
 	// AnnotationMonitorUserSecretHash is the annotation that is added to instance annotations to
 	// rollout restart PG pods in case monitor user password is changed.
-	AnnotationMonitorUserSecretHash = PrefixPerconaPGV3 + "monitor-user-secret-hash"
+	AnnotationMonitorUserSecretHash = PrefixPerconaPGV2 + "monitor-user-secret-hash"
 
 	// AnnotationEnvVarsSecretHash is the annotation that is added to
 	// rollout restart pods in case envFrom secret is changed.
-	AnnotationEnvVarsSecretHash = PrefixPerconaPGV3 + "env-secret-config-hash"
+	AnnotationEnvVarsSecretHash = PrefixPerconaPGV2 + "env-secret-config-hash"
 
 	// AnnotationLogCollectorConfigHash is the annotation that is added to instance
 	// annotations to rollout restart PG pods when the log collector (fluent-bit /
@@ -43,31 +43,31 @@ const (
 
 	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
 	// indicate that backup is in progress.
-	AnnotationBackupInProgress = PrefixPerconaPGV3 + "backup-in-progress"
+	AnnotationBackupInProgress = PrefixPerconaPGV2 + "backup-in-progress"
 
 	// AnnotationClusterBootstrapRestore is the annotation that is added to PerconaPGRestore to
 	// indicate that it is a cluster bootstrap restore.
-	AnnotationClusterBootstrapRestore = PrefixPerconaPGV3 + "cluster-bootstrap-restore"
+	AnnotationClusterBootstrapRestore = PrefixPerconaPGV2 + "cluster-bootstrap-restore"
 
-	AnnotationPatroniVersion = PrefixPerconaPGV3 + "patroni-version"
+	AnnotationPatroniVersion = PrefixPerconaPGV2 + "patroni-version"
 
 	// Special annotation to disable `patroni-version-check` by overriding the patroni version with a custom value.
-	AnnotationCustomPatroniVersion = PrefixPerconaPGV3 + "custom-patroni-version"
+	AnnotationCustomPatroniVersion = PrefixPerconaPGV2 + "custom-patroni-version"
 
 	// AnnotationReplicationMainSite is the annotation that is added to a standby PerconaPGCluster to
 	// indicate the name of the main site.
 	// This annotation is set on standby clusters based on pgbackrest only. This is needed to calculate the replication lag.
-	AnnotationReplicationMainSite = PrefixPerconaPGV3 + "replication-main-site"
+	AnnotationReplicationMainSite = PrefixPerconaPGV2 + "replication-main-site"
 
 	// AnnotationInstanceSuspended must be set on the instance StatefulSet to mark
 	// the instance as suspended.
-	AnnotationInstanceSuspended = PrefixPerconaPGV3 + "instance-suspended"
+	AnnotationInstanceSuspended = PrefixPerconaPGV2 + "instance-suspended"
 
 	// AnnotationSnapshotRestore is the annotation added to the data PVCs of a cluster
 	// to indicate the name of the PerconaPGRestore that is restoring the PVC from a snapshot.
-	AnnotationSnapshotRestore = PrefixPerconaPGV3 + "snapshot-restore"
+	AnnotationSnapshotRestore = PrefixPerconaPGV2 + "snapshot-restore"
 
 	// AnnotationPVCsPreparedAt is the annotation added to the PerconaPGRestore which
 	// prepares the PVCs for a snapshot restore.
-	AnnotationPVCsPreparedAt = PrefixPerconaPGV3 + "pvcs-prepared-at"
+	AnnotationPVCsPreparedAt = PrefixPerconaPGV2 + "pvcs-prepared-at"
 )

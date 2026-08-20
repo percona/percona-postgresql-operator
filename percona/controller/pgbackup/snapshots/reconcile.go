@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	annotationBackupTarget = pNaming.PrefixPerconaPGV3 + "backup-target"
+	annotationBackupTarget = pNaming.PrefixPerconaPGV2 + "backup-target"
 
 	defaultSnapshotErrorDeadline = 5 * time.Minute
 )
