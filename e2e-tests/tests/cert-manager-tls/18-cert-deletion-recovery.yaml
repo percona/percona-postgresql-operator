@@ -13,11 +13,16 @@ commands:
           local secret_name
           local cert_before
           local cert_after
+          local required_keys="tls.crt tls.key"
+          local key
+          local escaped_key
+          local value
 
           secret_name=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.spec.secretName}')
           cert_before=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
 
           kubectl -n "$NAMESPACE" delete certificate "$cert_name" --wait=true --timeout=120s
+          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=120s
           retry 6 5 kubectl -n "$NAMESPACE" get certificate "$cert_name"
           kubectl -n "$NAMESPACE" wait --for=condition=Ready "certificate/${cert_name}" --timeout=120s
 
@@ -26,6 +31,18 @@ commands:
               echo "Secret $secret_name data did not change after Certificate $cert_name recreation"
               return 1
           fi
+
+          if [[ "$cert_name" == "cert-manager-tls-pgbouncer-cert" ]]; then
+              required_keys="${required_keys} ca.crt"
+          fi
+          for key in ${required_keys}; do
+              escaped_key="${key//./\\.}"
+              value=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}")
+              if [[ -z "$value" ]]; then
+                  echo "Secret $secret_name is missing key: $key"
+                  return 1
+              fi
+          done
 
           echo "Certificate $cert_name and Secret $secret_name were recreated"
       }

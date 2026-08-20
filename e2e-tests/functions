@@ -698,7 +698,7 @@ function wait_pg_condition() {
 	local json=""
 	local elapsed=0
 
-	until [[ "${status}" == "${expected_status}" ]] && [[ "${reason}" == "${expected_reason}" ]] && [[ "${message}" == "${expected_message}" ]] && [[ "${generation}" == "${expected_generation}" ]]; do
+	until [[ ${status} == "${expected_status}" ]] && [[ ${reason} == "${expected_reason}" ]] && [[ ${message} == "${expected_message}" ]] && [[ ${generation} == "${expected_generation}" ]]; do
 		json=$(kubectl -n "${namespace}" get pg "${cluster}" -o json || true)
 		status=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .status")
 		reason=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .reason")
@@ -709,7 +709,7 @@ function wait_pg_condition() {
 		echo "expected: status=${expected_status} reason=${expected_reason} generation=${expected_generation} message=${expected_message}"
 		echo "current: status=${status} reason=${reason} generation=${generation} message=${message}"
 
-		if (( timeout_seconds > 0 && elapsed >= timeout_seconds )); then
+		if ((timeout_seconds > 0 && elapsed >= timeout_seconds)); then
 			echo "timeout waiting for condition ${condition} expected status=${expected_status} reason=${expected_reason} generation=${expected_generation} on pg/${cluster} after ${timeout_seconds}s"
 			echo "expected message: ${expected_message}"
 			echo "--- pg conditions ---"
@@ -756,7 +756,7 @@ function assert_tde_state() {
 	primary=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
 	check_pod="${primary}"
 
-	if [[ "${is_standby}" != "true" ]]; then
+	if [[ ${is_standby} != "true" ]]; then
 		replica=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
 	fi
 
@@ -785,7 +785,7 @@ function assert_tde_state() {
 		fi
 	done
 
-	if [[ "${is_standby}" == "true" ]]; then
+	if [[ ${is_standby} == "true" ]]; then
 		# Standby leader is labeled primary but stays in recovery, so restore_command is set there.
 		restore_command=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SHOW restore_command;')
 		if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
@@ -847,7 +847,7 @@ function assert_standby_promotion() {
 	primary=$(kubectl -n "${namespace}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
 
 	in_recovery=$(kubectl -n "${namespace}" exec "${primary}" -c database -- psql -t -A -c 'SELECT pg_is_in_recovery();')
-	if [[ "${in_recovery}" != "f" ]]; then
+	if [[ ${in_recovery} != "f" ]]; then
 		echo "Primary ${primary} is still in recovery: ${in_recovery}"
 		return 1
 	fi
@@ -2056,11 +2056,11 @@ function ensure_aks_hugepages_nodepool() {
 	local provider_id
 
 	provider_id="$(kubectl get nodes -o jsonpath='{.items[0].spec.providerID}')"
-	[[ -n "${provider_id}" ]] || { echo 'Missing provider id' && return 1; }
+	[[ -n ${provider_id} ]] || { echo 'Missing provider id' && return 1; }
 
 	node_rg="${provider_id#*/resourceGroups/}"
 	node_rg="${node_rg%%/*}"
-	[[ -n "${node_rg}" ]] || { echo 'Missing resource group in provider id' && return 1; }
+	[[ -n ${node_rg} ]] || { echo 'Missing resource group in provider id' && return 1; }
 
 	aks_id="$(az aks list --subscription="${subscription}" \
 		--query "[].[id,nodeResourceGroup]" \
@@ -2522,7 +2522,7 @@ function vault_tls() {
 	local vault_namespace="vault"
 	local service=$name
 	local secret_name=$name
-	local csr_name=vault-csr-${RANDOM}
+	local csr_name=vault-csr-${name}
 	local csr_signer
 
 	case ${PLATFORM} in
@@ -2584,7 +2584,7 @@ function start_vault() {
 	stop_vault "$name" || :
 	create_namespace "$vault_namespace" || :
 	helm repo add hashicorp https://helm.releases.hashicorp.com
-	
+
 	echo "install Vault $name"
 	local values_file="${tmp_dir}/vault.values.yaml"
 	local values_template="${TESTS_CONFIG_DIR}/vault-values-no-tls.yaml"
