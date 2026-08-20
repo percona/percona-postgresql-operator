@@ -357,12 +357,13 @@ func (r *Reconciler) reconcilePostgresDatabases(
 		// dropping needs the builtin flag and the custom extensions list to
 		// agree: while the extension is in spec.extensions.custom the custom
 		// machinery owns it and it must be left alone (same for set_user below)
+		extensionsSynced := cluster.Annotations[v1beta1.AnnotationCustomExtensionsSynced] == "true"
 		if cluster.Spec.Extensions.PGCron {
 			if pgCronOK = pgcron.EnableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",
 					"Unable to install pg_cron")
 			}
-		} else if slices.Contains(cluster.Spec.Extensions.Custom, "pg_cron") {
+		} else if !extensionsSynced || slices.Contains(cluster.Spec.Extensions.Custom, "pg_cron") {
 			pgCronOK = true
 		} else {
 			if pgCronOK = pgcron.DisableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
@@ -376,7 +377,7 @@ func (r *Reconciler) reconcilePostgresDatabases(
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserDisabled",
 					"Unable to install set_user")
 			}
-		} else if slices.Contains(cluster.Spec.Extensions.Custom, "set_user") {
+		} else if !extensionsSynced || slices.Contains(cluster.Spec.Extensions.Custom, "set_user") {
 			setUserOK = true
 		} else {
 			if setUserOK = setuser.DisableInPostgreSQL(ctx, exec) == nil; !setUserOK {

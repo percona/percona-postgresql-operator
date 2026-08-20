@@ -112,7 +112,6 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 		err := cluster.Validate()
 		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	})
-
 }
 
 func TestPerconaPGCluster_Version(t *testing.T) {

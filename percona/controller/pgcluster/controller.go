@@ -913,7 +913,6 @@ func (r *PGClusterReconciler) ensureMonitorUserSecret(ctx context.Context, cr *v
 	log.V(1).Info(fmt.Sprintf("Created secret %s", nn.Name))
 
 	return secret, nil
-
 }
 
 func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr *v2.PerconaPGCluster) error {

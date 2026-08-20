@@ -347,7 +347,6 @@ function deploy_s3_secrets() {
 	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
 
 	case $test_name in
-
 		"custom-extensions" | "builtin-extensions" | "operator-upgrade-extensions" | major-upgrade*)
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
@@ -576,9 +575,8 @@ function copy_custom_extensions_form_aws() {
 		bash -c "
 		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
 		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
-    
+		AWS_DEFAULT_REGION=us-east-1 \
 		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
-
 
 		AWS_ACCESS_KEY_ID='${access_key}' \
 		AWS_SECRET_ACCESS_KEY='${secret_key}' \

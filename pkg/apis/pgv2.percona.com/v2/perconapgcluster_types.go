@@ -603,6 +603,8 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		annotations[naming.AutoCreateUserSchemaAnnotation] = "true"
 	}
 
+	annotations[crunchyv1beta1.AnnotationCustomExtensionsSynced] = "true"
+
 	postgresCluster.Annotations = annotations
 	postgresCluster.Labels = cr.Labels
 	if postgresCluster.Labels == nil {
@@ -721,7 +723,6 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	if cr.Spec.Extensions.PGRepack.Enabled != nil {
 		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
 	}
-
 	if cr.Spec.Extensions.PGCron.Enabled != nil {
 		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.PGCron.Enabled
 	}
