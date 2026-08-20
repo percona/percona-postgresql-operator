@@ -23,7 +23,7 @@ commands:
 
       source ../../functions
 
-      if [[ ${PG_VER} -gt 17 ]]; then
+      if [[ ${PG_VER} -ge 17 ]]; then
         stop_vault "vault-service"
       fi
       remove_all_finalizers

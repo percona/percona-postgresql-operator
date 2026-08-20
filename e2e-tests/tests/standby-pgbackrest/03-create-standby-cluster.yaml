@@ -10,7 +10,7 @@ commands:
 
       repo_path=$(kubectl get pg -n "${NAMESPACE}" source-cluster -o jsonpath='{.spec.backups.pgbackrest.global.repo1-path}')
       tde_params='.'
-      if [[ ${PG_VER} -gt 17 ]]; then
+      if [[ ${PG_VER} -ge 17 ]]; then
         tde_params='
           .spec.extensions.pg_tde.enabled = true |
           .spec.extensions.pg_tde.walEncryption = true |

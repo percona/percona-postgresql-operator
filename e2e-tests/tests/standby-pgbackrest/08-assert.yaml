@@ -8,7 +8,7 @@ commands:
       source ../../functions
 
       assert_configmap_data 08-verify-data-source data ' 100500'
-      if [[ ${PG_VER} -gt 17 ]]; then
+      if [[ ${PG_VER} -ge 17 ]]; then
         assert_configmap_data 08-verify-extension-source pg_tde_extension ' pg_tde'
         assert_configmap_data 08-verify-encryption-source pg_tde_is_encrypted ' t'
         assert_configmap_data 08-verify-wal-encryption-source pg_tde_wal_encrypt ' on'

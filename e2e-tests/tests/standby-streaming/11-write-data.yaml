@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       table_method=''
-      if [[ ${PG_VER} -gt 17 ]]; then
+      if [[ ${PG_VER} -ge 17 ]]; then
         table_method=' USING tde_heap'
       fi
 

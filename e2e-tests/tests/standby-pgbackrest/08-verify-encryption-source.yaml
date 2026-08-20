@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      if [[ ${PG_VER} -le 17 ]]; then
+      if [[ ${PG_VER} -lt 17 ]]; then
         data=$(run_psql_local \
           '\c myapp \\\ SELECT * from myTable;' \
           "$(get_psql_uri source-cluster postgres)")

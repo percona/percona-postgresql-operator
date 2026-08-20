@@ -7,7 +7,7 @@ commands:
 
       source ../../functions
 
-      if [[ ${PG_VER} -le 17 ]]; then
+      if [[ ${PG_VER} -lt 17 ]]; then
         exit 0
       fi
 
