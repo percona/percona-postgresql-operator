@@ -461,6 +461,12 @@ func (cr *PerconaPGCluster) SetExtensionDefaults() {
 	if cr.Spec.Extensions.PGRepack.Enabled == nil {
 		cr.Spec.Extensions.PGRepack.Enabled = new(false)
 	}
+	if cr.Spec.Extensions.SetUser.Enabled == nil {
+		cr.Spec.Extensions.SetUser.Enabled = new(false)
+	}
+	if cr.Spec.Extensions.PGCron.Enabled == nil {
+		cr.Spec.Extensions.PGCron.Enabled = new(false)
+	}
 
 	// for backward compatibility, delete after 3.4.0
 	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
@@ -717,14 +723,15 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	}
 
 	if cr.Spec.Extensions.PGCron.Enabled != nil {
-		postgresCluster.Spec.Extensions.PGCron = new(*cr.Spec.Extensions.PGCron.Enabled)
-	} else {
-		postgresCluster.Spec.Extensions.PGCron = nil
+		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.PGCron.Enabled
 	}
 	if cr.Spec.Extensions.SetUser.Enabled != nil {
-		postgresCluster.Spec.Extensions.SetUser = new(*cr.Spec.Extensions.SetUser.Enabled)
-	} else {
-		postgresCluster.Spec.Extensions.SetUser = nil
+		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.SetUser.Enabled
+	}
+
+	postgresCluster.Spec.Extensions.Custom = nil
+	for _, ext := range cr.Spec.Extensions.Custom {
+		postgresCluster.Spec.Extensions.Custom = append(postgresCluster.Spec.Extensions.Custom, ext.Name)
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly

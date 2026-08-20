@@ -112,6 +112,7 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 		err := cluster.Validate()
 		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	})
+
 }
 
 func TestPerconaPGCluster_Version(t *testing.T) {
@@ -602,13 +603,11 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				// pg_cron comes via spec.extensions.custom and the builtin flag
-				// was never set: it must stay unset (nil = leave alone), so the
-				// builtin loop neither drops it nor takes over CREATE EXTENSION
-				assert.Nil(t, actual.Spec.Extensions.PGCron)
-				// the same holds for an extension the user installed by hand,
-				// without listing it in spec.extensions.custom at all
-				assert.Nil(t, actual.Spec.Extensions.SetUser)
+				// an unset flag means false like every other builtin flag, but
+				// the custom names travel along: pg_cron is owned by the custom
+				// machinery, so the reconcile must not drop it despite the flag
+				assert.False(t, actual.Spec.Extensions.PGCron)
+				assert.Equal(t, []string{"pg_cron"}, actual.Spec.Extensions.Custom)
 			},
 		},
 		"explicit builtin flags are passed through": {
@@ -646,15 +645,13 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				require.NotNil(t, actual.Spec.Extensions.PGCron)
-				assert.True(t, *actual.Spec.Extensions.PGCron)
+				assert.True(t, actual.Spec.Extensions.PGCron)
 				// an explicit false must still drop the extension, otherwise
 				// there would be no way to uninstall a builtin one
-				require.NotNil(t, actual.Spec.Extensions.SetUser)
-				assert.False(t, *actual.Spec.Extensions.SetUser)
+				assert.False(t, actual.Spec.Extensions.SetUser)
 			},
 		},
-		"builtin flags are not shared with the user CR": {
+		"explicit false does not drop an extension still listed as custom": {
 			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
@@ -664,7 +661,10 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					CRVersion:       version.Version(),
 					PostgresVersion: 18,
 					Extensions: ExtensionsSpec{
-						PGCron: BuiltInExtensionSpec{Enabled: new(true)},
+						PGCron: BuiltInExtensionSpec{Enabled: new(false)},
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
 					},
 					InstanceSets: PGInstanceSets{
 						{
@@ -682,16 +682,15 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, cr *PerconaPGCluster) {
-				require.NotNil(t, actual.Spec.Extensions.PGCron)
-				// the internal object must own its copy: mutating it must not
-				// write back into the user CR
-				*actual.Spec.Extensions.PGCron = false
-				require.NotNil(t, cr.Spec.Extensions.PGCron.Enabled)
-				assert.True(t, *cr.Spec.Extensions.PGCron.Enabled)
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				// dropping requires the builtin flag and the custom list to
+				// agree: the flag is false, but the custom entry still owns the
+				// extension, so the reconcile must leave it alone
+				assert.False(t, actual.Spec.Extensions.PGCron)
+				assert.Equal(t, []string{"pg_cron"}, actual.Spec.Extensions.Custom)
 			},
 		},
-		"unset builtin flags clear the stored value": {
+		"unset builtin flags fall back to false": {
 			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
@@ -716,10 +715,6 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					},
 				},
 			},
-			// ToCrunchy mutates the PostgresCluster stored in etcd: a value left
-			// over from an earlier explicit flag must be cleared once the user
-			// unsets the flag, or a stale false would keep dropping an extension
-			// the user re-installed on their own
 			inputPostgresCluster: &crunchyv1beta1.PostgresCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
@@ -727,14 +722,16 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				},
 				Spec: crunchyv1beta1.PostgresClusterSpec{
 					Extensions: crunchyv1beta1.ExtensionsSpec{
-						PGCron:  new(false),
-						SetUser: new(true),
+						PGCron:  true,
+						SetUser: true,
+						Custom:  []string{"pg_cron"},
 					},
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
-				assert.Nil(t, actual.Spec.Extensions.PGCron)
-				assert.Nil(t, actual.Spec.Extensions.SetUser)
+				assert.False(t, actual.Spec.Extensions.PGCron)
+				assert.False(t, actual.Spec.Extensions.SetUser)
+				assert.Empty(t, actual.Spec.Extensions.Custom)
 			},
 		},
 	}

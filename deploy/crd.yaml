@@ -27102,6 +27102,10 @@ spec:
                 type: boolean
               extensions:
                 properties:
+                  custom:
+                    items:
+                      type: string
+                    type: array
                   pg_tde:
                     properties:
                       enabled:
