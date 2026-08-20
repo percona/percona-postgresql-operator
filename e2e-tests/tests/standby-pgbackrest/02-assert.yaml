@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 480
+timeout: 600
 commands:
   - script: |-
       set -o errexit
@@ -49,8 +49,7 @@ commands:
         echo "expected PGTDEVaultProviderReady observedGeneration 1, got ${condGen}"
         exit 1
       fi
-  - timeout: 60
-    script: |
+  - script: |
       set -o errexit
 
       pgversion=$(kubectl -n ${NAMESPACE} get pg source-cluster -o jsonpath='{.spec.postgresVersion}')

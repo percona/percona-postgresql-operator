@@ -23,7 +23,7 @@ commands:
           .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = \"pg_cron\" |
           .spec.extensions.custom += [{\"name\": \"pg_cron\", \"version\": \"1.6.6\"}] |
           .spec.extensions.pg_tde.enabled = true |
-          .spec.extensions.pg_tde.vault.host = \"https://vault-major-upgrade.vault-major-upgrade.svc:8200\" |
+          .spec.extensions.pg_tde.vault.host = \"https://vault-major-upgrade.vault.svc:8200\" |
           .spec.extensions.pg_tde.vault.mountPath = \"tde\" |
           .spec.extensions.pg_tde.vault.tokenSecret.name = \"vault-secret\" |
           .spec.extensions.pg_tde.vault.tokenSecret.key = \"token\" |
