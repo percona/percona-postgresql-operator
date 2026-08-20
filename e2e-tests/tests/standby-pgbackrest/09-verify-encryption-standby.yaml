@@ -1,8 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
 commands:
-  - script: |-
+  - timeout: 480
+    script: |-
       set -o xtrace
       set -o errexit
 
@@ -16,11 +16,11 @@ commands:
       # with pgbackrest standby replicating data may take time. We need to give some time for this before failing
       data=''
       timer=0
-      until [[ -n "$data" ]]; do
-        data=$(run_psql_local \
+      until data=$(run_psql_local \
           '\c myapp \\\ SELECT * from myTable;' \
-          "$(get_standby_psql_uri standby-cluster postgres source-cluster)")
-        if [[ $timer -gt 20 ]]; then
+          "$(get_standby_psql_uri standby-cluster postgres source-cluster)") \
+          && [[ -n "$data" ]]; do
+        if [[ $timer -ge 20 ]]; then
           echo "ERROR: data not replicated after 400 seconds"
           exit 1
         fi
@@ -49,4 +49,3 @@ commands:
       assert_pg_tde_key_info_uid \
         "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp" \
         source-cluster
-
