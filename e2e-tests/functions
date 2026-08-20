@@ -466,7 +466,7 @@ function run_psql_command() {
 }
 
 # Fail unless pg_tde_key_info() contains global-master-key-<PostgresCluster metadata.uid>.
-assert_pg_tde_key_info_uid() {
+function assert_pg_tde_key_info_uid() {
 	local uri=${1}
 	local cluster=${2}
 
