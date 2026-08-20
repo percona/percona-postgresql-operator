@@ -10,10 +10,24 @@ commands:
 
       verify_certificate_recreation() {
           local cert_name="$1"
+          local secret_name
+          local cert_before
+          local cert_after
+
+          secret_name=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.spec.secretName}')
+          cert_before=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
 
           kubectl -n "$NAMESPACE" delete certificate "$cert_name" --wait=true --timeout=120s
           retry 6 5 kubectl -n "$NAMESPACE" get certificate "$cert_name"
           kubectl -n "$NAMESPACE" wait --for=condition=Ready "certificate/${cert_name}" --timeout=120s
+
+          cert_after=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
+          if [[ "$cert_before" == "$cert_after" ]]; then
+              echo "Secret $secret_name data did not change after Certificate $cert_name recreation"
+              return 1
+          fi
+
+          echo "Certificate $cert_name and Secret $secret_name were recreated"
       }
 
       verify_certificate_recreation cert-manager-tls-pgbouncer-cert
@@ -49,4 +63,3 @@ commands:
       done
 
       wait_cluster_consistency cert-manager-tls
-
