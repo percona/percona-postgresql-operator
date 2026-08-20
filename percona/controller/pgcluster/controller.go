@@ -374,6 +374,28 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
+	// doing it here so we can stop upstream controllers before this one reconciles anything
+	if ptr.Deref(cr.Spec.Unmanaged, false /* default */) {
+		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "is backup running")
+		}
+		if !backupRunning {
+			if err := r.makePostgresClusterUnmanaged(ctx, postgresCluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "make PostgresCluster unmanaged")
+			}
+
+			r.stopWALWatcher(ctx, cr)
+
+			log.Info("PerconaPGCluster is unmanaged. Skipping reconciliation", "cluster", cr.Name)
+
+			return reconcile.Result{}, nil
+		}
+
+		cr.Spec.Unmanaged = new(false)
+		log.Info("Backup is running. Can't make cluster unmanaged", "cluster", cr.Name)
+	}
+
 	if err := r.ensureFinalizers(ctx, cr); err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "ensure finalizers")
 	}
@@ -1076,10 +1098,15 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 		return
 	}
 
-	log := logging.FromContext(ctx)
 	if *cr.Spec.Backups.TrackLatestRestorableTime {
 		return
 	}
+
+	r.stopWALWatcher(ctx, cr)
+}
+
+func (r *PGClusterReconciler) stopWALWatcher(ctx context.Context, cr *v2.PerconaPGCluster) {
+	log := logging.FromContext(ctx)
 
 	watcherName, _ := watcher.GetWALWatcher(cr)
 	if !r.Watchers.IsExist(watcherName) {
@@ -1094,6 +1121,21 @@ func (r *PGClusterReconciler) stopExternalWatcher(ctx context.Context, cr *v2.Pe
 	}
 
 	r.Watchers.Remove(watcherName)
+}
+
+func (r *PGClusterReconciler) makePostgresClusterUnmanaged(ctx context.Context, postgresCluster *v1beta1.PostgresCluster) error {
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(postgresCluster), postgresCluster); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	if ptr.Deref(postgresCluster.Spec.Paused, false) {
+		return nil
+	}
+
+	orig := postgresCluster.DeepCopy()
+	postgresCluster.Spec.Paused = new(true)
+
+	return r.Client.Patch(ctx, postgresCluster, client.MergeFrom(orig))
 }
 
 func (r *PGClusterReconciler) ensureFinalizers(ctx context.Context, cr *v2.PerconaPGCluster) error {
