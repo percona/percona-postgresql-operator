@@ -5032,6 +5032,25 @@ spec:
                     properties:
                       className:
                         type: string
+                      jobs:
+                        properties:
+                          tolerations:
+                            items:
+                              properties:
+                                effect:
+                                  type: string
+                                key:
+                                  type: string
+                                operator:
+                                  type: string
+                                tolerationSeconds:
+                                  format: int64
+                                  type: integer
+                                value:
+                                  type: string
+                              type: object
+                            type: array
+                        type: object
                       mode:
                         default: offline
                         enum:
@@ -16683,9 +16702,9 @@ spec:
             - postgresVersion
             type: object
             x-kubernetes-validations:
-            - message: pg_tde is only supported for PG17 and above
+            - message: pg_tde is only supported for PG16 and above
               rule: '!has(self.extensions) || !has(self.extensions.pg_tde) || !has(self.extensions.pg_tde.enabled)
-                || !self.extensions.pg_tde.enabled || self.postgresVersion >= 17'
+                || !self.extensions.pg_tde.enabled || self.postgresVersion >= 16'
             - message: PostgresVersion must be >= 15 if grantPublicSchemaAccess exists
                 and is true
               rule: '!has(self.users) || self.postgresVersion >= 15 || self.users.all(u,
