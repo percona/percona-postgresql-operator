@@ -5,6 +5,9 @@ commands:
       set -o errexit
       set -o xtrace
 
+      # see 01-create-cluster.yaml: the whole test runs on community images
+      export PG_DISTRIBUTION=community
+
       source ../../functions
 
       kubectl apply -n ${NAMESPACE} -f - <<-EOF
@@ -14,7 +17,7 @@ commands:
           name: 18-to-19
         spec:
           postgresClusterName: major-upgrade-18-to-19
-          image: ${IMAGE_UPGRADE}
+          image: $(get_container_image "upgrade" 19)
           fromPostgresVersion: 18
           toPostgresVersion: 19
           toPostgresImage: $(get_container_image "postgres" 19)

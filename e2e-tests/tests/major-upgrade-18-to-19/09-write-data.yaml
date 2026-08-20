@@ -10,3 +10,12 @@ commands:
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100502)' \
         "postgres:$(get_psql_user_pass major-upgrade-18-to-19-pguser-postgres)@$(get_psql_user_host major-upgrade-18-to-19-pguser-postgres)"
+
+      # This row is written after the last backup, so the restore in step 10
+      # can only bring it back by replaying it from the WAL archive. Until the
+      # segment holding it is archived it exists only in pg_wal, and archiving
+      # it is otherwise left to archive_timeout (1 minute) — which the restore
+      # regularly outruns. Force the switch so the row is archived right away.
+      run_psql_local \
+        'SELECT pg_switch_wal()' \
+        "postgres:$(get_psql_user_pass major-upgrade-18-to-19-pguser-postgres)@$(get_psql_user_host major-upgrade-18-to-19-pguser-postgres)"
