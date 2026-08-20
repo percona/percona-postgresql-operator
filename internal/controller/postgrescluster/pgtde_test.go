@@ -24,13 +24,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgtde"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/events"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // execCall records a single invocation of Reconciler.PodExec.

@@ -57,7 +57,7 @@ linters:
           deny:
             - pkg: net/http/httptest
               desc: Should be used only in tests.
-            - pkg: github.com/percona/percona-postgresql-operator/v2/internal/testing/*
+            - pkg: github.com/percona/percona-postgresql-operator/v3/internal/testing/*
               desc: The "internal/testing" packages should be used only in tests.
             - pkg: errors
               desc: Use "github.com/pkg/errors" instead (errors.Wrap/Wrapf/Errorf) for stack traces.

@@ -12,8 +12,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer/startup"
+	pgbruntime "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer/startup"
 )
 
 const (

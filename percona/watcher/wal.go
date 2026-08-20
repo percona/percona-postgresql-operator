@@ -14,7 +14,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/percona/clientcmd"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
 	perconaPG "github.com/percona/percona-postgresql-operator/v3/percona/postgres"
 	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
