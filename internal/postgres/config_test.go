@@ -264,8 +264,6 @@ func TestBashTDEUnlink(t *testing.T) {
 }
 
 func TestBashHalt(t *testing.T) {
-	ctx := context.Background()
-
 	t.Run("NoPipeline", func(t *testing.T) {
 		cmd := exec.CommandContext(t.Context(), "bash")
 		cmd.Args = append(cmd.Args, "-c", "--", bashHalt+`; halt ab cd e`)
@@ -318,8 +316,6 @@ func TestBashHalt(t *testing.T) {
 }
 
 func TestBashPermissions(t *testing.T) {
-	ctx := context.Background()
-
 	// macOS `stat` takes different arguments than BusyBox and GNU coreutils.
 	if output, err := exec.CommandContext(t.Context(), "stat", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "stat" executable`)
@@ -347,8 +343,6 @@ func TestBashPermissions(t *testing.T) {
 }
 
 func TestBashRecreateDirectory(t *testing.T) {
-	ctx := context.Background()
-
 	// macOS `stat` takes different arguments than BusyBox and GNU coreutils.
 	if output, err := exec.CommandContext(t.Context(), "stat", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "stat" executable`)
@@ -417,8 +411,6 @@ func TestBashRecreateDirectory(t *testing.T) {
 }
 
 func TestBashSafeLink(t *testing.T) {
-	ctx := context.Background()
-
 	// macOS `mv` takes different arguments than GNU coreutils.
 	if output, err := exec.CommandContext(t.Context(), "mv", "--help").CombinedOutput(); err != nil {
 		t.Skip(`requires "mv" executable`)

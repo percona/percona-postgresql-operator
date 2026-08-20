@@ -68,12 +68,12 @@ tdelink() (
       exit 1
     }
   fi
-  set -x; ln --no-dereference --force --symbolic "${keyring}" "${name}"
+  set -x; ln -snf "${keyring}" "${name}"
 )
 
 tdeunlink() (
   local name="$1"
-  if [[ -L "${name}" ]]; then set -x; rm --force "${name}"; fi
+  if [[ -L "${name}" ]]; then set -x; rm -f "${name}"; fi
 )
 `
 
