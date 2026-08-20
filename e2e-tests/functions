@@ -36,6 +36,18 @@ function create_namespace() {
 	fi
 }
 
+function destroy_namespace() {
+	local namespace=$1
+
+	if [[ ${PLATFORM} == "openshift" ]]; then
+		oc delete project "$namespace" --ignore-not-found || :
+		oc wait --for=delete project "$namespace" || :
+	else
+		kubectl delete namespace $namespace --ignore-not-found || :
+		kubectl wait --for=delete namespace "$namespace" || :
+	fi
+}
+
 function check_operator_panic() {
 	local operator_pod=$(get_operator_pod)
 	local panic_log
@@ -2356,16 +2368,18 @@ function start_vault() {
 	local protocol=${2:-http}
 	local platform=kubernetes
 	local tmp_dir=$(mktemp -d)
+	local namespace="vault"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		platform=openshift
 		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 	fi
 
-	create_namespace "$name" "skip_clean"
+	helm uninstall "$name" --namespace "$namespace" || :
+	destroy_namespace "$namespace" || :
+	create_namespace "$namespace" || :
 	helm repo add hashicorp https://helm.releases.hashicorp.com
-	helm uninstall "$name" || :
-
+	
 	echo "install Vault $name"
 	local values_file="${tmp_dir}/vault.values.yaml"
 	local values_template="${TESTS_CONFIG_DIR}/vault-values-no-tls.yaml"
@@ -2383,7 +2397,7 @@ function start_vault() {
 	helm install $name hashicorp/vault \
 		--disable-openapi-validation \
 		--version $VAULT_VER \
-		--namespace "$name" \
+		--namespace "$namespace" \
 		--values "${values_file}"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
