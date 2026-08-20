@@ -43,4 +43,5 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 
 func PostgreSQLParameters(outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_cron")
+	outParameters.Mandatory.Add("cron.database_name", "postgres")
 }

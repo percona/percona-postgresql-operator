@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -218,7 +219,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 			})
 		})
 
-		When("pmm secret has no data", func() {
+		When("pmm secret doesn't contain PMM_SERVER_TOKEN", func() {
 			BeforeAll(func() {
 				Expect(k8sClient.Create(ctx, &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -226,7 +227,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 						Namespace: ns,
 					},
 					Data: map[string][]byte{
-						"PMM_SERVER_KEY": {},
+						"SOME_RANDOM_KEY": []byte("some-data"),
 					},
 				})).Should(Succeed())
 
@@ -241,49 +242,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
 			})
-		})
 
-		When("pmm secret has data for PMM_SERVER_KEY", func() {
-			BeforeAll(func() {
-				Expect(k8sClient.Update(ctx, &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-					Data: map[string][]byte{
-						"PMM_SERVER_KEY": []byte("some-data"),
-					},
-				})).Should(Succeed())
+			It("should have PMMReady condition set to False", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
 
-				_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-				_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("should have pmm container", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-
-				Expect(havePMMSidecar(sts)).To(BeTrue())
-			})
-
-			It("should have PMM secret hash", func() {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
-			})
-
-			It("should label PMM secret", func() {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster1-pmm-secret",
-						Namespace: ns,
-					},
-				}
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(secret), secret)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
-				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).To(Equal("PMMSecretInvalid"))
 			})
 		})
 
@@ -329,6 +296,15 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(secret.Labels).To(HaveKeyWithValue(v2.LabelPMMSecret, "true"))
 				Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
 			})
+
+			It("should have PMMReady condition set to True", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				cond := meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)
+				Expect(cond).NotTo(BeNil())
+				Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			})
 		})
 
 		When("cr has disabled pmm", func() {
@@ -347,6 +323,13 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
 
 				Expect(havePMMSidecar(sts)).To(BeFalse())
+			})
+
+			It("should remove PMMReady condition", func() {
+				freshCR := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cr), freshCR)).Should(Succeed())
+
+				Expect(meta.FindStatusCondition(freshCR.Status.Conditions, v2.ConditionPMMReady)).To(BeNil())
 			})
 		})
 	})
@@ -427,9 +410,8 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
-			secretString := fmt.Sprintln(monitorUserSecret.Data)
 			// #nosec G401
-			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+			currentHash := fmt.Sprintf("%x", md5.Sum(monitorUserSecret.Data["password"]))
 
 			stsList := &appsv1.StatefulSetList{}
 			labels := map[string]string{
@@ -465,9 +447,8 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
-			secretString := fmt.Sprintln(monitorUserSecret.Data)
 			// #nosec G401
-			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+			currentHash := fmt.Sprintf("%x", md5.Sum(monitorUserSecret.Data["password"]))
 
 			err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
 			Expect(err).NotTo(HaveOccurred())
@@ -1651,16 +1632,18 @@ var _ = Describe("Sidecars", Ordered, func() {
 		Expect(stsList.Items).NotTo(BeEmpty())
 
 		for _, sts := range stsList.Items {
-			l := len(sts.Spec.Template.Spec.Containers)
-			sidecar := sts.Spec.Template.Spec.Containers[l-4]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar-2"))
+			containersByName := map[string]corev1.Container{}
+			for _, c := range sts.Spec.Template.Spec.Containers {
+				containersByName[c.Name] = c
+			}
+
+			sidecar, ok := containersByName["instance-sidecar-2"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd-2"}))
 			Expect(sidecar.Image).To(Equal("instance-image-2"))
 
-			sidecar = sts.Spec.Template.Spec.Containers[l-3]
-			Expect(sidecar).NotTo(BeNil())
-			Expect(sidecar.Name).To(Equal("instance-sidecar"))
+			sidecar, ok = containersByName["instance-sidecar"]
+			Expect(ok).To(BeTrue())
 			Expect(sidecar.Command).To(Equal([]string{"instance-cmd"}))
 			Expect(sidecar.Image).To(Equal("instance-image"))
 		}
@@ -2399,6 +2382,170 @@ var _ = Describe("CR Validations", Ordered, func() {
 			})
 		})
 	})
+
+	Context("pg_tde validations", Ordered, func() {
+		When("creating a CR with valid pg_tde configurations", func() {
+			It("should accept pg_tde enabled with vault on PG 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-1", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-2", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde not specified at all", func() {
+				cr, err := readDefaultCR("cr-validation-tde-3", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept pg_tde disabled with vault on PG < 17", func() {
+				cr, err := readDefaultCR("cr-validation-tde-4", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 16
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+			})
+		})
+
+		When("creating a CR with invalid pg_tde configurations", func() {
+			It("should reject pg_tde enabled on PG < 16", func() {
+				cr, err := readDefaultCR("cr-validation-tde-5", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 15
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"pg_tde is only supported for PG16 and above",
+				))
+			})
+
+			It("should reject pg_tde enabled without vault", func() {
+				cr, err := readDefaultCR("cr-validation-tde-6", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Create(ctx, cr)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+		})
+
+		When("updating a CR with pg_tde transition rules", func() {
+			It("should reject removing vault while pg_tde is still enabled", func() {
+				cr, err := readDefaultCR("cr-validation-tde-8", ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				cr.Spec.PostgresVersion = 17
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+
+				updated := cr.DeepCopy()
+				updated.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: true,
+				}
+
+				err = k8sClient.Update(ctx, updated)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"vault is required for enabling pg_tde",
+				))
+			})
+
+			It("should accept disabling pg_tde while keeping vault", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+					Vault: &v1beta1.PGTDEVaultSpec{
+						Host: "https://vault.example.com:8200",
+						TokenSecret: v1beta1.PGTDESecretObjectReference{
+							Name: "vault-token",
+							Key:  "token",
+						},
+					},
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+
+			It("should accept removing vault after pg_tde is disabled", func() {
+				cr := &v2.PerconaPGCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "cr-validation-tde-8", Namespace: ns}, cr)).Should(Succeed())
+
+				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+					Enabled: false,
+				}
+
+				Expect(k8sClient.Update(ctx, cr)).Should(Succeed())
+			})
+		})
+	})
 })
 
 var _ = Describe("Init Container", Ordered, func() {
@@ -2931,5 +3078,127 @@ var _ = Describe("CR Version Management", Ordered, func() {
 				Expect(err.Error()).To(ContainSubstring("patch CR"))
 			})
 		})
+	})
+})
+
+var _ = Describe("Monitor user secret pre-creation", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "monitor-secret-precreate"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+	monitorSecretName := types.NamespacedName{
+		Name:      crName + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring,
+		Namespace: ns,
+	}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read default cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster with pmm enabled", func() {
+		cr.Spec.PMM.Enabled = true
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	stsLabels := map[string]string{
+		"postgres-operator.crunchydata.com/data":    "postgres",
+		"postgres-operator.crunchydata.com/cluster": crName,
+	}
+
+	var initialPassword []byte
+	var initialHash string
+
+	It("should create the monitor user secret during the first reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		secret := new(corev1.Secret)
+		Expect(k8sClient.Get(ctx, monitorSecretName, secret)).To(Succeed())
+		Expect(secret.Data["password"]).NotTo(BeEmpty())
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelPostgresUser, v2.UserMonitoring))
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelRole, naming.RolePostgresUser))
+
+		initialPassword = secret.Data["password"]
+	})
+
+	It("should annotate the PostgresCluster instance sets during the first reconcile", func() {
+		postgresCluster := new(v1beta1.PostgresCluster)
+		Expect(k8sClient.Get(ctx, crNamespacedName, postgresCluster)).To(Succeed())
+		Expect(postgresCluster.Spec.InstanceSets).NotTo(BeEmpty())
+
+		for _, set := range postgresCluster.Spec.InstanceSets {
+			Expect(set.Metadata).NotTo(BeNil())
+			Expect(set.Metadata.Annotations).To(HaveKey(pNaming.AnnotationMonitorUserSecretHash))
+		}
+
+		initialHash = postgresCluster.Spec.InstanceSets[0].Metadata.Annotations[pNaming.AnnotationMonitorUserSecretHash]
+		Expect(initialHash).NotTo(BeEmpty())
+	})
+
+	It("should create StatefulSets that already carry the hash annotation", func() {
+		stsList := new(appsv1.StatefulSetList)
+
+		// Only the Crunchy reconciler runs here: the annotation has to reach the
+		// StatefulSets from the PostgresCluster written by the first reconcile.
+		for i := 0; i < 3 && len(stsList.Items) == 0; i++ {
+			_, err := crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabels(stsLabels))).To(Succeed())
+		}
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations).To(HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, initialHash))
+		}
+	})
+
+	It("should keep the pre-created password when Crunchy adopts the secret", func() {
+		secret := new(corev1.Secret)
+		Expect(k8sClient.Get(ctx, monitorSecretName, secret)).To(Succeed())
+
+		// Crunchy fills in the connection details and the SCRAM verifier...
+		Expect(secret.Data["verifier"]).NotTo(BeEmpty())
+		// ... but must not rotate the password we generated.
+		Expect(secret.Data["password"]).To(Equal(initialPassword))
+	})
+
+	It("should not change the hash annotation on later reconciles", func() {
+		for range 3 {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		stsList := new(appsv1.StatefulSetList)
+		Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabels(stsLabels))).To(Succeed())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations).To(HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, initialHash))
+		}
 	})
 })

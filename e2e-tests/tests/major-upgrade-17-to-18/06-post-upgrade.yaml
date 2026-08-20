@@ -1,0 +1,28 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role major-upgrade-17-to-18 primary name)
+      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages --missing-stats-only
+      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
+      kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-extension --from-literal=pg_tde_extension="$result"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myapp');" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 05-verify-encryption --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp"

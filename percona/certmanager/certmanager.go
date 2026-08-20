@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -259,8 +258,8 @@ func (c *controller) ApplyIssuer(ctx context.Context, cluster *v1beta1.PostgresC
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			return errors.Wrap(c.cl.Update(ctx, existing), "failed to update issuer")
 		}
@@ -351,8 +350,8 @@ func (c *controller) ApplyCAIssuer(ctx context.Context, cluster *v1beta1.Postgre
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			return errors.Wrap(c.cl.Update(ctx, existing), "failed to update issuer")
 		}
@@ -425,8 +424,8 @@ func (c *controller) ApplyCACertificate(ctx context.Context, cluster *v1beta1.Po
 					Kind:               gvk.Kind,
 					Name:               cluster.GetName(),
 					UID:                cluster.GetUID(),
-					BlockOwnerDeletion: ptr.To(true),
-					Controller:         ptr.To(true),
+					BlockOwnerDeletion: new(true),
+					Controller:         new(true),
 				}}
 				needsUpdate = true
 			}
@@ -525,8 +524,8 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}
@@ -636,8 +635,8 @@ func (c *controller) ApplyInstanceCertificate(ctx context.Context, cluster *v1be
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}
@@ -746,8 +745,8 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}
@@ -853,8 +852,8 @@ func (c *controller) ApplyReplicationCertificate(ctx context.Context, cluster *v
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}
@@ -964,8 +963,8 @@ func (c *controller) ApplyPGBackRestClientCertificate(ctx context.Context, clust
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}
@@ -1078,8 +1077,8 @@ func (c *controller) ApplyPGBackRestRepoCertificate(ctx context.Context, cluster
 				Kind:               gvk.Kind,
 				Name:               cluster.GetName(),
 				UID:                cluster.GetUID(),
-				BlockOwnerDeletion: ptr.To(true),
-				Controller:         ptr.To(true),
+				BlockOwnerDeletion: new(true),
+				Controller:         new(true),
 			}}
 			needsUpdate = true
 		}

@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v3/percona/testutils"
 	"github.com/percona/percona-postgresql-operator/v3/percona/version"
 	pgv3 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
@@ -35,7 +36,7 @@ func TestGetLatestBackup(t *testing.T) {
 			name:             "no backups",
 			backups:          []client.Object{},
 			latestBackupName: "",
-			expectedErr:      errNoBackups,
+			expectedErr:      k8s.ErrNoBackups,
 		},
 		{
 			name: "single backup",
@@ -186,7 +187,7 @@ func TestGetLatestBackup(t *testing.T) {
 				},
 			},
 			latestBackupName: "",
-			expectedErr:      errRunningBackup,
+			expectedErr:      k8s.ErrRunningBackup,
 		},
 		{
 			name: "running backup but a backup is already succeeded",
@@ -300,7 +301,7 @@ func TestGetLatestBackup(t *testing.T) {
 				},
 			}
 
-			latest, err := getLatestBackup(ctx, client, cluster)
+			latest, err := k8s.GetLatestBackup(ctx, client, cluster)
 			if tt.expectedErr != nil {
 				require.EqualError(t, err, tt.expectedErr.Error())
 				assert.Nil(t, latest)
@@ -355,7 +356,7 @@ func TestGetLatestCommitTimestamp(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := testutils.BuildFakeClient(tt.pods...)
 
-			_, err := GetLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
+			_, err := getLatestCommitTimestamp(ctx, c, nil, tt.cluster, tt.backup)
 
 			assert.ErrorContains(t, err, tt.expectedErr.Error())
 		})

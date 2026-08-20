@@ -15,10 +15,16 @@ commands:
       data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
       kubectl create configmap -n "${NAMESPACE}" 12-read-from-primary --from-literal=data="${data}"
 
+      data2=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp2 -c "SELECT * from myTable2;"')
+      kubectl create configmap -n "${NAMESPACE}" 12-read-from-primary-2 --from-literal=data="${data2}"
+
       t=1
       for i in $(kubectl get pods -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=$cluster_name,postgres-operator.crunchydata.com/role=replica -o jsonpath='{.items[*].metadata.name}'); do
         echo "Replica pod: ${i}"
         data=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
         kubectl create configmap -n "${NAMESPACE}" 12-read-from-replica-${t} --from-literal=data="${data}"
+
+        data2=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp2 -c "SELECT * from myTable2;"')
+        kubectl create configmap -n "${NAMESPACE}" 12-read-from-replica-${t}-2 --from-literal=data="${data2}"
         t=$((t+1))
       done

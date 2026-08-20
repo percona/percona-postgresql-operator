@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -151,6 +152,13 @@ func (r *PGClusterReconciler) stopExternalWatchers(ctx context.Context, cr *v2.P
 	return nil
 }
 
+// repoNameRegex constrains pgBackRest repo names to the exact set repo1..repo4.
+// The CRD schema pattern is validated at admission, but repo names are also
+// interpolated into a shell command executed inside the database pod (see
+// deleteBackups). This Go-side check is defense-in-depth against a stored object
+// that bypasses admission validation, preventing shell command injection.
+var repoNameRegex = regexp.MustCompile(`^repo[1-4]$`)
+
 func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx)
 
@@ -179,6 +187,9 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
+		if !repoNameRegex.MatchString(repo.Name) {
+			return errors.Errorf("invalid repo name %q: must match ^repo[1-4]$", repo.Name)
+		}
 		cmd := []string{"bash", "-ceu", "--", fmt.Sprintf(pgBackrestCmd, strings.TrimPrefix(repo.Name, "repo"))}
 		if err := r.PodExec(ctx, cr.Namespace, pod.Name, "database", nil, &stdout, &stderr, cmd...); err != nil {
 			return errors.Wrapf(err, "delete backups, stderr: %s", stdout.String()+" "+stderr.String())

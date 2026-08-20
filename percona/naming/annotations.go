@@ -34,6 +34,13 @@ const (
 	// rollout restart pods in case envFrom secret is changed.
 	AnnotationEnvVarsSecretHash = PrefixPerconaPGV3 + "env-secret-config-hash"
 
+	// AnnotationLogCollectorConfigHash is the annotation that is added to instance
+	// annotations to rollout restart PG pods when the log collector (fluent-bit /
+	// logrotate) configuration changes. The config is delivered through ConfigMaps
+	// mounted by a stable name, so its content changes do not alter the pod template
+	// on their own; this hash makes them do so.
+	AnnotationLogCollectorConfigHash = PrefixPerconaPGV2 + "logcollector-config-hash"
+
 	// AnnotationBackupInProgress is the annotation that is added to PerconaPGCluster to
 	// indicate that backup is in progress.
 	AnnotationBackupInProgress = PrefixPerconaPGV3 + "backup-in-progress"

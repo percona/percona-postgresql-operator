@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
@@ -48,6 +49,103 @@ import (
 )
 
 var testCronSchedule string = "*/15 * * * *"
+
+func TestSetRepoVolumeSize(t *testing.T) {
+	tests := []struct {
+		name             string
+		request          string
+		limit            string
+		desired          string
+		existingRequest  string
+		existingCapacity string
+		expected         string
+		autogrow         bool
+	}{
+		{
+			name:     "automatic growth",
+			request:  "1Gi",
+			limit:    "5Gi",
+			desired:  "3Gi",
+			autogrow: true,
+			expected: "3Gi",
+		},
+		{
+			name:             "disabled after growth",
+			request:          "1Gi",
+			limit:            "5Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "limit removed after growth",
+			request:          "1Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "limit lowered after growth",
+			request:          "1Gi",
+			limit:            "2Gi",
+			existingRequest:  "3Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+		{
+			name:             "capacity is a lower bound",
+			request:          "1Gi",
+			limit:            "5Gi",
+			existingRequest:  "2Gi",
+			existingCapacity: "3Gi",
+			expected:         "3Gi",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := feature.NewGate()
+			assert.NilError(t, gate.SetFromMap(map[string]bool{feature.AutoGrowVolumes: tt.autogrow}))
+			ctx := feature.NewContext(t.Context(), gate)
+
+			pvc := &corev1.PersistentVolumeClaim{Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(tt.request)},
+				},
+			}}
+			if tt.limit != "" {
+				pvc.Spec.Resources.Limits = corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(tt.limit),
+				}
+			}
+
+			var existing *corev1.PersistentVolumeClaim
+			if tt.existingRequest != "" {
+				existing = &corev1.PersistentVolumeClaim{
+					Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(tt.existingRequest),
+						},
+					}},
+				}
+				if tt.existingCapacity != "" {
+					existing.Status.Capacity = corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(tt.existingCapacity),
+					}
+				}
+			}
+
+			new(Reconciler).setRepoVolumeSize(ctx, &v1beta1.PostgresCluster{},
+				pvc, existing, "repo1", tt.desired)
+			assert.Equal(t, pvc.Spec.Resources.Requests.Storage().String(), tt.expected)
+		})
+	}
+
+	status := getRepoVolumeStatus(nil, []*corev1.PersistentVolumeClaim{{
+		ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{naming.LabelPGBackRestRepo: "repo1"}},
+	}}, nil, "", map[string]string{"repo1": "3Gi"})
+	assert.Equal(t, status[0].DesiredRepoVolume, "3Gi")
+}
 
 func fakePostgresCluster(clusterName, namespace, clusterUID string,
 	includeDedicatedRepo bool,
@@ -309,7 +407,8 @@ func TestReconcilePGBackRest(t *testing.T) {
 				naming.LabelPGBackRestDedicated: "",
 			}
 			expectedLabelsSelector, err := metav1.LabelSelectorAsSelector(
-				metav1.SetAsLabelSelector(expectedLabels))
+				metav1.SetAsLabelSelector(expectedLabels),
+			)
 			if err != nil {
 				t.Error(err)
 			}
@@ -963,9 +1062,10 @@ func TestReconcileReplicaCreateBackup(t *testing.T) {
 		case "COMMAND":
 			assert.Assert(t, env.Value == "backup")
 		case "COMMAND_OPTS":
-			assert.Assert(t, env.Value == "--stanza=db --repo=1"+
-				// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
-				fmt.Sprintf(` --annotation="%s"="%s"`, v2.PGBackrestAnnotationJobType, naming.BackupReplicaCreate),
+			assert.Assert(
+				t, env.Value == "--stanza=db --repo=1"+
+					// K8SPG-506: adding label to get info about this backup in `pgbackrest info`
+					fmt.Sprintf(` --annotation="%s"="%s"`, v2.PGBackrestAnnotationJobType, naming.BackupReplicaCreate),
 			)
 
 		case "COMPARE_HASH":
@@ -1094,6 +1194,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		expectReconcile bool
 		// whether or not the test should expect a current job in the env to be deleted
 		expectCurrentJobDeletion bool
+		// whether or not to verify that applying a stale current job returns a conflict
+		verifyStaleJobConflict bool
 		// the reason associated with the expected event for the test (can be empty if
 		// no event is expected)
 		expectedEventReason string
@@ -1291,6 +1393,7 @@ func TestReconcileManualBackup(t *testing.T) {
 		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
 		expectCurrentJobDeletion: false,
 		expectReconcile:          true,
+		verifyStaleJobConflict:   true,
 	}, {
 		testDesc:         "reconcile new job when in-progress job exists for another id",
 		createCurrentJob: true,
@@ -1429,6 +1532,23 @@ func TestReconcileManualBackup(t *testing.T) {
 					// verify status is populated with the proper ID
 					assert.Assert(t, postgresCluster.Status.PGBackRest.ManualBackup != nil)
 					assert.Assert(t, postgresCluster.Status.PGBackRest.ManualBackup.ID != "")
+
+					if tc.verifyStaleJobConflict {
+						staleJob := jobs.Items[0].DeepCopy()
+						updatedJob := jobs.Items[0].DeepCopy()
+						delete(updatedJob.Labels, naming.LabelPGBackRestBackup)
+						assert.NilError(t, tClient.Update(ctx, updatedJob))
+
+						err = r.reconcileManualBackup(ctx, postgresCluster,
+							[]*batchv1.Job{staleJob}, sa, instances)
+						assert.Assert(t, apierrors.IsConflict(err))
+
+						actualJob := &batchv1.Job{}
+						assert.NilError(t, tClient.Get(ctx,
+							client.ObjectKeyFromObject(updatedJob), actualJob))
+						_, restored := actualJob.Labels[naming.LabelPGBackRestBackup]
+						assert.Assert(t, !restored)
+					}
 
 					return
 				} else {
@@ -1665,7 +1785,8 @@ func TestGetPGBackRestResources(t *testing.T) {
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Selector: metav1.SetAsLabelSelector(
-						naming.PGBackRestDedicatedLabels(clusterName)),
+						naming.PGBackRestDedicatedLabels(clusterName),
+					),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: naming.PGBackRestDedicatedLabels(clusterName),
@@ -1710,7 +1831,8 @@ func TestGetPGBackRestResources(t *testing.T) {
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Selector: metav1.SetAsLabelSelector(
-						naming.PGBackRestDedicatedLabels(clusterName)),
+						naming.PGBackRestDedicatedLabels(clusterName),
+					),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: naming.PGBackRestDedicatedLabels(clusterName),
@@ -2178,7 +2300,8 @@ func TestReconcileCloudBasedDataSource(t *testing.T) {
 				if tc.dataSource != nil {
 					pgclusterDataSource = tc.dataSource.PGBackRest
 				}
-				err := r.reconcileCloudBasedDataSource(ctx,
+				err := r.reconcileCloudBasedDataSource(
+					ctx,
 					cluster,
 					pgclusterDataSource,
 					"testhash",
@@ -2376,7 +2499,8 @@ func TestCopyConfigurationResources(t *testing.T) {
 		sc := sourceCluster("0")
 
 		assert.Check(t, apierrors.IsNotFound(
-			r.copyConfigurationResources(ctx, cluster("0", sc.Name, sc.Namespace), sc)))
+			r.copyConfigurationResources(ctx, cluster("0", sc.Name, sc.Namespace), sc),
+		))
 	})
 	t.Run("Only Secret", func(t *testing.T) {
 		secret := secret("1")
@@ -2388,7 +2512,8 @@ func TestCopyConfigurationResources(t *testing.T) {
 		sc := sourceCluster("1")
 
 		assert.Check(t, apierrors.IsNotFound(
-			r.copyConfigurationResources(ctx, cluster("1", sc.Name, sc.Namespace), sc)))
+			r.copyConfigurationResources(ctx, cluster("1", sc.Name, sc.Namespace), sc),
+		))
 	})
 	t.Run("Only ConfigMap", func(t *testing.T) {
 		configMap := configMap("2")
@@ -2400,7 +2525,8 @@ func TestCopyConfigurationResources(t *testing.T) {
 		sc := sourceCluster("2")
 
 		assert.Check(t, apierrors.IsNotFound(
-			r.copyConfigurationResources(ctx, cluster("2", sc.Name, sc.Namespace), sc)))
+			r.copyConfigurationResources(ctx, cluster("2", sc.Name, sc.Namespace), sc),
+		))
 	})
 	t.Run("Secret and ConfigMap, neither optional", func(t *testing.T) {
 		secret := secret("3")
@@ -2597,7 +2723,8 @@ volumes:
 				ImagePullPolicy: corev1.PullAlways,
 			},
 		}
-		job := generateBackupJobSpecIntent(ctx,
+		job := generateBackupJobSpecIntent(
+			ctx,
 			cluster, v1beta1.PGBackRestRepo{},
 			"", "",
 			nil, nil,
@@ -2612,7 +2739,8 @@ volumes:
 			cluster.Spec.Backups = v1beta1.Backups{
 				PGBackRest: v1beta1.PGBackRestArchive{},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -2629,12 +2757,14 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
 			)
-			assert.DeepEqual(t, job.Template.Spec.Containers[0].Resources,
+			assert.DeepEqual(
+				t, job.Template.Spec.Containers[0].Resources,
 				corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("1m"),
@@ -2669,7 +2799,8 @@ volumes:
 				},
 			},
 		}
-		job := generateBackupJobSpecIntent(ctx,
+		job := generateBackupJobSpecIntent(
+			ctx,
 			cluster, v1beta1.PGBackRestRepo{},
 			"", "",
 			nil, nil,
@@ -2682,7 +2813,8 @@ volumes:
 		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
 			PriorityClassName: new("some-priority-class"),
 		}
-		job := generateBackupJobSpecIntent(ctx,
+		job := generateBackupJobSpecIntent(
+			ctx,
 			cluster, v1beta1.PGBackRestRepo{},
 			"", "",
 			nil, nil,
@@ -2700,7 +2832,8 @@ volumes:
 		cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{
 			Tolerations: tolerations,
 		}
-		job := generateBackupJobSpecIntent(ctx,
+		job := generateBackupJobSpecIntent(
+			ctx,
 			cluster, v1beta1.PGBackRestRepo{},
 			"", "",
 			nil, nil,
@@ -2714,14 +2847,16 @@ volumes:
 		t.Run("Undefined", func(t *testing.T) {
 			cluster.Spec.Backups.PGBackRest.Jobs = nil
 
-			spec := generateBackupJobSpecIntent(ctx,
+			spec := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
 
 			cluster.Spec.Backups.PGBackRest.Jobs = &v1beta1.BackupJobs{}
 
-			spec = generateBackupJobSpecIntent(ctx,
+			spec = generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			assert.Assert(t, spec.TTLSecondsAfterFinished == nil)
@@ -2732,7 +2867,8 @@ volumes:
 				TTLSecondsAfterFinished: new(int32(0)),
 			}
 
-			spec := generateBackupJobSpecIntent(ctx,
+			spec := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
@@ -2745,7 +2881,8 @@ volumes:
 				TTLSecondsAfterFinished: new(int32(100)),
 			}
 
-			spec := generateBackupJobSpecIntent(ctx,
+			spec := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{}, "", "", nil, nil,
 			)
 			if assert.Check(t, spec.TTLSecondsAfterFinished != nil) {
@@ -2772,7 +2909,8 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -2807,7 +2945,8 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -2840,7 +2979,8 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -2873,7 +3013,8 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -2936,7 +3077,8 @@ volumes:
 						},
 					},
 				}
-				job := generateBackupJobSpecIntent(ctx,
+				job := generateBackupJobSpecIntent(
+					ctx,
 					cluster, v1beta1.PGBackRestRepo{},
 					"", "",
 					nil, nil,
@@ -2988,7 +3130,8 @@ volumes:
 						},
 					},
 				}
-				job := generateBackupJobSpecIntent(ctx,
+				job := generateBackupJobSpecIntent(
+					ctx,
 					cluster, v1beta1.PGBackRestRepo{},
 					"", "",
 					nil, nil,
@@ -3056,7 +3199,8 @@ volumes:
 					},
 				},
 			}
-			job := generateBackupJobSpecIntent(ctx,
+			job := generateBackupJobSpecIntent(
+				ctx,
 				cluster, v1beta1.PGBackRestRepo{},
 				"", "",
 				nil, nil,
@@ -3098,6 +3242,46 @@ func TestGenerateRepoHostIntent(t *testing.T) {
 		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, "")
 		if assert.Check(t, sts.Spec.Template.Spec.AutomountServiceAccountToken != nil) {
 			assert.Equal(t, *sts.Spec.Template.Spec.AutomountServiceAccountToken, false)
+		}
+	})
+
+	t.Run("AutoGrowServiceAccountAndMount", func(t *testing.T) {
+		gate := feature.NewGate()
+		assert.NilError(t, gate.SetFromMap(map[string]bool{feature.AutoGrowVolumes: true}))
+		ctx := feature.NewContext(ctx, gate)
+
+		cluster := &v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{
+			Name:   "hippo",
+			Labels: map[string]string{naming.LabelVersion: "2.5.0"},
+		}}
+		cluster.Spec.Backups.PGBackRest.Repos = []v1beta1.PGBackRestRepo{{
+			Name: "repo1",
+			Volume: &v1beta1.RepoPVC{VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+					Limits:   corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
+				},
+			}},
+		}}
+
+		sts, err := r.generateRepoHostIntent(ctx, cluster, "", &RepoResources{}, &observedInstances{})
+		assert.NilError(t, err)
+		assert.Equal(t, *sts.Spec.Template.Spec.AutomountServiceAccountToken, true)
+		assert.Equal(t, sts.Spec.Template.Spec.ServiceAccountName, naming.PGBackRestRBAC(cluster).Name)
+
+		var config *corev1.Container
+		for i := range sts.Spec.Template.Spec.Containers {
+			if sts.Spec.Template.Spec.Containers[i].Name == naming.ContainerPGBackRestConfig {
+				config = &sts.Spec.Template.Spec.Containers[i]
+				break
+			}
+		}
+		if assert.Check(t, config != nil) {
+			var found bool
+			for _, mount := range config.VolumeMounts {
+				found = found || mount.Name == "repo1" && mount.MountPath == "/pgbackrest/repo1"
+			}
+			assert.Assert(t, found)
 		}
 	})
 
@@ -3420,7 +3604,8 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 
 				assert.Equal(t, envVar.Name, "TEST_ENV")
 				assert.Equal(t, envVar.Value, "VALUE3")
-				assert.DeepEqual(t, container.EnvFrom,
+				assert.DeepEqual(
+					t, container.EnvFrom,
 					[]corev1.EnvFromSource{
 						{
 							Prefix: "restore",

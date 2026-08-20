@@ -42,46 +42,15 @@ func TestContainer(t *testing.T) {
 		verificationEnvVar func() corev1.EnvVar
 		err                error
 	}{
-		"pmm2 container": {
+		"error when token is missing": {
 			secret: func() *corev1.Secret {
 				secret := &corev1.Secret{}
 				secret.Data = map[string][]byte{
-					"PMM_SERVER_KEY": []byte(`key`),
+					"SOME_RANDOM_KEY": []byte(`key`),
 				}
 				return secret
 			},
-			verificationEnvVar: func() corev1.EnvVar {
-				return corev1.EnvVar{
-					Name:  "PMM_AGENT_SERVER_USERNAME",
-					Value: "api_key",
-				}
-			},
-		},
-		"pmm server key has no data": {
-			secret: func() *corev1.Secret {
-				secret := &corev1.Secret{}
-				secret.Data = map[string][]byte{
-					"PMM_SERVER_KEY": []byte(``),
-				}
-				return secret
-			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
-		},
-		"pmm3 when both server key and token exist": {
-			secret: func() *corev1.Secret {
-				secret := &corev1.Secret{}
-				secret.Data = map[string][]byte{
-					"PMM_SERVER_KEY":   []byte(`key`),
-					"PMM_SERVER_TOKEN": []byte(`token`),
-				}
-				return secret
-			},
-			verificationEnvVar: func() corev1.EnvVar {
-				return corev1.EnvVar{
-					Name:  "PMM_AGENT_SERVER_USERNAME",
-					Value: "service_token",
-				}
-			},
+			err: errors.New("can't enable PMM: PMM_SERVER_TOKEN doesn't exist in the provided secret or it is empty (PMM2 is no longer supported, migrate to PMM3)"),
 		},
 		"pmm3 when only token exists": {
 			secret: func() *corev1.Secret {
@@ -106,17 +75,7 @@ func TestContainer(t *testing.T) {
 				}
 				return secret
 			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
-		},
-		"error due to missing secret": {
-			secret: func() *corev1.Secret {
-				secret := &corev1.Secret{}
-				secret.Data = map[string][]byte{
-					"RANDOM_SECRET": []byte(`foo`),
-				}
-				return secret
-			},
-			err: errors.New("can't enable PMM: neither PMM_SERVER_TOKEN for PMM3 nor PMM_SERVER_KEY for PMM2 exist in the provided secret or they are empty"),
+			err: errors.New("can't enable PMM: PMM_SERVER_TOKEN doesn't exist in the provided secret or it is empty (PMM2 is no longer supported, migrate to PMM3)"),
 		},
 		"error due to nil secret": {
 			secret: func() *corev1.Secret {
@@ -148,138 +107,18 @@ func TestPMMConfigFile(t *testing.T) {
 		}
 	}
 
-	t.Run("v3.1.0 PMM2", func(t *testing.T) {
-		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), false))
-	})
-	t.Run("v3.1.0 PMM3", func(t *testing.T) {
-		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0"), true))
+	t.Run("v3.1.0", func(t *testing.T) {
+		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.1.0")))
 	})
 	t.Run("newer than 3.1.0", func(t *testing.T) {
-		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.2.0"), true))
+		assert.Equal(t, "/tmp/pmm-agent.yaml", pmmConfigFile(newPGC("3.2.0")))
 	})
-	t.Run("older than 3.1.0 PMM2", func(t *testing.T) {
-		assert.Equal(t, "/usr/local/percona/pmm2/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), false))
-	})
-	t.Run("older than 3.1.0 PMM3", func(t *testing.T) {
-		assert.Equal(t, "/usr/local/percona/pmm/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0"), true))
+	t.Run("older than 3.1.0", func(t *testing.T) {
+		assert.Equal(t, "/usr/local/percona/pmm/config/pmm-agent.yaml", pmmConfigFile(newPGC("3.0.0")))
 	})
 }
 
-func TestSidecarContainerV2(t *testing.T) {
-	pmmSpec := &v2.PMMSpec{
-		Image:                    "percona/pmm-client:pmm2-enabled",
-		ImagePullPolicy:          corev1.PullIfNotPresent,
-		ServerHost:               "pmm.server.local",
-		Secret:                   "pmm-secret",
-		PostgresParams:           "--environment=dev-postgres",
-		QuerySource:              v2.PgStatStatements,
-		Resources:                corev1.ResourceRequirements{},
-		ContainerSecurityContext: &corev1.SecurityContext{},
-	}
-
-	pgc := &v2.PerconaPGCluster{
-		Spec: v2.PerconaPGClusterSpec{
-			CRVersion: version.Version(),
-			PMM:       pmmSpec,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "test-namespace",
-		},
-	}
-
-	container := sidecarContainerV2(pgc)
-
-	assert.Equal(t, "pmm-client", container.Name)
-	assert.Equal(t, pmmSpec.Image, container.Image)
-	assert.Equal(t, pmmSpec.ImagePullPolicy, container.ImagePullPolicy)
-	assert.Len(t, container.Ports, 7)
-
-	expectedPorts := []int32{7777, 30100, 30101, 30102, 30103, 30104, 30105}
-	for i, port := range container.Ports {
-		assert.Equal(t, expectedPorts[i], port.ContainerPort)
-	}
-
-	assert.NotNil(t, container.LivenessProbe)
-	assert.Equal(t, "/local/Status", container.LivenessProbe.HTTPGet.Path)
-	assert.Equal(t, int32(7777), container.LivenessProbe.HTTPGet.Port.IntVal)
-
-	assert.NotNil(t, container.Lifecycle)
-	assert.NotNil(t, container.Lifecycle.PreStop)
-	assert.Equal(t, []string{"bash", "-c", "pmm-admin unregister --force"}, container.Lifecycle.PreStop.Exec.Command)
-
-	assert.Len(t, container.Env, 32)
-
-	expectedEnvVars := map[string]string{
-		"POD_NAME":                         "", // field reference is asserted separately
-		"POD_NAMESPACE":                    "", // field reference is asserted separately
-		"PMM_USER":                         "api_key",
-		"PMM_SERVER":                       pmmSpec.ServerHost,
-		"PMM_AGENT_SERVER_ADDRESS":         pmmSpec.ServerHost,
-		"PMM_AGENT_SERVER_USERNAME":        "api_key",
-		"PMM_AGENT_SERVER_PASSWORD":        "", // secret reference is asserted separately
-		"CLIENT_PORT_LISTEN":               "7777",
-		"CLIENT_PORT_MIN":                  "30100",
-		"CLIENT_PORT_MAX":                  "30105",
-		"PMM_AGENT_LISTEN_PORT":            "7777",
-		"PMM_AGENT_PORTS_MIN":              "30100",
-		"PMM_AGENT_PORTS_MAX":              "30105",
-		"PMM_AGENT_CONFIG_FILE":            "/tmp/pmm-agent.yaml",
-		"PMM_AGENT_LOG_LEVEL":              "info",
-		"PMM_AGENT_DEBUG":                  "false",
-		"PMM_AGENT_TRACE":                  "false",
-		"PMM_AGENT_SERVER_INSECURE_TLS":    "1",
-		"PMM_AGENT_LISTEN_ADDRESS":         "0.0.0.0",
-		"PMM_AGENT_SETUP_NODE_NAME":        "$(POD_NAMESPACE)-$(POD_NAME)",
-		"PMM_AGENT_SETUP_METRICS_MODE":     "push",
-		"PMM_AGENT_SETUP":                  "1",
-		"PMM_AGENT_SETUP_FORCE":            "1",
-		"PMM_AGENT_SETUP_NODE_TYPE":        "container",
-		"PMM_AGENT_SIDECAR":                "true",
-		"PMM_AGENT_SIDECAR_SLEEP":          "5",
-		"DB_TYPE":                          "postgresql",
-		"DB_USER":                          v2.UserMonitoring,
-		"DB_PASS":                          "", // secret reference is asserted separately
-		"PMM_AGENT_PRERUN_SCRIPT":          "pmm-admin status --wait=10s; pmm-admin add postgresql --username=$(DB_USER) --password='$(DB_PASS)' --host=127.0.0.1 --port=5432 --tls-cert-file=/pgconf/tls/tls.crt --tls-key-file=/pgconf/tls/tls.key --tls-ca-file=/pgconf/tls/ca.crt --tls-skip-verify --skip-connection-check --metrics-mode=push --service-name=$(PMM_AGENT_SETUP_NODE_NAME) --query-source=pgstatements --cluster=test-cluster --environment=dev-postgres; pmm-admin annotate --service-name=$(PMM_AGENT_SETUP_NODE_NAME) 'Service restarted'",
-		"PMM_AGENT_PATHS_TEMPDIR":          "/tmp",
-		"PMM_AGENT_SETUP_PROC_MOUNTS_PATH": "/proc/self/mounts",
-	}
-
-	for _, envVar := range container.Env {
-		assert.Contains(t, expectedEnvVars, envVar.Name)
-
-		switch envVar.Name {
-		case "POD_NAME", "POD_NAMESPACE":
-			assert.NotNil(t, envVar.ValueFrom)
-			assert.NotNil(t, envVar.ValueFrom.FieldRef)
-			assert.Equal(t, "v1", envVar.ValueFrom.FieldRef.APIVersion)
-
-			expectedFieldPath := map[string]string{
-				"POD_NAME":      "metadata.name",
-				"POD_NAMESPACE": "metadata.namespace",
-			}
-			assert.Equal(t, expectedFieldPath[envVar.Name], envVar.ValueFrom.FieldRef.FieldPath)
-		case "PMM_AGENT_SERVER_PASSWORD":
-			assert.NotNil(t, envVar.ValueFrom)
-			assert.NotNil(t, envVar.ValueFrom.SecretKeyRef)
-			assert.Equal(t, "PMM_SERVER_KEY", envVar.ValueFrom.SecretKeyRef.Key)
-			assert.Equal(t, "pmm-secret", envVar.ValueFrom.SecretKeyRef.Name)
-		case "DB_PASS":
-			assert.NotNil(t, envVar.ValueFrom)
-			assert.NotNil(t, envVar.ValueFrom.SecretKeyRef)
-			assert.Equal(t, "password", envVar.ValueFrom.SecretKeyRef.Key)
-			assert.Equal(t, "test-cluster-pguser-monitor", envVar.ValueFrom.SecretKeyRef.Name)
-		default:
-			assert.Equal(t, expectedEnvVars[envVar.Name], envVar.Value)
-		}
-	}
-
-	assert.Len(t, container.VolumeMounts, 2)
-	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
-	assert.True(t, container.VolumeMounts[0].ReadOnly)
-}
-
-func TestSidecarContainerV3(t *testing.T) {
+func TestSidecarContainer(t *testing.T) {
 	pmmSpec := &v2.PMMSpec{
 		Image:                    "percona/pmm-client:pmm3-enabled",
 		ImagePullPolicy:          corev1.PullIfNotPresent,
@@ -302,7 +141,7 @@ func TestSidecarContainerV3(t *testing.T) {
 		},
 	}
 
-	container := sidecarContainerV3(pgc)
+	container := sidecarContainer(pgc)
 
 	assert.Equal(t, "pmm-client", container.Name)
 	assert.Equal(t, pmmSpec.Image, container.Image)

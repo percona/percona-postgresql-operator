@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 180
+resourceRefs:
+  - apiVersion: pgv2.percona.com/v2
+    kind: PerconaPGCluster
+    name: cert-management-policy
+    ref: cluster
+assertAll:
+  - celExpr: cluster.status.conditions.exists(c, c.type == "ReadyForBackup" && c.status == "False" && c.reason == "PGBackRestRepoHostReady" && has(c.observedGeneration) && c.observedGeneration == cluster.metadata.generation)
+    message: ReadyForBackup should be False with reason PGBackRestRepoHostReady
+  - celExpr: cluster.status.conditions.exists(c, c.type == "TLSSecretsReady" && c.status == "False" && c.reason == "TLSSecretsMissing" && has(c.observedGeneration) && c.observedGeneration == cluster.metadata.generation)
+    message: TLSSecretsReady should be False with reason TLSSecretsMissing
+  - celExpr: cluster.status.conditions.exists(c, c.type == "Progressing" && c.status == "False" && c.reason == "Paused" && has(c.observedGeneration) && c.observedGeneration == cluster.metadata.generation)
+    message: Progressing should be False with reason Paused

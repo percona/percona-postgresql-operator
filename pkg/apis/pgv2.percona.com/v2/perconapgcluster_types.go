@@ -51,7 +51,10 @@ type PerconaPGCluster struct { //nolint:recvcheck
 	Status PerconaPGClusterStatus `json:"status,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.extensions) || !has(self.extensions.pg_tde) || !has(self.extensions.pg_tde.enabled) || !self.extensions.pg_tde.enabled || self.postgresVersion >= 16",message="pg_tde is only supported for PG16 and above"
 // +kubebuilder:validation:XValidation:rule="!has(self.users) || self.postgresVersion >= 15 || self.users.all(u, !has(u.grantPublicSchemaAccess) || !u.grantPublicSchemaAccess)",message="PostgresVersion must be >= 15 if grantPublicSchemaAccess exists and is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.logicalReplicas) || size(self.logicalReplicas) == 0 || self.postgresVersion >= 17",message="spec.logicalReplicas requires spec.postgresVersion >= 17"
+// +kubebuilder:validation:XValidation:rule="!has(self.logicalReplicas) || size(self.logicalReplicas) == 0 || !has(self.backups) || !has(self.backups.enabled) || self.backups.enabled || self.logicalReplicas.all(r, has(r.bootstrapMethod) && r.bootstrapMethod == 'pg_basebackup')",message="spec.logicalReplicas[].bootstrapMethod must be 'pg_basebackup' when spec.backups.enabled is false"
 type PerconaPGClusterSpec struct {
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
@@ -175,6 +178,11 @@ type PerconaPGClusterSpec struct {
 	// +optional
 	PMM *PMMSpec `json:"pmm,omitempty"`
 
+	// The specification of the log collector sidecar.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +optional
+	LogCollector *LogCollectorSpec `json:"logcollector,omitempty"`
+
 	// The specification of extensions.
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// +optional
@@ -199,6 +207,116 @@ type PerconaPGClusterSpec struct {
 	// files such as an LDAP CA certificate.
 	// +optional
 	Authentication *crunchyv1beta1.PostgresClusterAuthentication `json:"authentication,omitempty"`
+
+	// Logical replicas are read-write PostgreSQL instances in this cluster that
+	// receive changes from the primary over logical replication. Each one is
+	// seeded with a physical copy of the primary, taken the way its
+	// bootstrapMethod says, and converted with pg_createsubscriber, which
+	// requires spec.postgresVersion to be 17 or higher.
+	// +optional
+	LogicalReplicas LogicalReplicas `json:"logicalReplicas,omitempty"`
+}
+
+// +listType=map
+// +listMapKey=name
+type LogicalReplicas []LogicalReplicaSpec
+
+// ToCrunchy projects the logical replicas onto the Crunchy spec, which needs
+// only their names.
+func (l LogicalReplicas) ToCrunchy() []crunchyv1beta1.LogicalReplicaSpec {
+	if len(l) == 0 {
+		return nil
+	}
+
+	out := make([]crunchyv1beta1.LogicalReplicaSpec, 0, len(l))
+	for _, replica := range l {
+		out = append(out, crunchyv1beta1.LogicalReplicaSpec{Name: replica.Name})
+	}
+	return out
+}
+
+type LogicalReplicaSpec struct {
+	// Name of the logical replica. It is used to name the StatefulSet, Service
+	// and PersistentVolumeClaim of the replica, as well as the publications,
+	// subscriptions and replication slots backing it.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=20
+	// +kubebuilder:validation:Pattern=`^[a-z][a-z0-9-]*[a-z0-9]$`
+	Name string `json:"name"`
+
+	// Databases to replicate. When empty, every database in the cluster except
+	// the templates and "postgres" is replicated.
+	// +listType=set
+	// +optional
+	Databases []crunchyv1beta1.PostgresIdentifier `json:"databases,omitempty"`
+
+	// BootstrapMethod selects how the data volume is seeded before
+	// pg_createsubscriber converts it into a subscriber.
+	//
+	// "pgbackrest" restores the cluster's most recent backup and puts no load on
+	// the primary. "pg_basebackup" streams a fresh copy straight from the
+	// primary and needs no pgBackRest repository, which is the only option when
+	// spec.backups.enabled is false.
+	//
+	// It is only read while the replica is being bootstrapped; changing it on a
+	// replica that already exists has no effect.
+	// +kubebuilder:validation:Enum={pgbackrest,pg_basebackup}
+	// +kubebuilder:default=pgbackrest
+	// +optional
+	BootstrapMethod LogicalReplicaBootstrapMethod `json:"bootstrapMethod,omitempty"`
+
+	// Defines the data volume of the logical replica.
+	// +kubebuilder:validation:Required
+	DataVolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec"`
+
+	// +optional
+	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
+
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +optional
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+
+	// Specification of the service that exposes this logical replica.
+	// +optional
+	Expose *ServiceExpose `json:"expose,omitempty"`
+}
+
+func (cr *PerconaPGCluster) IsPaused() bool {
+	return cr.Spec.Pause != nil && *cr.Spec.Pause
+}
+
+// LogicalReplicaBootstrapMethod selects how the data volume of a logical
+// replica is seeded with a physical copy of the primary, before
+// pg_createsubscriber converts it into a subscriber.
+type LogicalReplicaBootstrapMethod string
+
+const (
+	LogicalReplicaBootstrapMethodPGBackRest   LogicalReplicaBootstrapMethod = "pgbackrest"
+	LogicalReplicaBootstrapMethodPGBaseBackup LogicalReplicaBootstrapMethod = "pg_basebackup"
+)
+
+// BootstrapMethodOrDefault returns the method the data volume of the replica is
+// seeded with. The field carries a CRD default, so this only matters for a spec
+// the API server has not defaulted.
+func (s *LogicalReplicaSpec) BootstrapMethodOrDefault() LogicalReplicaBootstrapMethod {
+	if s.BootstrapMethod == "" {
+		return LogicalReplicaBootstrapMethodPGBackRest
+	}
+	return s.BootstrapMethod
+}
+
+// LogicalReplicasEnabled returns whether the cluster has any logical replica
+// configured.
+func (cr *PerconaPGCluster) LogicalReplicasEnabled() bool {
+	return cr.CompareVersion("3.1.0") >= 0 && len(cr.Spec.LogicalReplicas) > 0
 }
 
 type ContainerOptions struct {
@@ -274,45 +392,7 @@ func (cr *PerconaPGCluster) Default() {
 		}
 	}
 
-	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatMonitor = new(true)
-		if cr.CompareVersion("2.9.0") >= 0 {
-			var qs PMMQuerySource
-			if cr.PMMEnabled() {
-				qs = cr.Spec.PMM.QuerySource
-			}
-			cr.Spec.Extensions.BuiltIn.PGStatMonitor = new(qs == PgStatMonitor)
-		}
-	}
-	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
-		cr.Spec.Extensions.BuiltIn.PGStatStatements = new(false)
-		if cr.CompareVersion("2.9.0") >= 0 {
-			var qs PMMQuerySource
-			if cr.PMMEnabled() {
-				qs = cr.Spec.PMM.QuerySource
-			}
-			cr.Spec.Extensions.BuiltIn.PGStatStatements = new(qs == PgStatStatements)
-		}
-	}
-	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
-		cr.Spec.Extensions.BuiltIn.PGAudit = new(true)
-	}
-	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
-		cr.Spec.Extensions.BuiltIn.PGVector = new(false)
-	}
-	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
-		cr.Spec.Extensions.BuiltIn.PGRepack = new(false)
-	}
-	if cr.Spec.Extensions.BuiltIn.PGCron == nil {
-		cr.Spec.Extensions.BuiltIn.PGCron = new(false)
-	}
-	if cr.Spec.Extensions.BuiltIn.SetUser == nil {
-		cr.Spec.Extensions.BuiltIn.SetUser = new(false)
-	}
-
-	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
-		cr.Spec.AutoCreateUserSchema = new(true)
-	}
+	cr.SetExtensionDefaults()
 
 	if cr.CompareVersion("3.1.0") >= 0 && cr.Spec.Backups.Enabled == nil {
 		cr.Spec.Backups.Enabled = new(true)
@@ -327,6 +407,83 @@ func (cr *PerconaPGCluster) Default() {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig == nil {
 		cr.Spec.Backups.VolumeSnapshots.OfflineConfig = DefaultOfflineSnapshotConfig()
 	}
+
+	if cr.CompareVersion("2.6.0") >= 0 && cr.Spec.AutoCreateUserSchema == nil {
+		cr.Spec.AutoCreateUserSchema = new(true)
+	}
+}
+
+func (cr *PerconaPGCluster) SetExtensionDefaults() {
+	// for backward compatibility, delete after 3.4.0
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor != nil {
+		cr.Spec.Extensions.PGStatMonitor.Enabled = cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements != nil {
+		cr.Spec.Extensions.PGStatStatements.Enabled = cr.Spec.Extensions.BuiltIn.PGStatStatements
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit != nil {
+		cr.Spec.Extensions.PGAudit.Enabled = cr.Spec.Extensions.BuiltIn.PGAudit
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
+		cr.Spec.Extensions.PGRepack.Enabled = cr.Spec.Extensions.BuiltIn.PGRepack
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector != nil {
+		cr.Spec.Extensions.PGVector.Enabled = cr.Spec.Extensions.BuiltIn.PGVector
+	}
+
+	if cr.Spec.Extensions.PGStatMonitor.Enabled == nil {
+		cr.Spec.Extensions.PGStatMonitor.Enabled = new(true)
+		if cr.CompareVersion("2.9.0") >= 0 {
+			var qs PMMQuerySource
+			if cr.PMMEnabled() {
+				qs = cr.Spec.PMM.QuerySource
+			}
+			cr.Spec.Extensions.PGStatMonitor.Enabled = new(qs == PgStatMonitor)
+		}
+	}
+	if cr.Spec.Extensions.PGStatStatements.Enabled == nil {
+		cr.Spec.Extensions.PGStatStatements.Enabled = new(false)
+		if cr.CompareVersion("2.9.0") >= 0 {
+			var qs PMMQuerySource
+			if cr.PMMEnabled() {
+				qs = cr.Spec.PMM.QuerySource
+			}
+			cr.Spec.Extensions.PGStatStatements.Enabled = new(qs == PgStatStatements)
+		}
+	}
+
+	if cr.Spec.Extensions.PGAudit.Enabled == nil {
+		cr.Spec.Extensions.PGAudit.Enabled = new(true)
+	}
+	if cr.Spec.Extensions.PGVector.Enabled == nil {
+		cr.Spec.Extensions.PGVector.Enabled = new(false)
+	}
+	if cr.Spec.Extensions.PGRepack.Enabled == nil {
+		cr.Spec.Extensions.PGRepack.Enabled = new(false)
+	}
+	if cr.Spec.Extensions.SetUser.Enabled == nil {
+		cr.Spec.Extensions.SetUser.Enabled = new(false)
+	}
+	if cr.Spec.Extensions.PGCron.Enabled == nil {
+		cr.Spec.Extensions.PGCron.Enabled = new(false)
+	}
+
+	// for backward compatibility, delete after 3.4.0
+	if cr.Spec.Extensions.BuiltIn.PGStatMonitor == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatMonitor = cr.Spec.Extensions.PGStatMonitor.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGStatStatements == nil {
+		cr.Spec.Extensions.BuiltIn.PGStatStatements = cr.Spec.Extensions.PGStatStatements.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGAudit == nil {
+		cr.Spec.Extensions.BuiltIn.PGAudit = cr.Spec.Extensions.PGAudit.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGVector == nil {
+		cr.Spec.Extensions.BuiltIn.PGVector = cr.Spec.Extensions.PGVector.Enabled
+	}
+	if cr.Spec.Extensions.BuiltIn.PGRepack == nil {
+		cr.Spec.Extensions.BuiltIn.PGRepack = cr.Spec.Extensions.PGRepack.Enabled
+	}
 }
 
 func (cr *PerconaPGCluster) Validate() error {
@@ -340,6 +497,46 @@ func (cr *PerconaPGCluster) Validate() error {
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
 	}
+	if err := cr.ValidateLogicalReplicas(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ValidateLogicalReplicas checks the invariants of spec.logicalReplicas that
+// cannot be expressed with kubebuilder markers.
+func (cr *PerconaPGCluster) ValidateLogicalReplicas() error {
+	if len(cr.Spec.LogicalReplicas) == 0 {
+		return nil
+	}
+
+	// A logical replica names a StatefulSet in the same namespace as the
+	// instance sets do, so the names must not collide.
+	instanceSets := make(map[string]struct{}, len(cr.Spec.InstanceSets))
+	for _, set := range cr.Spec.InstanceSets {
+		instanceSets[set.Name] = struct{}{}
+	}
+
+	seen := make(map[string]struct{}, len(cr.Spec.LogicalReplicas))
+	for _, replica := range cr.Spec.LogicalReplicas {
+		if _, ok := seen[replica.Name]; ok {
+			return errors.Errorf("duplicate spec.logicalReplicas name %q", replica.Name)
+		}
+		seen[replica.Name] = struct{}{}
+
+		if _, ok := instanceSets[replica.Name]; ok {
+			return errors.Errorf("spec.logicalReplicas name %q conflicts with an instance set of the same name", replica.Name)
+		}
+
+		dbs := make(map[crunchyv1beta1.PostgresIdentifier]struct{}, len(replica.Databases))
+		for _, db := range replica.Databases {
+			if _, ok := dbs[db]; ok {
+				return errors.Errorf("duplicate database %q in spec.logicalReplicas %q", db, replica.Name)
+			}
+			dbs[db] = struct{}{}
+		}
+	}
+
 	return nil
 }
 
@@ -457,6 +654,10 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 			log.Info(UserMonitoring + " user is reserved, it'll be ignored.")
 			continue
 		}
+		if user.Name == UserLogicalReplication {
+			log.Info(UserLogicalReplication + " user is reserved, it'll be ignored.")
+			continue
+		}
 		users = append(users, user)
 	}
 
@@ -483,31 +684,48 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		}
 	}
 
+	// SUPERUSER because pg_createsubscriber creates a publication FOR
+	// ALL TABLES, which plain REPLICATION roles such as _crunchyrepl cannot do.
+	if cr.LogicalReplicasEnabled() {
+		users = append(users, crunchyv1beta1.PostgresUserSpec{
+			Name:    UserLogicalReplication,
+			Options: "SUPERUSER REPLICATION",
+			Password: &crunchyv1beta1.PostgresPasswordSpec{
+				Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+			},
+		})
+	}
+
 	postgresCluster.Spec.Users = users
+
+	// crunchy layer renders pg_hba rules, server parameters and
+	// Patroni's ignore_slots from this.
+	postgresCluster.Spec.LogicalReplicas = cr.Spec.LogicalReplicas.ToCrunchy()
 
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)
 
-	if cr.Spec.Extensions.BuiltIn.PGStatMonitor != nil {
-		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.BuiltIn.PGStatMonitor
+	postgresCluster.Spec.Extensions.PGTDE = cr.Spec.Extensions.PGTDE
+	if cr.Spec.Extensions.PGStatMonitor.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatMonitor = *cr.Spec.Extensions.PGStatMonitor.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.PGStatStatements != nil {
-		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.BuiltIn.PGStatStatements
+	if cr.Spec.Extensions.PGStatStatements.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGStatStatements = *cr.Spec.Extensions.PGStatStatements.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.PGAudit != nil {
-		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.BuiltIn.PGAudit
+	if cr.Spec.Extensions.PGAudit.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGAudit = *cr.Spec.Extensions.PGAudit.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.PGVector != nil {
-		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.BuiltIn.PGVector
+	if cr.Spec.Extensions.PGVector.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGVector = *cr.Spec.Extensions.PGVector.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.PGRepack != nil {
-		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.BuiltIn.PGRepack
+	if cr.Spec.Extensions.PGRepack.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGRepack = *cr.Spec.Extensions.PGRepack.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.PGCron != nil {
-		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.BuiltIn.PGCron
+	if cr.Spec.Extensions.PGCron.Enabled != nil {
+		postgresCluster.Spec.Extensions.PGCron = *cr.Spec.Extensions.PGCron.Enabled
 	}
-	if cr.Spec.Extensions.BuiltIn.SetUser != nil {
-		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.BuiltIn.SetUser
+	if cr.Spec.Extensions.SetUser.Enabled != nil {
+		postgresCluster.Spec.Extensions.SetUser = *cr.Spec.Extensions.SetUser.Enabled
 	}
 
 	postgresCluster.Spec.TLSOnly = cr.Spec.TLSOnly
@@ -627,11 +845,114 @@ type PerconaPGClusterStatus struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Standby *StandbyStatus `json:"standby,omitempty"`
+
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LogicalReplicas []LogicalReplicaStatus `json:"logicalReplicas,omitempty"`
 }
 
 type StandbyStatus struct {
 	LagLastComputedAt *metav1.Time `json:"lagLastComputedAt,omitempty"`
 	LagBytes          int64        `json:"lagBytes,omitempty"`
+}
+
+type LogicalReplicaState string
+
+const (
+	// LogicalReplicaStateBootstrapping means the replica is being seeded and
+	// converted by the bootstrap Job, or has been and is not serving yet.
+	LogicalReplicaStateBootstrapping LogicalReplicaState = "bootstrapping"
+
+	LogicalReplicaStateReady LogicalReplicaState = "ready"
+
+	// LogicalReplicaStateBroken means replication has stopped and the replica
+	// needs to be recreated.
+	LogicalReplicaStateBroken LogicalReplicaState = "broken"
+
+	// LogicalReplicaStateSuspended means the replica was stopped on purpose,
+	// because the cluster it replicates is being restored. Not an error.
+	LogicalReplicaStateSuspended LogicalReplicaState = "suspended"
+)
+
+const (
+	// LogicalReplicaReasonSourceSlotMissing means the replication slot backing
+	// this replica is gone from the primary. A slot lives only on the primary
+	// that created it, so a failover is the most common cause.
+	LogicalReplicaReasonSourceSlotMissing = "SourceSlotMissing"
+
+	LogicalReplicaReasonSubscriptionDisabled = "SubscriptionDisabled"
+
+	// LogicalReplicaReasonApplyWorkerDown means a subscription is enabled but has
+	// no running apply worker, usually because it cannot reach the primary. It
+	// retries forever without disabling the subscription, so nothing else shows
+	// that replication has stopped.
+	LogicalReplicaReasonApplyWorkerDown = "ApplyWorkerDown"
+
+	LogicalReplicaReasonBootstrapFailed = "BootstrapFailed"
+	LogicalReplicaReasonPodNotFound     = "LogicalReplicaPodNotFound"
+
+	// LogicalReplicaReasonPrimaryNotReady means the primary does not yet carry
+	// everything the bootstrap needs; the ReadyForLogicalReplication condition
+	// says which prerequisite is missing.
+	LogicalReplicaReasonPrimaryNotReady = "PrimaryNotReady"
+
+	LogicalReplicaReasonClusterPaused = "ClusterPaused"
+
+	LogicalReplicaReasonSourceRestoring = "SourceRestoring"
+
+	// LogicalReplicaReasonSourceRestored means the data directory this replica was
+	// seeded from has been replaced by a restore. The replication slots went with
+	// it - pgBackRest does not back up pg_replslot - and a point-in-time restore
+	// has rewound the primary past changes the replica already applied, so nothing
+	// short of seeding it again fixes it.
+	LogicalReplicaReasonSourceRestored = "SourceRestored"
+
+	// LogicalReplicaReasonWaitingForDataVolume means the data volume of an
+	// earlier incarnation of this replica is still being deleted.
+	LogicalReplicaReasonWaitingForDataVolume = "WaitingForDataVolume"
+
+	// LogicalReplicaReasonWaitingForDatabases means the databases this replica
+	// would replicate do not exist on the primary yet. The set is frozen for the
+	// replica's lifetime, so it waits rather than seeding from a partial list.
+	LogicalReplicaReasonWaitingForDatabases = "WaitingForDatabases"
+
+	// LogicalReplicaReasonAwaitingCleanup means the replica has been removed from
+	// the spec but its objects on the primary could not be dropped yet. Its status
+	// is kept until they are: forgetting it leaks a slot that pins WAL.
+	LogicalReplicaReasonAwaitingCleanup = "AwaitingCleanup"
+)
+
+type LogicalReplicaStatus struct {
+	Name string `json:"name"`
+
+	// +optional
+	State LogicalReplicaState `json:"state,omitempty"`
+
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Databases replicated by this replica. It is resolved once, when the
+	// replica is bootstrapped, and does not change afterwards.
+	// +optional
+	Databases []string `json:"databases,omitempty"`
+
+	// SeededAt is when the data this replica serves was copied from the
+	// cluster.
+	// +optional
+	SeededAt *metav1.Time `json:"seededAt,omitempty"`
+
+	// InvalidatedAt is when the operator established that the data on this
+	// replica can no longer be reconciled with the cluster, because the cluster
+	// was restored in place after the replica was seeded from it. The replica
+	// stays stopped until it is removed from spec.logicalReplicas and added
+	// back, which seeds it again from scratch.
+	// +optional
+	InvalidatedAt *metav1.Time `json:"invalidatedAt,omitempty"`
 }
 
 type Patroni struct {
@@ -693,6 +1014,16 @@ type VolumeSnapshots struct {
 	// Ignored if mode is not offline.
 	// +optional
 	OfflineConfig *OfflineSnapshotConfig `json:"offlineConfig,omitempty"`
+
+	// Jobs allows configuration for all VolumeSnapshot jobs.
+	// +optional
+	Jobs *VolumeSnapshotJobSpec `json:"jobs,omitempty"`
+}
+
+type VolumeSnapshotJobSpec struct {
+	// Tolerations that will be applied on the VolumeSnapshot Job.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 func DefaultOfflineSnapshotConfig() *OfflineSnapshotConfig {
@@ -895,6 +1226,93 @@ func (cr *PerconaPGCluster) PMMEnabled() bool {
 	return cr.Spec.PMM != nil && cr.Spec.PMM.Enabled
 }
 
+type LogCollectorSpec struct {
+	// Enabled turns the log collector on or off. When unset, it defaults to on
+	// for new clusters and off for existing ones.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// Custom Fluent Bit configuration, merged into the log collector pipeline.
+	// Must be in Fluent Bit's YAML configuration format (the classic ".conf"
+	// format is not supported); this is what enables YAML-only features such as
+	// pipeline processors (e.g. opentelemetry_envelope). Invalid configuration
+	// is ignored by the collector at startup.
+	// +optional
+	Configuration string `json:"configuration,omitempty"`
+
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
+
+	// LivenessProbe sets the liveness probe for the fluent-bit log collector
+	// container. When not set, the container has no liveness probe.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the fluent-bit log collector
+	// container. When not set, the container has no readiness probe.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// +optional
+	LogRotate *LogRotateSpec `json:"logRotate,omitempty"`
+}
+
+type LogRotateSpec struct {
+	// Configuration allows overriding the default logrotate configuration.
+	// +optional
+	Configuration string `json:"configuration,omitempty"`
+
+	// ExtraConfig allows specifying logrotate configuration files in addition to
+	// the main configuration file. This should be a reference to a ConfigMap in
+	// the same namespace. Keys must contain the .conf extension to be processed
+	// correctly.
+	// +optional
+	ExtraConfig corev1.LocalObjectReference `json:"extraConfig,omitempty"`
+
+	// Schedule is the cron schedule on which logrotate runs.
+	// +kubebuilder:default="0 0 * * *"
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+
+	// LivenessProbe sets the liveness probe for the logrotate container.
+	// When not set, the container has no liveness probe.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the logrotate container.
+	// When not set, the container has no readiness probe.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+}
+
+func (cr *PerconaPGCluster) LogCollectorEnabled() bool {
+	return cr.Spec.LogCollector != nil &&
+		cr.Spec.LogCollector.Enabled != nil &&
+		*cr.Spec.LogCollector.Enabled
+}
+
 type CustomExtensionSpec struct {
 	Name     string `json:"name,omitempty"`
 	Version  string `json:"version,omitempty"`
@@ -918,16 +1336,31 @@ type BuiltInExtensionsSpec struct {
 	PGAudit          *bool `json:"pg_audit,omitempty"`
 	PGVector         *bool `json:"pgvector,omitempty"`
 	PGRepack         *bool `json:"pg_repack,omitempty"`
-	PGCron           *bool `json:"pg_cron,omitempty"`
-	SetUser          *bool `json:"set_user,omitempty"`
 }
 
+type BuiltInExtensionSpec struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	Image           string                      `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
 	Storage         CustomExtensionsStorageSpec `json:"storage,omitempty"`
-	BuiltIn         BuiltInExtensionsSpec       `json:"builtin,omitempty"`
-	Custom          []CustomExtensionSpec       `json:"custom,omitempty"`
+
+	// Deprecated: Use extensions.<extension> instead. This field will be removed after 3.4.0.
+	BuiltIn BuiltInExtensionsSpec `json:"builtin,omitempty"`
+
+	PGStatMonitor    BuiltInExtensionSpec     `json:"pg_stat_monitor,omitempty"`
+	PGStatStatements BuiltInExtensionSpec     `json:"pg_stat_statements,omitempty"`
+	PGAudit          BuiltInExtensionSpec     `json:"pg_audit,omitempty"`
+	PGVector         BuiltInExtensionSpec     `json:"pgvector,omitempty"`
+	PGRepack         BuiltInExtensionSpec     `json:"pg_repack,omitempty"`
+	PGCron           BuiltInExtensionSpec     `json:"pg_cron,omitempty"`
+	SetUser          BuiltInExtensionSpec     `json:"set_user,omitempty"`
+	PGTDE            crunchyv1beta1.PGTDESpec `json:"pg_tde,omitempty"`
+
+	Custom []CustomExtensionSpec `json:"custom,omitempty"`
 }
 
 type SecretsSpec struct {
@@ -1016,6 +1449,14 @@ type PGInstanceSetSpec struct { //nolint:recvcheck
 	SidecarVolumes []corev1.Volume             `json:"sidecarVolumes,omitempty"`
 	SidecarPVCs    []crunchyv1beta1.SidecarPVC `json:"sidecarPVCs,omitempty"`
 
+	// K8SPG-440
+	// Additional volumes to mount into the PostgreSQL instance container.
+	// Changing this value causes PostgreSQL to restart.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ExtraVolumes []crunchyv1beta1.ExtraVolume `json:"extraVolumes,omitempty"`
+
 	// Configuration for instance default sidecar containers.
 	// +optional
 	Containers *crunchyv1beta1.InstanceSidecars `json:"containers,omitempty"`
@@ -1101,6 +1542,7 @@ func (p PGInstanceSetSpec) ToCrunchy() crunchyv1beta1.PostgresInstanceSetSpec {
 		Sidecars:                  p.Containers,
 		SidecarVolumes:            p.SidecarVolumes,
 		SidecarPVCs:               p.SidecarPVCs,
+		ExtraVolumes:              p.ExtraVolumes,
 		InitContainers:            p.InitContainers,
 		PriorityClassName:         p.PriorityClassName,
 		Replicas:                  p.Replicas,
@@ -1180,6 +1622,10 @@ type PGProxySpec struct {
 
 func (p *PGProxySpec) IsSet() bool {
 	return p != nil && p.PGBouncer != nil
+}
+
+func (p *PGProxySpec) PGBouncerEnabled() bool {
+	return p.IsSet() && (p.PGBouncer.Replicas == nil || *p.PGBouncer.Replicas != 0)
 }
 
 func (p *PGProxySpec) ToCrunchy(version string) *crunchyv1beta1.PostgresProxySpec {
@@ -1302,6 +1748,9 @@ type PGBouncerSpec struct {
 
 	Env     []corev1.EnvVar        `json:"env,omitempty"`
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// If set, pauses pgbouncer connections.
+	Paused *bool `json:"paused,omitempty"`
 }
 
 func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSpec {
@@ -1333,6 +1782,7 @@ func (p *PGBouncerSpec) ToCrunchy(version string) *crunchyv1beta1.PGBouncerPodSp
 		Env:                       p.Env,
 		EnvFrom:                   p.EnvFrom,
 		AdditionalTrustedCAs:      p.AdditionalTrustedCAs,
+		Paused:                    p.Paused,
 	}
 
 	spec.Default()
@@ -1355,8 +1805,18 @@ const (
 	LabelPMMSecret       = labelPrefix + "pmm-secret"
 )
 
+// ConditionPMMReady indicates whether the PMM sidecar is configured for the
+// cluster. It is False when PMM is enabled but misconfigured (e.g. the secret
+// is missing or doesn't contain PMM_SERVER_TOKEN).
+const ConditionPMMReady = "PMMReady"
+
 const (
 	UserMonitoring = "monitor"
+
+	// UserLogicalReplication is the reserved superuser that pg_createsubscriber
+	// connects to the primary as, and that the replica streams as. It only exists
+	// while the cluster has at least one logical replica.
+	UserLogicalReplication = "logicalrepl"
 )
 
 // UserMonitoring constructs the monitoring user.
@@ -1421,4 +1881,24 @@ var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object)
 		return nil
 	}
 	return cr.PGBouncerUserSecrets()
+}
+
+// LogRotateExtraConfigMaps returns the names of the ConfigMaps the log collector
+// references through logRotate.extraConfig.
+func (cr *PerconaPGCluster) LogRotateExtraConfigMaps() []string {
+	if cr.Spec.LogCollector == nil || cr.Spec.LogCollector.LogRotate == nil ||
+		cr.Spec.LogCollector.LogRotate.ExtraConfig.Name == "" {
+		return nil
+	}
+	return []string{cr.Spec.LogCollector.LogRotate.ExtraConfig.Name}
+}
+
+const IndexFieldLogRotateExtraConfig = "pgCluster.logRotateExtraConfig"
+
+var LogRotateExtraConfigIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cr, ok := obj.(*PerconaPGCluster)
+	if !ok {
+		return nil
+	}
+	return cr.LogRotateExtraConfigMaps()
 }

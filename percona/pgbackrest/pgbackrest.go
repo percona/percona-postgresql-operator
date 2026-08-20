@@ -24,7 +24,7 @@ type InfoBackup struct {
 	Info       struct {
 		// For full backups, delta equals backup size
 		Delta int64 `json:"delta,omitempty"`
-	} `json:"info,omitempty"`
+	} `json:"info"`
 	Timestamp struct {
 		Start int64 `json:"start,omitempty"`
 		Stop  int64 `json:"stop,omitempty"`

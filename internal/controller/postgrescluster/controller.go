@@ -40,8 +40,10 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/config"
 	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	pgbruntime "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgaudit"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
@@ -50,6 +52,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatmonitor"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pmm"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
@@ -81,6 +84,7 @@ type Reconciler struct {
 	Controller                   controller.Controller
 	Cache                        cache.Cache
 	certManagerWatchesRegistered atomic.Bool
+	newPGBouncerAdmin            func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error)
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -256,10 +260,30 @@ func (r *Reconciler) Reconcile(
 		}
 	}
 
+	// K8SPG-1045
+	if err == nil {
+		if err = r.reconcileTLSCondition(ctx, cluster); err != nil {
+			return runtime.ErrorWithBackoff(err)
+		}
+
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, v1beta1.ConditionTypeTLSSecretsReady, metav1.ConditionFalse) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:               v1beta1.PostgresClusterProgressing,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Paused",
+				Message:            "Reconciliation is paused. Check `TLSSecretsReady` condition",
+				ObservedGeneration: cluster.GetGeneration(),
+			})
+			return runtime.ErrorWithBackoff(patchClusterStatus())
+		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PostgresClusterProgressing)
+	}
+
 	pgHBAs := postgres.NewHBAs()
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
+	logicalreplica.PostgreSQLHBAs(cluster, &pgHBAs)
 
 	// K8SPG-554
 	if cluster.Spec.TLSOnly {
@@ -290,6 +314,12 @@ func (r *Reconciler) Reconcile(
 	if cluster.Spec.Extensions.SetUser {
 		setuser.PostgreSQLParameters(&pgParameters)
 	}
+
+	// pg_tde should be removed from shared libraries only after extension is dropped
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		pgtde.PostgreSQLParameters(cluster, &pgParameters)
+	}
+
 	pgbackrest.PostgreSQL(cluster, &pgParameters, backupsSpecFound)
 	pgmonitor.PostgreSQLParameters(cluster, &pgParameters)
 
@@ -429,7 +459,15 @@ func (r *Reconciler) Reconcile(
 	}
 
 	if err == nil {
-		err = r.reconcilePostgresDatabases(ctx, cluster, instances)
+		err = r.reconcilePostgresDatabases(ctx, cluster, instances, patchClusterStatus)
+	}
+	// K8SPG-911: the two reconcilers around this one need a writable instance.
+	// A standby has none, so its pg_tde status comes from what it reports.
+	if err == nil {
+		r.reconcilePGTDEStandby(ctx, cluster, instances)
+	}
+	if err == nil {
+		err = r.reconcilePGTDEProviders(ctx, cluster, instances, patchClusterStatus)
 	}
 	if err == nil {
 		err = r.reconcilePostgresUsers(ctx, cluster, instances)
@@ -560,6 +598,12 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	if r.newPGBouncerAdmin == nil {
+		r.newPGBouncerAdmin = func(o pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+			return pgbruntime.NewAdminClient(o)
+		}
+	}
+
 	if r.DiscoveryClient == nil {
 		var err error
 		r.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
@@ -607,6 +651,10 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Watches(&corev1.Secret{}, r.watchClusterSecrets(), builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			_, hasCluster := obj.GetLabels()[naming.LabelCluster]
+			return hasCluster
+		}))).
 		Watches(&corev1.Pod{}, r.watchPods()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&appsv1.StatefulSet{},

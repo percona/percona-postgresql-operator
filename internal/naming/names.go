@@ -135,15 +135,27 @@ const (
 )
 
 const (
+	// PGTDEVolume is the name of the pg_tde secret volume and volume mount in a
+	// PostgreSQL instance Pod
+	PGTDEVolume = "pg-tde"
+
+	// PGTDEMountPath is the path for mounting the pg_tde secret
+	PGTDEMountPath = "/pgconf/tde"
+
+	// PGTDEVaultProvider is the name of the Vault provider
+	PGTDEVaultProvider = "vault-provider"
+
+	// PGTDEGlobalKey is the name of the global key
+	PGTDEGlobalKey = "global-master-key"
+)
+
+const (
 	// PGBackRestRepoContainerName is the name assigned to the container used to run pgBackRest
 	PGBackRestRepoContainerName = "pgbackrest"
 
 	// PGBackRestRestoreContainerName is the name assigned to the container used to run pgBackRest
 	// restores
 	PGBackRestRestoreContainerName = "pgbackrest-restore"
-
-	// PGBackRestRepoName is the name used for a pgbackrest repository
-	PGBackRestRepoName = "%s-pgbackrest-repo-%s"
 
 	// PGBackRestPGDataLogPath is the pgBackRest default log path configuration used by the
 	// PostgreSQL instance.

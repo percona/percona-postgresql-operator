@@ -7,7 +7,6 @@ package pgbackrest
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -98,11 +97,10 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 	cm.Data[CMInstanceKey] = iniGeneratedWarning +
 		populatePGInstanceConfigurationMap(
 			serviceName, serviceNamespace, repoHostName, pgdataDir,
-			config.FetchKeyCommand(&postgresCluster.Spec),
-			strconv.Itoa(postgresCluster.Spec.PostgresVersion),
 			pgPort, postgresCluster.Spec.Backups.PGBackRest.Repos,
 			postgresCluster.Spec.Backups.PGBackRest.Global,
-			postgresCluster.Spec.ClusterServiceDNSSuffix).String()
+			postgresCluster.Spec.ClusterServiceDNSSuffix,
+			postgresCluster.Spec.Extensions.PGTDE.WALEncryption).String()
 
 	// PostgreSQL instances that have not rolled out expect to mount a server
 	// config file. Always populate that file so those volumes stay valid and
@@ -117,13 +115,12 @@ func CreatePGBackRestConfigMapIntent(postgresCluster *v1beta1.PostgresCluster,
 
 		cm.Data[CMRepoKey] = iniGeneratedWarning +
 			populateRepoHostConfigurationMap(
-				serviceName, serviceNamespace,
-				pgdataDir, config.FetchKeyCommand(&postgresCluster.Spec),
-				strconv.Itoa(postgresCluster.Spec.PostgresVersion),
+				serviceName, serviceNamespace, pgdataDir,
 				pgPort, instanceNames,
 				postgresCluster.Spec.Backups.PGBackRest.Repos,
 				postgresCluster.Spec.Backups.PGBackRest.Global,
-				postgresCluster.Spec.ClusterServiceDNSSuffix).String()
+				postgresCluster.Spec.ClusterServiceDNSSuffix,
+				postgresCluster.Spec.Extensions.PGTDE.WALEncryption).String()
 	}
 
 	cm.Data[ConfigHashKey] = configHash
@@ -173,7 +170,9 @@ func MakePGBackrestLogDir(template *corev1.PodTemplateSpec,
 //   - Renames the data directory as needed to bootstrap the cluster using the restored database.
 //     This ensures compatibility with the "existing" bootstrap method that is included in the
 //     Patroni config when bootstrapping a cluster using an existing data directory.
-func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev1.PersistentVolumeClaim, args ...string) []string {
+func RestoreCommand(
+	cluster *v1beta1.PostgresCluster, instance *v1beta1.PostgresInstanceSetSpec,
+	pgdata, hugePagesSetting string, _ []*corev1.PersistentVolumeClaim, args ...string) []string {
 	ps := postgres.NewParameterSet()
 	ps.Add("data_directory", pgdata)
 	ps.Add("huge_pages", hugePagesSetting)
@@ -187,8 +186,15 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 	// progress during recovery.
 	ps.Add("hot_standby", "on")
 
-	if fetchKeyCommand != "" {
-		ps.Add("encryption_key_command", fetchKeyCommand)
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		ps.Add("shared_preload_libraries", "pg_tde")
+
+		// K8SPG-911: recovery ends by writing to WAL, so this server has to encrypt
+		// it the same way the cluster it is bootstrapping will. The parameter comes
+		// from the extension, so it can only be set alongside the library.
+		if cluster.Spec.Extensions.PGTDE.WALEncryption {
+			ps.Add("pg_tde.wal_encrypt", "on")
+		}
 	}
 
 	configure := strings.Join([]string{
@@ -230,7 +236,7 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 		`echo >> /tmp/postgres.restore.conf "unix_socket_directories = '${PGHOST}'"`,
 	}, "\n")
 
-	script := strings.Join([]string{
+	statements := []string{
 		`declare -r PGDATA="$1" opts="$2"; export PGDATA PGHOST`,
 
 		// Remove any "postmaster.pid" file leftover from a prior failure.
@@ -241,7 +247,14 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 
 		// Ignore any Patroni settings present in the backup.
 		`rm -f "${PGDATA}/patroni.dynamic.json"`,
+	}
 
+	// K8SPG-911: the restored data directory carries the pg_tde keyring, but the
+	// pg_tde tools that recovery runs look for it in the root of the volume that
+	// holds the WAL files. Link it there now that the restore has put it in place.
+	statements = append(statements, postgres.PGTDELinkCommands(cluster, instance)...)
+
+	statements = append(statements,
 		// By default, pg_ctl waits 60 seconds for Postgres to stop or start.
 		// We want to be certain when Postgres is running or not, so we use
 		// a very large timeout (365 days) to effectively wait forever. With
@@ -285,7 +298,8 @@ func RestoreCommand(pgdata, hugePagesSetting, fetchKeyCommand string, _ []*corev
 		// into position for our Patroni bootstrap method.
 		`pg_ctl stop --silent --wait`,
 		`mv "${PGDATA}" "${PGDATA}_bootstrap"`,
-	}, "\n")
+	)
+	script := strings.Join(statements, "\n")
 
 	return append([]string{"bash", "-ceu", "--", script, "-", pgdata}, args...)
 }
@@ -328,10 +342,10 @@ exit 1`
 // populatePGInstanceConfigurationMap returns options representing the pgBackRest configuration for
 // a PostgreSQL instance
 func populatePGInstanceConfigurationMap(
-	serviceName, serviceNamespace, repoHostName, pgdataDir,
-	fetchKeyCommand, postgresVersion string,
+	serviceName, serviceNamespace, repoHostName, pgdataDir string,
 	pgPort int32, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
+	walEncryption bool,
 ) iniSectionSet {
 	// TODO(cbandy): pass a FQDN in already.
 	repoHostFQDN := repoHostName + "-0." +
@@ -341,12 +355,20 @@ func populatePGInstanceConfigurationMap(
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
 
-	// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
-	global.Set("archive-async", "y")
 	// pgBackRest spool-path should always be co-located with the Postgres WAL path.
 	global.Set("spool-path", "/pgdata/pgbackrest-spool")
 	// pgBackRest will log to the pgData volume for commands run on the PostgreSQL instance
 	global.Set("log-path", naming.PGBackRestPGDataLogPath)
+
+	if walEncryption {
+		// WAL encryption doesn't play well with archive-async
+		global.Set("archive-async", "n")
+		global.Set("checksum-page", "n")
+		global.Set("archive-header-check", "n")
+	} else {
+		// For faster and more robust WAL archiving, we turn on pgBackRest archive-async.
+		global.Set("archive-async", "y")
+	}
 
 	for _, repo := range repos {
 		global.Set(repo.Name+"-path", defaultRepo1Path+repo.Name)
@@ -382,12 +404,6 @@ func populatePGInstanceConfigurationMap(
 	stanza.Set("pg1-port", fmt.Sprint(pgPort))
 	stanza.Set("pg1-socket-path", postgres.SocketDirectory)
 
-	if fetchKeyCommand != "" {
-		stanza.Set("archive-header-check", "n")
-		stanza.Set("page-header-check", "n")
-		stanza.Set("pg-version-force", postgresVersion)
-	}
-
 	return iniSectionSet{
 		"global":          global,
 		DefaultStanzaName: stanza,
@@ -397,10 +413,10 @@ func populatePGInstanceConfigurationMap(
 // populateRepoHostConfigurationMap returns options representing the pgBackRest configuration for
 // a pgBackRest dedicated repository host
 func populateRepoHostConfigurationMap(
-	serviceName, serviceNamespace, pgdataDir,
-	fetchKeyCommand, postgresVersion string,
+	serviceName, serviceNamespace, pgdataDir string,
 	pgPort int32, pgHosts []string, repos []v1beta1.PGBackRestRepo,
 	globalConfig map[string]string, dnsSuffix string,
+	walEncryption bool,
 ) iniSectionSet {
 	global := iniMultiSet{}
 	stanza := iniMultiSet{}
@@ -433,6 +449,11 @@ func populateRepoHostConfigurationMap(
 		global.Set("log-level-file", "off")
 	}
 
+	if walEncryption {
+		global.Set("checksum-page", "n")
+		global.Set("archive-header-check", "n")
+	}
+
 	for option, val := range globalConfig {
 		global.Set(option, val)
 	}
@@ -453,12 +474,6 @@ func populateRepoHostConfigurationMap(
 		stanza.Set(fmt.Sprintf("pg%d-path", i+1), pgdataDir)
 		stanza.Set(fmt.Sprintf("pg%d-port", i+1), fmt.Sprint(pgPort))
 		stanza.Set(fmt.Sprintf("pg%d-socket-path", i+1), postgres.SocketDirectory)
-
-		if fetchKeyCommand != "" {
-			stanza.Set("archive-header-check", "n")
-			stanza.Set("page-header-check", "n")
-			stanza.Set("pg-version-force", postgresVersion)
-		}
 	}
 
 	return iniSectionSet{
@@ -491,7 +506,7 @@ func getExternalRepoConfigs(repo v1beta1.PGBackRestRepo) map[string]string {
 // reloadCommand returns an entrypoint that convinces the pgBackRest TLS server
 // to reload its options and certificate files when they change. The process
 // will appear as name in `ps` and `top`.
-func reloadCommand(name string, post250 bool) []string {
+func reloadCommand(name string, post250 bool, autoGrowRepos []string) []string {
 	// Use a Bash loop to periodically check the mtime of the mounted server
 	// volume and configuration file. When either changes, signal pgBackRest
 	// and print the observed timestamp.
@@ -549,6 +564,47 @@ until read -r -t 5 -u "${fd}"; do
   fi
 done
 `
+	}
+
+	if len(autoGrowRepos) > 0 {
+		var monitorCalls strings.Builder
+		for _, repoName := range autoGrowRepos {
+			fmt.Fprintf(&monitorCalls, "  monitor_volume %q %q\n",
+				repoMountPath+"/"+repoName,
+				naming.SuggestedPGBackRestRepoVolumeSizeAnnotation(repoName))
+		}
+
+		autoGrowScript := `
+# Parameters for updating automatic volume-growth annotations.
+APISERVER="https://kubernetes.default.svc"
+SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+NAMESPACE=$(<"${SERVICEACCOUNT}/namespace")
+TOKEN=$(<"${SERVICEACCOUNT}/token")
+CACERT="${SERVICEACCOUNT}/ca.crt"
+
+monitor_volume() {
+  local path="$1" annotation="$2" df_output size use size_int use_int new_size patch
+  df_output=$(df --human-readable --block-size=M "${path}")
+  size=$(awk 'FNR == 2 {print $2}' <<<"${df_output}")
+  use=$(awk 'FNR == 2 {print $5}' <<<"${df_output}")
+  size_int="${size//M/}"
+  use_int="${use//[[:punct:]]/}"
+  if ((use_int > 75)); then
+    new_size="$((size_int + size_int / 2))Mi"
+    patch='{"metadata":{"annotations":{"'"${annotation}"'":"'"${new_size}"'"}}}'
+    curl --fail --silent --show-error --cacert "${CACERT}" \
+      --header "Authorization: Bearer ${TOKEN}" \
+      --header "Content-Type: application/merge-patch+json" \
+      --request PATCH \
+      --data "${patch}" \
+      "${APISERVER}/api/v1/namespaces/${NAMESPACE}/pods/${HOSTNAME}" || true
+  fi
+}
+`
+
+		// Run each repository check from the existing five-second reload loop.
+		script = strings.Replace(script, "done\n", monitorCalls.String()+"done\n", 1)
+		script = autoGrowScript + script
 	}
 
 	// Elide the above script from `ps` and `top` by wrapping it in a function

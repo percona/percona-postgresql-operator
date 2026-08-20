@@ -13,12 +13,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/util"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -266,6 +268,18 @@ func (r *Reconciler) reconcileClusterReplicaService(
 ) (*corev1.Service, error) {
 	service, err := r.generateClusterReplicaService(cluster)
 
+	// K8SPG-1062
+	if err == nil {
+		if !cluster.HasReplicas() {
+			key := client.ObjectKeyFromObject(service)
+			err = errors.WithStack(r.Client.Get(ctx, key, service))
+			if err == nil {
+				err = errors.WithStack(r.deleteControlled(ctx, cluster, service))
+			}
+			return service, client.IgnoreNotFound(err)
+		}
+	}
+
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
@@ -288,7 +302,7 @@ func (r *Reconciler) reconcileDataSource(ctx context.Context,
 ) (bool, error) {
 	// a hash func to hash the pgBackRest restore options
 	hashFunc := func(jobConfigs []string) (string, error) {
-		return safeHash32(func(w io.Writer) (err error) {
+		return util.SafeHash32(func(w io.Writer) (err error) {
 			for _, o := range jobConfigs {
 				_, err = w.Write([]byte(o))
 			}

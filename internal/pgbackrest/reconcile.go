@@ -235,17 +235,22 @@ func AddConfigToRestorePod(
 	addConfigVolumeAndMounts(pod, append(sources, configmap, secret))
 }
 
+// ConfigVolumeMount returns the mount [AddConfigToRestorePod] adds to a Pod.
+func ConfigVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "pgbackrest-config",
+		MountPath: configDirectory,
+		ReadOnly:  true,
+	}
+}
+
 // addConfigVolumeAndMounts adds the config projections to pod as the
 // configuration volume. It mounts that volume to the database container and
 // all pgBackRest containers in pod.
 func addConfigVolumeAndMounts(
 	pod *corev1.PodSpec, config []corev1.VolumeProjection,
 ) {
-	configVolumeMount := corev1.VolumeMount{
-		Name:      "pgbackrest-config",
-		MountPath: configDirectory,
-		ReadOnly:  true,
-	}
+	configVolumeMount := ConfigVolumeMount()
 
 	configVolume := corev1.Volume{
 		Name: configVolumeMount.Name,
@@ -277,6 +282,7 @@ func addServerContainerAndVolume(
 	ctx context.Context,
 	cluster *v1beta1.PostgresCluster, pod *corev1.PodSpec,
 	certificates []corev1.VolumeProjection, resources *corev1.ResourceRequirements,
+	autoGrowRepos []string,
 ) {
 	serverVolumeMount := corev1.VolumeMount{
 		Name:      "pgbackrest-server",
@@ -334,7 +340,7 @@ func addServerContainerAndVolume(
 
 	reloader := corev1.Container{
 		Name:            naming.ContainerPGBackRestConfig,
-		Command:         reloadCommand(naming.ContainerPGBackRestConfig, cluster.CompareVersion("2.5.0") >= 0),
+		Command:         reloadCommand(naming.ContainerPGBackRestConfig, cluster.CompareVersion("2.5.0") >= 0, autoGrowRepos),
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
 		SecurityContext: initialize.RestrictedSecurityContext(cluster.CompareVersion("2.5.0") >= 0),
@@ -374,7 +380,7 @@ func AddServerToInstancePod(
 		resources = sidecars.PGBackRest.Resources
 	}
 
-	addServerContainerAndVolume(ctx, cluster, pod, certificates, resources)
+	addServerContainerAndVolume(ctx, cluster, pod, certificates, resources, nil)
 }
 
 // AddServerToRepoPod adds the TLS server container and volume to pod for
@@ -397,7 +403,24 @@ func AddServerToRepoPod(
 		resources = &cluster.Spec.Backups.PGBackRest.RepoHost.Resources
 	}
 
-	addServerContainerAndVolume(ctx, cluster, pod, certificates, resources)
+	addServerContainerAndVolume(ctx, cluster, pod, certificates, resources,
+		AutoGrowRepoNames(ctx, cluster))
+}
+
+func AutoGrowRepoNames(ctx context.Context, cluster *v1beta1.PostgresCluster) []string {
+	if !feature.Enabled(ctx, feature.AutoGrowVolumes) {
+		return nil
+	}
+
+	names := make([]string, 0, len(cluster.Spec.Backups.PGBackRest.Repos))
+	for _, repo := range cluster.Spec.Backups.PGBackRest.Repos {
+		if repo.Volume != nil &&
+			!repo.Volume.VolumeClaimSpec.Resources.Limits.Storage().IsZero() {
+			names = append(names, repo.Name)
+		}
+	}
+
+	return names
 }
 
 // InstanceCertificates populates the shared Secret with certificates needed to run pgBackRest.

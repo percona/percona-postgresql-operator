@@ -64,7 +64,7 @@ type PerconaPGBackupSpec struct {
 	// +optional
 	// The name of the pgBackRest repo to run the backup command against.
 	// This is required when method is 'pgbackrest'.
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName *string `json:"repoName,omitempty"`
 
 	// Method with which to perform the backup

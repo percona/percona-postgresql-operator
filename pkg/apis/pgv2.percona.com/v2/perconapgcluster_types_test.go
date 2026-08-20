@@ -83,6 +83,26 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	}
 }
 
+func TestPerconaPGCluster_IsPaused(t *testing.T) {
+	tests := map[string]struct {
+		pause    *bool
+		expected bool
+	}{
+		"unset means running": {pause: nil},
+		"explicitly false":    {pause: new(false)},
+		"true":                {pause: new(true), expected: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := new(PerconaPGCluster)
+			cr.Spec.Pause = tt.pause
+
+			assert.Equal(t, tt.expected, cr.IsPaused())
+		})
+	}
+}
+
 func TestPerconaPGCluster_Validate(t *testing.T) {
 	t.Run("rejects pg_stat_monitor and pg_stat_statements together", func(t *testing.T) {
 		cluster := new(PerconaPGCluster)
@@ -143,6 +163,46 @@ func TestPerconaPGCluster_Proxy(t *testing.T) {
 		assert.NotNil(t, cr.Spec.Proxy.PGBouncer.Metadata.Labels)
 		assert.Equal(t, cr.Spec.CRVersion, cr.Spec.Proxy.PGBouncer.Metadata.Labels[LabelOperatorVersion])
 	})
+}
+
+func TestPGProxySpec_PGBouncerEnabled(t *testing.T) {
+	tests := map[string]struct {
+		spec     *PGProxySpec
+		expected bool
+	}{
+		"nil proxy": {
+			spec:     nil,
+			expected: false,
+		},
+		"nil PgBouncer": {
+			spec:     &PGProxySpec{},
+			expected: false,
+		},
+		"replicas unspecified": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{},
+			},
+			expected: true,
+		},
+		"zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(0))},
+			},
+			expected: false,
+		},
+		"non-zero replicas": {
+			spec: &PGProxySpec{
+				PGBouncer: &PGBouncerSpec{Replicas: new(int32(1))},
+			},
+			expected: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.spec.PGBouncerEnabled())
+		})
+	}
 }
 
 func TestPerconaPGCluster_PostgresImage(t *testing.T) {
@@ -530,6 +590,44 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 			if tt.assertClusterFunc != nil {
 				tt.assertClusterFunc(t, crunchyCluster, tt.expectedPerconaPGCluster)
 			}
+		})
+	}
+}
+
+// K8SPG-440
+func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
+	extraVolumes := []crunchyv1beta1.ExtraVolume{
+		{
+			Name: "fts-dicts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+				},
+			},
+			Mounts: []crunchyv1beta1.ExtraVolumeMount{
+				{MountPath: "/pgdata/dicts", ReadOnly: true},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		spec PGInstanceSetSpec
+		want []crunchyv1beta1.ExtraVolume
+	}{
+		"forwards extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1", ExtraVolumes: extraVolumes},
+			want: extraVolumes,
+		},
+		"no extra volumes": {
+			spec: PGInstanceSetSpec{Name: "instance1"},
+			want: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tc.spec.ToCrunchy()
+			assert.Equal(t, tc.want, got.ExtraVolumes)
 		})
 	}
 }

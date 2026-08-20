@@ -27,15 +27,21 @@ import (
 
 // upgradeCommand returns an entrypoint that prepares the filesystem for
 // and performs a PostgreSQL major version upgrade using pg_upgrade.
-func upgradeCommand(oldVersion, newVersion int, fetchKeyCommand string, availableCPUs int) []string {
+func upgradeCommand(oldVersion, newVersion int, availableCPUs int, pgTDE bool) []string {
 	// Use multiple CPUs when three or more are available.
 	argJobs := fmt.Sprintf(` --jobs=%d`, max(1, availableCPUs-1))
 
-	// if the fetch key command is set for TDE, provide the value during initialization
-	initdb := `/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"`
-	if fetchKeyCommand != "" {
-		initdb += ` --encryption-key-command "` + fetchKeyCommand + `"`
+	// K8SPG-911: Running pg_upgrade on a cluster with pg_tde corrupts the
+	// encryption metadata. pg_tde_upgrade wraps pg_upgrade with the same
+	// arguments: it copies the pg_tde directory from the old data directory
+	// and uses pg_tde_resetwal instead of pg_resetwal.
+	// - https://docs.percona.com/pg-tde/command-line-tools/pg-tde-upgrade.html
+	upgradeBinary := `pg_upgrade`
+	if pgTDE {
+		upgradeBinary = `pg_tde_upgrade`
 	}
+
+	initdb := `/usr/pgsql-"${new_version}"/bin/initdb -k -D /pgdata/pg"${new_version}"`
 
 	args := []string{fmt.Sprint(oldVersion), fmt.Sprint(newVersion)}
 	script := strings.Join([]string{
@@ -88,15 +94,15 @@ func upgradeCommand(oldVersion, newVersion int, fetchKeyCommand string, availabl
 
 		// Before the actual upgrade is run, we will run the upgrade --check to
 		// verify everything before actually changing any data.
-		`echo -e "Step 5: Running pg_upgrade check...\n"`,
-		`time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \`,
+		`echo -e "Step 5: Running ` + upgradeBinary + ` check...\n"`,
+		`time /usr/pgsql-"${new_version}"/bin/` + upgradeBinary + ` --old-bindir /usr/pgsql-"${old_version}"/bin \`,
 		`--new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}"\`,
 		` --new-datadir /pgdata/pg"${new_version}" --link --check` + argJobs,
 
 		// Assuming the check completes successfully, the pg_upgrade command will
 		// be run that actually prepares the upgraded pgdata directory.
-		`echo -e "\nStep 6: Running pg_upgrade...\n"`,
-		`time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \`,
+		`echo -e "\nStep 6: Running ` + upgradeBinary + `...\n"`,
+		`time /usr/pgsql-"${new_version}"/bin/` + upgradeBinary + ` --old-bindir /usr/pgsql-"${old_version}"/bin \`,
 		`--new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}" \`,
 		`--new-datadir /pgdata/pg"${new_version}" --link` + argJobs,
 
@@ -127,7 +133,7 @@ func largestWholeCPU(resources corev1.ResourceRequirements) int {
 // directory of the startup instance.
 func (r *PGUpgradeReconciler) generateUpgradeJob(
 	ctx context.Context, upgrade *v1beta1.PGUpgrade,
-	startup *appsv1.StatefulSet, fetchKeyCommand string,
+	startup *appsv1.StatefulSet, pgTDE bool,
 ) *batchv1.Job {
 	job := &batchv1.Job{}
 	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
@@ -227,8 +233,8 @@ func (r *PGUpgradeReconciler) generateUpgradeJob(
 		Command: upgradeCommand(
 			upgrade.Spec.FromPostgresVersion,
 			upgrade.Spec.ToPostgresVersion,
-			fetchKeyCommand,
-			wholeCPUs),
+			wholeCPUs,
+			pgTDE),
 		Image:           pgUpgradeContainerImage(upgrade),
 		ImagePullPolicy: upgrade.Spec.ImagePullPolicy,
 		Resources:       upgrade.Spec.Resources,

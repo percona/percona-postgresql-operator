@@ -1,6 +1,16 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 520
+commands:
+  - script: |
+      set +o xtrace
+
+      load_balancer=""
+      until [ -n "${load_balancer}" ]; do
+        load_balancer=$(kubectl get service monitoring-service -n "${NAMESPACE}" -o json \
+          | jq -r '.status.loadBalancer.ingress[0] | .ip // .hostname // empty')
+        [ -n "${load_balancer}" ] || sleep 5
+      done
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -18,16 +28,3 @@ kind: Service
 apiVersion: v1
 metadata:
   name: monitoring-service
----
-apiVersion: v1
-count: 1
-involvedObject:
-  apiVersion: v1
-  kind: Service
-  name: monitoring-service
-kind: Event
-message: Ensured load balancer
-reason: EnsuredLoadBalancer
-source:
-  component: service-controller
-type: Normal

@@ -6,15 +6,19 @@ package postgrescluster
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -26,6 +30,121 @@ const (
 	clusterKeyFile  = "tls.key"
 	rootCertFile    = "ca.crt"
 )
+
+// K8SPG-1045
+func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1.PostgresCluster) error {
+	cond := metav1.Condition{
+		Type:               v1beta1.ConditionTypeTLSSecretsReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "TLSSecretsFound",
+		ObservedGeneration: cluster.GetGeneration(),
+	}
+
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
+		cond.Message = "certManagementPolicy is " + string(cluster.Spec.TLS.GetCertManagementPolicy())
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+
+	var missing []string
+	var invalid []string
+
+	checkSecret := func(projection *corev1.SecretProjection, secretName string, requiredKeys ...string) error {
+		if projection != nil {
+			secretName = projection.Name
+		}
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      secretName,
+		}}
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+		if client.IgnoreNotFound(err) != nil {
+			return errors.Wrapf(err, "get TLS secret %s", secret.Name)
+		}
+		if k8serrors.IsNotFound(err) {
+			missing = append(missing, secret.Name)
+			return nil
+		}
+
+		var emptyKeys []string
+		for _, key := range requiredKeys {
+			if len(secret.Data[key]) == 0 {
+				emptyKeys = append(emptyKeys, key)
+			}
+		}
+		if len(emptyKeys) > 0 {
+			invalid = append(invalid, secret.Name+" (missing or empty keys: "+strings.Join(emptyKeys, ", ")+")")
+		}
+
+		return nil
+	}
+
+	if err := checkSecret(cluster.Spec.CustomRootCATLSSecret, naming.PostgresRootCASecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check root ca secret")
+	}
+	if err := checkSecret(cluster.Spec.CustomTLSSecret, naming.PostgresTLSSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check custom tls secret")
+	}
+	if err := checkSecret(cluster.Spec.CustomReplicationClientTLSSecret, naming.ReplicationClientCertSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check replication client cert secret")
+	}
+	if err := checkSecret(nil, naming.PGBackRestSecret(cluster).Name); err != nil {
+		return errors.Wrap(err, "check pgBackRest TLS secret")
+	}
+
+	if cluster.Spec.Proxy != nil && cluster.Spec.Proxy.PGBouncer != nil {
+		customTLSSecret := cluster.Spec.Proxy.PGBouncer.CustomTLSSecret
+		if customTLSSecret == nil {
+			if err := checkSecret(nil, naming.ClusterPGBouncer(cluster).Name,
+				pgbouncer.CertFrontendAuthoritySecretKey,
+				pgbouncer.CertFrontendSecretKey,
+				pgbouncer.CertFrontendPrivateKeySecretKey,
+			); err != nil {
+				return errors.Wrap(err, "check PgBouncer TLS secret")
+			}
+		} else if err := checkSecret(customTLSSecret, naming.ClusterPGBouncer(cluster).Name); err != nil {
+			return errors.Wrap(err, "check custom PgBouncer TLS secret")
+		}
+	}
+
+	if cluster.Spec.CustomTLSSecret == nil {
+		instances := &appsv1.StatefulSetList{}
+		if err := r.Client.List(
+			ctx, instances,
+			client.InNamespace(cluster.Namespace),
+			client.MatchingLabels{
+				naming.LabelCluster: cluster.Name,
+				naming.LabelData:    naming.DataPostgres,
+			},
+		); err != nil {
+			return errors.Wrap(err, "list instances to check TLS secrets")
+		}
+
+		for i := range instances.Items {
+			if err := checkSecret(nil, naming.InstanceCertificates(&instances.Items[i]).Name); err != nil {
+				return errors.Wrap(err, "check instance TLS secret")
+			}
+		}
+	}
+
+	if len(missing) > 0 {
+		cond.Message = "Missing user-provided TLS secrets: " + strings.Join(missing, ", ") + ". certManagementPolicy is userProvidedOnly"
+		cond.Reason = "TLSSecretsMissing"
+		cond.Status = metav1.ConditionFalse
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+	if len(invalid) > 0 {
+		cond.Message = "Invalid user-provided TLS secrets: " + strings.Join(invalid, ", ") + ". certManagementPolicy is userProvidedOnly"
+		cond.Reason = "TLSSecretsInvalid"
+		cond.Status = metav1.ConditionFalse
+		meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+		return nil
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, cond)
+	return nil
+}
 
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
@@ -87,6 +206,23 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		if err != nil {
+			return nil, errors.Wrap(err, "get user-provided root CA secret")
+		}
+
+		root := &pki.RootCertificateAuthority{}
+		if err := root.Certificate.UnmarshalText(existing.Data[certificateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse certificate in user-provided root CA secret %q", existing.Name)
+		}
+		if err := root.PrivateKey.UnmarshalText(existing.Data[privateKey]); err != nil {
+			return nil, errors.Wrapf(err, "parse private key in user-provided root CA secret %q", existing.Name)
+		}
+		if !pki.RootIsValid(root) {
+			return nil, errors.Errorf("user-provided root CA secret %q is invalid", existing.Name)
+		}
+		return root, nil
+	}
 	// If the secret is managed by cert-manager, parse it using cert-manager key names
 	// (tls.crt/tls.key) and return without overwriting the secret with internal PKI.
 	if err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
@@ -227,6 +363,9 @@ func (r *Reconciler) reconcileClusterCertificate(
 		return cluster.Spec.CustomTLSSecret, nil
 	}
 
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		return r.reconcileUserProvidedClusterCertificate(ctx, cluster)
+	}
 	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
@@ -249,6 +388,23 @@ func (r *Reconciler) reconcileClusterCertificate(
 	return r.reconcileInternalClusterCertificate(ctx, root, cluster, primaryService, replicaService)
 }
 
+func (r *Reconciler) reconcileUserProvidedClusterCertificate(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.SecretProjection, error) {
+	secret := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+		return nil, errors.Wrapf(err, "get user-provided TLS secret %s", secret.Name)
+	}
+
+	for _, key := range []string{clusterCertFile, clusterKeyFile, rootCertFile} {
+		if len(secret.Data[key]) == 0 {
+			return nil, errors.Errorf("user-provided TLS secret %q is missing key %q", secret.Name, key)
+		}
+	}
+
+	return clusterCertSecretProjection(secret), nil
+}
+
 // reconcileInternalClusterCertificate creates a cluster certificate using internal PKI.
 func (r *Reconciler) reconcileInternalClusterCertificate(
 	ctx context.Context, root *pki.RootCertificateAuthority,
@@ -261,7 +417,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 
 	existing := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
 	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing)))
+		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
+	))
 	if err != nil {
 		return nil, errors.Wrap(err, "get secret")
 	}
@@ -302,7 +459,8 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 		naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:            cluster.Name,
 			naming.LabelClusterCertificate: "postgres-tls",
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
 
 	// K8SPG-330: Keep this commented in case of conflicts.
 	// We don't want to delete TLS secrets on cluster deletion.

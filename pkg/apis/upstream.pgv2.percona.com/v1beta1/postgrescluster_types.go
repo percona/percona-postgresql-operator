@@ -174,6 +174,14 @@ type PostgresClusterSpec struct {
 	// +optional
 	Standby *PostgresStandbySpec `json:"standby,omitempty"`
 
+	// Logical replicas of this cluster, managed by the Percona layer. Only the
+	// names are mirrored here: this layer uses their presence to render the
+	// pg_hba rules for the logical replication user and Patroni's ignore_slots.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	LogicalReplicas []LogicalReplicaSpec `json:"logicalReplicas,omitempty"`
+
 	// A list of group IDs applied to the process of a container. These can be
 	// useful when accessing shared file systems with constrained permissions.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
@@ -208,6 +216,20 @@ type PostgresClusterSpec struct {
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
 }
 
+func (cluster *PostgresCluster) HasReplicas() bool {
+	if cluster == nil {
+		return false
+	}
+
+	for _, set := range cluster.Spec.InstanceSets {
+		if set.Replicas != nil && *set.Replicas > 1 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (cluster *PostgresCluster) PGBouncerUserSecrets() []string {
 	if cluster.Spec.Proxy == nil || cluster.Spec.Proxy.PGBouncer == nil {
 		return nil
@@ -235,6 +257,48 @@ type InitContainerSpec struct {
 	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
 }
 
+type PGTDESecretObjectReference struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+type PGTDEVaultSpec struct {
+	// Host of Vault server.
+	Host string `json:"host"`
+	// Name of the secret that contains the access token with read and write access to the mount path.
+	TokenSecret PGTDESecretObjectReference `json:"tokenSecret"`
+	// Name of the secret that contains the CA certificate for SSL verification.
+	CASecret PGTDESecretObjectReference `json:"caSecret,omitempty"`
+	// The mount point on the Vault server where the key provider should store the keys.
+	// +kubebuilder:default=secret/data
+	MountPath string `json:"mountPath,omitempty"`
+}
+
+// HasCA reports whether a CA certificate is configured for verifying the Vault
+// server. Both halves of the reference are needed to reach the certificate, so
+// this is the single answer for whether to project it into the Pod, where to
+// read it from, and whether it belongs in the key provider configuration.
+// Those three have to agree: naming a path pg_tde cannot read fails every
+// request to Vault, and projecting a key that is not set is rejected by the
+// API server.
+func (s *PGTDEVaultSpec) HasCA() bool {
+	return s.CASecret.Name != "" && s.CASecret.Key != ""
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || (has(self.enabled) && self.enabled == false) || has(self.vault)",message="vault is required for enabling pg_tde"
+// +kubebuilder:validation:XValidation:rule="!has(self.walEncryption) || !self.walEncryption || (has(self.enabled) && self.enabled)",message="pg_tde must be enabled to enable WAL encryption"
+type PGTDESpec struct {
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Encrypt write-ahead log segments. Requires pg_tde.enabled to be true.
+	WALEncryption bool `json:"walEncryption,omitempty"`
+
+	Vault *PGTDEVaultSpec `json:"vault,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled) || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)",message="to disable pg_tde first set enabled=false without removing vault and wait for pod restarts"
 type ExtensionsSpec struct {
 	PGStatMonitor    bool `json:"pgStatMonitor,omitempty"`
 	PGAudit          bool `json:"pgAudit,omitempty"`
@@ -243,6 +307,8 @@ type ExtensionsSpec struct {
 	PGRepack         bool `json:"pgRepack,omitempty"`
 	PGCron           bool `json:"pgCron,omitempty"`
 	SetUser          bool `json:"setUser,omitempty"`
+
+	PGTDE PGTDESpec `json:"pg_tde,omitempty"`
 }
 
 type TLSSpec struct {
@@ -252,9 +318,30 @@ type TLSSpec struct {
 	CAValidityDuration *metav1.Duration `json:"caValidityDuration,omitempty"`
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
+	// +kubebuilder:default=auto
+	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
+	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
 }
+
+func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
+	if s == nil || s.CertManagementPolicy == "" {
+		return CertManagementAuto
+	}
+	return s.CertManagementPolicy
+}
+
+type CertManagementPolicy string
+
+const (
+	CertManagementAuto             CertManagementPolicy = "auto"
+	CertManagementUserProvidedOnly CertManagementPolicy = "userProvidedOnly"
+)
+
+const (
+	ConditionTypeTLSSecretsReady = "TLSSecretsReady"
+)
 
 // DataSource defines data sources for a new PostgresCluster.
 type DataSource struct {
@@ -350,7 +437,7 @@ type PostgresClusterDataSource struct {
 	// that should be utilized to perform a pgBackRest restore when initializing the data source
 	// for the new PostgresCluster.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName string `json:"repoName"`
 
 	// Command line options to include when running the pgBackRest restore command.
@@ -430,6 +517,9 @@ type PostgresClusterStatus struct {
 	// Identifies the databases that have been installed into PostgreSQL.
 	DatabaseRevision string `json:"databaseRevision,omitempty"`
 
+	// Identifies the pg_tde configuration that have been installed into PostgreSQL.
+	PGTDERevision string `json:"pgTDERevision,omitempty"`
+
 	// Current state of PostgreSQL instances.
 	// +listType=map
 	// +listMapKey=name
@@ -503,6 +593,16 @@ const (
 	PostgresClusterProgressing = "Progressing"
 	ProxyAvailable             = "ProxyAvailable"
 	Registered                 = "Registered"
+	PGTDEEnabled               = "PGTDEEnabled"
+
+	// PGTDEVaultProviderReady reports whether the pg_tde vault key provider
+	// matches the configuration in the spec. It is false while a credential
+	// change is in progress and when one has failed. Unlike PGTDEEnabled it
+	// does not influence shared_preload_libraries or Pod contents; it exists
+	// so a stalled credential change is visible to the user.
+	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
+
+	PGBouncerPaused = "PGBouncerPaused"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -547,6 +647,14 @@ type PostgresInstanceSetSpec struct {
 	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
 	// K8SPG-864
 	SidecarPVCs []SidecarPVC `json:"sidecarPVCs,omitempty"`
+
+	// K8SPG-440
+	// Additional volumes to mount into the PostgreSQL instance container.
+	// Changing this value causes PostgreSQL to restart.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ExtraVolumes []ExtraVolume `json:"extraVolumes,omitempty"`
 
 	// Additional init containers for PostgreSQL instance pods. Changing this value causes
 	// PostgreSQL to restart.
@@ -706,6 +814,15 @@ func (s *PostgresProxySpec) Default() {
 	}
 }
 
+// K8SPG-1062
+func (s *PostgresProxySpec) PGBouncerEnabled() bool {
+	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
+}
+
+func (s *PostgresProxySpec) PGBouncerPaused() bool {
+	return s != nil && s.PGBouncer != nil && s.PGBouncer.Paused != nil && *s.PGBouncer.Paused
+}
+
 type RegistrationRequirementStatus struct {
 	PGOVersion string `json:"pgoVersion,omitempty"`
 }
@@ -725,7 +842,7 @@ type PostgresStandbySpec struct {
 
 	// The name of the pgBackRest repository to follow for WAL files.
 	// +optional
-	// +kubebuilder:validation:Pattern=^repo[1-4]
+	// +kubebuilder:validation:Pattern=^repo[1-4]$
 	RepoName string `json:"repoName,omitempty"`
 
 	// Network address of the PostgreSQL server to follow via streaming replication.
@@ -736,6 +853,16 @@ type PostgresStandbySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1024
 	Port *int32 `json:"port,omitempty"`
+}
+
+// LogicalReplicaSpec is the projection of a Percona logical replica onto this
+// spec. The Percona layer owns the full definition and the whole lifecycle of
+// the replica; only what this layer needs to render server configuration is
+// carried over.
+type LogicalReplicaSpec struct {
+	// Name of the logical replica.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 }
 
 // UserInterfaceSpec is a union of the supported PostgreSQL user interfaces.
@@ -967,9 +1094,48 @@ func (cr *PostgresCluster) BackupSpecFound() bool {
 	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
 }
 
+// IsStandby returns whether this cluster replays WAL from a source outside of itself.
+func (cr *PostgresCluster) IsStandby() bool {
+	return cr.Spec.Standby != nil && cr.Spec.Standby.Enabled
+}
+
 // K8SPG-864
 type SidecarPVC struct {
 	Name string `json:"name"`
 
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec"`
+}
+
+// ExtraVolume defines an additional volume and where it is mounted within the
+// PostgreSQL instance container. K8SPG-440
+type ExtraVolume struct {
+	// Name of the volume. Must be unique within the instance pod.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// VolumeSource represents the location and type of the mounted volume,
+	// e.g. an existing PersistentVolumeClaim, ConfigMap, Secret or emptyDir.
+	// +kubebuilder:validation:Required
+	VolumeSource corev1.VolumeSource `json:"volumeSource"`
+
+	// Mounts describes where the volume is mounted inside the PostgreSQL
+	// instance container.
+	// +kubebuilder:validation:MinItems=1
+	Mounts []ExtraVolumeMount `json:"mounts"`
+}
+
+// ExtraVolumeMount describes a mount point of an ExtraVolume. K8SPG-440
+type ExtraVolumeMount struct {
+	// Path within the container at which the volume is mounted.
+	// +kubebuilder:validation:Required
+	MountPath string `json:"mountPath"`
+
+	// Path within the volume from which the container's volume is mounted.
+	// Defaults to the volume's root.
+	// +optional
+	SubPath string `json:"subPath,omitempty"`
+
+	// Mounted read-only if true, read-write otherwise (false or unspecified).
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty"`
 }

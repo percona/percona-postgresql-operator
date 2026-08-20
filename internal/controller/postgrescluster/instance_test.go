@@ -523,6 +523,88 @@ func TestWritablePod(t *testing.T) {
 	})
 }
 
+// K8SPG-911
+func TestStandbyLeaderPod(t *testing.T) {
+	container := "container"
+
+	instance := func(role string, terminating, running bool) *Instance {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "namespace",
+				Name:      "pod",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{{Name: container}},
+			},
+		}
+		if role != "" {
+			pod.Annotations = map[string]string{"status": `{"role":"` + role + `"}`}
+		}
+		if terminating {
+			pod.DeletionTimestamp = &metav1.Time{}
+		}
+		if running {
+			pod.Status.ContainerStatuses[0].State.Running = new(corev1.ContainerStateRunning)
+		} else {
+			pod.Status.ContainerStatuses[0].State.Waiting = new(corev1.ContainerStateWaiting)
+		}
+
+		return &Instance{Name: "instance", Pods: []*corev1.Pod{pod}, Runner: &appsv1.StatefulSet{}}
+	}
+
+	t.Run("empty observed", func(t *testing.T) {
+		pod, instance := (&observedInstances{}).standbyLeaderPod(container)
+		assert.Assert(t, pod == nil)
+		assert.Assert(t, instance == nil)
+	})
+
+	t.Run("nil observed", func(t *testing.T) {
+		var observed *observedInstances
+		pod, instance := observed.standbyLeaderPod(container)
+		assert.Assert(t, pod == nil)
+		assert.Assert(t, instance == nil)
+	})
+
+	for _, tc := range []struct {
+		name        string
+		role        string
+		terminating bool
+		running     bool
+		expected    bool
+	}{
+		{name: "StandbyLeader", role: "standby_leader", running: true, expected: true},
+		{name: "Terminating", role: "standby_leader", terminating: true, running: true},
+		{name: "NotRunning", role: "standby_leader"},
+		{name: "Replica", role: "replica", running: true},
+		{name: "NoStatusAnnotation", running: true},
+		{
+			// The role label Patroni puts on a standby leader is the same one it
+			// puts on a real primary, which is why standbyLeaderPod reads the
+			// member status instead. A writable instance belongs to
+			// writablePod, and the two must never both match.
+			name: "Primary", role: "primary", running: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := instance(tc.role, tc.terminating, tc.running)
+			observed := &observedInstances{forCluster: []*Instance{inst}}
+
+			pod, matched := observed.standbyLeaderPod(container)
+			if !tc.expected {
+				assert.Assert(t, pod == nil)
+				assert.Assert(t, matched == nil)
+				return
+			}
+
+			assert.Assert(t, pod != nil)
+			assert.Equal(t, matched, inst)
+
+			writable, _ := observed.writablePod(container)
+			assert.Assert(t, writable == nil, "a standby leader is not writable")
+		})
+	}
+}
+
 func TestAddPGBackRestToInstancePodSpec(t *testing.T) {
 	t.Parallel()
 
@@ -1432,6 +1514,21 @@ func TestDeleteInstance(t *testing.T) {
 	}
 }
 
+// pgTDECluster returns a cluster with the given pg_tde settings, for the
+// TDEWALEncryptionAnnotation cases of TestGenerateInstanceStatefulSetIntent.
+func pgTDECluster(enabled, walEncryption bool) *v1beta1.PostgresCluster {
+	cluster := testCluster()
+	cluster.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
+		Enabled:       enabled,
+		WALEncryption: walEncryption,
+		Vault: &v1beta1.PGTDEVaultSpec{
+			Host:        "https://vault.local:8200",
+			TokenSecret: v1beta1.PGTDESecretObjectReference{Name: "vault", Key: "token"},
+		},
+	}
+	return cluster
+}
+
 func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
 	type intentParams struct {
 		cluster                    *v1beta1.PostgresCluster
@@ -1716,6 +1813,35 @@ func TestGenerateInstanceStatefulSetIntent(t *testing.T) {
   topologyKey: kubernetes.io/hostname
   whenUnsatisfiable: ScheduleAnyway
 `))
+		},
+	}, {
+		// K8SPG-911
+		name: "pg_tde disabled",
+		ip: intentParams{
+			cluster: pgTDECluster(false, false),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			_, ok := ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation]
+			assert.Assert(t, !ok)
+		},
+	}, {
+		// K8SPG-911
+		name: "pg_tde enabled without WAL encryption",
+		ip: intentParams{
+			cluster: pgTDECluster(true, false),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			assert.Equal(t, ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation], "false")
+		},
+	}, {
+		// K8SPG-911: toggling WAL encryption has to change the Pod template so
+		// the Pods are recreated with the new pg_tde.wal_encrypt value.
+		name: "pg_tde enabled with WAL encryption",
+		ip: intentParams{
+			cluster: pgTDECluster(true, true),
+		},
+		run: func(t *testing.T, ss *appsv1.StatefulSet) {
+			assert.Equal(t, ss.Spec.Template.Annotations[naming.TDEWALEncryptionAnnotation], "true")
 		},
 	}} {
 		t.Run(test.name, func(t *testing.T) {

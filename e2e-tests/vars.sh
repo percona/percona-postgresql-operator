@@ -23,16 +23,55 @@ export K8S_UPGRADE_REGION=${K8S_UPGRADE_REGION:-"us-central1-a"}
 export K8S_UPGRADE_INITIAL_VERSION=${K8S_UPGRADE_INITIAL_VERSION:-""}
 export K8S_UPGRADE_FINAL_VERSION=${K8S_UPGRADE_FINAL_VERSION:-""}
 
-if command -v oc &>/dev/null; then
-	if oc get projects; then
-		export OPENSHIFT=4
+function detect_k8s_platform() {
+	local detected_platform
+	local xtrace_enabled=false
+
+	if [[ -o xtrace ]]; then
+		xtrace_enabled=true
+		set +o xtrace
 	fi
+
+	if [[ -n ${PLATFORM:-} ]]; then
+		detected_platform="${PLATFORM}"
+	elif kubectl get namespace openshift-kube-apiserver >/dev/null 2>&1; then
+		detected_platform="openshift"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'eksctl.io'; then
+		detected_platform="eks"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'cloud.google.com/gke'; then
+		detected_platform="gke"
+	elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels}' 2>/dev/null | grep -q 'kubernetes.azure.com'; then
+		detected_platform="aks"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'digitalocean://'; then
+		detected_platform="doks"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'kind://'; then
+		detected_platform="kind"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'minikube'; then
+		detected_platform="minikube"
+	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'rke2'; then
+		detected_platform="rancher"
+	else
+		detected_platform="unknown"
+	fi
+
+	echo "${detected_platform}"
+
+	if [[ ${xtrace_enabled} == true ]]; then
+		set -o xtrace
+	fi
+}
+
+if [[ -z ${PLATFORM:-} ]]; then
+	PLATFORM="$(detect_k8s_platform)"
+	export PLATFORM
 fi
 
 export IMAGE_BASE=${IMAGE_BASE:-"perconalab/percona-postgresql-operator"}
 export IMAGE=${IMAGE:-"${IMAGE_BASE}:${VERSION}"}
+# Extract major PG version from IMAGE_POSTGRESQL when PG_VER is unset.
+# Matches: -ppgN-postgres | -postgresN-community | *:N / *:N.x
 if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
-	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -E 's/.*-(ppg|postgres)([0-9]+).*/\2/')
+	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -nE 's/.*(-ppg|-postgres|:)([0-9]+)([.-]|$).*/\2/p')
 	export PG_VER="${pg_version_value}"
 else
 	export PG_VER="${PG_VER:-18}"
@@ -53,14 +92,14 @@ else
 fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
-export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:dev-latest"}
-export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:dev-latest"}
-export IMAGE_PMM3_CLIENT=${IMAGE_PMM3_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
-export IMAGE_PMM3_SERVER=${IMAGE_PMM3_SERVER:-"perconalab/pmm-server:3-dev-latest"}
+export IMAGE_PMM_CLIENT=${IMAGE_PMM_CLIENT:-"perconalab/pmm-client:3-dev-latest"}
+export IMAGE_PMM_SERVER=${IMAGE_PMM_SERVER:-"perconalab/pmm-server:3-dev-latest"}
+export IMAGE_LOGCOLLECTOR=${IMAGE_LOGCOLLECTOR:-"perconalab/fluentbit:main-logcollector"}
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
 export MINIO_VER="5.4.0"
+export VAULT_VER="0.32.0"
 
 # Add 'docker.io' for images that are provided without registry
 export REGISTRY_NAME="docker.io"

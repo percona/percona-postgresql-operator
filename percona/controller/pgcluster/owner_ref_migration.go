@@ -13,6 +13,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 	"github.com/pkg/errors"
@@ -48,7 +49,7 @@ var errOwnerRefMigrationInProgress = errors.New("owner ref migration is in progr
 func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	log := logging.FromContext(ctx).WithName("APIGroupMigration")
 
-	if c := meta.FindStatusCondition(cr.Status.Conditions, "APIGroupMigration"); c != nil && c.Status == metav1.ConditionTrue {
+	if c := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionAPIGroupMigration); c != nil && c.Status == metav1.ConditionTrue {
 		return nil
 	}
 
@@ -58,7 +59,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 			log.Info("legacy PostgresCluster CRD not found; no need to check references", "gvk", LegacyGVK)
 
 			err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
-				Type:               "APIGroupMigration",
+				Type:               pNaming.ConditionAPIGroupMigration,
 				Status:             metav1.ConditionTrue,
 				Reason:             "APIGroupMigrationNotNeeded",
 				Message:            "Legacy API group is not installed",
@@ -79,7 +80,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, legacy); err != nil {
 		if apierrors.IsNotFound(err) {
 			err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
-				Type:               "APIGroupMigration",
+				Type:               pNaming.ConditionAPIGroupMigration,
 				Status:             metav1.ConditionTrue,
 				Reason:             "APIGroupMigrationNotNeeded",
 				Message:            "Legacy PostgresCluster not found",
@@ -96,7 +97,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	}
 
 	err := setStatusCondition(ctx, r.Client, cr, metav1.Condition{
-		Type:               "APIGroupMigration",
+		Type:               pNaming.ConditionAPIGroupMigration,
 		Status:             metav1.ConditionFalse,
 		Reason:             "APIGroupMigrationInProgress",
 		Message:            "Waiting for owner references to be updated",
@@ -149,7 +150,7 @@ func (r *PGClusterReconciler) reconcileOwnerRefMigrationStatus(ctx context.Conte
 	}
 
 	err = setStatusCondition(ctx, r.Client, cr, metav1.Condition{
-		Type:               "APIGroupMigration",
+		Type:               pNaming.ConditionAPIGroupMigration,
 		Status:             metav1.ConditionTrue,
 		Reason:             "APIGroupMigrationCompleted",
 		Message:            "All owner references are updated",

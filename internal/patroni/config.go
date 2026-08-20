@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -158,6 +159,14 @@ func clusterYAML(
 		},
 	}
 
+	if cluster.Spec.Extensions.PGTDE.Enabled {
+		postgresqlSection := root["postgresql"].(map[string]any)
+		postgresqlSection["bin_name"] = map[string]any{
+			"pg_basebackup": "pg_tde_basebackup",
+			"pg_rewind":     "pg_tde_rewind",
+		}
+	}
+
 	if !ClusterBootstrapped(cluster) {
 		// Patroni has not yet bootstrapped. Populate the "bootstrap.dcs" field to
 		// facilitate it. When Patroni is already bootstrapped, this field is ignored.
@@ -200,16 +209,10 @@ func DynamicConfiguration(
 
 	// Copy the "postgresql" section before making any changes.
 	postgresql := map[string]any{
-		// TODO(cbandy): explain this. requires an archive, perhaps.
+		// Replicas stream from the archive rather than from a slot on the
+		// primary, so leaving slots off means a lagging or removed replica
+		// cannot pin WAL on the primary.
 		"use_slots": false,
-	}
-
-	// When TDE is configured, override the pg_rewind binary name to point
-	// to the wrapper script.
-	if config.FetchKeyCommand(&cluster.Spec) != "" {
-		postgresql["bin_name"] = map[string]any{
-			"pg_rewind": "/tmp/pg_rewind_tde.sh",
-		}
 	}
 
 	if section, ok := root["postgresql"].(map[string]any); ok {
@@ -328,6 +331,13 @@ func DynamicConfiguration(
 
 		standby["create_replica_methods"] = methods
 		root["standby_cluster"] = standby
+	}
+
+	if matchers := logicalreplica.IgnoreSlotsMatchers(cluster); len(matchers) > 0 {
+		existing, _ := root["ignore_slots"].([]any)
+		// Concat rather than append: root is a shallow copy of configuration, so
+		// appending could write into the user's own slice.
+		root["ignore_slots"] = slices.Concat(existing, matchers)
 	}
 
 	return root
@@ -649,11 +659,6 @@ func instanceYAML(
 
 				// NOTE(cbandy): The "--waldir" option was introduced in PostgreSQL v10.
 				"waldir=" + postgres.WALDirectory(cluster, instance),
-			}
-
-			// Append the encryption key command, if provided.
-			if ekc := config.FetchKeyCommand(&cluster.Spec); ekc != "" {
-				initdb = append(initdb, fmt.Sprintf("encryption-key-command=%s", ekc))
 			}
 
 			// Populate some "bootstrap" fields to initialize the cluster.

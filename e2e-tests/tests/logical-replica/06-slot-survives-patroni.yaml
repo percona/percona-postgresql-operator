@@ -1,0 +1,54 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 300
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      # run_psql interpolates the statement into a printf format string, so it
+      # cannot carry single quotes. plugin IS NOT NULL is what makes a slot
+      # logical, which is the only kind this cluster has.
+      slot_count() {
+        run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin IS NOT NULL;" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs
+      }
+
+      # One per logical replica: analytics and reporting.
+      before=$(slot_count)
+      if [[ ${before} != "2" ]]; then
+        echo "ERROR: expected two logical slots on the primary, got: ${before}"
+        exit 1
+      fi
+
+      # Regression guard for the ignore_slots wiring. Patroni drops slots it
+      # does not know about on every HA loop, and that is not gated on
+      # use_slots, which this operator leaves off by default and this cluster
+      # does not override. loop_wait defaults to 10s, so wait out several loops
+      # before re-checking.
+      sleep 120
+
+      after=$(slot_count)
+      if [[ ${after} != "2" ]]; then
+        echo "ERROR: Patroni deleted a logical replication slot (count=${after})"
+        exit 1
+      fi
+
+      for replica in analytics reporting; do
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"${replica}\")].state}")
+        if [[ ${state} != "ready" ]]; then
+          echo "ERROR: logical replica ${replica} is ${state}, expected ready"
+          exit 1
+        fi
+      done

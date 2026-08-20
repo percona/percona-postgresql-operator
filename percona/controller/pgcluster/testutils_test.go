@@ -56,6 +56,7 @@ func reconciler(cr *v2.PerconaPGCluster) *PGClusterReconciler {
 		KubeVersion:          "1.26",
 		Cron:                 NewCronRegistry(),
 		Watchers:             reg,
+		Recorder:             new(record.FakeRecorder),
 		ExternalChan:         externalChan,
 		StopExternalWatchers: stopChan,
 	})
@@ -76,7 +77,8 @@ func crunchyReconciler() *postgrescluster.Reconciler {
 
 func backupReconciler() *pgbackup.PGBackupReconciler {
 	return &pgbackup.PGBackupReconciler{
-		Client: k8sClient,
+		Client:             k8sClient,
+		LatestCommitGetter: watcher.GetLatestCommitGetter(),
 	}
 }
 

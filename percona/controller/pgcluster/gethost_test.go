@@ -42,6 +42,13 @@ func TestGetHost(t *testing.T) {
 			expectedHost: clusterName + "-primary." + ns + ".svc",
 		},
 		{
+			name: "PGBouncer configured with zero replicas",
+			proxy: &v2.PGProxySpec{PGBouncer: &v2.PGBouncerSpec{
+				Replicas: new(int32),
+			}},
+			expectedHost: clusterName + "-primary." + ns + ".svc",
+		},
+		{
 			name:         "PGBouncer configured, no ServiceExpose",
 			proxy:        &v2.PGProxySpec{PGBouncer: &v2.PGBouncerSpec{}},
 			expectedHost: clusterName + "-pgbouncer." + ns + ".svc",

@@ -154,7 +154,6 @@ watchdog:
 		cluster.Labels = map[string]string{
 			v1beta1.LabelVersion: "2.9.0",
 		}
-		cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
 		cluster.Spec.Patroni.Default()
 
 		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
@@ -192,6 +191,55 @@ watchdog:
 		assert.Assert(t, ok, "expected postgresql section")
 		_, exists := pgSection["remove_data_directory_on_diverged_timelines"]
 		assert.Assert(t, !exists, "expected remove_data_directory_on_diverged_timelines to be absent for version < 2.9.0")
+	})
+
+	t.Run("PGTDE enabled adds bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+
+		cluster.Spec.PostgresVersion = 17
+		cluster.Spec.Extensions.PGTDE.Enabled = true
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		binName, ok := pgSection["bin_name"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql.bin_name section")
+
+		assert.Equal(t, binName["pg_basebackup"], "pg_tde_basebackup")
+		assert.Equal(t, binName["pg_rewind"], "pg_tde_rewind")
+	})
+
+	t.Run("PGTDE disabled no bin_name", func(t *testing.T) {
+		cluster := new(v1beta1.PostgresCluster)
+		err := cluster.Default(context.Background(), nil)
+		assert.NilError(t, err)
+		cluster.Namespace = "some-namespace"
+		cluster.Name = "cluster-name"
+		cluster.Labels = map[string]string{
+			v1beta1.LabelVersion: "2.9.0",
+		}
+		cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
+		cluster.Spec.Patroni.Default()
+
+		data, err := clusterYAML(cluster, postgres.HBAs{}, postgres.Parameters{})
+		assert.NilError(t, err)
+
+		var parsed map[string]any
+		assert.NilError(t, yaml.Unmarshal([]byte(data), &parsed))
+
+		pgSection, ok := parsed["postgresql"].(map[string]any)
+		assert.Assert(t, ok, "expected postgresql section")
+		_, hasBinName := pgSection["bin_name"]
+		assert.Assert(t, !hasBinName, "expected no bin_name when PGTDE is disabled")
 	})
 
 	t.Run(">PG10", func(t *testing.T) {
@@ -360,6 +408,38 @@ func TestDynamicConfiguration(t *testing.T) {
 					"pg_hba":        []string{},
 					"use_pg_rewind": true,
 					"use_slots":     "input",
+				},
+			},
+		},
+		{
+			name: "postgresql: use_slots enabled with permanent slots",
+			input: map[string]any{
+				"postgresql": map[string]any{
+					"use_slots": true,
+				},
+				"slots": map[string]any{
+					"my_slot": map[string]any{
+						"type":     "logical",
+						"database": "mydb",
+						"plugin":   "pgoutput",
+					},
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters":    map[string]any{},
+					"pg_hba":        []string{},
+					"use_pg_rewind": true,
+					"use_slots":     true,
+				},
+				"slots": map[string]any{
+					"my_slot": map[string]any{
+						"type":     "logical",
+						"database": "mydb",
+						"plugin":   "pgoutput",
+					},
 				},
 			},
 		},
@@ -972,33 +1052,6 @@ func TestDynamicConfiguration(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "tde enabled",
-			cluster: &v1beta1.PostgresCluster{
-				Spec: v1beta1.PostgresClusterSpec{
-					Patroni: &v1beta1.PatroniSpec{
-						DynamicConfiguration: map[string]any{
-							"postgresql": map[string]any{
-								"parameters": map[string]any{
-									"encryption_key_command": "echo test",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: map[string]any{
-				"loop_wait": int32(10),
-				"ttl":       int32(30),
-				"postgresql": map[string]any{
-					"bin_name":      map[string]any{"pg_rewind": string("/tmp/pg_rewind_tde.sh")},
-					"parameters":    map[string]any{},
-					"pg_hba":        []string{},
-					"use_pg_rewind": bool(true),
-					"use_slots":     bool(false),
-				},
-			},
-		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster := tt.cluster
@@ -1014,6 +1067,62 @@ func TestDynamicConfiguration(t *testing.T) {
 			assert.DeepEqual(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestDynamicConfigurationIgnoreSlots(t *testing.T) {
+	t.Parallel()
+
+	newCluster := func(replicas ...string) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.Spec.PostgresVersion = 17
+		for _, name := range replicas {
+			cluster.Spec.LogicalReplicas = append(cluster.Spec.LogicalReplicas,
+				v1beta1.LogicalReplicaSpec{Name: name})
+		}
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		return cluster
+	}
+
+	t.Run("absent without logical replicas", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster(), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		_, ok := actual["ignore_slots"]
+		assert.Assert(t, !ok)
+	})
+
+	t.Run("added for logical replicas", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster("analytics"), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		// Without this Patroni deletes the slot pg_createsubscriber leaves on
+		// the primary: dropping unknown slots is not gated on use_slots, which
+		// this operator pins to false.
+		assert.DeepEqual(t, actual["ignore_slots"], []any{
+			map[string]any{"type": "logical", "plugin": "pgoutput"},
+		})
+	})
+
+	t.Run("user entries are preserved", func(t *testing.T) {
+		input := map[string]any{
+			"ignore_slots": []any{
+				map[string]any{"name": "mine", "type": "physical"},
+			},
+		}
+
+		actual := DynamicConfiguration(newCluster("analytics"), input, postgres.HBAs{}, postgres.Parameters{})
+
+		assert.DeepEqual(t, actual["ignore_slots"], []any{
+			map[string]any{"name": "mine", "type": "physical"},
+			map[string]any{"type": "logical", "plugin": "pgoutput"},
+		})
+	})
+
+	t.Run("one matcher regardless of replica count", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster("a", "b", "c"), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		ignored, ok := actual["ignore_slots"].([]any)
+		assert.Assert(t, ok)
+		assert.Equal(t, len(ignored), 1)
+	})
 }
 
 func TestInstanceConfigFiles(t *testing.T) {
@@ -1191,40 +1300,7 @@ restapi: {}
 tags: {}
 	`, "\t\n")+"\n")
 
-	cluster.Spec.Patroni = &v1beta1.PatroniSpec{
-		DynamicConfiguration: map[string]any{
-			"postgresql": map[string]any{
-				"parameters": map[string]any{
-					"encryption_key_command": "echo test",
-				},
-			},
-		},
-	}
-
-	datawithTDE, err := instanceYAML(cluster, instance, nil)
-	assert.NilError(t, err)
-	assert.Equal(t, datawithTDE, strings.Trim(`
-# Generated by postgres-operator. DO NOT EDIT UNLESS YOU KNOW WHAT YOU'RE DOING.
-# If you want to override the config, annotate this ConfigMap with pgv2.percona.com/override-config=true
-bootstrap:
-  initdb:
-  - data-checksums
-  - encoding=UTF8
-  - waldir=/pgdata/pg12_wal
-  - encryption-key-command=echo test
-  method: initdb
-kubernetes: {}
-postgresql:
-  basebackup:
-  - waldir=/pgdata/pg12_wal
-  create_replica_methods:
-  - basebackup
-  pgpass: /tmp/.pgpass
-  use_unix_socket: true
-restapi: {}
-tags: {}
-	`, "\t\n")+"\n")
-
+	cluster.Spec.Patroni = &v1beta1.PatroniSpec{}
 	cluster.Spec.Patroni.CreateReplicaMethods = []v1beta1.CreateReplicaMethod{"basebackup", "pgbackrest"}
 	dataWithCustomMethods, err := instanceYAML(cluster, instance, nil)
 	assert.NilError(t, err)
@@ -1236,7 +1312,6 @@ bootstrap:
   - data-checksums
   - encoding=UTF8
   - waldir=/pgdata/pg12_wal
-  - encryption-key-command=echo test
   method: initdb
 kubernetes: {}
 postgresql:

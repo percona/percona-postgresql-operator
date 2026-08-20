@@ -704,6 +704,158 @@ volumes:
 		assert.DeepEqual(t, pod.InitContainers[0].Command[4:],
 			[]string{"startup", "11", "/pgwal/pg11_wal", "/pgdata/pgbackrest/log"})
 	})
+
+	// K8SPG-440
+	t.Run("WithExtraVolumes", func(t *testing.T) {
+		extraInstance := new(v1beta1.PostgresInstanceSetSpec)
+		extraInstance.ExtraVolumes = []v1beta1.ExtraVolume{
+			{
+				Name: "fts-dicts",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+					},
+				},
+				Mounts: []v1beta1.ExtraVolumeMount{
+					{MountPath: "/pgdata/dicts", ReadOnly: true},
+				},
+			},
+			{
+				Name: "extra-data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "extra-storage",
+					},
+				},
+				Mounts: []v1beta1.ExtraVolumeMount{
+					{MountPath: "/pgdata/extra", SubPath: "sub"},
+				},
+			},
+		}
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, cluster, extraInstance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		// Extra volume mounts are appended to the postgres container, not the
+		// startup init container.
+		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data
+- mountPath: /etc/database-containerinfo
+  name: database-containerinfo
+  readOnly: true
+- mountPath: /pgdata/dicts
+  name: fts-dicts
+  readOnly: true
+- mountPath: /pgdata/extra
+  name: extra-data
+  subPath: sub`), "expected extra volume mounts in %q container", pod.Containers[0].Name)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.InitContainers[0].VolumeMounts, `
+- mountPath: /pgconf/tls
+  name: cert-volume
+  readOnly: true
+- mountPath: /pgdata
+  name: postgres-data`), "expected no extra volume mounts in %q container", pod.InitContainers[0].Name)
+
+		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
+- name: cert-volume
+  projected:
+    defaultMode: 384
+    sources:
+    - secret:
+        items:
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+        - key: ca.crt
+          path: ca.crt
+        name: srv-secret
+    - secret:
+        items:
+        - key: tls.crt
+          path: replication/tls.crt
+        - key: tls.key
+          path: replication/tls.key
+        name: repl-secret
+- name: postgres-data
+  persistentVolumeClaim:
+    claimName: datavol
+- downwardAPI:
+    items:
+    - path: cpu_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: limits.cpu
+    - path: cpu_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1m
+        resource: requests.cpu
+    - path: mem_limit
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: limits.memory
+    - path: mem_request
+      resourceFieldRef:
+        containerName: database
+        divisor: 1Mi
+        resource: requests.memory
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.labels
+      path: labels
+    - fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.annotations
+      path: annotations
+  name: database-containerinfo
+- configMap:
+    name: my-dicts
+  name: fts-dicts
+- name: extra-data
+  persistentVolumeClaim:
+    claimName: extra-storage`), "expected extra volumes appended to the pod")
+	})
+
+	// K8SPG-440
+	t.Run("WithExtraVolumesOldVersion", func(t *testing.T) {
+		oldCluster := cluster.DeepCopy()
+		oldCluster.SetLabels(map[string]string{naming.LabelVersion: "3.0.0"})
+
+		extraInstance := new(v1beta1.PostgresInstanceSetSpec)
+		extraInstance.ExtraVolumes = []v1beta1.ExtraVolume{
+			{
+				Name: "fts-dicts",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "my-dicts"},
+					},
+				},
+				Mounts: []v1beta1.ExtraVolumeMount{
+					{MountPath: "/pgdata/dicts"},
+				},
+			},
+		}
+
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, oldCluster, extraInstance,
+			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+
+		for _, m := range pod.Containers[0].VolumeMounts {
+			assert.Assert(t, m.Name != "fts-dicts", "extra volumes must not be mounted before 3.1.0")
+		}
+		for _, v := range pod.Volumes {
+			assert.Assert(t, v.Name != "fts-dicts", "extra volumes must not be added before 3.1.0")
+		}
+	})
 }
 
 func TestInstancePodAllowVolumeGrow(t *testing.T) {
