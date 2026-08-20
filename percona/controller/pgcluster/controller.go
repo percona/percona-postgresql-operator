@@ -374,16 +374,25 @@ func (r *PGClusterReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// doing it here so we can stop upstream controllers before this one reconciles anything
-	if ptr.Deref(cr.Spec.Unmanaged, false) {
-		if err := r.makePostgresClusterUnmanaged(ctx, postgresCluster); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "pause PostgresCluster")
+	if ptr.Deref(cr.Spec.Unmanaged, false /* default */) {
+		backupRunning, err := isBackupRunning(ctx, r.Client, cr)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "is backup running")
+		}
+		if !backupRunning {
+			if err := r.makePostgresClusterUnmanaged(ctx, postgresCluster); err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "make PostgresCluster unmanaged")
+			}
+
+			r.stopWALWatcher(ctx, cr)
+
+			log.Info("PerconaPGCluster is unmanaged. Skipping reconciliation", "cluster", cr.Name)
+
+			return reconcile.Result{}, nil
 		}
 
-		r.stopWALWatcher(ctx, cr)
-
-		log.Info("PerconaPGCluster is unmanaged. Skipping reconciliation", "cluster", cr.Name)
-
-		return reconcile.Result{}, nil
+		cr.Spec.Unmanaged = new(false)
+		log.Info("Backup is running. Can't make cluster unmanaged", "cluster", cr.Name)
 	}
 
 	if err := r.ensureFinalizers(ctx, cr); err != nil {
