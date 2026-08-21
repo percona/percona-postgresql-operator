@@ -70,7 +70,9 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client                       client.Client
+	Client client.Client
+	// K8SPG-992: APIReader reads directly from the API server, bypassing the cache
+	APIReader                    client.Reader
 	Scheme                       *k8sruntime.Scheme
 	DiscoveryClient              *discovery.DiscoveryClient
 	IsOpenShift                  bool
@@ -85,6 +87,13 @@ type Reconciler struct {
 	Cache                        cache.Cache
 	certManagerWatchesRegistered atomic.Bool
 	newPGBouncerAdmin            func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error)
+}
+
+func (r *Reconciler) apiReader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}

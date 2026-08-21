@@ -155,6 +155,7 @@ func addControllersToManager(ctx context.Context, mgr manager.Manager) error {
 
 	r := &postgrescluster.Reconciler{
 		Client:              mgr.GetClient(),
+		APIReader:           mgr.GetAPIReader(), // K8SPG-992
 		Scheme:              mgr.GetScheme(),
 		Owner:               postgrescluster.ControllerName,
 		Recorder:            mgr.GetEventRecorderFor(postgrescluster.ControllerName),
