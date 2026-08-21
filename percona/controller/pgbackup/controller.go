@@ -142,6 +142,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		pgCluster = nil
 	}
 
+	if pgCluster != nil && ptr.Deref(pgCluster.Spec.Unmanaged, false) && pgBackup.DeletionTimestamp.IsZero() {
+		return reconcile.Result{}, nil
+	}
+
 	if pgCluster == nil || !pgCluster.DeletionTimestamp.IsZero() {
 		if pgBackup.Status.State == v2.BackupStarting || pgBackup.Status.State == v2.BackupRunning {
 			statusError := fmt.Sprintf("PerconaPGCluster %s is not found", pgBackup.Spec.PGCluster)
