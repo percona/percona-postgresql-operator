@@ -1,3 +1,4 @@
+additional-volumes
 backup-enable-disable
 builtin-extensions
 custom-extensions
@@ -37,7 +38,6 @@ standby-pgbackrest
 standby-streaming
 start-from-backup
 start-from-volumes
-tablespaces
 telemetry-transfer
 upgrade-consistency
 upgrade-minor

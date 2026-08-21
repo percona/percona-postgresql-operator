@@ -626,7 +626,7 @@ func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := tc.spec.ToCrunchy()
+			got := tc.spec.ToCrunchy("3.1.0")
 			assert.Equal(t, tc.want, got.ExtraVolumes)
 		})
 	}
@@ -635,6 +635,20 @@ func TestPGInstanceSetSpec_ToCrunchy_ExtraVolumes(t *testing.T) {
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
 	return slices.Contains(slice, item)
+}
+
+// K8SPG-1086
+func TestPGInstanceSetSpec_ToCrunchyLogVolume(t *testing.T) {
+	spec := PGInstanceSetSpec{
+		Name: "instance1",
+		LogVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		},
+	}
+
+	assert.Nil(t, spec.ToCrunchy("3.1.0").LogVolumeClaimSpec,
+		"logVolumeClaimSpec should be ignored below CRVersion 3.2.0")
+	assert.NotNil(t, spec.ToCrunchy("3.2.0").LogVolumeClaimSpec)
 }
 
 func TestValidateDynamicConfiguration(t *testing.T) {

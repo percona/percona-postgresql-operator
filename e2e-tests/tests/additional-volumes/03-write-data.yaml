@@ -6,15 +6,17 @@ commands:
       set -o xtrace
 
       source ../../functions
-        
+
+      uri=$(get_psql_uri additional-volumes postgres)
+
       run_psql_local \
         "CREATE TABLESPACE myts LOCATION '\''/tablespaces/myts/data'\'';" \
-        "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)"
-      
+        "${uri}"
+
       run_psql_local \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY) TABLESPACE myts;' \
-        "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)"
-        
+        "${uri}"
+
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
-        "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)"
+        "${uri}"

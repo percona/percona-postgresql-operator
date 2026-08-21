@@ -472,6 +472,29 @@ assert_pg_tde_key_info_uid() {
 	fi
 }
 
+# Fail unless the WAL and log directories on the data volume are symlinked onto their
+# dedicated volumes. ${2} names the moment being checked, e.g. "after restart".
+check_additional_volume_symlinks() {
+	local pod=${1}
+	local when=${2}
+	local pair link want target
+
+	for pair in \
+		"/pgdata/pg${PG_VER}/pg_wal=/pgwal/pg${PG_VER}_wal" \
+		"/pgdata/pgbackrest-spool=/pgwal/pgbackrest-spool" \
+		"/pgdata/logs/postgres=/pglogs/postgres" \
+		"/pgdata/pgbackrest/log=/pglogs/pgbackrest/log"; do
+		link=${pair%%=*}
+		want=${pair#*=}
+
+		target=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- readlink "${link}")
+		if [[ ${target} != "${want}" ]]; then
+			echo "${pod}: ${link} points at '${target}' ${when}, want '${want}'"
+			exit 1
+		fi
+	done
+}
+
 function get_psql_user_pass() {
 	local secret_name=${1}
 
