@@ -50,7 +50,7 @@ metadata:
       controller: true
       blockOwnerDeletion: true
 status:
-  observedGeneration: 3
+  observedGeneration: 2
   replicas: 1
   readyReplicas: 1
   updatedReplicas: 1
