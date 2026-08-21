@@ -310,7 +310,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 			// cluster certificates are not managed by cert-manager
 			// but Certificate object exists due to the bug described in K8SPG-1017
 			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
-			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster, cert) {
 				_, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
 				if err != nil {
 					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
