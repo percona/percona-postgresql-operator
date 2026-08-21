@@ -85,10 +85,14 @@ status:
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  # 2 = create + manual-backup options written by the operator (step 02).
-  # The operator upgrade itself must not write anything into the stored spec:
-  # an unset builtin flag stays unset, so there is no extra generation bump.
-  generation: 2
+  # 3 = create + manual-backup options written by the operator (step 02)
+  #   + the first spec write by the upgraded operator.
+  # That last write is triggered by the custom-extensions-synced annotation
+  # (K8SPG-786) and would not change the spec by itself — but the pg_tde
+  # field serializes as "pg_tde: {}" even when unused (omitempty is a no-op
+  # on value structs), so the write lands a spec diff and bumps generation.
+  # Once pg_tde becomes a pointer this goes back to 2.
+  generation: 3
   labels:
     e2e: upgrade-minor
   name: upgrade-minor
@@ -106,7 +110,7 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 2
+  observedGeneration: 3
   pgbackrest:
     repoHost:
       apiVersion: apps/v1
