@@ -7,11 +7,6 @@ commands:
 
       source ../../functions
 
-      if [[ $PLATFORM == "rancher" ]]; then
-        echo "Skipping verification as Rancher depends on cert-manager"
-        exit 0
-      fi
-
       if is_cert_manager_installed && ! is_cert_manager_installed_by_test; then
           echo "cert-manager is installed, but next steps requires it to be uninstalled. As not supported by Rancher, exiting."
           exit 0
