@@ -1,0 +1,20 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-extensions
+spec:
+  # pg_cron moves from a custom extension to a builtin one: the operator takes
+  # over its lifecycle, but the extension and its data must survive the move.
+  # Dropping it here used to be the default behavior, because the extension
+  # disappears from the custom list.
+  extensions:
+    pg_cron:
+      enabled: true
+    custom:
+    - name: pg_stat_kcache
+      version: 2.3.2
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          shared_preload_libraries: pg_stat_statements,pg_stat_kcache,pg_cron

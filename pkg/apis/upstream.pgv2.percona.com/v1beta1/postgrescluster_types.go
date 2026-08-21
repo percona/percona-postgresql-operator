@@ -308,6 +308,8 @@ type ExtensionsSpec struct {
 	PGCron           bool `json:"pgCron,omitempty"`
 	SetUser          bool `json:"setUser,omitempty"`
 
+	Custom []string `json:"custom,omitempty"`
+
 	PGTDE PGTDESpec `json:"pg_tde,omitempty"`
 }
 
@@ -1065,6 +1067,8 @@ func NewPostgresCluster() *PostgresCluster {
 }
 
 const LabelVersion = "pgv2.percona.com/version"
+
+const AnnotationCustomExtensionsSynced = "pgv2.percona.com/custom-extensions-synced"
 
 func (cr *PostgresCluster) CompareVersion(ver string) int {
 	crVersion, err := gover.NewVersion(cr.Labels[LabelVersion])

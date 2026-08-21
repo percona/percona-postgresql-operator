@@ -1,0 +1,102 @@
+spec:
+  instances:
+    - name: instance1
+      replicas: 3
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+      walVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      tablespaceVolumes:
+        - name: user
+          dataVolumeClaimSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+      sidecars:
+        - name: test-sidecar
+          image: busybox:latest
+          command: ["sleep", "30d"]
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    postgres-operator.crunchydata.com/data: postgres
+                topologyKey: kubernetes.io/hostname
+  users:
+    - name: postgres
+      password:
+        type: AlphaNumeric
+    - name: upgrade-minor
+      password:
+        type: AlphaNumeric
+    - name: extra
+      databases:
+        - extradb
+      password:
+        type: ASCII
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          shared_buffers: 128MB
+          max_connections: "200"
+  proxy:
+    pgBouncer:
+      replicas: 3
+      sidecars:
+        - name: test-sidecar
+          image: busybox:latest
+          command: ["sleep", "30d"]
+      config:
+        global:
+          pool_mode: session
+  databaseInitSQL:
+    key: init.sql
+    name: upgrade-minor-init-sql
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: upgrade-minor-pgbackrest-secrets
+      global:
+        repo2-retention-full: "3"
+        repo2-s3-uri-style: path
+        repo2-s3-verify-tls: "n"
+      manual:
+        repoName: repo2
+        options:
+          - --type=full
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+        - name: repo2
+          s3:
+            bucket: operator-testing
+            endpoint: <minio-endpoint>
+            region: us-east-1

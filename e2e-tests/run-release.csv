@@ -27,6 +27,8 @@ ldap
 ldap-tls
 logcollection
 monitoring
+operator-upgrade-cert-manager
+operator-upgrade-extensions
 one-pod
 repo-host-autogrow
 operator-self-healing

@@ -1,6 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 120
+# the max-settings cluster (3 replicas, wal/tablespace volumes, repo2) plus the
+# replica-create backup needs noticeably longer than the old single-repo setup
+timeout: 600
 ---
 kind: StatefulSet
 apiVersion: apps/v1
@@ -128,6 +130,8 @@ status:
       - bound: true
         name: repo1
         replicaCreateBackupComplete: true
+        stanzaCreated: true
+      - name: repo2
         stanzaCreated: true
   proxy:
     pgBouncer:

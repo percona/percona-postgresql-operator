@@ -1,0 +1,15 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      wait_cluster_consistency ${test_name}
+      # operator upgrade alone must not restart a single workload pod
+      assert_no_operator_rollout ${test_name} ${TEMP_DIR}/revisions.before
+      # writes kept flowing the whole time (also stops the heartbeat)
+      assert_heartbeat_gap ${test_name} 30
