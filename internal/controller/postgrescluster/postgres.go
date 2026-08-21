@@ -541,7 +541,14 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	pods, allRunning := instances.runningPods(container)
 	if !allRunning {
 		log.V(1).Info("Waiting for all pods to be running")
-		return nil
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEVaultProviderReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "WaitingForInstances",
+			Message:            "waiting for all instances to be running to stage vault credentials",
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+		return patchStatus()
 	}
 
 	for _, p := range pods {
@@ -630,18 +637,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			// naming those paths. Staging on only some of them would leave the
 			// rest unable to resolve the key, and a replica promoted before
 			// phase 2 would come up without the credentials it needs.
-			if !allRunning {
-				log.Info("waiting for all instances to be running before staging vault credentials")
-				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-					Type:               v1beta1.PGTDEVaultProviderReady,
-					Status:             metav1.ConditionFalse,
-					Reason:             "WaitingForInstances",
-					Message:            "waiting for all instances to be running to stage vault credentials",
-					ObservedGeneration: cluster.GetGeneration(),
-				})
-				return patchStatus()
-			}
-
 			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
 			if err = r.stagePGTDEVaultCredentials(ctx, cluster.Namespace,
 				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
