@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      kubectl -n "$NAMESPACE" delete perconapgcluster "$cluster" --wait=true
+      kubectl -n "$NAMESPACE" delete postgrescluster "$cluster" --wait=true --ignore-not-found
+      kubectl -n "$NAMESPACE" delete pvc \
+        -l postgres-operator.crunchydata.com/cluster="$cluster" --wait=true
+      kubectl -n "$NAMESPACE" delete secret \
+        -l postgres-operator.crunchydata.com/cluster="$cluster" --wait=true
+
+      get_cr "$cluster" \
+        | yq '.spec.tls.certManagementPolicy = "operatorProvidedOnly"' \
+        | yq '.spec.tls.issuerConf = {"name":"cert-management-policy-ignored-issuer","kind":"ClusterIssuer"}' \
+        | yq '.spec.proxy.pgBouncer.replicas = 1' \
+        | yq '.spec.instances[].replicas = 1' \
+        | kubectl -n "$NAMESPACE" apply -f -
+    timeout: 300
