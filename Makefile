@@ -405,6 +405,9 @@ after-release-versions:
 		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
 		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
 		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
+		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=$(IMAGE_TAG_BASE):main-ppg19-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=$(IMAGE_TAG_BASE):main-pgbouncer19#" \
+		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=$(IMAGE_TAG_BASE):main-pgbackrest19#" \
 		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
 		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
 		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest#" \
