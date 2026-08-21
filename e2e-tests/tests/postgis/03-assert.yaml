@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: 03-check-postgis
+data:
+  extensions_postgres: fuzzystrmatch,postgis,postgis_tiger_geocoder,postgis_topology
+  extensions_mygisdata: fuzzystrmatch,postgis,postgis_tiger_geocoder,postgis_topology
+  schemas: tiger,topology
+  geometry: geometry
+  geojson: '{"type":"Point","coordinates":[-118.4079,33.9434]}'
+  version_matches: "true"
+  image_is_gis: "true"
