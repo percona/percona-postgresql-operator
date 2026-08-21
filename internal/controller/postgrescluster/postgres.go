@@ -566,17 +566,30 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		}
 	}
 
+	pods, allRunning := instances.runningPods(container)
+	if !allRunning {
+		log.V(1).Info("Waiting for all pods to be running")
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEVaultProviderReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "WaitingForInstances",
+			Message:            "waiting for all instances to be running to stage vault credentials",
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+		return patchStatus()
+	}
+
+	for _, p := range pods {
+		// We need to configure pg_tde after volumes are mounted and extension is created
+		if _, ok := p.Annotations[naming.TDEInstalledAnnotation]; !ok {
+			log.V(1).Info("Waiting for pg_tde to be installed", "pod", p.Name)
+			return nil
+		}
+	}
+
 	pod, _ := instances.writablePod(container)
 	if pod == nil {
 		log.V(1).Info("Waiting for a writable instance")
-		return nil
-	}
-
-	pods, allRunning := instances.runningPods(container)
-
-	// We need to configure pg_tde after volumes are mounted and extension is created
-	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
-		log.V(1).Info("Waiting for pg_tde to be installed", "pod", pod.Name)
 		return nil
 	}
 
@@ -652,18 +665,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			// naming those paths. Staging on only some of them would leave the
 			// rest unable to resolve the key, and a replica promoted before
 			// phase 2 would come up without the credentials it needs.
-			if !allRunning {
-				log.Info("waiting for all instances to be running before staging vault credentials")
-				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-					Type:               v1beta1.PGTDEVaultProviderReady,
-					Status:             metav1.ConditionFalse,
-					Reason:             "WaitingForInstances",
-					Message:            "waiting for all instances to be running to stage vault credentials",
-					ObservedGeneration: cluster.GetGeneration(),
-				})
-				return patchStatus()
-			}
-
 			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
 			if err = r.stagePGTDEVaultCredentials(ctx, cluster.Namespace,
 				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
