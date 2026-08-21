@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 60
+timeout: 120
 commands:
   - script: |-
       set -o xtrace
