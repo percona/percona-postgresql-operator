@@ -25,7 +25,7 @@ IMAGE_PGBOUNCER18=percona/percona-pgbouncer:1.25.2-6
 IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18.3-1
 IMAGE_BACKREST18=percona/percona-pgbackrest:2.59.0-1
 
-IMAGE_UPGRADE=perconalab/percona-postgresql-operator:2.9.0-custom-256-upgrade
+IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18.6-17.11-16.15-15.19-14.24-1
 
 IMAGE_PMM_CLIENT=percona/pmm-client:2.44.1-1
 IMAGE_PMM_SERVER=percona/pmm-server:2.44.1
