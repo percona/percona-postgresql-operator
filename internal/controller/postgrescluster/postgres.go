@@ -566,17 +566,23 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		}
 	}
 
-	pod, _ := instances.writablePod(container)
-	if pod == nil {
-		log.V(1).Info("Waiting for a writable instance")
+	pods, allRunning := instances.runningPods(container)
+	if !allRunning {
+		log.V(1).Info("Waiting for all pods to be running")
 		return nil
 	}
 
-	pods, allRunning := instances.runningPods(container)
+	for _, p := range pods {
+		// We need to configure pg_tde after volumes are mounted and extension is created
+		if _, ok := p.Annotations[naming.TDEInstalledAnnotation]; !ok {
+			log.V(1).Info("Waiting for pg_tde to be installed", "pod", p.Name)
+			return nil
+		}
+	}
 
-	// We need to configure pg_tde after volumes are mounted and extension is created
-	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
-		log.V(1).Info("Waiting for pg_tde to be installed", "pod", pod.Name)
+	pod, _ := instances.writablePod(container)
+	if pod == nil {
+		log.V(1).Info("Waiting for a writable instance")
 		return nil
 	}
 
