@@ -1,77 +1,55 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 900
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
 
-      pgb_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbouncer-frontend-tls -o jsonpath='{.data.tls\.crt}')
-      pgbr_repo_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-repo-tls -o jsonpath='{.data.tls\.crt}')
-      pgbr_client_cert_before=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-client-tls -o jsonpath='{.data.tls\.crt}')
-
-      kubectl -n "$NAMESPACE" delete certificate \
-        cert-manager-tls-pgbouncer-cert \
-        cert-manager-tls-pgbackrest-repo-cert \
-        cert-manager-tls-pgbackrest-client-cert
-
-      for secret_name in \
-        cert-manager-tls-pgbouncer-frontend-tls \
-        cert-manager-tls-pgbackrest-repo-tls \
-        cert-manager-tls-pgbackrest-client-tls; do
-          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=60s
-      done
-
-      verify_cert_recreated() {
+      verify_certificate_recreation() {
           local cert_name="$1"
-          cert_ready=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
-          [[ "$cert_ready" == "True" ]]
-      }
+          local secret_name
+          local cert_before
+          local cert_after
+          local required_keys="tls.crt tls.key"
+          local key
+          local escaped_key
+          local value
 
-      retry 60 10 verify_cert_recreated cert-manager-tls-pgbouncer-cert
-      echo "pgBouncer Certificate recreated and ready"
+          secret_name=$(kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.spec.secretName}')
+          cert_before=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
 
-      retry 60 10 verify_cert_recreated cert-manager-tls-pgbackrest-repo-cert
-      echo "pgBackRest repo Certificate recreated and ready"
+          kubectl -n "$NAMESPACE" delete certificate "$cert_name" --wait=true --timeout=120s
+          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=120s
+          retry 6 5 kubectl -n "$NAMESPACE" get certificate "$cert_name"
+          kubectl -n "$NAMESPACE" wait --for=condition=Ready "certificate/${cert_name}" --timeout=120s
 
-      retry 60 10 verify_cert_recreated cert-manager-tls-pgbackrest-client-cert
-      echo "pgBackRest client Certificate recreated and ready"
+          cert_after=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
+          if [[ "$cert_before" == "$cert_after" ]]; then
+              echo "Secret $secret_name data did not change after Certificate $cert_name recreation"
+              return 1
+          fi
 
-      verify_secret_data() {
-          local secret_name="$1"
-          shift
-          for key in "$@"; do
+          if [[ "$cert_name" == "cert-manager-tls-pgbouncer-cert" ]]; then
+              required_keys="${required_keys} ca.crt"
+          fi
+          for key in ${required_keys}; do
               escaped_key="${key//./\\.}"
-              val=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}" 2>/dev/null)
-              if [[ -z "$val" ]]; then
+              value=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath="{.data.${escaped_key}}")
+              if [[ -z "$value" ]]; then
                   echo "Secret $secret_name is missing key: $key"
                   return 1
               fi
           done
+
+          echo "Certificate $cert_name and Secret $secret_name were recreated"
       }
 
-      retry 30 5 verify_secret_data cert-manager-tls-pgbouncer-frontend-tls tls.crt tls.key ca.crt
-      retry 30 5 verify_secret_data cert-manager-tls-pgbackrest-repo-tls tls.crt tls.key
-      retry 30 5 verify_secret_data cert-manager-tls-pgbackrest-client-tls tls.crt tls.key
-
-      pgb_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbouncer-frontend-tls -o jsonpath='{.data.tls\.crt}')
-      if [[ "$pgb_cert_before" == "$pgb_cert_after" ]]; then
-          echo "pgBouncer certificate was not reissued after deletion"
-          exit 1
-      fi
-
-      pgbr_repo_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-repo-tls -o jsonpath='{.data.tls\.crt}')
-      if [[ "$pgbr_repo_cert_before" == "$pgbr_repo_cert_after" ]]; then
-          echo "pgBackRest repo certificate was not reissued after deletion"
-          exit 1
-      fi
-
-      pgbr_client_cert_after=$(kubectl -n "$NAMESPACE" get secret cert-manager-tls-pgbackrest-client-tls -o jsonpath='{.data.tls\.crt}')
-      if [[ "$pgbr_client_cert_before" == "$pgbr_client_cert_after" ]]; then
-          echo "pgBackRest client certificate was not reissued after deletion"
-          exit 1
-      fi
+      verify_certificate_recreation cert-manager-tls-pgbouncer-cert
+      verify_certificate_recreation cert-manager-tls-pgbackrest-repo-cert
+      verify_certificate_recreation cert-manager-tls-pgbackrest-client-cert
 
       instance_sts=$(kubectl -n "$NAMESPACE" get sts \
         -l postgres-operator.crunchydata.com/cluster=cert-manager-tls,postgres-operator.crunchydata.com/instance-set=instance1 \
@@ -102,4 +80,3 @@ commands:
       done
 
       wait_cluster_consistency cert-manager-tls
-timeout: 900

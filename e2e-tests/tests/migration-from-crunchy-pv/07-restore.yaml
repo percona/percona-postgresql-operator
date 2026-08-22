@@ -36,8 +36,7 @@ commands:
       fi
       echo "Restoring from backup: ${backup_label}"
 
-      # The cluster has replicas: 1 so there are no streaming replicas to
-      # diverge — no scale-down workaround needed.
+      # Restore the three-replica cluster from the post-migration backup.
       cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
       apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore

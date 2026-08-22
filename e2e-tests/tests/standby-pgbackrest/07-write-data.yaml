@@ -8,8 +8,13 @@ commands:
 
       source ../../functions
 
+      table_method=''
+      if [[ ${PG_VER} -ge 17 ]]; then
+        table_method=' USING tde_heap'
+      fi
+
       run_psql_local \
-        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE myTable (id int PRIMARY KEY) USING tde_heap;' \
+        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE myTable (id int PRIMARY KEY)'"${table_method}"';' \
         "$(get_psql_uri source-cluster postgres)"
 
       run_psql_local \

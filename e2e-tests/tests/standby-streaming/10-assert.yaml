@@ -5,71 +5,22 @@ commands:
   - script: |-
       set -o errexit
 
-      kubectl wait --for=condition=PGTDEEnabled --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
-      kubectl wait --for=condition=PGTDEVaultProviderReady --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
+      source ../../functions
 
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].observedGeneration}')
-      if [[ "${condStatus}" != "True" ]]; then
-        echo "expected PGTDEEnabled status True, got ${condStatus}"
-        exit 1
-      fi
-      if [[ "${condReason}" != "Enabled" ]]; then
-        echo "expected PGTDEEnabled reason Enabled, got ${condReason}"
-        exit 1
-      fi
-      if [[ "${condMsg}" != "pg_tde is enabled in PerconaPGCluster" ]]; then
-        echo "expected PGTDEEnabled message 'pg_tde is enabled in PerconaPGCluster', got ${condMsg}"
-        exit 1
-      fi
-      if [[ "${condGen}" != "2" ]]; then
-        echo "expected PGTDEEnabled observedGeneration 2, got ${condGen}"
-        exit 1
+      echo "Waiting for standby cluster to be ready"
+      kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
+
+      if [[ ${PG_VER} -ge 17 ]]; then
+        wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "Enabled" "pg_tde is enabled in PerconaPGCluster" "2"
+        wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "Configured" "pg_tde vault key provider matches the spec" "2"
       fi
 
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].observedGeneration}')
-      if [[ "${condStatus}" != "True" ]]; then
-        echo "expected PGTDEVaultProviderReady status True, got ${condStatus}"
-        exit 1
-      fi
-      if [[ "${condReason}" != "Configured" ]]; then
-        echo "expected PGTDEVaultProviderReady reason Configured, got ${condReason}"
-        exit 1
-      fi
-      if [[ "${condMsg}" != "pg_tde vault key provider matches the spec" ]]; then
-        echo "expected PGTDEVaultProviderReady message 'pg_tde vault key provider matches the spec', got ${condMsg}"
-        exit 1
-      fi
-      if [[ "${condGen}" != "2" ]]; then
-        echo "expected PGTDEVaultProviderReady observedGeneration 2, got ${condGen}"
-        exit 1
-      fi
+      until assert_standby_promotion "standby-cluster"; do
+        echo "Waiting standby promotion in standby cluster"
+        sleep 5
+      done
 
-
-      # role=primary, spec.standby.enabled=false and status.state=ready are not
-      # proof of promotion: a Standby Leader keeps the primary label and can be
-      # ready while still in recovery. pg_is_in_recovery() is the Postgres signal.
-      primary=$(kubectl -n "${NAMESPACE}" get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
-
-      in_recovery=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SELECT pg_is_in_recovery();')
-      test "${in_recovery}" = "f"
-
-      patroni_list=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- patronictl list)
-      if echo "${patroni_list}" | grep -q 'Standby Leader'; then
-        echo "Patroni still reports Standby Leader:"
-        echo "${patroni_list}"
-        exit 1
-      fi
-      if ! echo "${patroni_list}" | grep -q '| Leader  |'; then
-        echo "Patroni does not report a Leader:"
-        echo "${patroni_list}"
-        exit 1
-      fi
+      echo "Standby promotion reached in standby cluster"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
