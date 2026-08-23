@@ -76,6 +76,11 @@ func issuerConf(cluster *v1beta1.PostgresCluster) *cmmeta.IssuerReference {
 
 // ResolveIssuerMode determines how the operator should handle cluster.Spec.TLS.IssuerConf.
 func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (IssuerMode, error) {
+	// Only auto uses cert-manager
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementAuto {
+		return IssuerModeManagedNamespaced, nil
+	}
+
 	ic := issuerConf(cluster)
 	if ic == nil {
 		return IssuerModeManagedNamespaced, nil

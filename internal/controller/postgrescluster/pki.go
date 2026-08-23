@@ -160,6 +160,7 @@ func (r *Reconciler) reconcileRootCertificate(
 ) (
 	*pki.RootCertificateAuthority, error,
 ) {
+	policy := cluster.Spec.TLS.GetCertManagementPolicy()
 	mode, err := certmanager.ResolveIssuerMode(ctx, r.Client, cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve issuer mode")
@@ -207,7 +208,7 @@ func (r *Reconciler) reconcileRootCertificate(
 		}
 	}
 
-	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+	if policy == v1beta1.CertManagementUserProvidedOnly {
 		if err != nil {
 			return nil, errors.Wrap(err, "get user-provided root CA secret")
 		}
@@ -226,7 +227,7 @@ func (r *Reconciler) reconcileRootCertificate(
 	}
 	// If the secret is managed by cert-manager, parse it using cert-manager key names
 	// (tls.crt/tls.key) and return without overwriting the secret with internal PKI.
-	if err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
+	if policy == v1beta1.CertManagementAuto && err == nil && existing.Annotations["cert-manager.io/certificate-name"] != "" {
 		if _, certManagerErr := r.reconcileCertManagerRootCertificate(ctx, cluster); certManagerErr != nil {
 			return nil, certManagerErr
 		}
@@ -309,12 +310,11 @@ func (r *Reconciler) reconcileCertManagerRootCertificate(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Secret, error) {
 	log := logging.FromContext(ctx)
-	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	useCertManager, err := r.shouldUseCertManager(ctx, cluster)
 	if err != nil {
-		return nil, errors.Wrap(err, "error checking if cert-manager is installed")
+		return nil, errors.Wrap(err, "error deciding whether to use cert-manager")
 	}
-	if !installed {
-		log.Info("cert-manager is not installed")
+	if !useCertManager {
 		return nil, nil
 	}
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, false)
@@ -385,7 +385,7 @@ func (r *Reconciler) reconcileClusterCertificate(
 	// cluster certificates are not managed by cert-manager
 	// but Certificate object exists due to the bug described in K8SPG-1017
 	// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
-	if cert := certmanager.ClusterCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+	if cert := certmanager.ClusterCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster, cert) {
 		_, err := r.reconcileCertManagerClusterCertificate(ctx, cluster, primaryService, replicaService)
 		if err != nil {
 			logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
@@ -541,11 +541,13 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 // shouldReconcileCertManagerCertificate reports whether a stale cert-manager
 // Certificate CR exists for the cluster and should be reconciled to update
 // its ownerRef (K8SPG-1007 recovery for Certificates left behind by the
-// K8SPG-1017 bug). Returns false when cert-manager is not installed or the
-// Certificate CR does not exist.
-func (r *Reconciler) shouldReconcileCertManagerCertificate(ctx context.Context, namespace, certName string) bool {
-	installed, err := r.isCertManagerInstalled(ctx, namespace)
-	if err != nil || !installed {
+// K8SPG-1017 bug). Returns false when policy disables cert-manager,
+// cert-manager is unavailable, or the Certificate CR does not exist.
+func (r *Reconciler) shouldReconcileCertManagerCertificate(
+	ctx context.Context, cluster *v1beta1.PostgresCluster, certName string,
+) bool {
+	useCertManager, err := r.shouldUseCertManager(ctx, cluster)
+	if err != nil || !useCertManager {
 		return false
 	}
 
@@ -553,7 +555,7 @@ func (r *Reconciler) shouldReconcileCertManagerCertificate(ctx context.Context, 
 	// the intent (no mutating cert-manager calls happen on this path).
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true /* dry run */)
 
-	exists, err := c.CertificateExists(ctx, namespace, certName)
+	exists, err := c.CertificateExists(ctx, cluster.Namespace, certName)
 
 	return err == nil && exists
 }
@@ -568,19 +570,19 @@ func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1
 		return false, errors.Wrap(err, "failed to resolve issuer mode")
 	}
 
-	installed, err := r.isCertManagerInstalled(ctx, cluster.Namespace)
+	useCertManager, err := r.shouldUseCertManager(ctx, cluster)
 	if err != nil {
 		return false, err
 	}
 
 	if mode != certmanager.IssuerModeManagedNamespaced {
-		if !installed {
+		if !useCertManager {
 			return false, errors.New("cert-manager is required when spec.tls.issuerConf is set")
 		}
 		return true, nil
 	}
 
-	if !installed {
+	if !useCertManager {
 		return false, nil
 	}
 
@@ -596,12 +598,17 @@ func (r *Reconciler) isRootCACertManagerManaged(ctx context.Context, cluster *v1
 	return rootSecret.Annotations["cert-manager.io/certificate-name"] != "", nil
 }
 
-func (r *Reconciler) isCertManagerInstalled(ctx context.Context, ns string) (bool, error) {
+func (r *Reconciler) shouldUseCertManager(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (bool, error) {
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementAuto {
+		return false, nil
+	}
 	if r.RestConfig == nil {
 		return false, nil
 	}
 	c := r.CertManagerCtrlFunc(r.Client, r.Scheme, true)
-	err := c.Check(ctx, r.RestConfig, ns)
+	err := c.Check(ctx, r.RestConfig, cluster.Namespace)
 	if err != nil {
 		switch {
 		case errors.Is(err, certmanager.ErrCertManagerNotFound):
