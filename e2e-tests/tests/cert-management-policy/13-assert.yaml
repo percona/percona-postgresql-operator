@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+resourceRefs:
+  - apiVersion: pgv2.percona.com/v2
+    kind: PerconaPGCluster
+    name: cert-management-policy
+    ref: cluster
+assertAll:
+  - celExpr: cluster.spec.tls.certManagementPolicy == "operatorProvidedOnly"
+    message: certManagementPolicy should be operatorProvidedOnly
+  - celExpr: cluster.status.conditions.exists(c, c.type == "ReadyForBackup" && c.status == "True" && has(c.observedGeneration) && c.observedGeneration == cluster.metadata.generation)
+    message: ReadyForBackup should be True
+  - celExpr: cluster.status.conditions.exists(c, c.type == "TLSSecretsReady" && c.status == "True" && c.reason == "TLSSecretsFound" && c.message == "certManagementPolicy is operatorProvidedOnly" && has(c.observedGeneration) && c.observedGeneration == cluster.metadata.generation)
+    message: TLSSecretsReady should confirm operatorProvidedOnly
+  - celExpr: cluster.status.pgbouncer.ready == 1 && cluster.status.pgbouncer.size == 1
+    message: PgBouncer should have one ready instance
+  - celExpr: cluster.status.postgres.ready == 1 && cluster.status.postgres.size == 1
+    message: PostgreSQL should have one ready instance
+  - celExpr: cluster.status.state == "ready"
+    message: Cluster state should be ready

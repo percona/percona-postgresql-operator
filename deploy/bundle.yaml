@@ -16720,6 +16720,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string
@@ -35076,6 +35077,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string

@@ -319,7 +319,7 @@ type TLSSpec struct {
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
 	// +kubebuilder:default=auto
-	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
+	// +kubebuilder:validation:Enum={auto,userProvidedOnly,operatorProvidedOnly}
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
@@ -335,8 +335,9 @@ func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
 type CertManagementPolicy string
 
 const (
-	CertManagementAuto             CertManagementPolicy = "auto"
-	CertManagementUserProvidedOnly CertManagementPolicy = "userProvidedOnly"
+	CertManagementAuto                 CertManagementPolicy = "auto"
+	CertManagementUserProvidedOnly     CertManagementPolicy = "userProvidedOnly"
+	CertManagementOperatorProvidedOnly CertManagementPolicy = "operatorProvidedOnly"
 )
 
 const (
