@@ -134,7 +134,7 @@ type PostgresClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=18
+	// +kubebuilder:validation:Maximum=19
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 

@@ -13218,7 +13218,7 @@ spec:
                 minimum: 1024
                 type: integer
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
