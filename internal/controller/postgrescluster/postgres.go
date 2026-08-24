@@ -372,9 +372,6 @@ func (r *Reconciler) reconcilePostgresDatabases(
 			}
 		}
 
-		// dropping needs the builtin flag and the custom extensions list to
-		// agree: while the custom machinery owns the extension it must be left
-		// alone (same for set_user below)
 		if cluster.Spec.Extensions.PGCron {
 			if pgCronOK = pgcron.EnableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",

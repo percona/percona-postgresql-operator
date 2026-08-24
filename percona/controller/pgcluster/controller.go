@@ -947,10 +947,7 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 			if _, ok := crExtensions[ext]; ok {
 				continue
 			}
-			// ...unless the user moved it from spec.extensions.custom to
-			// spec.extensions.builtin. Dropping it here would destroy the data
-			// the extension owns (e.g. the cron.job rows) and the builtin
-			// reconcile would then re-create it empty.
+
 			if builtInExtensionEnabled(cr, ext) {
 				continue
 			}
