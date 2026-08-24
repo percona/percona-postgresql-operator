@@ -1399,6 +1399,7 @@ function get_container_image() {
 			pgbouncer) key="IMAGE_PGBOUNCER${pgVersion}" ;;
 			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
 			postgis) key="IMAGE_POSTGIS${pgVersion}" ;;
+			upgrade) key="IMAGE_UPGRADE${pgVersion}" ;;
 			*) key="IMAGE_POSTGRESQL${pgVersion}" ;;
 		esac
 		get_release_image "$key"
@@ -1413,8 +1414,35 @@ function get_container_image() {
 		operatorVersion=main
 	fi
 
+	# Community images are built from upstream PGDG packages and published under
+	# their own tags. pgBouncer is version agnostic there, so a single image
+	# serves every PostgreSQL version. PostgreSQL 19 is the exception: it is in
+	# beta and its images carry the version in the tag, because they are built
+	# separately (PGDG testing packages, pgBackRest 2.59, PG 19 upgrade binaries).
+	if [[ ${PG_DISTRIBUTION} == "community" ]]; then
+		case $component in
+			pgbouncer)
+				echo "${IMAGE_BASE}:${operatorVersion}-pgbouncer-community"
+				;;
+			pgbackrest | upgrade)
+				if [[ ${pgVersion} -ge 19 ]]; then
+					echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+				else
+					echo "${IMAGE_BASE}:${operatorVersion}-${component}-community"
+				fi
+				;;
+			*)
+				echo "${IMAGE_BASE}:${operatorVersion}-postgres${pgVersion}-community"
+				;;
+		esac
+		return
+	fi
+
 	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
 		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	elif [[ $component == 'upgrade' ]]; then
+		# a single upgrade image carries every supported version
+		echo "${IMAGE_BASE}:${operatorVersion}-upgrade"
 	elif [[ $component == 'postgis' ]]; then
 		# the docker build job publishes postgis images as ...-ppg<V>-postgres-gis
 		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-postgres-gis"
