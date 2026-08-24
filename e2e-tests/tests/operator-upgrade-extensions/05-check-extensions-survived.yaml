@@ -17,9 +17,6 @@ commands:
         | grep -v '^$' > ${TEMP_DIR}/ext.after
       diff -u ${TEMP_DIR}/ext.before ${TEMP_DIR}/ext.after || { echo "ERROR: pg_extension changed after operator update"; exit 1; }
 
-      # cron is still ticking: wait for a new row past the update timestamp.
-      # poll instead of a fixed sleep — pg_cron fires on minute boundaries and
-      # the primary may still be settling right after the operator swap
       fresh=0
       for i in $(seq 1 12); do
           fresh=$(run_psql_local "SELECT count(*) FROM cron_log WHERE ts > \$\$$(cat ${TEMP_DIR}/update_ts.txt)\$\$" "$uri" | tr -d '[:space:]')

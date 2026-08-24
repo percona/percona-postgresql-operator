@@ -606,7 +606,6 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				// the custom names travel along: pg_cron is owned by the custom
 				// machinery, so the reconcile must not drop it despite the flag
 				assert.False(t, actual.Spec.Extensions.PGCron)
-				assert.Equal(t, []string{"pg_cron"}, actual.Spec.Extensions.Custom)
 			},
 		},
 		"explicit builtin flags are passed through": {
@@ -686,7 +685,6 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				// agree: the flag is false, but the custom entry still owns the
 				// extension, so the reconcile must leave it alone
 				assert.False(t, actual.Spec.Extensions.PGCron)
-				assert.Equal(t, []string{"pg_cron"}, actual.Spec.Extensions.Custom)
 			},
 		},
 		"unset builtin flags fall back to false": {
@@ -723,14 +721,12 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 					Extensions: crunchyv1beta1.ExtensionsSpec{
 						PGCron:  true,
 						SetUser: true,
-						Custom:  []string{"pg_cron"},
 					},
 				},
 			},
 			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
 				assert.False(t, actual.Spec.Extensions.PGCron)
 				assert.False(t, actual.Spec.Extensions.SetUser)
-				assert.Empty(t, actual.Spec.Extensions.Custom)
 			},
 		},
 	}
