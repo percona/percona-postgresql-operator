@@ -12,7 +12,7 @@ spec:
   crVersion: 3.1.0
 #  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
-#    image: docker.io/perconalab/percona-postgresql-operator:main
+#    image: docker.io/perconalab/percona-postgresql-operator:CNGTM-357-v3.1.0-preview-a1bb984c4
 #    resources:
 #      limits:
 #        cpu: 2.0

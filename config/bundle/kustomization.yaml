@@ -7,4 +7,4 @@ resources:
 images:
 - name: postgres-operator
   newName: docker.io/perconalab/percona-postgresql-operator
-  newTag: main
+  newTag: CNGTM-357-v3.1.0-preview-a1bb984c4
