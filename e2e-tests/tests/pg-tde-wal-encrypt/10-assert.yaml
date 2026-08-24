@@ -97,4 +97,4 @@ kind: PostgresCluster
 metadata:
   name: pg-tde-wal-encrypt
 status:
-  pgTDERevision: 85f48dc8df
+  pgTDERevision: 869459ddfc
