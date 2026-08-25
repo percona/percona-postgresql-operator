@@ -80,6 +80,10 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, errors.Wrapf(err, "get PerconaPGCluster %s/%s", perconaPGUpgrade.Namespace, perconaPGUpgrade.Spec.PostgresClusterName)
 	}
 
+	if pgCluster.Spec.Unmanaged != nil && *pgCluster.Spec.Unmanaged {
+		return reconcile.Result{}, nil
+	}
+
 	pgUpgrade := &crunchyv1beta1.PGUpgrade{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      perconaPGUpgrade.Name,

@@ -136,6 +136,30 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 	return nil
 }
 
+// removeStaleBackupAnnotation removes the manual backup annotation when the PerconaPGBackup is gone.
+// Otherwise crunchy would start a backup job that no PerconaPGBackup owns.
+func (r *PGClusterReconciler) removeStaleBackupAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	backupName := cr.Annotations[naming.PGBackRestBackup]
+	if backupName == "" {
+		return nil
+	}
+
+	pgBackup := new(v2.PerconaPGBackup)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: backupName, Namespace: cr.Namespace}, pgBackup); err != nil {
+		if k8serrors.IsNotFound(err) {
+			delete(cr.Annotations, naming.PGBackRestBackup)
+			return nil
+		}
+		return errors.Wrapf(err, "get PerconaPGBackup %s", backupName)
+	}
+
+	if pgBackup.Spec.PGCluster != cr.Name {
+		delete(cr.Annotations, naming.PGBackRestBackup)
+	}
+
+	return nil
+}
+
 func (r *PGClusterReconciler) reconcileBackupJobs(ctx context.Context, cr *v2.PerconaPGCluster) error {
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {
 		backupJobs, err := listBackupJobs(ctx, r.Client, cr, repo.Name)

@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # PostgreSQL 19 is a beta tech preview: it exists only as a community
+      # image built from PGDG packages, there are no ppg-19 packages. Both
+      # sides of the upgrade must come from the same build, so this test pins
+      # the community distribution instead of following the run flavor.
+      # Drop this once PostgreSQL 19 goes GA and ppg-19 images are published.
+      export PG_DISTRIBUTION=community
+
+      source ../../functions
+
+      postgres_image=$(get_container_image "postgres" 18)
+      pgbouncer_image=$(get_container_image "pgbouncer" 18)
+      pgbackrest_image=$(get_container_image "pgbackrest" 18)
+
+      get_cr \
+        | yq eval "
+          .spec.postgresVersion = 18 |
+          .spec.image = \"${postgres_image}\" |
+          .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = \"3Gi\" |
+          .spec.proxy.pgBouncer.image = \"${pgbouncer_image}\" |
+          .spec.backups.pgbackrest.image = \"${pgbackrest_image}\" |
+          .spec.patroni.removeDataDirectoryOnDivergedTimelines = true" \
+        | kubectl -n "${NAMESPACE}" apply -f -

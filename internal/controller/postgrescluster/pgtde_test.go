@@ -1184,7 +1184,7 @@ func TestReconcilePGTDEProviders(t *testing.T) {
 		cluster.Status.PGTDERevision = "stale"
 
 		r := &Reconciler{
-			Client:   fake.NewClientBuilder().Build(),
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec:  execRecorder(&calls, nil),
 		}
@@ -1403,6 +1403,7 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		calls := 0
 
 		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec: func(ctx context.Context, namespace, pod, container string,
 				stdin io.Reader, stdout, stderr io.Writer, command ...string,
@@ -1441,6 +1442,7 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		patched := 0
 
 		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec: func(ctx context.Context, namespace, pod, container string,
 				stdin io.Reader, stdout, stderr io.Writer, command ...string,
@@ -1491,6 +1493,7 @@ func TestReconcilePostgresDatabasesPGTDEReporting(t *testing.T) {
 		cluster := newCluster(false)
 
 		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec: func(ctx context.Context, namespace, pod, container string,
 				stdin io.Reader, stdout, stderr io.Writer, command ...string,
@@ -1794,6 +1797,7 @@ func TestReconcilePostgresDatabasesPGTDEStatusIsIndependent(t *testing.T) {
 		patched := 0
 
 		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec:  failOn("pgaudit"),
 		}
@@ -1818,6 +1822,7 @@ func TestReconcilePostgresDatabasesPGTDEStatusIsIndependent(t *testing.T) {
 		cluster := newCluster()
 
 		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithScheme(runtime.Scheme).Build(),
 			Recorder: events.NewRecorder(t, runtime.Scheme),
 			PodExec: func(ctx context.Context, namespace, pod, container string,
 				stdin io.Reader, stdout, stderr io.Writer, command ...string,

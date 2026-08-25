@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 240
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      date -u +%Y-%m-%dT%H:%M:%SZ > ${TEMP_DIR}/update_ts.txt
+
+      update_operator
+      kubectl wait -n ${OPERATOR_NS:-$NAMESPACE} --timeout 60s \
+        --for=jsonpath='{.spec.template.spec.containers[0].image}'=$IMAGE deployment/percona-postgresql-operator
+
+      sleep 90 # several reconcile cycles under the new operator with cert-manager present

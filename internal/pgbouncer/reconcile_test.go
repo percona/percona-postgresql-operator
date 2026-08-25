@@ -234,6 +234,16 @@ func TestSecretCertManagementPolicy(t *testing.T) {
 			expectTLSData: true,
 		},
 		{
+			name:          "operator provided only generates TLS data in the operator Secret",
+			policy:        v1beta1.CertManagementOperatorProvidedOnly,
+			expectTLSData: true,
+		},
+		{
+			name:      "operator provided only with custom TLS does not generate TLS data",
+			policy:    v1beta1.CertManagementOperatorProvidedOnly,
+			customTLS: true,
+		},
+		{
 			name:      "auto with custom TLS leaves TLS data out of the operator Secret",
 			policy:    v1beta1.CertManagementAuto,
 			customTLS: true,

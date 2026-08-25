@@ -13833,7 +13833,7 @@ spec:
                 minimum: 1024
                 type: integer
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
@@ -16632,6 +16632,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string
@@ -17660,7 +17661,7 @@ spec:
                     type: object
                 type: object
               fromPostgresVersion:
-                maximum: 17
+                maximum: 18
                 minimum: 12
                 type: integer
               image:
@@ -18458,7 +18459,7 @@ spec:
               toPostgresImage:
                 type: string
               toPostgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 13
                 type: integer
               tolerations:
@@ -20809,7 +20810,7 @@ spec:
               toPostgresImage:
                 type: string
               toPostgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 13
                 type: integer
               tolerations:
@@ -32053,7 +32054,7 @@ spec:
               postGISVersion:
                 type: string
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
@@ -34900,6 +34901,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string

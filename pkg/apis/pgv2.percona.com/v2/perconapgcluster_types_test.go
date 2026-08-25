@@ -571,6 +571,164 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.Nil(t, actual.Spec.Proxy)
 			},
 		},
+		"custom extension is not dropped by builtin reconcile": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				// an unset flag means false like every other builtin flag, but
+				// the custom names travel along: pg_cron is owned by the custom
+				// machinery, so the reconcile must not drop it despite the flag
+				assert.False(t, actual.Spec.Extensions.PGCron)
+			},
+		},
+		"explicit builtin flags are passed through": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						PGCron:  BuiltInExtensionSpec{Enabled: new(true)},
+						SetUser: BuiltInExtensionSpec{Enabled: new(false)},
+						// pg_cron is listed here as well: an explicit builtin
+						// flag wins, the user asked the operator to manage it
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.True(t, actual.Spec.Extensions.PGCron)
+				// an explicit false must still drop the extension, otherwise
+				// there would be no way to uninstall a builtin one
+				assert.False(t, actual.Spec.Extensions.SetUser)
+			},
+		},
+		"explicit false does not drop an extension still listed as custom": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Extensions: ExtensionsSpec{
+						PGCron: BuiltInExtensionSpec{Enabled: new(false)},
+						Custom: []CustomExtensionSpec{
+							{Name: "pg_cron", Version: "1.6.6"},
+						},
+					},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				// dropping requires the builtin flag and the custom list to
+				// agree: the flag is false, but the custom entry still owns the
+				// extension, so the reconcile must leave it alone
+				assert.False(t, actual.Spec.Extensions.PGCron)
+			},
+		},
+		"unset builtin flags fall back to false": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			inputPostgresCluster: &crunchyv1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: crunchyv1beta1.PostgresClusterSpec{
+					Extensions: crunchyv1beta1.ExtensionsSpec{
+						PGCron:  true,
+						SetUser: true,
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.False(t, actual.Spec.Extensions.PGCron)
+				assert.False(t, actual.Spec.Extensions.SetUser)
+			},
+		},
 	}
 
 	for testName, tt := range tests {

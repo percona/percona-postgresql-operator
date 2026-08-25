@@ -65,6 +65,7 @@ func reconciler(cr *v2.PerconaPGCluster) *PGClusterReconciler {
 func crunchyReconciler() *postgrescluster.Reconciler {
 	return &postgrescluster.Reconciler{
 		Client:              k8sClient,
+		APIReader:           k8sClient, // K8SPG-992
 		Owner:               postgrescluster.ControllerName,
 		Recorder:            new(record.FakeRecorder),
 		Tracer:              otel.Tracer("test"),

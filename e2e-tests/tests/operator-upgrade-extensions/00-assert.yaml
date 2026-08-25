@@ -1,0 +1,8 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-operator-and-minio
+timeout: 180
+commands:
+  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
+  - script: kubectl assert exist-enhanced deployment minio-service -n ${NAMESPACE} --field-selector status.readyReplicas=1

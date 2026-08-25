@@ -13218,7 +13218,7 @@ spec:
                 minimum: 1024
                 type: integer
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
@@ -16017,6 +16017,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string

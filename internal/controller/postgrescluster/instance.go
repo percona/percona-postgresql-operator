@@ -1614,7 +1614,6 @@ func (r *Reconciler) reconcileInstanceCertificates(
 			}
 			return existing, nil
 		}
-
 		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
@@ -1627,7 +1626,7 @@ func (r *Reconciler) reconcileInstanceCertificates(
 		// cluster certificates are not managed by cert-manager
 		// but Certificate object exists due to the bug described in K8SPG-1017
 		// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
-		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster, cert) {
 			_, err := r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
 			if err != nil {
 				logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
