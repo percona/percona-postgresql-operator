@@ -200,16 +200,17 @@ func (r *Reconciler) generatePostgresUserSecret(
 // K8SPG-786
 func (r *Reconciler) customExtensionNames(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
-) []string {
+) ([]string, error) {
 	perconaPGCluster := &v2.PerconaPGCluster{}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(cluster), perconaPGCluster); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			logging.FromContext(ctx).Error(err, "get PerconaPGCluster for custom extensions")
-		}
-		return nil
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(cluster), perconaPGCluster)
+	if k8serrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "get PerconaPGCluster for custom extensions")
 	}
 
-	return perconaPGCluster.Status.InstalledCustomExtensions
+	return perconaPGCluster.Status.InstalledCustomExtensions, nil
 }
 
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
@@ -284,7 +285,10 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	var pgTdeRan bool
 	var pgTdeErr error
 
-	customExtensions := r.customExtensionNames(ctx, cluster)
+	customExtensions, err := r.customExtensionNames(ctx, cluster)
+	if err != nil {
+		return err
+	}
 
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
