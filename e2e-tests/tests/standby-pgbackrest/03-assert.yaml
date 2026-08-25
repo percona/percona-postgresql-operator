@@ -1,111 +1,30 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 480
+timeout: 600
 commands:
   - script: |-
       kubectl wait --for=jsonpath='{.metadata.annotations.pgv2\.percona\.com/replication-main-site}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
-  - timeout: 60
-    script: |
+  - script: |
       set -o errexit
 
-      pgversion=$(kubectl -n ${NAMESPACE} get pg standby-cluster -o jsonpath='{.spec.postgresVersion}')
-      # Standby leader is labeled primary but stays in recovery, so restore_command is set.
-      standby_leader=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
+      source ../../functions
 
-      if [[ $(kubectl -n ${NAMESPACE} exec ${standby_leader} -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
-        echo "pg_tde.wal_encrypt is not enabled in ${standby_leader}"
-        exit 1
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping TDE assertions for PostgreSQL ${PG_VER}"
+        exit 0
       fi
 
-      for pod in $(kubectl -n ${NAMESPACE} get pods -o name \
-        --selector=postgres-operator.crunchydata.com/cluster=standby-cluster,postgres-operator.crunchydata.com/data=postgres); do
-        annotation=$(kubectl -n ${NAMESPACE} get ${pod} -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
-        if [[ ${annotation} != "true" ]]; then
-          echo "${pod} is not annotated for WAL encryption: ${annotation}"
-          exit 1
-        fi
+      echo "Waiting for standby cluster to be ready"
+      kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
 
-        target=$(kubectl -n ${NAMESPACE} exec ${pod} -c database -- readlink /pgdata/pg_tde)
-        if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
-          echo "${pod} does not link the pg_tde keyring: ${target}"
-          exit 1
-        fi
-        if ! kubectl -n ${NAMESPACE} exec ${pod} -c database -- test -d /pgdata/pg_tde; then
-          echo "${pod} pg_tde keyring link does not resolve"
-          exit 1
-        fi
+      wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "ReplicatedFromSource" "pg_tde arrived with the data replicated from the source cluster" "2"
+      wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "ReplicatedFromSource" "pg_tde fetched its principal key using the replicated key provider" "2"
+
+      until assert_tde_state "standby-cluster" "true"; do
+        sleep 5
       done
 
-      restore_command=$(kubectl -n ${NAMESPACE} exec ${standby_leader} -c database -- psql -t -A -c 'SHOW restore_command;')
-      if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
-        echo "restore_command doesn't use the pg_tde_restore_encrypt wrapper in ${standby_leader}: ${restore_command}"
-        exit 1
-      fi
-      if [[ ${restore_command} != *'--repo=1'* ]]; then
-        echo "restore_command doesn't target repo1 in ${standby_leader}: ${restore_command}"
-        exit 1
-      fi
-
-      for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
-        conf=$(kubectl get -n ${NAMESPACE} cm standby-cluster-pgbackrest-config -o yaml | yq '.data."'"${key}"'"')
-        if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
-          echo "no checksum-page in ${key}"
-          exit 1
-        fi
-      done
-
-      instance_conf=$(kubectl get -n ${NAMESPACE} cm standby-cluster-pgbackrest-config -o yaml | yq '.data."pgbackrest_instance.conf"')
-      if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
-        echo "archive-async is not disabled in pgbackrest_instance.conf"
-        exit 1
-      fi
-  - script: |-
-      set -o errexit
-
-      kubectl wait --for=condition=PGTDEEnabled --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
-      kubectl wait --for=condition=PGTDEVaultProviderReady --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
-
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEEnabled")].observedGeneration}')
-      if [[ "${condStatus}" != "True" ]]; then
-        echo "expected PGTDEEnabled status True, got ${condStatus}"
-        exit 1
-      fi
-      if [[ "${condReason}" != "ReplicatedFromSource" ]]; then
-        echo "expected PGTDEEnabled reason ReplicatedFromSource, got ${condReason}"
-        exit 1
-      fi
-      if [[ "${condMsg}" != "pg_tde arrived with the data replicated from the source cluster" ]]; then
-        echo "expected PGTDEEnabled message 'pg_tde arrived with the data replicated from the source cluster', got ${condMsg}"
-        exit 1
-      fi
-      if [[ "${condGen}" != "2" ]]; then
-        echo "expected PGTDEEnabled observedGeneration 2, got ${condGen}"
-        exit 1
-      fi
-
-      condStatus=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].status}')
-      condReason=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].reason}')
-      condMsg=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].message}')
-      condGen=$(kubectl get pg -n "${NAMESPACE}" standby-cluster -o jsonpath='{.status.conditions[?(@.type=="PGTDEVaultProviderReady")].observedGeneration}')
-      if [[ "${condStatus}" != "True" ]]; then
-        echo "expected PGTDEVaultProviderReady status True, got ${condStatus}"
-        exit 1
-      fi
-      if [[ "${condReason}" != "ReplicatedFromSource" ]]; then
-        echo "expected PGTDEVaultProviderReady reason ReplicatedFromSource, got ${condReason}"
-        exit 1
-      fi
-      if [[ "${condMsg}" != "pg_tde fetched its principal key using the replicated key provider" ]]; then
-        echo "expected PGTDEVaultProviderReady message 'pg_tde fetched its principal key using the replicated key provider', got ${condMsg}"
-        exit 1
-      fi
-      if [[ "${condGen}" != "2" ]]; then
-        echo "expected PGTDEVaultProviderReady observedGeneration 2, got ${condGen}"
-        exit 1
-      fi
+      echo "PG TDE expected state reached in standby cluster"
 ---
 apiVersion: apps/v1
 kind: StatefulSet

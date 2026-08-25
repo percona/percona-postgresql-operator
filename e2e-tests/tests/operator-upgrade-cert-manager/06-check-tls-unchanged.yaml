@@ -1,0 +1,32 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 240
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      wait_cluster_consistency ${test_name}
+
+      # K8SPG-1017: no cert-manager Certificates may appear for a PKI-issued cluster
+      certs=$(kubectl -n "${NAMESPACE}" get certificates.cert-manager.io -o name 2>/dev/null || true)
+      if [[ -n "$certs" ]]; then
+          echo "ERROR: cert-manager Certificates appeared for the PKI cluster:"
+          echo "$certs"
+          exit 1
+      fi
+
+      # the operator must not hand the existing PKI root CA over to cert-manager
+      cm_annotated=$(kubectl -n "${NAMESPACE}" get secrets -l postgres-operator.crunchydata.com/cluster=${test_name} \
+        -o jsonpath='{range .items[*]}{.metadata.name}={.metadata.annotations.cert-manager\.io/certificate-name}{"\n"}{end}' \
+        | grep -v '=$' || true)
+      if [[ -n "$cm_annotated" ]]; then
+          echo "ERROR: TLS secrets became cert-manager managed after the upgrade:"
+          echo "$cm_annotated"
+          exit 1
+      fi
+
+      assert_tls_unchanged ${test_name} ${TEMP_DIR}/tls.before
+      assert_no_operator_rollout ${test_name} ${TEMP_DIR}/revisions.before
