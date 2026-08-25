@@ -8,11 +8,6 @@ commands:
       source ../../functions
       init_temp_dir # do this only in the first TestStep
 
-      if [[ $PLATFORM == "rancher" ]]; then
-        echo "Skipping test as Rancher depends on cert-manager"
-        exit 1
-      fi
-
       destroy_cert_manager
       deploy_operator
       deploy_client

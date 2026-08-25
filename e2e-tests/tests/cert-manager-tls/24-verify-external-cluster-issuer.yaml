@@ -67,7 +67,20 @@ commands:
       kubectl -n "$NAMESPACE" patch perconapgcluster cert-manager-tls \
         --type=merge \
         -p="{\"spec\":{\"tls\":{\"issuerConf\":{\"name\":\"${issuer_name}\",\"kind\":\"ClusterIssuer\"}}}}"
-      sleep 10
+
+      kubectl -n "$NAMESPACE" wait \
+        --for=jsonpath='{.spec.issuerRef.name}'="${issuer_name}" \
+        certificate/cert-manager-tls-cluster-cert \
+        --timeout=120s
+
+      kubectl -n "$NAMESPACE" wait \
+        --for=jsonpath='{.spec.issuerRef.kind}'=ClusterIssuer \
+        certificate/cert-manager-tls-cluster-cert \
+        --timeout=120s
+
+      kubectl -n "$NAMESPACE" wait --for=condition=Ready \
+        certificate/cert-manager-tls-cluster-cert \
+        --timeout=120s
 
       wait_cluster_consistency cert-manager-tls
 
@@ -83,6 +96,4 @@ commands:
           echo "Cluster certificate does not reference the external ClusterIssuer, got name=$cluster_cert_issuer_name kind=$cluster_cert_issuer_kind"
           exit 1
       fi
-
-      kubectl -n "$NAMESPACE" wait --for=condition=Ready certificate/cert-manager-tls-cluster-cert --timeout=60s
     timeout: 300

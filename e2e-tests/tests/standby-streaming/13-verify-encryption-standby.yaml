@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping TDE verification for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
       result=$(run_psql_command \
         "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
         "$(get_psql_uri standby-cluster postgres)")
@@ -49,7 +54,11 @@ commands:
       primary=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
       replica=$(kubectl -n ${NAMESPACE} get pods --selector=postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=standby-cluster -o jsonpath='{.items[0].metadata.name}')
 
-      if [[ $(kubectl -n ${NAMESPACE} exec ${primary} -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;') != "on" ]]; then
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_psql_uri standby-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-wal-encryption-standby --from-literal=pg_tde_wal_encrypt="$result"
+      if [[ ${result} != " on" ]]; then
         echo "pg_tde.wal_encrypt is not enabled in ${primary} after switchover"
         exit 1
       fi
@@ -103,4 +112,3 @@ commands:
         echo "archive-async is not disabled in pgbackrest_instance.conf"
         exit 1
       fi
-

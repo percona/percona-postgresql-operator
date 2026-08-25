@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # pg_cron was added to shared_preload_libraries in the previous step and
+      # postgres only loads it on start, so the pods have to be restarted before
+      # the extension can be created
+      wait_cluster_consistency custom-extensions
+
+      restart_pg_pods custom-extensions instance1
+    timeout: 360

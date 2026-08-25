@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: pgv2.percona.com/v2
+  kind: PerconaPGCluster
+- apiVersion: upstream.pgv2.percona.com/v1beta1
+  kind: PostgresCluster
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      for c in operator-upgrade-cert-manager; do
+          kubectl -n ${NAMESPACE} patch postgrescluster $c --type=merge -p='{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+          kubectl -n ${NAMESPACE} delete postgrescluster $c --ignore-not-found
+      done
+      remove_all_finalizers
+      check_operator_panic
+      destroy_operator
+      destroy_cert_manager
+    timeout: 120
