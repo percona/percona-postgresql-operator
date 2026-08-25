@@ -189,6 +189,9 @@ func (r *Reconciler) additionalTrustedCAs(
 		if !ok {
 			return nil, errors.Errorf("additional trusted CA Secret '%s' does not contain key '%s'", ref.Name, rootCertFile)
 		}
+		if len(pki.TrustBundle(ca)) == 0 {
+			return nil, errors.Errorf("additional trusted CA Secret '%s' does not contain a PEM-encoded certificate in key '%s'", ref.Name, rootCertFile)
+		}
 		result = append(result, ca)
 	}
 
