@@ -505,7 +505,7 @@ func (r *Reconciler) Reconcile(
 		err = r.reconcileVolumeSnapshots(ctx, cluster, dedicatedSnapshotPVC)
 	}
 	if err == nil {
-		err = r.reconcilePGBouncer(ctx, cluster, instances, primaryCertificate, rootCA)
+		err = r.reconcilePGBouncer(ctx, cluster, instances, primaryCertificate, caBundle, rootCA)
 	}
 	if err == nil {
 		err = r.reconcilePGMonitor(ctx, cluster, instances, monitoringSecret)

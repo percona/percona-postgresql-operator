@@ -100,6 +100,15 @@ func TestTrustBundle(t *testing.T) {
 		assert.DeepEqual(t, TrustBundle([]byte("junk\n"), onePEM), onePEM)
 	})
 
+	t.Run("MalformedCertificateBlockIgnored", func(t *testing.T) {
+		// A block labeled CERTIFICATE whose DER does not actually decode as
+		// an X.509 certificate must not be treated as one: accepting it
+		// would let malformed input reach a trust file unexamined.
+		fake := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+		assert.Assert(t, TrustBundle(fake) == nil)
+		assert.DeepEqual(t, TrustBundle(fake, onePEM), onePEM)
+	})
+
 	t.Run("CrossSignedVariantsBothKept", func(t *testing.T) {
 		// Two certificates that share a subject and public key but differ in
 		// their DER are distinct trust anchors; dedup must not collapse them.

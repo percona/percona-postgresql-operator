@@ -35,7 +35,7 @@ import (
 // reconcilePGBouncer writes the objects necessary to run a PgBouncer Pod.
 func (r *Reconciler) reconcilePGBouncer(
 	ctx context.Context, cluster *v1beta1.PostgresCluster, instances *observedInstances,
-	primaryCertificate *corev1.SecretProjection,
+	primaryCertificate *corev1.SecretProjection, caBundle *corev1.SecretProjection,
 	root *pki.RootCertificateAuthority,
 ) error {
 	var (
@@ -51,7 +51,7 @@ func (r *Reconciler) reconcilePGBouncer(
 		secret, err = r.reconcilePGBouncerSecret(ctx, cluster, root, service)
 	}
 	if err == nil {
-		err = r.reconcilePGBouncerDeployment(ctx, cluster, primaryCertificate, configmap, secret)
+		err = r.reconcilePGBouncerDeployment(ctx, cluster, primaryCertificate, caBundle, configmap, secret)
 	}
 	if err == nil {
 		err = r.reconcilePGBouncerPodDisruptionBudget(ctx, cluster)
@@ -535,7 +535,7 @@ func (r *Reconciler) reconcilePGBouncerService(
 // generatePGBouncerDeployment returns an appsv1.Deployment that runs PgBouncer pods.
 func (r *Reconciler) generatePGBouncerDeployment(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
-	primaryCertificate *corev1.SecretProjection,
+	primaryCertificate *corev1.SecretProjection, caBundle *corev1.SecretProjection,
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) (*appsv1.Deployment, bool, error) {
 	deploy := &appsv1.Deployment{ObjectMeta: naming.ClusterPGBouncer(cluster)}
@@ -656,7 +656,7 @@ func (r *Reconciler) generatePGBouncerDeployment(
 	}
 
 	if err == nil {
-		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec, initImage)
+		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, caBundle, secret, &deploy.Spec.Template.Spec, initImage)
 	}
 
 	return deploy, true, err
@@ -668,11 +668,11 @@ func (r *Reconciler) generatePGBouncerDeployment(
 // reconcilePGBouncerDeployment writes the Deployment that runs PgBouncer.
 func (r *Reconciler) reconcilePGBouncerDeployment(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
-	primaryCertificate *corev1.SecretProjection,
+	primaryCertificate *corev1.SecretProjection, caBundle *corev1.SecretProjection,
 	configmap *corev1.ConfigMap, secret *corev1.Secret,
 ) error {
 	deploy, specified, err := r.generatePGBouncerDeployment(
-		ctx, cluster, primaryCertificate, configmap, secret,
+		ctx, cluster, primaryCertificate, caBundle, configmap, secret,
 	)
 
 	// Set observations whether the deployment exists or not.

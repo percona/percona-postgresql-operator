@@ -237,6 +237,7 @@ func Pod(
 	inCluster *v1beta1.PostgresCluster,
 	inConfigMap *corev1.ConfigMap,
 	inPostgreSQLCertificate *corev1.SecretProjection,
+	inCABundle *corev1.SecretProjection,
 	inSecret *corev1.Secret,
 	outPod *corev1.PodSpec,
 	initImage string,
@@ -262,7 +263,7 @@ func Pod(
 				// written leaves the Pod stuck with an unmountable volume.
 				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
 					len(inSecret.Data[CertFrontendAuthoritySecretKey]) > 0)...),
-			backendAuthority(inPostgreSQLCertificate),
+			backendAuthority(inPostgreSQLCertificate, inCABundle),
 		),
 	}
 

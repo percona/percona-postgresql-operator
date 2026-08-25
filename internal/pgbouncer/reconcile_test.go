@@ -5,6 +5,7 @@
 package pgbouncer
 
 import (
+	"bytes"
 	"context"
 	"slices"
 	"strings"
@@ -329,10 +330,18 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		return cluster
 	}
 
-	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+	ca1Root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+	ca1, err := ca1Root.Certificate.MarshalText()
+	assert.NilError(t, err)
+
+	ca2Root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+	ca2PEM, err := ca2Root.Certificate.MarshalText()
+	assert.NilError(t, err)
 	// No trailing newline. Entries are re-encoded into canonical PEM, so this
 	// gains one and the next entry is separated from it either way.
-	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----")
+	ca2 := bytes.TrimRight(ca2PEM, "\n")
 	ca2Normalized := append(append([]byte{}, ca2...), '\n')
 
 	t.Run("AppendedToGeneratedBundle", func(t *testing.T) {
@@ -443,7 +452,7 @@ func TestPod(t *testing.T) {
 		naming.LabelVersion: "2.5.0",
 	})
 
-	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "") }
+	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "") }
 
 	t.Run("Disabled", func(t *testing.T) {
 		before := pod.DeepCopy()
@@ -555,6 +564,38 @@ volumes:
 		assert.DeepEqual(t, before, pod)
 	})
 
+	// When a merged caBundle is supplied - because spec.tls.additionalTrustedCAs
+	// applies, or because the issuer wrote no ca.crt of its own - it is mounted
+	// as the backend authority in place of primaryCertificate's.
+	t.Run("BackendAuthorityPrefersCABundle", func(t *testing.T) {
+		caBundle := &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "some-cluster-ca-bundle"},
+		}
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, caBundle, secret, pod, "")
+
+		var backend *corev1.VolumeProjection
+		for _, volume := range pod.Volumes {
+			if volume.Name != "pgbouncer-config" || volume.Projected == nil {
+				continue
+			}
+			for i, source := range volume.Projected.Sources {
+				if source.Secret != nil && source.Secret.Name == "some-cluster-ca-bundle" {
+					backend = &volume.Projected.Sources[i]
+				}
+			}
+		}
+
+		assert.Assert(t, backend != nil, "expected the CA bundle Secret to be projected")
+		assert.Assert(t, cmp.MarshalMatches(backend, `
+secret:
+  items:
+  - key: ca.crt
+    path: ~postgres-operator/backend-ca.crt
+  name: some-cluster-ca-bundle
+		`))
+	})
+
 	// A spec that asks for additional CAs does not always produce a merged
 	// bundle: userProvidedOnly drops the cluster-wide list, and a referenced
 	// Secret that does not exist yet is skipped. When the key was not written,
@@ -583,7 +624,7 @@ volumes:
 		}
 
 		pod := new(corev1.PodSpec)
-		Pod(ctx, cluster, configMap, primaryCertificate, new(corev1.Secret), pod, "")
+		Pod(ctx, cluster, configMap, primaryCertificate, nil, new(corev1.Secret), pod, "")
 
 		var projected []string
 		for _, volume := range pod.Volumes {
@@ -631,7 +672,7 @@ volumes:
 		}}
 
 		pod := new(corev1.PodSpec)
-		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+		Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: pgbouncer-config
@@ -936,7 +977,7 @@ volumes:
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 				assert.Equal(t, len(pod.Containers), 2)
 
 				var volume *corev1.Volume
@@ -998,7 +1039,7 @@ name: pgbouncer-logs
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 				assert.Equal(t, len(pod.Containers), 2)
 
 				if !tt.expect {
@@ -1037,7 +1078,7 @@ timeoutSeconds: 35
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "some/init:image")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "some/init:image")
 
 				var volume *corev1.Volume
 				for i := range pod.Volumes {

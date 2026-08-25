@@ -1399,6 +1399,19 @@ func TestAdditionalTrustedCAs(t *testing.T) {
 		assert.ErrorContains(t, err, "does not contain key 'ca.crt'")
 	})
 
+	t.Run("MalformedCertificateIsAnError", func(t *testing.T) {
+		// A "ca.crt" whose CERTIFICATE-labeled PEM block does not actually
+		// decode as an X.509 certificate is as unusable as an empty one, and
+		// must be reported rather than silently written into a trust file.
+		malformed := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"ca.crt": malformed}),
+		).Build()}
+
+		_, err := r.additionalTrustedCAs(ctx, newCluster("ca-one"))
+		assert.ErrorContains(t, err, "does not contain a PEM-encoded certificate")
+	})
+
 	t.Run("IgnoredForUserProvidedOnly", func(t *testing.T) {
 		// The operator owns none of the TLS Secrets in that mode, so it has
 		// nowhere to merge these into.
