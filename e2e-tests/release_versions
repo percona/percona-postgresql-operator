@@ -25,7 +25,13 @@ IMAGE_PGBOUNCER18=perconalab/percona-postgresql-operator:main-pgbouncer18
 IMAGE_POSTGIS18=perconalab/percona-postgresql-operator:main-ppg18-postgres-gis
 IMAGE_BACKREST18=perconalab/percona-postgresql-operator:main-pgbackrest18
 
+IMAGE_POSTGRESQL19=perconalab/percona-postgresql-operator:main-ppg19-postgres
+IMAGE_PGBOUNCER19=perconalab/percona-postgresql-operator:main-pgbouncer19
+IMAGE_BACKREST19=perconalab/percona-postgresql-operator:main-pgbackrest19
+IMAGE_UPGRADE19=perconalab/percona-postgresql-operator:main-upgrade19
+
 IMAGE_UPGRADE=perconalab/percona-postgresql-operator:main-upgrade
+IMAGE_LOGCOLLECTOR=perconalab/fluentbit:main-logcollector
 
 IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest
 IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest

@@ -184,7 +184,10 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
-	pgBackrestCmd := "pgbackrest --stanza=db --log-level-console=info stop && " +
+	// K8SPG-992: We use --force for a "stop" to stop pgbackrest processes
+	// left by a terminated backup job.
+	// Otherwise, their locks can block stanza-delete.
+	pgBackrestCmd := "pgbackrest --stanza=db --log-level-console=info stop --force && " +
 		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {

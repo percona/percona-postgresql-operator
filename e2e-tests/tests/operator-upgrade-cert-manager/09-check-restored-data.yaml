@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
+      data=$(run_psql_local '\c myapp \\\ SELECT id from myApp ORDER BY id' "$uri" | tr -d '[:space:]')
+      if [[ "$data" != "100500" ]]; then
+          echo "ERROR: unexpected data after restore: '$data' (want only 100500)"
+          exit 1
+      fi

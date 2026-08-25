@@ -14,17 +14,24 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-
-	// Google Kubernetes Engine / Google Cloud Platform authentication provider
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 )
+
+// K8SPG-992
+func init() {
+	if err := v2.AddToScheme(runtime.Scheme); err != nil {
+		panic(err)
+	}
+}
 
 var suite struct {
 	Client client.Client
@@ -63,5 +70,4 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-
 })
