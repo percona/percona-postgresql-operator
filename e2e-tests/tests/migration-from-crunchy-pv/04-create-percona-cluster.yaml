@@ -35,15 +35,11 @@ commands:
       fi
       echo "PV ${pv_name} is Available"
 
-      # Label the PV so the Percona PVC selector binds to it exclusively,
-      # avoiding accidental binding to another released volume.
-      kubectl label pv "${pv_name}" percona-pv-migration=migrated
-      echo "PV ${pv_name} labelled percona-pv-migration=migrated"
-
-      # dataVolumeClaimSpec.selector.matchLabels binds the PVC to this PV directly;
-      # no dataSource restore is needed — PGDATA is already on the volume.
+      # Pre-bind the first Percona PVC directly to the released Crunchy PV.
+      export pv_name
       get_cr "percona-migrated" "${PERCONA_REPO_PATH}" | \
         yq eval 'del(.spec.users)' | \
+        yq eval '.spec.instances[0].dataVolumeClaimSpec.volumeName = strenv(pv_name)' - | \
         $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
         kubectl -n "${NAMESPACE}" apply -f -
     timeout: 60

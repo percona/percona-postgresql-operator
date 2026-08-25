@@ -23,6 +23,9 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -ge 17 ]]; then
+        stop_vault "vault-service"
+      fi
       remove_all_finalizers
       check_operator_panic
       destroy_operator
