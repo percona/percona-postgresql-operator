@@ -36,6 +36,18 @@ function create_namespace() {
 	fi
 }
 
+function destroy_namespace() {
+	local namespace=$1
+
+	if [[ ${PLATFORM} == "openshift" ]]; then
+		oc delete project "$namespace" --ignore-not-found || :
+		oc wait --for=delete project "$namespace" || :
+	else
+		kubectl delete namespace $namespace --ignore-not-found || :
+		kubectl wait --for=delete namespace "$namespace" || :
+	fi
+}
+
 function check_operator_panic() {
 	local operator_pod=$(get_operator_pod)
 	local panic_log
@@ -454,7 +466,7 @@ function run_psql_command() {
 }
 
 # Fail unless pg_tde_key_info() contains global-master-key-<PostgresCluster metadata.uid>.
-assert_pg_tde_key_info_uid() {
+function assert_pg_tde_key_info_uid() {
 	local uri=${1}
 	local cluster=${2}
 
@@ -667,6 +679,192 @@ function wait_for_delete() {
 			exit 1
 		fi
 	done
+}
+
+function wait_pg_condition() {
+	local cluster="$1"
+	local condition="$2"
+	local expected_status="$3"
+	local expected_reason="$4"
+	local expected_message="$5"
+	local expected_generation="$6"
+	local timeout_seconds="${7:-0}"
+	local interval="${8:-5}"
+	local namespace="${9:-$NAMESPACE}"
+	local status=""
+	local reason=""
+	local message=""
+	local generation=""
+	local json=""
+	local elapsed=0
+
+	until [[ ${status} == "${expected_status}" ]] && [[ ${reason} == "${expected_reason}" ]] && [[ ${message} == "${expected_message}" ]] && [[ ${generation} == "${expected_generation}" ]]; do
+		json=$(kubectl -n "${namespace}" get pg "${cluster}" -o json || true)
+		status=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .status")
+		reason=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .reason")
+		message=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .message")
+		generation=$(printf '%s' "${json}" | jq -r ".status.conditions[]? | select(.type == \"${condition}\") | .observedGeneration")
+
+		echo "Waiting state: pg/${cluster} condition=${condition}"
+		echo "expected: status=${expected_status} reason=${expected_reason} generation=${expected_generation} message=${expected_message}"
+		echo "current: status=${status} reason=${reason} generation=${generation} message=${message}"
+
+		if ((timeout_seconds > 0 && elapsed >= timeout_seconds)); then
+			echo "timeout waiting for condition ${condition} expected status=${expected_status} reason=${expected_reason} generation=${expected_generation} on pg/${cluster} after ${timeout_seconds}s"
+			echo "expected message: ${expected_message}"
+			echo "--- pg conditions ---"
+			kubectl -n "${namespace}" get pg "${cluster}" -o jsonpath='{range .status.conditions[*]}{.type}{"|"}{.status}{"|"}{.reason}{"|"}{.observedGeneration}{"|"}{.message}{"\n"}{end}' || true
+			echo "--- pg describe ---"
+			kubectl -n "${namespace}" describe pg "${cluster}" || true
+			echo "--- recent events ---"
+			kubectl -n "${namespace}" get events --sort-by=.lastTimestamp | tail -n 80 || true
+			return 1
+		fi
+
+		sleep "${interval}"
+		elapsed=$((elapsed + interval))
+	done
+
+	echo "${cluster} ${condition} reached expected values: status=${status} reason=${reason} generation=${generation}"
+}
+
+function assert_configmap_data() {
+	local name="$1"
+	local key="$2"
+	local expected="$3"
+	local namespace="${4:-$NAMESPACE}"
+	local current
+
+	current=$(kubectl -n "${namespace}" get configmap "${name}" -o json \
+		| jq -r --arg key "${key}" '.data[$key] // empty')
+	if [[ ${current} != "${expected}" ]]; then
+		echo "Waiting state: configmap/${name} key=${key}"
+		echo "expected: value=${expected}"
+		echo "current: value=${current:-<missing>}"
+		return 1
+	fi
+}
+
+function assert_tde_state() {
+	local cluster="$1"
+	local is_standby="${2:-false}"
+	local pgversion primary replica check_pod
+	local pod annotation target archive_command restore_command conf instance_conf
+	local wal_encrypt current repo_name
+
+	pgversion=$(kubectl -n "${NAMESPACE}" get pg "${cluster}" -o jsonpath='{.spec.postgresVersion}')
+	primary=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
+	check_pod="${primary}"
+
+	if [[ ${is_standby} != "true" ]]; then
+		replica=$(kubectl -n "${NAMESPACE}" get pods --selector="postgres-operator.crunchydata.com/role=replica,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
+	fi
+
+	wal_encrypt=$(kubectl -n "${NAMESPACE}" exec "${check_pod}" -c database -- psql -t -A -c 'SHOW pg_tde.wal_encrypt;')
+	if [[ ${wal_encrypt} != "on" ]]; then
+		echo "Waiting state: pg_tde.wal_encrypt pod=${check_pod}; expected: value=on; current: value=${wal_encrypt}"
+		return 1
+	fi
+
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -o name \
+		--selector="postgres-operator.crunchydata.com/cluster=${cluster},postgres-operator.crunchydata.com/data=postgres"); do
+		annotation=$(kubectl -n "${NAMESPACE}" get "${pod}" -o yaml | yq '.metadata.annotations."pgv2.percona.com/tde-wal-encryption"')
+		if [[ ${annotation} != "true" ]]; then
+			echo "Waiting state: WAL encryption annotation pod=${pod}; expected: value=true; current: value=${annotation}"
+			return 1
+		fi
+
+		target=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- readlink /pgdata/pg_tde)
+		if [[ ${target} != "/pgdata/pg${pgversion}/pg_tde" ]]; then
+			echo "Waiting state: pg_tde keyring link pod=${pod}; expected: target=/pgdata/pg${pgversion}/pg_tde; current: target=${target}"
+			return 1
+		fi
+		if ! kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- test -d /pgdata/pg_tde; then
+			echo "Waiting state: pg_tde keyring path pod=${pod}; expected: path=/pgdata/pg_tde exists; current: path=/pgdata/pg_tde does not exist"
+			return 1
+		fi
+	done
+
+	if [[ ${is_standby} == "true" ]]; then
+		# Standby leader is labeled primary but stays in recovery, so restore_command is set there.
+		restore_command=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SHOW restore_command;')
+		if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
+			echo "Waiting state: restore_command wrapper pod=${primary}; expected: contains=pg_tde_restore_encrypt %f %p; current: value=${restore_command}"
+			return 1
+		fi
+		repo_name=$(kubectl -n "${NAMESPACE}" get pg "${cluster}" -o jsonpath='{.spec.standby.repoName}')
+		if [[ -n ${repo_name} && ${restore_command} != *"--repo=${repo_name#repo}"* ]]; then
+			echo "Waiting state: restore_command repository pod=${primary}; expected: contains=--repo=${repo_name#repo}; current: value=${restore_command}"
+			return 1
+		fi
+	else
+		archive_command=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- psql -t -A -c 'SHOW archive_command;')
+		if [[ ${archive_command} != 'pg_tde_archive_decrypt %f %p "pgbackrest --stanza=db archive-push %%p"'* ]]; then
+			echo "Waiting state: archive_command wrapper pod=${primary}; expected: starts-with=pg_tde_archive_decrypt %f %p \"pgbackrest --stanza=db archive-push %%p\"; current: value=${archive_command}"
+			return 1
+		fi
+
+		if [[ ${archive_command} != *'pg_tde_waldump'* ]]; then
+			echo "Waiting state: archive_command WAL inspection pod=${primary}; expected: contains=pg_tde_waldump; current: value=${archive_command}"
+			return 1
+		fi
+
+		# restore_command is applied on replicas (primary SHOW is empty once settled)
+		restore_command=$(kubectl -n "${NAMESPACE}" exec "${replica}" -c database -- psql -t -A -c 'SHOW restore_command;')
+		if [[ ${restore_command} != *'pg_tde_restore_encrypt %f %p '* ]]; then
+			echo "Waiting state: restore_command wrapper pod=${replica}; expected: contains=pg_tde_restore_encrypt %f %p; current: value=${restore_command}"
+			return 1
+		fi
+	fi
+
+	for key in pgbackrest_instance.conf pgbackrest_repo.conf; do
+		conf=$(kubectl get -n "${NAMESPACE}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."'"${key}"'"')
+		if ! echo "${conf}" | grep -q '^checksum-page = n$'; then
+			current=$(echo "${conf}" | grep '^checksum-page' || true)
+			echo "Waiting state: checksum-page config=${key}; expected: value=checksum-page = n; current: value=${current:-<missing>}"
+			return 1
+		fi
+	done
+
+	instance_conf=$(kubectl get -n "${NAMESPACE}" cm "${cluster}-pgbackrest-config" -o yaml | yq '.data."pgbackrest_instance.conf"')
+	if ! echo "${instance_conf}" | grep -q '^archive-async = n$'; then
+		current=$(echo "${instance_conf}" | grep '^archive-async' || true)
+		echo "Waiting state: archive-async config=pgbackrest_instance.conf; expected: value=archive-async = n; current: value=${current:-<missing>}"
+		return 1
+	fi
+
+	return 0
+}
+
+function assert_standby_promotion() {
+	local cluster="$1"
+	local namespace="${2:-$NAMESPACE}"
+	local primary in_recovery patroni_list
+
+	# role=primary, spec.standby.enabled=false and status.state=ready are not
+	# proof of promotion: a Standby Leader keeps the primary label and can be
+	# ready while still in recovery. pg_is_in_recovery() is the Postgres signal.
+	primary=$(kubectl -n "${namespace}" get pods --selector="postgres-operator.crunchydata.com/role=primary,postgres-operator.crunchydata.com/cluster=${cluster}" -o jsonpath='{.items[0].metadata.name}')
+
+	in_recovery=$(kubectl -n "${namespace}" exec "${primary}" -c database -- psql -t -A -c 'SELECT pg_is_in_recovery();')
+	if [[ ${in_recovery} != "f" ]]; then
+		echo "Primary ${primary} is still in recovery: ${in_recovery}"
+		return 1
+	fi
+
+	patroni_list=$(kubectl -n "${namespace}" exec "${primary}" -c database -- patronictl list)
+	if echo "${patroni_list}" | grep -q 'Standby Leader'; then
+		echo "Patroni still reports Standby Leader:"
+		echo "${patroni_list}"
+		return 1
+	fi
+	if ! echo "${patroni_list}" | grep -q '| Leader  |'; then
+		echo "Patroni does not report a Leader:"
+		echo "${patroni_list}"
+		return 1
+	fi
+
+	return 0
 }
 
 function deploy_pmm_server() {
@@ -896,6 +1094,7 @@ function get_cluster_runtime_socket_path() {
 function deploy_chaos_mesh() {
 	local runtime
 	local socket_path
+	local chaos_daemon_sa
 
 	destroy_chaos_mesh
 
@@ -914,7 +1113,10 @@ function deploy_chaos_mesh() {
 		--set dashboard.create=false
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
-		oc adm policy add-scc-to-user privileged -z chaos-daemon --namespace="${NAMESPACE}"
+		retry 12 5 kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" >/dev/null
+		chaos_daemon_sa="$(kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" -o jsonpath='{.spec.template.spec.serviceAccountName}')"
+		chaos_daemon_sa="${chaos_daemon_sa:-chaos-daemon}"
+		oc adm policy add-scc-to-user privileged -z "${chaos_daemon_sa}" --namespace="${NAMESPACE}"
 		kubectl rollout restart daemonset/chaos-daemon --namespace="${NAMESPACE}"
 	fi
 
@@ -1012,7 +1214,7 @@ function network_delay() {
 	sleep 5
 }
 
-function chaos_daemon_exec_in_pod_network_namespace() {
+function chaos_daemon_exec_in_pod_netns() {
 	local ns=$1
 	local pod=$2
 	local container=$3
@@ -1030,11 +1232,25 @@ function chaos_daemon_exec_in_pod_network_namespace() {
 		--field-selector="spec.nodeName=${node}" \
 		-o jsonpath='{.items[0].metadata.name}')
 
+	# Find the target container's network namespace and run the command there.
+	# Ignore the host namespace so iptables changes affect only the target Pod.
 	# The variables in this script are expanded inside the chaos-daemon container.
 	# shellcheck disable=SC2016
 	kubectl exec --namespace "${ns}" "${daemon}" -- sh -eu -c '
-		netns=$(grep -l "$1" /proc/[0-9]*/cgroup | head -n1)
-		netns=${netns%/cgroup}/ns/net
+		host_netns=$(readlink /proc/1/ns/net)
+		netns=""
+		for cgroup in $(grep -l "$1" /proc/[0-9]*/cgroup 2>/dev/null); do
+			candidate=${cgroup%/cgroup}/ns/net
+			if [ -e "$candidate" ] && [ "$(readlink "$candidate")" != "$host_netns" ]; then
+				netns="$candidate"
+				break
+			fi
+		done
+
+		if [ -z "$netns" ]; then
+			netns=$(grep -l "$1" /proc/[0-9]*/cgroup 2>/dev/null | tail -n1)
+			netns=${netns%/cgroup}/ns/net
+		fi
 		shift
 		exec nsexec --net "$netns" "$@"
 	' sh "${container_id}" "$@"
@@ -1044,8 +1260,9 @@ function network_block_storage_endpoint() {
 	local ns=$1
 	local primary=$2
 	local endpoint=$3
+	local container="${4:-database}"
 
-	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+	chaos_daemon_exec_in_pod_netns "${ns}" "${primary}" "${container}" \
 		iptables -I OUTPUT 1 -p tcp --dport 443 \
 		-m string --algo bm --string "${endpoint}" \
 		-m comment --comment pgo-e2e-block-storage \
@@ -1058,8 +1275,9 @@ function network_unblock_storage_endpoint() {
 	local ns=$1
 	local primary=$2
 	local endpoint=$3
+	local container="${4:-database}"
 
-	chaos_daemon_exec_in_pod_network_namespace "${ns}" "${primary}" database \
+	chaos_daemon_exec_in_pod_netns "${ns}" "${primary}" "${container}" \
 		iptables -D OUTPUT -p tcp --dport 443 \
 		-m string --algo bm --string "${endpoint}" \
 		-m comment --comment pgo-e2e-block-storage \
@@ -1863,23 +2081,22 @@ function ensure_aks_hugepages_nodepool() {
 	local cluster_name
 	local node_rg
 	local aks_id
+	local provider_id
 
-	node_rg="$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || true)"
-	[[ -n ${node_rg} ]] || return 1
+	provider_id="$(kubectl get nodes -o jsonpath='{.items[0].spec.providerID}')"
+	[[ -n ${provider_id} ]] || { echo 'Missing provider id' && return 1; }
 
-	aks_id="$(az aks list --subscription "${subscription}" \
-		--query "[?nodeResourceGroup=='$node_rg'] | [0].id" \
-		-o tsv 2>/dev/null || true)"
-	[[ -n ${aks_id} ]] || return 1
+	node_rg="${provider_id#*/resourceGroups/}"
+	node_rg="${node_rg%%/*}"
+	[[ -n ${node_rg} ]] || { echo 'Missing resource group in provider id' && return 1; }
+
+	aks_id="$(az aks list --subscription="${subscription}" \
+		--query "[].[id,nodeResourceGroup]" \
+		-o tsv 2>/dev/null | awk -v target="${node_rg}" 'tolower($2)==tolower(target){print $1; exit}' || true)"
+	[[ -n ${aks_id} ]] || { echo "Missing AKS ID based on node resource group '${node_rg}' (subscription '${subscription}'). Check az account/subscription context and cluster ownership." && return 1; }
 
 	cluster_name="$(echo "$aks_id" | $sed -E 's|.*/managedClusters/([^/]+)$|\1|I')"
-	[[ -n ${cluster_name} ]] || return 1
-
-	if [[ -z ${cluster_name} ]]; then
-		echo "AKS: can't detect cluster name from node labels."
-		echo "Skipping hugepages test."
-		return 1
-	fi
+	[[ -n ${cluster_name} ]] || { echo 'Missing cluster name in AKS ID' && return 1; }
 
 	echo "AKS cluster detected: ${cluster_name}"
 
@@ -2443,10 +2660,10 @@ function vault_tls() {
 	local name=${1:-vault-service}
 	local tmp_dir=$2
 
+	local vault_namespace="vault"
 	local service=$name
-	local namespace=$name
 	local secret_name=$name
-	local csr_name=vault-csr-${RANDOM}
+	local csr_name=vault-csr-${name}
 	local csr_signer
 
 	case ${PLATFORM} in
@@ -2461,10 +2678,10 @@ function vault_tls() {
 	openssl genrsa -out ${tmp_dir}/vault.key 2048
 	sed \
 		-e "s/<service>/${service}/g" \
-		-e "s/<namespace>/${namespace}/g" \
+		-e "s/<namespace>/${vault_namespace}/g" \
 		"${TESTS_CONFIG_DIR}/vault-csr.conf" >${tmp_dir}/csr.conf
 
-	openssl req -new -key ${tmp_dir}/vault.key -subj "/CN=system:node:${service}.${namespace}.svc;/O=system:nodes" -out ${tmp_dir}/server.csr -config ${tmp_dir}/csr.conf
+	openssl req -new -key ${tmp_dir}/vault.key -subj "/CN=system:node:${service}.${vault_namespace}.svc;/O=system:nodes" -out ${tmp_dir}/server.csr -config ${tmp_dir}/csr.conf
 
 	CSR_NAME="${csr_name}" \
 		CSR_REQUEST="$(base64 <${tmp_dir}/server.csr | tr -d '\n')" \
@@ -2487,7 +2704,7 @@ function vault_tls() {
 			| base64 -d >${tmp_dir}/vault.ca
 	fi
 	kubectl create secret generic ${secret_name} \
-		--namespace ${namespace} \
+		--namespace ${vault_namespace} \
 		--from-file=vault.key=${tmp_dir}/vault.key \
 		--from-file=vault.crt=${tmp_dir}/vault.crt \
 		--from-file=vault.ca=${tmp_dir}/vault.ca
@@ -2498,15 +2715,16 @@ function start_vault() {
 	local protocol=${2:-http}
 	local platform=kubernetes
 	local tmp_dir=$(mktemp -d)
+	local vault_namespace="vault"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		platform=openshift
 		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 	fi
 
-	create_namespace "$name" "skip_clean"
+	stop_vault "$name" || :
+	create_namespace "$vault_namespace" || :
 	helm repo add hashicorp https://helm.releases.hashicorp.com
-	helm uninstall "$name" || :
 
 	echo "install Vault $name"
 	local values_file="${tmp_dir}/vault.values.yaml"
@@ -2525,7 +2743,7 @@ function start_vault() {
 	helm install $name hashicorp/vault \
 		--disable-openapi-validation \
 		--version $VAULT_VER \
-		--namespace "$name" \
+		--namespace "$vault_namespace" \
 		--values "${values_file}"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
@@ -2536,33 +2754,44 @@ function start_vault() {
 	set +o xtrace
 	local retry=0
 	echo -n pod/$name-0
-	until kubectl -n ${name} get pod/$name-0 -o 'jsonpath={.status.containerStatuses[0].state}' 2>/dev/null | grep 'running'; do
+	until kubectl -n ${vault_namespace} get pod/$name-0 -o 'jsonpath={.status.containerStatuses[0].state}' 2>/dev/null | grep 'running'; do
 		echo -n .
 		sleep 1
 		let retry+=1
 		if [ "$retry" -ge 480 ]; then
-			kubectl -n ${name} describe pod/$name-0
-			kubectl -n ${name} logs $name-0
+			kubectl -n ${vault_namespace} describe pod/$name-0
+			kubectl -n ${vault_namespace} logs $name-0
 			echo max retry count "$retry" reached. something went wrong with vault
 			exit 1
 		fi
 	done
 
-	kubectl -n ${name} exec -it $name-0 -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json >"$tmp_dir/$name"
+	kubectl -n ${vault_namespace} exec -it $name-0 -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json >"$tmp_dir/$name"
 	local unsealKey=$(jq -r ".unseal_keys_b64[]" <"$tmp_dir/$name")
 	local token=$(jq -r ".root_token" <"$tmp_dir/$name")
 	sleep 10
 
-	kubectl -n ${name} exec -it $name-0 -- vault operator unseal -tls-skip-verify "$unsealKey"
-	kubectl -n ${name} exec -it $name-0 -- \
+	kubectl -n ${vault_namespace} exec -it $name-0 -- vault operator unseal -tls-skip-verify "$unsealKey"
+	kubectl -n ${vault_namespace} exec -it $name-0 -- \
 		sh -c "export VAULT_TOKEN=$token && export VAULT_LOG_LEVEL=trace \
                 && vault secrets enable --version=2 -path=tde kv \
                 && vault audit enable file file_path=/vault/vault-audit.log"
 	sleep 10
 
-	kubectl -n "${NAMESPACE}" create secret generic vault-secret \
+	kubectl -n "$NAMESPACE" create secret generic vault-secret \
 		--from-literal=token=${token} \
 		--from-file=ca.crt=${tmp_dir}/vault.ca
+}
+
+function stop_vault() {
+	local name=${1:-vault-service}
+	local vault_namespace="vault"
+
+	helm uninstall "$name" --namespace "$vault_namespace" || :
+	kubectl delete csr "vault-csr-${name}" --ignore-not-found || :
+	kubectl delete mutatingwebhookconfiguration ${name}-agent-injector-cfg --ignore-not-found || :
+	kubectl delete clusterrole,clusterrolebinding -l app.kubernetes.io/instance=${name} --ignore-not-found || :
+	destroy_namespace "$vault_namespace" || :
 }
 
 function issue_root_ca() {
