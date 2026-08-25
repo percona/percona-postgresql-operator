@@ -1134,3 +1134,79 @@ func TestPostgreSQL(t *testing.T) {
 			gocmp.Transformer("", (*postgres.HostBasedAuthentication).String))
 	})
 }
+
+// frontendAuthorityCert is the third of the operator's three CA resolvers, and
+// the only one without direct coverage. spec.tls.additionalTrustedCAs exists
+// because an issuer may return no ca.crt at all, so the anchor arriving from
+// that field alone has to be enough.
+func TestFrontendAuthorityCert(t *testing.T) {
+	t.Parallel()
+
+	caPEM := func(t *testing.T) []byte {
+		t.Helper()
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err, "bug in test")
+		text, err := root.Certificate.MarshalText()
+		assert.NilError(t, err, "bug in test")
+		return text
+	}
+	secretWithCA := func(ca []byte) *corev1.Secret {
+		return &corev1.Secret{Data: map[string][]byte{tlsAuthoritySecretKey: ca}}
+	}
+	certCount := func(b []byte) int {
+		return strings.Count(string(b), "-----BEGIN CERTIFICATE-----")
+	}
+
+	t.Run("PrefersTheInternalRoot", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		want, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+
+		got, err := frontendAuthorityCert(root, new(corev1.Secret), nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, want, got)
+	})
+
+	t.Run("UsesTheIssuedCA", func(t *testing.T) {
+		issued := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, issued, got)
+	})
+
+	t.Run("AdditionalCAsAloneAreEnough", func(t *testing.T) {
+		// An ACME issuer writes only tls.crt and tls.key. Without this the
+		// frontend bundle would be empty and reconciliation would fail.
+		extra := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, new(corev1.Secret), [][]byte{extra})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, extra, got)
+	})
+
+	t.Run("MergesIssuedAndAdditionalCAs", func(t *testing.T) {
+		issued, extra := caPEM(t), caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), [][]byte{extra})
+		assert.NilError(t, err)
+		assert.Equal(t, certCount(got), 2)
+		assert.DeepEqual(t, got, append(append([]byte{}, issued...), extra...))
+	})
+
+	t.Run("DuplicatesAreNotRepeated", func(t *testing.T) {
+		// Naming the issuer's own CA in additionalTrustedCAs must not grow the
+		// bundle on every reconcile.
+		issued := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), [][]byte{issued})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, issued, got)
+	})
+
+	t.Run("ErrorsWhenNothingSuppliesAnAnchor", func(t *testing.T) {
+		_, err := frontendAuthorityCert(nil, new(corev1.Secret), nil)
+		assert.ErrorContains(t, err, "additionalTrustedCAs")
+	})
+}
