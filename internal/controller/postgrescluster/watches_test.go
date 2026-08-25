@@ -10,11 +10,15 @@ import (
 	"gotest.tools/v3/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllertest"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestWatchCertManagerSecrets(t *testing.T) {
@@ -229,4 +233,62 @@ func TestWatchPodsUpdate(t *testing.T) {
 		}},
 	}, queue)
 	assert.Equal(t, queue.Len(), 1)
+}
+
+func TestWatchAdditionalTrustedCASecrets(t *testing.T) {
+	ctx := t.Context()
+
+	scheme := runtime.NewScheme()
+	assert.NilError(t, corev1.AddToScheme(scheme))
+	assert.NilError(t, v1beta1.AddToScheme(scheme))
+
+	referencing := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "referencing-cluster"},
+		Spec: v1beta1.PostgresClusterSpec{
+			TLS: &v1beta1.TLSSpec{
+				AdditionalTrustedCAs: []corev1.LocalObjectReference{{Name: "some-ca"}},
+			},
+		},
+	}
+	notReferencing := &v1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "other-cluster"},
+	}
+
+	cc := fake.NewClientBuilder().WithScheme(scheme).
+		WithIndex(&v1beta1.PostgresCluster{},
+			v1beta1.IndexFieldAdditionalTrustedCASecrets,
+			v1beta1.AdditionalTrustedCASecretsIndexerFunc).
+		WithObjects(referencing, notReferencing).
+		Build()
+
+	reconciler := &Reconciler{Client: cc}
+	h := reconciler.watchAdditionalTrustedCASecrets()
+
+	t.Run("secret not referenced by any cluster enqueues nothing", func(t *testing.T) {
+		queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "unrelated-ca"}}
+		h.Create(ctx, event.CreateEvent{Object: secret}, queue)
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("secret referenced by a cluster enqueues that cluster", func(t *testing.T) {
+		queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "some-ca"}}
+		h.Create(ctx, event.CreateEvent{Object: secret}, queue)
+		assert.Equal(t, queue.Len(), 1)
+
+		item, _ := queue.Get()
+		assert.Equal(t, item, reconcile.Request{NamespacedName: client.ObjectKey{
+			Namespace: "ns1",
+			Name:      "referencing-cluster",
+		}})
+		queue.Done(item)
+	})
+
+	t.Run("secret in a different namespace enqueues nothing", func(t *testing.T) {
+		queue := &controllertest.Queue{TypedInterface: workqueue.NewTyped[reconcile.Request]()}
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns2", Name: "some-ca"}}
+		h.Create(ctx, event.CreateEvent{Object: secret}, queue)
+		assert.Equal(t, queue.Len(), 0)
+	})
 }

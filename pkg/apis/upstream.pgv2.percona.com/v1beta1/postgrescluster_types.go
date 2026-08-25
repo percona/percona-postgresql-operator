@@ -250,6 +250,30 @@ var PGBouncerUserSecretsIndexerFunc client.IndexerFunc = func(obj client.Object)
 	return cluster.PGBouncerUserSecrets()
 }
 
+// AdditionalTrustedCASecrets returns the names of the Secrets referenced by
+// spec.tls.additionalTrustedCAs, for indexing and watching.
+func (cluster *PostgresCluster) AdditionalTrustedCASecrets() []string {
+	refs := cluster.Spec.TLS.GetAdditionalTrustedCAs()
+	if len(refs) == 0 {
+		return nil
+	}
+	names := make([]string, len(refs))
+	for i, ref := range refs {
+		names[i] = ref.Name
+	}
+	return names
+}
+
+const IndexFieldAdditionalTrustedCASecrets = "postgresCluster.additionalTrustedCASecrets" //nolint:gosec
+
+var AdditionalTrustedCASecretsIndexerFunc client.IndexerFunc = func(obj client.Object) []string {
+	cluster, ok := obj.(*PostgresCluster)
+	if !ok {
+		return nil
+	}
+	return cluster.AdditionalTrustedCASecrets()
+}
+
 type InitContainerSpec struct {
 	// +kubebuilder:validation:Required
 	Image                    string                       `json:"image,omitempty"`
