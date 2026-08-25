@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+# adding pg_cron to the custom list and to shared_preload_libraries restarts
+# every instance pod
+timeout: 420
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-extensions
+status:
+  installedCustomExtensions:
+  - pg_stat_kcache
+  - pg_cron
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

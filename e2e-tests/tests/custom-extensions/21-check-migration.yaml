@@ -1,0 +1,20 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      uri="postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
+
+      # moving an extension from spec.extensions.custom to a builtin flag must
+      # not drop it: the operator removes it from the custom list, but the
+      # builtin flag is enabled, so the extension and its data have to stay
+      installed=$(run_psql_local '\c postgres \\\ SELECT extname FROM pg_extension WHERE extname = $$pg_cron$$' "$uri" | tr -d '[:space:]')
+      [[ "$installed" == "pg_cron" ]] || { echo "ERROR: pg_cron was dropped by the custom to builtin migration"; exit 1; }
+
+      jobs=$(run_psql_local '\c postgres \\\ SELECT count(*) FROM cron.job WHERE jobname = $$migration-tick$$' "$uri" | tr -d '[:space:]')
+      [[ "$jobs" == "1" ]] || { echo "ERROR: cron.job data lost in the custom to builtin migration"; exit 1; }

@@ -852,6 +852,19 @@ func (r *PGClusterReconciler) handleMonitorUserPassChange(ctx context.Context, c
 	return nil
 }
 
+func builtInExtensionEnabled(cr *v2.PerconaPGCluster, name string) bool {
+	extensions := cr.Spec.Extensions
+
+	switch name {
+	case "pg_cron":
+		return ptr.Deref(extensions.PGCron.Enabled, false)
+	case "set_user":
+		return ptr.Deref(extensions.SetUser.Enabled, false)
+	}
+
+	return false
+}
+
 func (r *PGClusterReconciler) ensureMonitorUserSecret(ctx context.Context, cr *v2.PerconaPGCluster) (*corev1.Secret, error) {
 	log := logging.FromContext(ctx)
 
@@ -935,9 +948,14 @@ func (r *PGClusterReconciler) reconcileCustomExtensions(ctx context.Context, cr 
 		// Check for missing entries in crExtensions
 		for _, ext := range installedExtensions {
 			// If an object exists in installedExtensions but not in crExtensions, the extension should be deleted.
-			if _, ok := crExtensions[ext]; !ok {
-				removedExtensions = append(removedExtensions, ext)
+			if _, ok := crExtensions[ext]; ok {
+				continue
 			}
+
+			if builtInExtensionEnabled(cr, ext) {
+				continue
+			}
+			removedExtensions = append(removedExtensions, ext)
 		}
 
 		if len(removedExtensions) > 0 {

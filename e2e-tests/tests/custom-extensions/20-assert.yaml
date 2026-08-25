@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+# removing pg_cron from the custom list changes INSTALL_EXTENSIONS and restarts
+# every instance pod
+timeout: 600
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: custom-extensions
+status:
+  # pg_cron is gone from the custom list, it is managed as a builtin now
+  installedCustomExtensions:
+  - pg_stat_kcache
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

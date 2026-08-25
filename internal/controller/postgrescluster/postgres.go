@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ import (
 	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
 	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
+	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -195,6 +197,22 @@ func (r *Reconciler) generatePostgresUserSecret(
 	return intent, nil
 }
 
+// K8SPG-786
+func (r *Reconciler) customExtensionNames(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) ([]string, error) {
+	perconaPGCluster := &v2.PerconaPGCluster{}
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(cluster), perconaPGCluster)
+	if k8serrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "get PerconaPGCluster for custom extensions")
+	}
+
+	return perconaPGCluster.Status.InstalledCustomExtensions, nil
+}
+
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
 func (r *Reconciler) reconcilePostgresDatabases(
 	ctx context.Context,
@@ -266,6 +284,11 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// result is kept separately from the flag above.
 	var pgTdeRan bool
 	var pgTdeErr error
+
+	customExtensions, err := r.customExtensionNames(ctx, cluster)
+	if err != nil {
+		return err
+	}
 
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
@@ -358,6 +381,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",
 					"Unable to install pg_cron")
 			}
+		} else if slices.Contains(customExtensions, "pg_cron") {
+			pgCronOK = true
 		} else {
 			if pgCronOK = pgcron.DisableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronEnabled",
@@ -370,6 +395,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserDisabled",
 					"Unable to install set_user")
 			}
+		} else if slices.Contains(customExtensions, "set_user") {
+			setUserOK = true
 		} else {
 			if setUserOK = setuser.DisableInPostgreSQL(ctx, exec) == nil; !setUserOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserEnabled",

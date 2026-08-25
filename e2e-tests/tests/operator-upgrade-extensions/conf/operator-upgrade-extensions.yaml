@@ -1,0 +1,29 @@
+spec:
+  initContainer:
+    image: <extensions-image>
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          cron.use_background_workers: "on"
+  users:
+    - name: postgres
+      password:
+        type: AlphaNumeric
+  extensions:
+    image: <extensions-image>
+    imagePullPolicy: Always
+    storage:
+      type: s3
+      bucket: operator-testing
+      region: us-east-1
+      endpoint: http://minio-service:9000
+      forcePathStyle: true
+      disableSSL: true
+      secret:
+        name: minio-secret
+    builtin:
+      pg_stat_monitor: true
+      pg_audit: true
+      pgvector: true
+      pg_repack: true
