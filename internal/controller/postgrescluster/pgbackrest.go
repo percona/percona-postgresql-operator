@@ -2603,6 +2603,29 @@ func (r *Reconciler) reconcileDedicatedRepoHost(ctx context.Context,
 	return repoHost, nil
 }
 
+// K8SPG-992: manualBackupJobNeeded returns true if a backup job should be created
+// for the given PerconaPGBackup.
+func manualBackupJobNeeded(ctx context.Context, cl client.Reader, cluster *v1beta1.PostgresCluster, backupName string) (bool, error) {
+	pgBackup := new(v2.PerconaPGBackup)
+	err := cl.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: backupName}, pgBackup)
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	if pgBackup.Spec.PGCluster != cluster.Name {
+		return false, nil
+	}
+
+	if !pgBackup.DeletionTimestamp.IsZero() || pgBackup.Status.State.IsTerminal() {
+		return false, nil
+	}
+
+	return pgBackup.Status.JobName == "", nil
+}
+
 // +kubebuilder:rbac:groups="batch",resources="jobs",verbs={create,patch,delete}
 
 // reconcileManualBackup is responsible for reconciling pgBackRest backups that are initiated
@@ -2730,6 +2753,17 @@ func (r *Reconciler) reconcileManualBackup(ctx context.Context,
 	// that has reached a "completed" or "failed" status is no longer reconciled)
 	if manualStatus != nil && manualStatus.Finished {
 		return nil
+	}
+
+	// K8SPG-992: we need this check to eliminate possibility of creating a second backup Job for the same PerconaPGBackup.
+	if currentBackupJob == nil {
+		needsJob, err := manualBackupJobNeeded(ctx, r.apiReader(), postgresCluster, manualAnnotation)
+		if err != nil {
+			return err
+		}
+		if !needsJob {
+			return nil
+		}
 	}
 
 	// determine if the dedicated repository host is ready using the repo host ready

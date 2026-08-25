@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # cert-manager appears in the cluster AFTER the PKI cluster exists — K8SPG-1017 trigger
+      deploy_cert_manager

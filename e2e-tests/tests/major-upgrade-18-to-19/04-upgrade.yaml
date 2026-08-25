@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # see 01-create-cluster.yaml: the whole test runs on community images
+      export PG_DISTRIBUTION=community
+
+      source ../../functions
+
+      kubectl apply -n ${NAMESPACE} -f - <<-EOF
+        apiVersion: pgv2.percona.com/v2
+        kind: PerconaPGUpgrade
+        metadata:
+          name: 18-to-19
+        spec:
+          postgresClusterName: major-upgrade-18-to-19
+          image: $(get_container_image "upgrade" 19)
+          fromPostgresVersion: 18
+          toPostgresVersion: 19
+          toPostgresImage: $(get_container_image "postgres" 19)
+          toPgBouncerImage: $(get_container_image "pgbouncer" 19)
+          toPgBackRestImage: $(get_container_image "pgbackrest" 19)
+      EOF

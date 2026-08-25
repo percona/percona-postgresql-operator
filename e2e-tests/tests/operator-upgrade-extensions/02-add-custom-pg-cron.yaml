@@ -1,0 +1,18 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 420
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" patch perconapgcluster ${test_name} --type merge -p '{
+        "spec": {
+          "extensions": {"custom": [{"name": "pg_cron", "version": "1.6.6"}]},
+          "patroni": {"dynamicConfiguration": {"postgresql": {"parameters": {"shared_preload_libraries": "pg_cron"}}}}
+        }
+      }'
+      sleep 7 # wait for reconcile loop
+      wait_cluster_consistency ${test_name}

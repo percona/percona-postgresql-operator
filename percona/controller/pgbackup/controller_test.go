@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,30 +32,30 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 	ctx := feature.NewContext(t.Context(), gate)
 
 	tests := []struct {
-		name          string
-		deleteCluster bool
-		snapshot      bool
-		expectedError string
+		name                   string
+		deleteBackupsFinalizer bool
+		snapshot               bool
+		expectedError          string
 	}{
 		{
-			name:          "cluster is deleted",
-			deleteCluster: true,
+			name:          "cluster without delete-backups finalizer is deleted",
 			expectedError: "PerconaPGCluster test-cluster is not found",
 		},
 		{
-			name:          "cluster is terminating",
-			expectedError: "PerconaPGCluster test-cluster is being deleted",
+			name:                   "cluster with delete-backups finalizer is terminating",
+			deleteBackupsFinalizer: true,
+			expectedError:          "PerconaPGCluster test-cluster is being deleted",
 		},
 		{
-			name:          "cluster is deleted during snapshot",
-			deleteCluster: true,
+			name:          "cluster without delete-backups finalizer is deleted during snapshot",
 			snapshot:      true,
 			expectedError: "PerconaPGCluster test-cluster is not found",
 		},
 		{
-			name:          "cluster is terminating during snapshot",
-			snapshot:      true,
-			expectedError: "PerconaPGCluster test-cluster is being deleted",
+			name:                   "cluster with delete-backups finalizer is terminating during snapshot",
+			deleteBackupsFinalizer: true,
+			snapshot:               true,
+			expectedError:          "PerconaPGCluster test-cluster is being deleted",
 		},
 	}
 
@@ -62,7 +63,9 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster, err := readDefaultCR("test-cluster", "test-namespace")
 			require.NoError(t, err)
-			cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			if tt.deleteBackupsFinalizer {
+				cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			}
 			if tt.snapshot {
 				cluster.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
 					Mode:      v2.VolumeSnapshotModeOffline,
@@ -80,7 +83,10 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 					PGCluster: cluster.Name,
 					RepoName:  new("repo1"),
 				},
-				Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+				Status: v2.PerconaPGBackupStatus{
+					State:   v2.BackupRunning,
+					JobName: "test-backup-job",
+				},
 			}
 			if tt.snapshot {
 				backup.Spec.Method = new(v2.BackupMethodVolumeSnapshot)
@@ -93,6 +99,13 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 			}
 
 			objects := []client.Object{backup}
+			if !tt.snapshot {
+				objects = append(objects, &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Name:       backup.Status.JobName,
+					Namespace:  backup.Namespace,
+					Finalizers: []string{pNaming.FinalizerKeepJob},
+				}})
+			}
 			if tt.snapshot {
 				holder := backupLeaseHolder(backup)
 				objects = append(objects, &coordinationv1.Lease{
@@ -108,11 +121,6 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 			cl, err := buildFakeClient(ctx, cluster, objects...)
 			require.NoError(t, err)
 			require.NoError(t, cl.Delete(ctx, cluster))
-			if tt.deleteCluster {
-				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
-				cluster.Finalizers = nil
-				require.NoError(t, cl.Update(ctx, cluster))
-			}
 
 			r := &PGBackupReconciler{Client: cl}
 			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
@@ -133,10 +141,175 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 				}, new(coordinationv1.Lease))
 				assert.True(t, k8serrors.IsNotFound(err))
 			} else {
+				assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+
+				err = cl.Get(ctx, client.ObjectKey{
+					Name: backup.Status.JobName, Namespace: backup.Namespace,
+				}, new(batchv1.Job))
+				assert.True(t, k8serrors.IsNotFound(err))
+
+				_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+				require.NoError(t, err)
+				require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
 				assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
 			}
 		})
 	}
+}
+
+func TestReconcileDeletesStartingBackupJobWhenClusterIsDeleted(t *testing.T) {
+	ctx := t.Context()
+	tests := []struct {
+		name                   string
+		deleteBackupsFinalizer bool
+		expectedError          string
+	}{
+		{
+			name:          "cluster without delete-backups finalizer is deleted",
+			expectedError: "PerconaPGCluster test-cluster is not found",
+		},
+		{
+			name:                   "cluster with delete-backups finalizer is terminating",
+			deleteBackupsFinalizer: true,
+			expectedError:          "PerconaPGCluster test-cluster is being deleted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := readDefaultCR("test-cluster", "test-namespace")
+			require.NoError(t, err)
+			if tt.deleteBackupsFinalizer {
+				cluster.Finalizers = []string{pNaming.FinalizerDeleteBackups}
+			}
+
+			backup := &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-backup",
+					Namespace:  cluster.Namespace,
+					Finalizers: []string{pNaming.FinalizerDeleteBackup},
+				},
+				Spec: v2.PerconaPGBackupSpec{
+					PGCluster: cluster.Name,
+					RepoName:  new("repo1"),
+				},
+				Status: v2.PerconaPGBackupStatus{State: v2.BackupStarting},
+			}
+			job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-backup-xff6",
+				Namespace: backup.Namespace,
+				Labels: naming.PGBackRestBackupJobLabels(
+					cluster.Name, *backup.Spec.RepoName, naming.BackupManual,
+				),
+				Annotations: map[string]string{
+					naming.PGBackRestBackup: backup.Name,
+				},
+				Finalizers: []string{pNaming.FinalizerKeepJob},
+			}}
+
+			cl, err := buildFakeClient(ctx, cluster, backup, job)
+			require.NoError(t, err)
+			require.NoError(t, cl.Delete(ctx, cluster))
+
+			r := &PGBackupReconciler{Client: cl}
+			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)}
+			_, err = r.Reconcile(ctx, request)
+			require.NoError(t, err)
+
+			updated := new(v2.PerconaPGBackup)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.Equal(t, v2.BackupFailed, updated.Status.State)
+			assert.Equal(t, tt.expectedError, updated.Status.Error)
+			assert.Empty(t, updated.Status.JobName)
+			assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+
+			err = cl.Get(ctx, client.ObjectKeyFromObject(job), new(batchv1.Job))
+			assert.True(t, k8serrors.IsNotFound(err))
+
+			_, err = r.Reconcile(ctx, request)
+			require.NoError(t, err)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.NotContains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+		})
+	}
+}
+
+func TestReconcileDeletesJobWhenStartingBackupIsDeleted(t *testing.T) {
+	ctx := t.Context()
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+
+	backup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-backup",
+			Namespace:  cluster.Namespace,
+			Finalizers: []string{pNaming.FinalizerDeleteBackup},
+		},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{State: v2.BackupStarting},
+	}
+	cluster.Annotations[naming.PGBackRestBackup] = backup.Name
+	cluster.Annotations[pNaming.AnnotationBackupInProgress] = backup.Name
+
+	job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+		Name:      "test-cluster-backup-xff6",
+		Namespace: backup.Namespace,
+		Labels: naming.PGBackRestBackupJobLabels(
+			cluster.Name, *backup.Spec.RepoName, naming.BackupManual,
+		),
+		Annotations: map[string]string{
+			naming.PGBackRestBackup: backup.Name,
+		},
+		Finalizers: []string{pNaming.FinalizerKeepJob},
+	}}
+
+	cl, err := buildFakeClient(ctx, cluster, backup, job)
+	require.NoError(t, err)
+	require.NoError(t, cl.Delete(ctx, backup))
+
+	r := &PGBackupReconciler{Client: cl}
+	request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)}
+	_, err = r.Reconcile(ctx, request)
+	require.NoError(t, err)
+
+	updated := new(v2.PerconaPGBackup)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+	assert.False(t, updated.DeletionTimestamp.IsZero())
+	assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+	assert.Equal(t, job.Name, updated.Status.JobName)
+
+	currentJob := new(batchv1.Job)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(job), currentJob))
+	assert.True(t, currentJob.DeletionTimestamp.IsZero())
+	assert.Contains(t, currentJob.Finalizers, pNaming.FinalizerKeepJob)
+
+	// The next reconciliation waits for Crunchy to observe the annotation cleanup,
+	// so the Job is left untouched.
+	_, err = r.Reconcile(ctx, request)
+	require.NoError(t, err)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(job), currentJob))
+	assert.True(t, currentJob.DeletionTimestamp.IsZero())
+	assert.Contains(t, currentJob.Finalizers, pNaming.FinalizerKeepJob)
+
+	currentCluster := new(v2.PerconaPGCluster)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster))
+	delete(currentCluster.Annotations, naming.PGBackRestBackup)
+	delete(currentCluster.Annotations, pNaming.AnnotationBackupInProgress)
+	require.NoError(t, cl.Update(ctx, currentCluster))
+
+	crunchyCluster := new(v1beta1.PostgresCluster)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), crunchyCluster))
+	delete(crunchyCluster.Annotations, pNaming.ToCrunchyAnnotation(naming.PGBackRestBackup))
+	delete(crunchyCluster.Annotations, pNaming.ToCrunchyAnnotation(pNaming.AnnotationBackupInProgress))
+	require.NoError(t, cl.Update(ctx, crunchyCluster))
+
+	_, err = r.Reconcile(ctx, request)
+	require.NoError(t, err)
+	err = cl.Get(ctx, client.ObjectKeyFromObject(job), new(batchv1.Job))
+	assert.True(t, k8serrors.IsNotFound(err))
 }
 
 func TestReconcileNotUpdatingOldBackup(t *testing.T) {

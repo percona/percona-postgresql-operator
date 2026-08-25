@@ -1,0 +1,39 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
+      run_psql_local 'CREATE DATABASE myapp' "$uri" || true
+      run_psql_local '\c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY)' "$uri"
+      run_psql_local '\c myapp \\\ INSERT INTO myApp VALUES (100500) ON CONFLICT DO NOTHING' "$uri"
+
+      snapshot_tls_fingerprints ${test_name} ${TEMP_DIR}/tls.before
+      snapshot_workload_revisions ${test_name} ${TEMP_DIR}/revisions.before
+
+      # sanity: PKI actually issued something
+      [[ -s ${TEMP_DIR}/tls.before ]] || { echo "ERROR: no TLS secrets found for baseline"; exit 1; }
+
+      # premise check: the cluster MUST be operator-PKI issued at this point.
+      # The operator keeps PKI for an existing cluster only when its root CA secret
+      # carries no cert-manager annotation (see isRootCACertManagerManaged).
+      ca_annotation=$(kubectl -n "${NAMESPACE}" get secret ${test_name}-pgbackrest-ca \
+        -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+      if [[ -z "$ca_annotation" ]]; then
+          ca_annotation=$(kubectl -n "${NAMESPACE}" get secrets -l postgres-operator.crunchydata.com/cluster=${test_name} \
+            -o jsonpath='{range .items[*]}{.metadata.annotations.cert-manager\.io/certificate-name}{"\n"}{end}' | grep -v '^$' || true)
+      fi
+      if [[ -n "$ca_annotation" ]]; then
+          echo "ERROR: cluster TLS is already cert-manager managed ('$ca_annotation') - the PKI premise is broken."
+          echo "HINT: cert-manager was present when the cluster was created (leftover from a previous run?)."
+          exit 1
+      fi
+      if [[ -n "$(kubectl -n "${NAMESPACE}" get certificates.cert-manager.io -o name 2>/dev/null)" ]]; then
+          echo "ERROR: cert-manager Certificates already exist before step 03 - the PKI premise is broken."
+          exit 1
+      fi

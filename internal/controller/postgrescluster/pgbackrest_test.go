@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1134,6 +1135,7 @@ func TestReconcileManualBackup(t *testing.T) {
 			Tracer:   otel.Tracer(ControllerName),
 			Owner:    ControllerName,
 		}
+		r.APIReader = mgr.GetAPIReader()
 	})
 	t.Cleanup(func() { teardownManager(cancel, t) })
 
@@ -1144,9 +1146,11 @@ func TestReconcileManualBackup(t *testing.T) {
 	fakeJob := func(clusterName, repoName string) *batchv1.Job {
 		return &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        "manual-backup-" + rand.String(4),
-				Namespace:   ns.GetName(),
-				Annotations: map[string]string{naming.PGBackRestBackup: defaultBackupId},
+				Name:      "manual-backup-" + rand.String(4),
+				Namespace: ns.GetName(),
+				Annotations: map[string]string{
+					naming.PGBackRestBackup: clusterName + "-" + defaultBackupId,
+				},
 				Labels: naming.PGBackRestBackupJobLabels(clusterName, repoName,
 					naming.BackupManual),
 			},
@@ -1186,6 +1190,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		status *v1beta1.PostgresClusterStatus
 		// the ID used to populate the "backup" annotation for the test (can be empty)
 		backupId string
+		// K8SPG-992: whether to skip creating the PerconaPGBackup that owns the backup ID
+		noPGBackup bool
 		// the manual backup field to define in the postgrescluster spec for the test
 		manual *v1beta1.PGBackRestManualBackup
 		// whether or not the test should expect a Job to be reconciled
@@ -1393,6 +1399,23 @@ func TestReconcileManualBackup(t *testing.T) {
 		expectReconcile:          true,
 		verifyStaleJobConflict:   true,
 	}, {
+		testDesc:         "no PerconaPGBackup for backup id should not reconcile",
+		createCurrentJob: false,
+		noPGBackup:       true,
+		clusterConditions: map[string]metav1.ConditionStatus{
+			ConditionRepoHostReady: metav1.ConditionTrue,
+			ConditionReplicaCreate: metav1.ConditionTrue,
+		},
+		status: &v1beta1.PostgresClusterStatus{
+			PGBackRest: &v1beta1.PGBackRestStatus{
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
+		},
+		backupId:                 backupId,
+		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
+		expectCurrentJobDeletion: false,
+		expectReconcile:          false,
+	}, {
 		testDesc:         "reconcile new job when in-progress job exists for another id",
 		createCurrentJob: true,
 		clusterConditions: map[string]metav1.ConditionStatus{
@@ -1460,12 +1483,33 @@ func TestReconcileManualBackup(t *testing.T) {
 
 				ctx := context.Background()
 
+				if !tc.noPGBackup {
+					for _, id := range []string{defaultBackupId, backupId} {
+						assert.NilError(t, tClient.Create(ctx, &v2.PerconaPGBackup{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      clusterName + "-" + id,
+								Namespace: ns.GetName(),
+							},
+							Spec: v2.PerconaPGBackupSpec{
+								PGCluster: clusterName,
+								RepoName:  new("repo1"),
+							},
+						}))
+					}
+				}
+
 				postgresCluster := fakePostgresCluster(clusterName, ns.GetName(), "", dedicated)
 				postgresCluster.Spec.Backups.PGBackRest.Manual = tc.manual
-				postgresCluster.Annotations = map[string]string{naming.PGBackRestBackup: tc.backupId}
+				postgresCluster.Annotations = map[string]string{}
+				if tc.backupId != "" {
+					postgresCluster.Annotations[naming.PGBackRestBackup] = clusterName + "-" + tc.backupId
+				}
 				assert.NilError(t, tClient.Create(ctx, postgresCluster))
 
-				postgresCluster.Status = *tc.status
+				postgresCluster.Status = *tc.status.DeepCopy()
+				if mb := postgresCluster.Status.PGBackRest.ManualBackup; mb != nil {
+					mb.ID = clusterName + "-" + mb.ID
+				}
 				for condition, status := range tc.clusterConditions {
 					meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
 						Type: condition, Reason: "testing", Status: status,
@@ -4860,4 +4904,87 @@ func TestPgBackRestCACert(t *testing.T) {
 		_, err := pgBackRestCACert(nil, secretWithCA([]byte("not a cert")), &corev1.Secret{}, nil)
 		assert.ErrorContains(t, err, "failed to parse CA certificate")
 	})
+}
+
+// K8SPG-992
+func TestManualBackupJobNeeded(t *testing.T) {
+	backup := func(f func(*v2.PerconaPGBackup)) *v2.PerconaPGBackup {
+		b := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup1", Namespace: "postgres-operator"},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: "hippo",
+				RepoName:  new("repo1"),
+			},
+		}
+		if f != nil {
+			f(b)
+		}
+		return b
+	}
+
+	for _, tt := range []struct {
+		name     string
+		pgBackup *v2.PerconaPGBackup
+		expected bool
+	}{{
+		name:     "no PerconaPGBackup",
+		expected: false,
+	}, {
+		name:     "new backup without a Job",
+		pgBackup: backup(nil),
+		expected: true,
+	}, {
+		name: "starting backup without a Job",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupStarting
+		}),
+		expected: true,
+	}, {
+		name: "backup that already had a Job",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupRunning
+			b.Status.JobName = "hippo-backup-abcd"
+		}),
+		expected: false,
+	}, {
+		name: "backup for another cluster",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Spec.PGCluster = "elephant"
+		}),
+		expected: false,
+	}, {
+		name: "backup being deleted",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.DeletionTimestamp = new(metav1.Now())
+			b.Finalizers = []string{"internal.percona.com/delete-backup"}
+		}),
+		expected: false,
+	}, {
+		name: "failed backup",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupFailed
+		}),
+		expected: false,
+	}, {
+		name: "succeeded backup",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupSucceeded
+		}),
+		expected: false,
+	}} {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(runtime.Scheme)
+			if tt.pgBackup != nil {
+				builder = builder.WithObjects(tt.pgBackup)
+			}
+
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "hippo", Namespace: "postgres-operator"},
+			}
+
+			needed, err := manualBackupJobNeeded(t.Context(), builder.Build(), cluster, "backup1")
+			assert.NilError(t, err)
+			assert.Equal(t, needed, tt.expected)
+		})
+	}
 }

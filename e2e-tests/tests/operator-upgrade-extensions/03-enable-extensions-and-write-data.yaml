@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
+
+      for ext in pg_stat_monitor pgaudit vector pg_repack pg_cron; do
+          run_psql_local "\c postgres \\\\\\ CREATE EXTENSION IF NOT EXISTS \"$ext\"" "$uri"
+      done
+
+      # workloads that must survive the operator update
+      run_psql_local 'CREATE TABLE IF NOT EXISTS cron_log (ts timestamptz)' "$uri"
+      run_psql_local 'SELECT cron.schedule($$tick$$,$$* * * * *$$,$$INSERT INTO cron_log VALUES (now())$$)' "$uri"
+      run_psql_local 'CREATE TABLE IF NOT EXISTS vec (e vector(3))' "$uri"
+      run_psql_local 'INSERT INTO vec VALUES ($$[1,2,3]$$)' "$uri"
+
+      run_psql_local 'SELECT extname||$$=$$||extversion FROM pg_extension ORDER BY 1' "$uri" \
+        | grep -v '^$' > ${TEMP_DIR}/ext.before
+      cat ${TEMP_DIR}/ext.before

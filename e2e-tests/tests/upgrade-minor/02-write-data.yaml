@@ -1,5 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 120
 commands:
   - script: |-
       set -o errexit
@@ -10,7 +11,21 @@ commands:
       run_psql_local \
         'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
         "postgres:$(get_psql_user_pass upgrade-minor-pguser-postgres)@$(get_psql_user_host upgrade-minor-pguser-postgres)"
-      
+
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
         "postgres:$(get_psql_user_pass upgrade-minor-pguser-postgres)@$(get_psql_user_host upgrade-minor-pguser-postgres)"
+
+      # full backup taken by the RELEASED operator (restored later in step 08
+      # by the operator under test — cross-version backup compatibility)
+      kubectl -n "${NAMESPACE}" apply -f - << BACKUP
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      metadata:
+        name: backup-before-update
+      spec:
+        pgCluster: ${test_name}
+        repoName: repo2
+        options:
+          - --type=full
+      BACKUP

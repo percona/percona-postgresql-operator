@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 100
+timeout: 120
 commands:
   - script: |-
       set -o errexit
@@ -31,15 +31,26 @@ commands:
       backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
       pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
       postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+      operator_image=$(get_version_images $lower_ver OPERATOR)
+
+      yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
+        "${TEMP_DIR}/cr_lower.yaml" ../../tests/upgrade-minor/conf/upgrade-minor.yaml \
+        >"${TEMP_DIR}/cr.yaml"
 
       yq -i eval '
           .metadata.name = "'${test_name}'" |
           .metadata.labels = {"e2e":"'${test_name}'"} |
-          .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
           .spec.postgresVersion = '$pg_ver' |
+          .spec.initContainer.image = "'${REGISTRY_NAME_FULL}''${operator_image}'" |
+          .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
           .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
-          .spec.backups.pgbackrest.repos[0].schedules = null |
-          .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'" |
-          .spec.users += [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
-          .spec.users += [{"name":"'${test_name}'","password":{"type":"AlphaNumeric"}}]' "${TEMP_DIR}/cr_lower.yaml"
-      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
+          .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'"' "${TEMP_DIR}/cr.yaml"
+
+      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      $sed -i "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" "${TEMP_DIR}/cr.yaml"
+      # yq may unquote "n" turning it into YAML boolean — restore the quoting
+      $sed -i 's|repo2-s3-verify-tls: n$|repo2-s3-verify-tls: "n"|' "${TEMP_DIR}/cr.yaml"
+
+      yq '.spec.crVersion' "${TEMP_DIR}/cr_lower.yaml" >"${TEMP_DIR}/cr_ver_released.txt"
+
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr.yaml"

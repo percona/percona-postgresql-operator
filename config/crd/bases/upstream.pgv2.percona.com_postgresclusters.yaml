@@ -11144,7 +11144,7 @@ spec:
               postGISVersion:
                 type: string
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:

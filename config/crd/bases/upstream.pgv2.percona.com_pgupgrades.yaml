@@ -1263,7 +1263,7 @@ spec:
               toPostgresImage:
                 type: string
               toPostgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 13
                 type: integer
               tolerations:

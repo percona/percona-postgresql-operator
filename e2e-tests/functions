@@ -347,7 +347,7 @@ function deploy_s3_secrets() {
 	kubectl -n "$NAMESPACE" create secret generic "${test_name}-pgbackrest-secrets" "${secret_args[@]}"
 
 	case $test_name in
-		"custom-extensions" | "builtin-extensions" | major-upgrade*)
+		"custom-extensions" | "builtin-extensions" | "operator-upgrade-extensions" | major-upgrade*)
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/cloud-secret.yml"
 			kubectl -n "$NAMESPACE" apply -f "$TESTS_CONFIG_DIR/minio-secret.yml"
 			;;
@@ -1399,6 +1399,7 @@ function get_container_image() {
 			pgbouncer) key="IMAGE_PGBOUNCER${pgVersion}" ;;
 			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
 			postgis) key="IMAGE_POSTGIS${pgVersion}" ;;
+			upgrade) key="IMAGE_UPGRADE${pgVersion}" ;;
 			*) key="IMAGE_POSTGRESQL${pgVersion}" ;;
 		esac
 		get_release_image "$key"
@@ -1413,8 +1414,35 @@ function get_container_image() {
 		operatorVersion=main
 	fi
 
+	# Community images are built from upstream PGDG packages and published under
+	# their own tags. pgBouncer is version agnostic there, so a single image
+	# serves every PostgreSQL version. PostgreSQL 19 is the exception: it is in
+	# beta and its images carry the version in the tag, because they are built
+	# separately (PGDG testing packages, pgBackRest 2.59, PG 19 upgrade binaries).
+	if [[ ${PG_DISTRIBUTION} == "community" ]]; then
+		case $component in
+			pgbouncer)
+				echo "${IMAGE_BASE}:${operatorVersion}-pgbouncer-community"
+				;;
+			pgbackrest | upgrade)
+				if [[ ${pgVersion} -ge 19 ]]; then
+					echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+				else
+					echo "${IMAGE_BASE}:${operatorVersion}-${component}-community"
+				fi
+				;;
+			*)
+				echo "${IMAGE_BASE}:${operatorVersion}-postgres${pgVersion}-community"
+				;;
+		esac
+		return
+	fi
+
 	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
 		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	elif [[ $component == 'upgrade' ]]; then
+		# a single upgrade image carries every supported version
+		echo "${IMAGE_BASE}:${operatorVersion}-upgrade"
 	elif [[ $component == 'postgis' ]]; then
 		# the docker build job publishes postgis images as ...-ppg<V>-postgres-gis
 		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-postgres-gis"
@@ -2296,6 +2324,119 @@ function verify_k8s_nodes_version() {
 			return 1
 		fi
 	done
+}
+
+# Save sts update revisions + deployment revisions of the cluster workloads.
+snapshot_workload_revisions() {
+	local cluster="$1" out="$2"
+	kubectl -n "$NAMESPACE" get sts -l postgres-operator.crunchydata.com/cluster="$cluster" \
+		-o jsonpath='{range .items[*]}{.metadata.name}={.status.updateRevision}{"\n"}{end}' >"$out"
+	kubectl -n "$NAMESPACE" get deploy -l postgres-operator.crunchydata.com/cluster="$cluster" \
+		-o jsonpath='{range .items[*]}{.metadata.name}={.metadata.annotations.deployment\.kubernetes\.io/revision}{"\n"}{end}' >>"$out"
+}
+
+# Fail if any sts/deploy revision changed (operator-driven rollout).
+# Container restarts are tolerated only on pods whose node was evicted.
+assert_no_operator_rollout() {
+	local cluster="$1" baseline="$2" current="${TEMP_DIR}/revisions.current"
+	snapshot_workload_revisions "$cluster" "$current"
+	if ! diff -u "$baseline" "$current"; then
+		echo "ERROR: workload revisions changed - operator triggered a rollout"
+		return 1
+	fi
+	local restarted
+	restarted=$(kubectl -n "$NAMESPACE" get pods -l postgres-operator.crunchydata.com/cluster="$cluster" \
+		-o jsonpath='{range .items[*]}{.metadata.name}={.status.containerStatuses[*].restartCount}{"\n"}{end}' \
+		| grep -Ev '=(0 ?)*0?$' | cut -d= -f1 || true)
+	local pod
+	for pod in $restarted; do
+		if ! kubectl -n "$NAMESPACE" get events --field-selector involvedObject.name="$pod" \
+			-o jsonpath='{range .items[*]}{.reason}{"\n"}{end}' | grep -qE 'TaintManagerEviction|NodeNotReady|Preempt'; then
+			echo "ERROR: pod $pod restarted without node eviction"
+			return 1
+		fi
+	done
+	return 0
+}
+
+# sha256 of tls.crt of every TLS-bearing secret of the cluster.
+snapshot_tls_fingerprints() {
+	local cluster="$1" out="$2" s crt
+	: >"$out"
+	for s in $(kubectl -n "$NAMESPACE" get secrets -l postgres-operator.crunchydata.com/cluster="$cluster" -o name); do
+		crt=$(kubectl -n "$NAMESPACE" get "$s" -o jsonpath='{.data.tls\.crt}')
+		if [[ -n $crt ]]; then
+			echo "${s}=$(echo "$crt" | sha256sum | awk '{print $1}')" >>"$out"
+		fi
+	done
+	sort -o "$out" "$out"
+}
+
+assert_tls_unchanged() {
+	local current="${TEMP_DIR}/tls.current"
+	snapshot_tls_fingerprints "$1" "$current"
+	if ! diff -u "$2" "$current"; then
+		echo "ERROR: TLS certificates were re-issued"
+		return 1
+	fi
+}
+
+# Background INSERT loop through pgbouncer; pid stored in TEMP_DIR.
+start_heartbeat() {
+	local cluster="$1"
+	local uri="postgres:$(get_psql_user_pass ${cluster}-pguser-postgres)@$(get_psql_user_host ${cluster}-pguser-postgres)"
+	run_psql_local 'CREATE TABLE IF NOT EXISTS heartbeat (ts timestamptz)' "$uri"
+	(
+		set +o xtrace
+		while true; do
+			run_psql_local 'INSERT INTO heartbeat VALUES (now())' "$uri" || true
+			sleep 2
+		done
+	) >/dev/null 2>&1 &
+	echo $! >"${TEMP_DIR}/heartbeat.pid"
+}
+
+assert_heartbeat_gap() {
+	local cluster="$1" max_gap="$2"
+	kill "$(cat "${TEMP_DIR}/heartbeat.pid")" 2>/dev/null || true
+	local uri="postgres:$(get_psql_user_pass ${cluster}-pguser-postgres)@$(get_psql_user_host ${cluster}-pguser-postgres)"
+	local gap
+	gap=$(run_psql_local 'SELECT COALESCE(ceil(EXTRACT(EPOCH FROM max(ts - prev)))::int,0) FROM (SELECT ts, lag(ts) OVER (ORDER BY ts) AS prev FROM heartbeat) g' "$uri" | tr -d '[:space:]')
+	echo "heartbeat max gap: ${gap}s (limit ${max_gap}s)"
+	if [[ -z "$gap" || "$gap" -gt "$max_gap" ]]; then
+		echo "ERROR: heartbeat gap '${gap}' exceeds ${max_gap}s"
+		return 1
+	fi
+}
+
+# Scan operator + postgres logs and Warning events since a timestamp.
+check_logs_for_errors() {
+	local cluster="$1" since="$2" allow="$3" fail=0 pod f
+	local op_ns="${OPERATOR_NS:-$NAMESPACE}"
+	rm -f "${TEMP_DIR}"/log_errors_*.txt
+	# the operator logs JSON only with LOG_STRUCTURED=true, deploy/operator.yaml
+	# sets it to false, so match the console encoder format as well
+	kubectl -n "$op_ns" logs deployment/percona-postgresql-operator --since-time="$since" 2>/dev/null \
+		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
+	for pod in $(kubectl -n "$NAMESPACE" get pods -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/data=postgres -o name); do
+		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
+			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true
+	done
+	# event messages can be multi-line (pgBackRest output): fold every event back
+	# into a single line, otherwise the continuation lines pass both the
+	# timestamp filter and the allowlist, which only matches the first line
+	kubectl -n "$NAMESPACE" get events --field-selector type=Warning \
+		-o jsonpath='{range .items[*]}{.lastTimestamp} {.involvedObject.name} {.reason} {.message}{"\n"}{end}' 2>/dev/null \
+		| awk '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T/ {if (rec != "") print rec; rec = $0; next} {rec = rec " " $0} END {if (rec != "") print rec}' \
+		| awk -v s="$since" '$1 >= s' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_events.txt" || true
+	for f in operator postgres events; do
+		if [[ -s "${TEMP_DIR}/log_errors_${f}.txt" ]]; then
+			echo "=== unexpected ${f} errors since ${since} ==="
+			cat "${TEMP_DIR}/log_errors_${f}.txt"
+			fail=1
+		fi
+	done
+	return $fail
 }
 
 function vault_tls() {
