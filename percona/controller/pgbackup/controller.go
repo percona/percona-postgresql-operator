@@ -254,7 +254,7 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		// Fail if the Job hasn't appeared within the configured startup timeout.
 		// Once the Job exists, activeDeadlineSeconds (from BackupJobs config) handles runtime timeout.
 		startupDeadline := int64(600) // Default to 10 minutes
-		if pgCluster != nil && pgCluster.Spec.Backups.PGBackRest.Jobs.StartupDeadlineSeconds != nil {
+		if pgCluster != nil && pgCluster.Spec.Backups.PGBackRest.Jobs != nil && pgCluster.Spec.Backups.PGBackRest.Jobs.StartupDeadlineSeconds != nil {
 			startupDeadline = *pgCluster.Spec.Backups.PGBackRest.Jobs.StartupDeadlineSeconds
 		}
 		if time.Since(pgBackup.CreationTimestamp.Time) > time.Duration(startupDeadline)*time.Second {
