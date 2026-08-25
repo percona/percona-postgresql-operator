@@ -254,9 +254,14 @@ func Pod(
 		Sources: append(
 			append(append([]corev1.VolumeProjection{},
 				podConfigFiles(inCluster, inConfigMap, inSecret)...),
+				// Whether the merged bundle is mounted has to follow whether
+				// Secret() actually wrote it, not what the spec asks for. The
+				// two disagree in more than one configuration - userProvidedOnly
+				// drops the cluster-wide CAs, and a referenced Secret that does
+				// not exist yet is skipped - and projecting a key that was never
+				// written leaves the Pod stuck with an unmountable volume.
 				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
-					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0 ||
-						len(inCluster.Spec.TLS.GetAdditionalTrustedCAs()) > 0)...),
+					len(inSecret.Data[CertFrontendAuthoritySecretKey]) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

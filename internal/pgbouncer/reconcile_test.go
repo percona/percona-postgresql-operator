@@ -6,6 +6,7 @@ package pgbouncer
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -554,6 +555,57 @@ volumes:
 		assert.DeepEqual(t, before, pod)
 	})
 
+	// A spec that asks for additional CAs does not always produce a merged
+	// bundle: userProvidedOnly drops the cluster-wide list, and a referenced
+	// Secret that does not exist yet is skipped. When the key was not written,
+	// the custom Secret has to keep supplying ca.crt - projecting a missing key
+	// leaves the Pod stuck with an unmountable volume.
+	t.Run("CustomTLSSecretKeepsItsAuthorityWhenNoBundleWasWritten", func(t *testing.T) {
+		// Self-contained: the subtests above share a mutable fixture, and this
+		// one must hold whether or not they ran.
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.SetLabels(map[string]string{naming.LabelVersion: "2.5.0"})
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		assert.NilError(t, cluster.Default(ctx, nil))
+
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+			Items: []corev1.KeyToPath{
+				{Key: "k1", Path: "tls.crt"},
+				{Key: "k2", Path: "tls.key"},
+				{Key: "k3", Path: "ca.crt"},
+			},
+		}
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+			AdditionalTrustedCAs: []corev1.LocalObjectReference{{Name: "external-ca"}},
+		}
+
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, new(corev1.Secret), pod, "")
+
+		var projected []string
+		for _, volume := range pod.Volumes {
+			if volume.Name != "pgbouncer-config" || volume.Projected == nil {
+				continue
+			}
+			for _, source := range volume.Projected.Sources {
+				if source.Secret != nil {
+					for _, item := range source.Secret.Items {
+						projected = append(projected, source.Secret.Name+"/"+item.Key)
+					}
+				}
+			}
+		}
+
+		assert.Assert(t, len(projected) > 0, "no Secret sources were projected")
+		assert.Assert(t, !slices.Contains(projected, "/"+CertFrontendAuthoritySecretKey),
+			"projected a merged bundle that was never written: %v", projected)
+		assert.Assert(t, slices.Contains(projected, "tls-name/k3"),
+			"the custom Secret must keep supplying ca.crt: %v", projected)
+	})
+
 	// K8SPG-952: in manual TLS mode with additional CAs, the frontend
 	// authority is mounted from the operator Secret where the merged CA
 	// bundle is stored; tls.crt/tls.key still come from the custom Secret.
@@ -569,6 +621,14 @@ volumes:
 		cluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs = []corev1.LocalObjectReference{
 			{Name: "external-ca"},
 		}
+
+		// The authority is mounted from the operator Secret only because
+		// Secret() wrote the merged bundle there. Projecting a key that was
+		// never written would leave the Pod unable to mount its volume, so the
+		// mount follows the Secret rather than the spec.
+		secret := &corev1.Secret{Data: map[string][]byte{
+			CertFrontendAuthoritySecretKey: []byte("merged-ca-bundle"),
+		}}
 
 		pod := new(corev1.PodSpec)
 		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
