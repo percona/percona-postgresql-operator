@@ -13984,6 +13984,15 @@ spec:
                 type: array
               tls:
                 properties:
+                  additionalTrustedCAs:
+                    items:
+                      properties:
+                        name:
+                          default: ""
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
                   caValidityDuration:
                     type: string
                   certManagementPolicy:

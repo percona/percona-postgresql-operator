@@ -148,6 +148,54 @@ func (r *Reconciler) reconcileTLSCondition(ctx context.Context, cluster *v1beta1
 }
 
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+
+// additionalTrustedCAs returns the CA bundles referenced by
+// spec.tls.additionalTrustedCAs, in the order they are listed. These are the
+// trust anchors for issuers that do not return a CA certificate of their own:
+// an ACME issuer writes only tls.crt and tls.key, so without this the operator
+// has nothing to put in the files that verify peers.
+//
+// A referenced Secret that does not exist yet is skipped, matching
+// getAdditionalTrustedCAs; one that exists but has no "ca.crt" is a
+// configuration mistake and is reported.
+func (r *Reconciler) additionalTrustedCAs(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) ([][]byte, error) {
+	if cluster.Spec.TLS == nil || len(cluster.Spec.TLS.AdditionalTrustedCAs) == 0 {
+		return nil, nil
+	}
+
+	// K8SPG-1045: in userProvidedOnly the operator does not own any of the TLS
+	// Secrets, so it has nothing to merge these into.
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+		return nil, nil
+	}
+
+	var result [][]byte
+	for _, ref := range cluster.Spec.TLS.AdditionalTrustedCAs {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Name:      ref.Name,
+			Namespace: cluster.GetNamespace(),
+		}}
+
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); k8serrors.IsNotFound(err) {
+			logging.FromContext(ctx).Info("additional trusted CA secret not found, skipping", "name", ref.Name)
+			continue
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "failed to get additional trusted CA secret '%s'", ref.Name)
+		}
+
+		ca, ok := secret.Data[rootCertFile]
+		if !ok {
+			return nil, errors.Errorf("additional trusted CA Secret '%s' does not contain key '%s'", ref.Name, rootCertFile)
+		}
+		result = append(result, ca)
+	}
+
+	return result, nil
+}
+
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
 // +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
 
 // reconcileRootCertificate ensures the root certificate, stored
@@ -484,6 +532,14 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 		intent.Data[rootCA], err = root.Certificate.MarshalText()
 		err = errors.WithStack(err)
 	}
+	if err == nil {
+		// ssl_ca_file reads this to verify client certificates, so any CA the
+		// user asked us to trust has to be in it.
+		var additionalCAs [][]byte
+		if additionalCAs, err = r.additionalTrustedCAs(ctx, cluster); err == nil && len(additionalCAs) > 0 {
+			intent.Data[rootCA] = pki.TrustBundle(append([][]byte{intent.Data[rootCA]}, additionalCAs...)...)
+		}
+	}
 
 	// TODO(tjmoore4): The generated postgrescluster secret is only created
 	// when a custom secret is not specified. However, if the secret is
@@ -670,6 +726,120 @@ func (*Reconciler) instanceCertificate(
 	}
 
 	return leaf, err
+}
+
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={get}
+// +kubebuilder:rbac:groups="",resources="secrets",verbs={create,patch}
+
+// reconcileCABundleSecret writes the Secret that supplies ca.crt to the
+// instance Pods when cert-manager owns the certificate Secrets. Those Secrets
+// are rebuilt by cert-manager on every issuance and r.apply takes field
+// ownership by force, so merging the additional CAs into them would leave the
+// two controllers overwriting each other. This Secret is the operator's own,
+// and is projected in their place.
+//
+// It returns nil when there is nothing to merge, which leaves the certificate
+// volume exactly as it was before spec.tls.additionalTrustedCAs existed.
+func (r *Reconciler) reconcileCABundleSecret(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) (*corev1.SecretProjection, error) {
+	additionalCAs, err := r.additionalTrustedCAs(ctx, cluster)
+	if err != nil || len(additionalCAs) == 0 {
+		return nil, err
+	}
+
+	// A user-provided Secret is not ours to merge into, and the internal PKI
+	// path writes ca.crt itself, so neither needs this indirection.
+	if cluster.Spec.CustomTLSSecret != nil {
+		return nil, nil
+	}
+	certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
+	}
+	if !certManagerManaged {
+		return nil, nil
+	}
+
+	// Whatever these files verified before has to keep verifying, so the
+	// issued CAs stay in the bundle alongside the additional ones. Either may
+	// be absent: an ACME issuer writes no ca.crt at all.
+	sources := make([][]byte, 0, 2+len(additionalCAs))
+	for _, meta := range []metav1.ObjectMeta{
+		naming.PostgresTLSSecret(cluster),
+		naming.ReplicationClientCertSecret(cluster),
+	} {
+		secret := &corev1.Secret{ObjectMeta: meta}
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return nil, errors.Wrapf(err, "get TLS secret %s", secret.Name)
+			}
+			continue
+		}
+		sources = append(sources, secret.Data[rootCertFile])
+	}
+
+	intent := &corev1.Secret{ObjectMeta: naming.PostgresCABundleSecret(cluster)}
+	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	intent.Type = corev1.SecretTypeOpaque
+	intent.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
+	intent.Labels = naming.Merge(
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+		naming.WithPerconaLabels(map[string]string{
+			naming.LabelCluster: cluster.Name,
+		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
+	intent.Data = map[string][]byte{
+		rootCertFile: pki.TrustBundle(append(sources, additionalCAs...)...),
+	}
+
+	// Unlike the certificate Secrets, which K8SPG-330 deliberately keeps after
+	// the cluster is gone, this one holds nothing that cannot be rebuilt.
+	if err := r.setControllerReference(cluster, intent); err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if err := r.apply(ctx, intent); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	// One key, both paths: this replaces the ca.crt of the cluster and the
+	// replication certificate Secrets alike.
+	return &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: intent.Name},
+		Items: []corev1.KeyToPath{
+			{Key: rootCertFile, Path: rootCertFile},
+			{Key: rootCertFile, Path: naming.ReplicationCACertPath},
+		},
+	}, nil
+}
+
+// emptyCABundleError explains why a trust bundle came out empty. Content that
+// is not PEM contributes nothing, which otherwise looks identical to an issuer
+// that returned no CA at all and would point the reader at the wrong field.
+func emptyCABundleError(what string, sources ...[]byte) error {
+	for _, source := range sources {
+		if len(source) > 0 {
+			return errors.Errorf("failed to parse CA certificate for %s", what)
+		}
+	}
+	return errors.Errorf(
+		"issuer did not return a CA certificate for %s;"+
+			" set spec.tls.additionalTrustedCAs to supply one", what)
+}
+
+// withoutCA returns projection without its ca.crt item. A projected volume
+// rejects two sources writing the same path, so a certificate Secret has to
+// stop supplying ca.crt once the merged bundle does.
+func withoutCA(projection *corev1.SecretProjection) *corev1.SecretProjection {
+	out := projection.DeepCopy()
+	items := out.Items[:0]
+	for _, item := range out.Items {
+		if item.Key != rootCertFile {
+			items = append(items, item)
+		}
+	}
+	out.Items = items
+	return out
 }
 
 // clusterCertSecretProjection returns a secret projection of the postgrescluster's

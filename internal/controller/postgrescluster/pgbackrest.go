@@ -2313,6 +2313,11 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 	// 	err = r.setControllerReference(cluster, intent)
 	// }
 
+	var additionalCAs [][]byte
+	if err == nil {
+		additionalCAs, err = r.additionalTrustedCAs(ctx, cluster)
+	}
+
 	if err == nil && repoHost != nil {
 		certManagerManaged := false
 		if cluster.Spec.CustomTLSSecret == nil {
@@ -2336,10 +2341,10 @@ func (r *Reconciler) reconcilePGBackRestSecret(ctx context.Context,
 				}
 			}
 
-			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+			err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, additionalCAs, existing, intent)
 		}
 	} else if err == nil {
-		err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+		err = pgbackrest.Secret(ctx, cluster, repoHost, rootCA, additionalCAs, existing, intent)
 	}
 
 	// Delete the Secret when it exists and there is nothing we want to keep in it.
@@ -2398,17 +2403,22 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 		return errors.Wrap(repoErr, "failed to get pgbackrest repo TLS secret")
 	}
 
+	additionalCAs, err := r.additionalTrustedCAs(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	// If cert-manager hasn't issued the secrets yet, fall back to internal PKI
 	// so pgBackRest remains functional during the transition.
 	if clientErr != nil || repoErr != nil {
 		log.V(1).Info("cert-manager pgbackrest secrets not yet available, using internal PKI")
-		return pgbackrest.Secret(ctx, cluster, repoHost, rootCA, existing, intent)
+		return pgbackrest.Secret(ctx, cluster, repoHost, rootCA, additionalCAs, existing, intent)
 	}
 
 	// Populate the pgBackRest secret from cert-manager-issued certs.
 	initialize.Map(&intent.Data)
 
-	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret)
+	caCert, err := pgBackRestCACert(rootCA, clientSecret, repoSecret, additionalCAs)
 	if err != nil {
 		return err
 	}
@@ -2421,20 +2431,45 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	return nil
 }
 
-func pgBackRestCACert(rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret) ([]byte, error) {
-	if rootCA != nil {
+// pgBackRestCACert returns the contents of "pgbackrest.ca-roots", the single
+// file pgBackRest uses both to verify the client certificate it is presented
+// (tls-server-ca-file) and to verify the servers it connects to
+// (pgN-/repoN-host-ca-file). Every anchor either side needs has to be in it.
+//
+// An issuer that returns no CA of its own contributes nothing rather than
+// failing outright; the user supplies the anchor through
+// spec.tls.additionalTrustedCAs instead. Only an empty result is an error.
+func pgBackRestCACert(
+	rootCA *pki.RootCertificateAuthority, clientSecret, repoSecret *corev1.Secret,
+	additionalCAs [][]byte,
+) ([]byte, error) {
+	if rootCA != nil && len(additionalCAs) == 0 {
 		caCert, err := rootCA.Certificate.MarshalText()
 		return caCert, errors.Wrap(err, "failed to marshal root CA certificate")
 	}
 
-	if ca := clientSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
-		return ca, nil
+	var sources [][]byte
+	if rootCA != nil {
+		root, err := rootCA.Certificate.MarshalText()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal root CA certificate")
+		}
+		sources = append(sources, root)
+	} else {
+		// The client and repo host certificates can come from different
+		// issuers, so take the CA of each rather than the first one found.
+		sources = append(sources,
+			clientSecret.Data[corev1.ServiceAccountRootCAKey],
+			repoSecret.Data[corev1.ServiceAccountRootCAKey],
+		)
 	}
-	if ca := repoSecret.Data[corev1.ServiceAccountRootCAKey]; len(ca) > 0 {
-		return ca, nil
+	sources = append(sources, additionalCAs...)
+
+	if caCert := pki.TrustBundle(sources...); len(caCert) > 0 {
+		return caCert, nil
 	}
 
-	return nil, errors.New("external issuer did not return a CA certificate for pgBackRest")
+	return nil, emptyCABundleError("pgBackRest", sources...)
 }
 
 // +kubebuilder:rbac:groups="",resources="serviceaccounts",verbs={create,patch}

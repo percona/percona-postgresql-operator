@@ -137,7 +137,7 @@ func Secret(ctx context.Context,
 			outSecret.Data[CertFrontendSecretKey] = inSecret.Data[CertFrontendSecretKey]
 		} else if frontendCertManagerSecret != nil {
 			if err == nil {
-				outSecret.Data[CertFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
+				outSecret.Data[CertFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret, additionalCAs)
 			}
 			if err == nil {
 				outSecret.Data[CertFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
@@ -193,14 +193,9 @@ func Secret(ctx context.Context,
 	if err == nil && len(additionalCAs) > 0 &&
 		(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret != nil ||
 			inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly) {
-		bundle := outSecret.Data[CertFrontendAuthoritySecretKey]
-		for _, ca := range additionalCAs {
-			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
-				bundle = append(bundle, '\n')
-			}
-			bundle = append(bundle, ca...)
-		}
-		outSecret.Data[CertFrontendAuthoritySecretKey] = bundle
+		outSecret.Data[CertFrontendAuthoritySecretKey] = pki.TrustBundle(append(
+			[][]byte{outSecret.Data[CertFrontendAuthoritySecretKey]}, additionalCAs...,
+		)...)
 	}
 
 	return err
@@ -210,14 +205,30 @@ func Secret(ctx context.Context,
 // PgBouncer frontend certificate. It prefers the internal PKI root, which is
 // nil when an external cert-manager issuer is in use; in that case, it falls
 // back to the "ca.crt" that cert-manager writes into the frontend Secret.
-func frontendAuthorityCert(inRoot *pki.RootCertificateAuthority, frontendCertManagerSecret *corev1.Secret) ([]byte, error) {
+//
+// An issuer that returns no CA of its own contributes nothing rather than
+// failing outright: ACME issuers write only tls.crt and tls.key, and the user
+// supplies the anchor through spec.tls.additionalTrustedCAs instead. Only an
+// empty result is an error.
+func frontendAuthorityCert(
+	inRoot *pki.RootCertificateAuthority, frontendCertManagerSecret *corev1.Secret,
+	additionalCAs [][]byte,
+) ([]byte, error) {
 	if inRoot != nil {
-		return inRoot.Certificate.MarshalText()
+		root, err := inRoot.Certificate.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		return root, nil
 	}
-	if ca := frontendCertManagerSecret.Data[tlsAuthoritySecretKey]; len(ca) > 0 {
+	if ca := pki.TrustBundle(append(
+		[][]byte{frontendCertManagerSecret.Data[tlsAuthoritySecretKey]}, additionalCAs...,
+	)...); len(ca) > 0 {
 		return ca, nil
 	}
-	return nil, errors.New("external issuer did not return a CA certificate for pgbouncer frontend")
+	return nil, errors.New(
+		"issuer did not return a CA certificate for pgbouncer frontend;" +
+			" set spec.tls.additionalTrustedCAs to supply one")
 }
 
 // Pod populates a PodSpec with the container and volumes needed to run PgBouncer.
@@ -244,7 +255,8 @@ func Pod(
 			append(append([]corev1.VolumeProjection{},
 				podConfigFiles(inCluster, inConfigMap, inSecret)...),
 				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
-					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
+					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0 ||
+						len(inCluster.Spec.TLS.GetAdditionalTrustedCAs()) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}

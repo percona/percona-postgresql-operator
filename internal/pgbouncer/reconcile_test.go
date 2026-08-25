@@ -329,8 +329,10 @@ func TestSecretAdditionalCAs(t *testing.T) {
 	}
 
 	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
-	// No trailing newline; a separator must be inserted before the next entry.
+	// No trailing newline. Entries are re-encoded into canonical PEM, so this
+	// gains one and the next entry is separated from it either way.
 	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----")
+	ca2Normalized := append(append([]byte{}, ca2...), '\n')
 
 	t.Run("AppendedToGeneratedBundle", func(t *testing.T) {
 		cluster := newCluster("3.1.0")
@@ -339,7 +341,20 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
 		expected := append(append([]byte{}, rootPEM...), ca1...)
-		expected = append(expected, ca2...)
+		expected = append(expected, ca2Normalized...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("DuplicatesDropped", func(t *testing.T) {
+		// The same CA reaching the bundle from two references must not be
+		// written twice, or the bundle grows on every reconcile.
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil,
+			[][]byte{ca1, rootPEM, ca1}))
+
+		expected := append(append([]byte{}, rootPEM...), ca1...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
 	})
 
@@ -380,7 +395,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 
 		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
-		expected := append(append([]byte{}, ca1...), ca2...)
+		expected := append(append([]byte{}, ca1...), ca2Normalized...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
 	})
 

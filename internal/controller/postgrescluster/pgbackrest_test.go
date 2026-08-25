@@ -4762,7 +4762,7 @@ func TestPgBackRestCACert(t *testing.T) {
 		root, err := pki.NewRootCertificateAuthority()
 		assert.NilError(t, err)
 
-		caCert, err := pgBackRestCACert(root, &corev1.Secret{}, &corev1.Secret{})
+		caCert, err := pgBackRestCACert(root, &corev1.Secret{}, &corev1.Secret{}, nil)
 		assert.NilError(t, err)
 
 		want, err := root.Certificate.MarshalText()
@@ -4770,26 +4770,94 @@ func TestPgBackRestCACert(t *testing.T) {
 		assert.DeepEqual(t, want, caCert)
 	})
 
-	t.Run("falls back to client secret ca.crt when rootCA is nil", func(t *testing.T) {
-		clientSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("client-ca-bytes")}}
-		repoSecret := &corev1.Secret{}
-
-		caCert, err := pgBackRestCACert(nil, clientSecret, repoSecret)
+	caPEM := func(t *testing.T) []byte {
+		t.Helper()
+		root, err := pki.NewRootCertificateAuthority()
 		assert.NilError(t, err)
-		assert.DeepEqual(t, []byte("client-ca-bytes"), caCert)
+		text, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		return text
+	}
+	secretWithCA := func(ca []byte) *corev1.Secret {
+		return &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: ca}}
+	}
+	certCount := func(b []byte) int {
+		return strings.Count(string(b), "-----BEGIN CERTIFICATE-----")
+	}
+
+	t.Run("falls back to client secret ca.crt when rootCA is nil", func(t *testing.T) {
+		clientCA := caPEM(t)
+
+		caCert, err := pgBackRestCACert(nil, secretWithCA(clientCA), &corev1.Secret{}, nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, clientCA, caCert)
 	})
 
 	t.Run("falls back to repo secret ca.crt when client secret has none", func(t *testing.T) {
-		clientSecret := &corev1.Secret{}
-		repoSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("repo-ca-bytes")}}
+		repoCA := caPEM(t)
 
-		caCert, err := pgBackRestCACert(nil, clientSecret, repoSecret)
+		caCert, err := pgBackRestCACert(nil, &corev1.Secret{}, secretWithCA(repoCA), nil)
 		assert.NilError(t, err)
-		assert.DeepEqual(t, []byte("repo-ca-bytes"), caCert)
+		assert.DeepEqual(t, repoCA, caCert)
+	})
+
+	t.Run("merges both secrets when their CAs differ", func(t *testing.T) {
+		// One file verifies both the client certificate and the servers, so a
+		// client and repo host from different issuers both have to be in it.
+		clientCA, repoCA := caPEM(t), caPEM(t)
+
+		caCert, err := pgBackRestCACert(nil, secretWithCA(clientCA), secretWithCA(repoCA), nil)
+		assert.NilError(t, err)
+		assert.Equal(t, certCount(caCert), 2)
+		assert.DeepEqual(t, caCert, append(append([]byte{}, clientCA...), repoCA...))
+	})
+
+	t.Run("identical CAs are not duplicated", func(t *testing.T) {
+		// The usual case: one issuer signs both, so today's single-cert output
+		// must be preserved exactly.
+		ca := caPEM(t)
+
+		caCert, err := pgBackRestCACert(nil, secretWithCA(ca), secretWithCA(ca), nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, ca, caCert)
+	})
+
+	t.Run("appends additional trusted CAs", func(t *testing.T) {
+		issuedCA, extraCA := caPEM(t), caPEM(t)
+
+		caCert, err := pgBackRestCACert(nil, secretWithCA(issuedCA), &corev1.Secret{}, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, caCert, append(append([]byte{}, issuedCA...), extraCA...))
+	})
+
+	t.Run("additional trusted CAs alone are enough", func(t *testing.T) {
+		// An ACME issuer writes no ca.crt at all; the user supplies the anchor.
+		extraCA := caPEM(t)
+
+		caCert, err := pgBackRestCACert(nil, &corev1.Secret{}, &corev1.Secret{}, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, extraCA, caCert)
+	})
+
+	t.Run("rootCA is merged with additional trusted CAs", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		rootPEM, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		extraCA := caPEM(t)
+
+		caCert, err := pgBackRestCACert(root, &corev1.Secret{}, &corev1.Secret{}, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, caCert, append(append([]byte{}, rootPEM...), extraCA...))
 	})
 
 	t.Run("errors when neither secret has a CA cert", func(t *testing.T) {
-		_, err := pgBackRestCACert(nil, &corev1.Secret{}, &corev1.Secret{})
+		_, err := pgBackRestCACert(nil, &corev1.Secret{}, &corev1.Secret{}, nil)
 		assert.ErrorContains(t, err, "did not return a CA certificate")
+	})
+
+	t.Run("errors when ca.crt is not a certificate", func(t *testing.T) {
+		_, err := pgBackRestCACert(nil, secretWithCA([]byte("not a cert")), &corev1.Secret{}, nil)
+		assert.ErrorContains(t, err, "failed to parse CA certificate")
 	})
 }

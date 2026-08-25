@@ -323,6 +323,21 @@ type TLSSpec struct {
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
+
+	// Additional CA bundles to trust when verifying certificates for this cluster.
+	// Each item is a reference to a Secret that contains a PEM-encoded CA bundle in
+	// key `ca.crt`. Required when the configured issuer does not return a CA
+	// certificate of its own, as ACME issuers do not.
+	AdditionalTrustedCAs []corev1.LocalObjectReference `json:"additionalTrustedCAs,omitempty"`
+}
+
+// GetAdditionalTrustedCAs is nil-safe: spec.tls is optional, and every caller
+// that merges trust anchors has to work on a cluster that never set it.
+func (s *TLSSpec) GetAdditionalTrustedCAs() []corev1.LocalObjectReference {
+	if s == nil {
+		return nil
+	}
+	return s.AdditionalTrustedCAs
 }
 
 func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {

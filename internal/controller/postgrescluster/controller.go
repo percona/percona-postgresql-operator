@@ -192,6 +192,7 @@ func (r *Reconciler) Reconcile(
 		instances                    *observedInstances
 		patroniLeaderService         *corev1.Service
 		primaryCertificate           *corev1.SecretProjection
+		caBundle                     *corev1.SecretProjection
 		primaryService               *corev1.Service
 		replicaService               *corev1.Service
 		rootCA                       *pki.RootCertificateAuthority
@@ -435,6 +436,11 @@ func (r *Reconciler) Reconcile(
 		primaryCertificate, err = r.reconcileClusterCertificate(ctx, rootCA, cluster, primaryService, replicaService)
 	}
 	if err == nil {
+		// After the cluster and replication certificates, whose ca.crt this
+		// merges with the CAs from spec.tls.additionalTrustedCAs.
+		caBundle, err = r.reconcileCABundleSecret(ctx, cluster)
+	}
+	if err == nil {
 		err = r.reconcilePatroniDistributedConfiguration(ctx, cluster)
 	}
 	if err == nil {
@@ -453,7 +459,7 @@ func (r *Reconciler) Reconcile(
 		err = r.reconcileInstanceSets(
 			ctx, cluster, clusterConfigMap, clusterReplicationSecret, rootCA,
 			clusterPodService, instanceServiceAccount, instances, patroniLeaderService,
-			primaryCertificate, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
+			primaryCertificate, caBundle, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
 			backupsSpecFound,
 		)
 	}

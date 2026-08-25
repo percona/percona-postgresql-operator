@@ -645,6 +645,7 @@ func (r *Reconciler) reconcileInstanceSets(
 	instances *observedInstances,
 	patroniLeaderService *corev1.Service,
 	primaryCertificate *corev1.SecretProjection,
+	caBundle *corev1.SecretProjection,
 	clusterVolumes []corev1.PersistentVolumeClaim,
 	exporterQueriesConfig, exporterWebConfig *corev1.ConfigMap,
 	backupsSpecFound bool,
@@ -681,7 +682,7 @@ func (r *Reconciler) reconcileInstanceSets(
 			ctx, cluster, instances, set,
 			clusterConfigMap, clusterReplicationSecret,
 			rootCA, clusterPodService, instanceServiceAccount,
-			patroniLeaderService, primaryCertificate,
+			patroniLeaderService, primaryCertificate, caBundle,
 			findAvailableInstanceNames(*set, instances, clusterVolumes),
 			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
 			backupsSpecFound,
@@ -1137,6 +1138,7 @@ func (r *Reconciler) scaleUpInstances(
 	instanceServiceAccount *corev1.ServiceAccount,
 	patroniLeaderService *corev1.Service,
 	primaryCertificate *corev1.SecretProjection,
+	caBundle *corev1.SecretProjection,
 	availableInstanceNames []string,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
@@ -1184,7 +1186,7 @@ func (r *Reconciler) scaleUpInstances(
 			ctx, cluster, observed.byName[instances[i].Name], set,
 			clusterConfigMap, clusterReplicationSecret,
 			rootCA, clusterPodService, instanceServiceAccount,
-			patroniLeaderService, primaryCertificate, instances[i],
+			patroniLeaderService, primaryCertificate, caBundle, instances[i],
 			numInstancePods, clusterVolumes, exporterQueriesConfig, exporterWebConfig,
 			backupsSpecFound,
 		)
@@ -1212,6 +1214,7 @@ func (r *Reconciler) reconcileInstance(
 	instanceServiceAccount *corev1.ServiceAccount,
 	patroniLeaderService *corev1.Service,
 	primaryCertificate *corev1.SecretProjection,
+	caBundle *corev1.SecretProjection,
 	instance *appsv1.StatefulSet,
 	numInstancePods int,
 	clusterVolumes []corev1.PersistentVolumeClaim,
@@ -1258,9 +1261,17 @@ func (r *Reconciler) reconcileInstance(
 		tablespaceVolumes, err = r.reconcileTablespaceVolumes(ctx, cluster, spec, instance, clusterVolumes)
 	}
 	if err == nil {
+		// The merged bundle supplies ca.crt for both, so they must not.
+		clusterCertificates := primaryCertificate
+		replicationCertificates := replicationCertSecretProjection(clusterReplicationSecret)
+		if caBundle != nil {
+			clusterCertificates = withoutCA(clusterCertificates)
+			replicationCertificates = withoutCA(replicationCertificates)
+		}
+
 		postgres.InstancePod(
 			ctx, cluster, spec,
-			primaryCertificate, replicationCertSecretProjection(clusterReplicationSecret),
+			clusterCertificates, replicationCertificates, caBundle,
 			postgresDataVolume, postgresWALVolume, tablespaceVolumes,
 			&instance.Spec.Template.Spec)
 
@@ -1696,7 +1707,12 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	_ = leafCert.Certificate.UnmarshalText(instanceCerts.Data["dns.crt"])
 	_ = leafCert.PrivateKey.UnmarshalText(instanceCerts.Data["dns.key"])
 
-	caCert, err := instanceCACert(rootCertificateAuth, existing)
+	additionalCAs, err := r.additionalTrustedCAs(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	caCert, err := instanceCACert(rootCertificateAuth, existing, additionalCAs)
 	if err != nil {
 		return nil, err
 	}
@@ -1723,18 +1739,42 @@ func (r *Reconciler) reconcileCertManagerInstanceCertificates(
 	return instanceCerts, nil
 }
 
-func instanceCACert(rootCertificateAuth *pki.RootCertificateAuthority, issuedSecret *corev1.Secret) (pki.Certificate, error) {
-	if rootCertificateAuth != nil {
+// instanceCACert returns the trust anchors that Patroni and the pgBackRest
+// server on this instance verify their peers against. It is the single place
+// both the internal PKI and the cert-manager paths resolve that from, so the
+// additional CAs cannot be applied to one and forgotten on the other.
+//
+// An issuer that returns no CA of its own contributes nothing rather than
+// failing outright: ACME issuers write only tls.crt and tls.key, and the user
+// supplies the anchor through spec.tls.additionalTrustedCAs instead. Only an
+// empty result is an error.
+func instanceCACert(
+	rootCertificateAuth *pki.RootCertificateAuthority, issuedSecret *corev1.Secret,
+	additionalCAs [][]byte,
+) (pki.Certificate, error) {
+	if rootCertificateAuth != nil && len(additionalCAs) == 0 {
 		return rootCertificateAuth.Certificate, nil
 	}
 
-	ca := issuedSecret.Data[corev1.ServiceAccountRootCAKey]
-	if len(ca) == 0 {
-		return pki.Certificate{}, errors.New("external issuer did not return a CA certificate for the instance")
+	var sources [][]byte
+	if rootCertificateAuth != nil {
+		root, err := rootCertificateAuth.Certificate.MarshalText()
+		if err != nil {
+			return pki.Certificate{}, errors.Wrap(err, "failed to marshal root CA certificate")
+		}
+		sources = append(sources, root)
+	} else if issuedSecret != nil {
+		sources = append(sources, issuedSecret.Data[corev1.ServiceAccountRootCAKey])
+	}
+	sources = append(sources, additionalCAs...)
+
+	bundle := pki.TrustBundle(sources...)
+	if len(bundle) == 0 {
+		return pki.Certificate{}, emptyCABundleError("the instance", sources...)
 	}
 
 	var caCert pki.Certificate
-	if err := caCert.UnmarshalText(ca); err != nil {
+	if err := caCert.UnmarshalText(bundle); err != nil {
 		return pki.Certificate{}, errors.Wrap(err, "failed to parse CA certificate from cert-manager secret")
 	}
 	return caCert, nil
@@ -1780,18 +1820,25 @@ func (r *Reconciler) reconcileInternalInstanceCertificates(
 	instanceCerts.Data = make(map[string][]byte)
 
 	var leafCert *pki.LeafCertificate
+	var caCert pki.Certificate
 
 	if err == nil {
 		leafCert, err = r.instanceCertificate(ctx, instance, existing, instanceCerts, rootCertificateAuth, cluster.Spec.ClusterServiceDNSSuffix)
 	}
 	if err == nil {
+		var additionalCAs [][]byte
+		if additionalCAs, err = r.additionalTrustedCAs(ctx, cluster); err == nil {
+			caCert, err = instanceCACert(rootCertificateAuth, nil, additionalCAs)
+		}
+	}
+	if err == nil {
 		err = patroni.InstanceCertificates(ctx,
-			rootCertificateAuth.Certificate, leafCert.Certificate,
+			caCert, leafCert.Certificate,
 			leafCert.PrivateKey, instanceCerts)
 	}
 	if err == nil {
 		err = pgbackrest.InstanceCertificates(ctx, cluster,
-			rootCertificateAuth.Certificate, leafCert.Certificate, leafCert.PrivateKey,
+			caCert, leafCert.Certificate, leafCert.PrivateKey,
 			instanceCerts)
 	}
 	if err == nil {

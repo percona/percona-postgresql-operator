@@ -363,7 +363,14 @@ func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1bet
 		pgBouncer.CustomTLSSecret == nil {
 		return nil, nil
 	}
-	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
+	// The cluster-wide anchors from spec.tls apply to the frontend bundle too:
+	// without them an ACME-issued frontend certificate has nothing to chain to.
+	clusterCAs, err := r.additionalTrustedCAs(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pgBouncer.AdditionalTrustedCAs) == 0 && len(clusterCAs) == 0 {
 		return nil, nil
 	}
 
@@ -390,6 +397,8 @@ func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1bet
 		}
 		result = append(result, ca)
 	}
+
+	result = append(result, clusterCAs...)
 
 	for _, ref := range pgBouncer.AdditionalTrustedCAs {
 		secret := &corev1.Secret{

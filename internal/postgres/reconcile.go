@@ -114,6 +114,7 @@ func InstancePod(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inInstanceSpec *v1beta1.PostgresInstanceSetSpec,
 	inClusterCertificates, inClientCertificates *corev1.SecretProjection,
+	inCABundle *corev1.SecretProjection,
 	inDataVolume, inWALVolume *corev1.PersistentVolumeClaim,
 	inTablespaceVolumes []*corev1.PersistentVolumeClaim,
 	outInstancePod *corev1.PodSpec,
@@ -137,6 +138,14 @@ func InstancePod(ctx context.Context,
 				},
 			},
 		},
+	}
+
+	// When set, this Secret supplies ca.crt for both the server and the
+	// replication certificate; those projections no longer carry it, so the
+	// paths do not collide.
+	if inCABundle != nil {
+		certVolume.Projected.Sources = append(certVolume.Projected.Sources,
+			corev1.VolumeProjection{Secret: inCABundle})
 	}
 
 	dataVolumeMount := DataVolumeMount()
