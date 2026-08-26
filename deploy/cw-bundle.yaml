@@ -1175,10 +1175,8 @@ spec:
                       jobs:
                         properties:
                           activeDeadlineSeconds:
-                            description: |-
-                              Specifies the duration (in seconds) after a backup Job's start before
-                              Kubernetes terminates it and marks it as failed.
                             format: int64
+                            minimum: 60
                             type: integer
                           affinity:
                             properties:
@@ -1739,10 +1737,6 @@ spec:
                                 type: object
                             type: object
                           startupDeadlineSeconds:
-                            description: |-
-                              Specifies the duration (in seconds) after a backup resource is created
-                              before the backup is considered failed if the Job has not started.
-                              Defaults to 600 seconds (10 minutes) if not set.
                             format: int64
                             minimum: 60
                             type: integer
@@ -21393,10 +21387,8 @@ spec:
                       jobs:
                         properties:
                           activeDeadlineSeconds:
-                            description: |-
-                              Specifies the duration (in seconds) after a backup Job's start before
-                              Kubernetes terminates it and marks it as failed.
                             format: int64
+                            minimum: 60
                             type: integer
                           affinity:
                             properties:
@@ -21957,10 +21949,6 @@ spec:
                                 type: object
                             type: object
                           startupDeadlineSeconds:
-                            description: |-
-                              Specifies the duration (in seconds) after a backup resource is created
-                              before the backup is considered failed if the Job has not started.
-                              Defaults to 600 seconds (10 minutes) if not set.
                             format: int64
                             minimum: 60
                             type: integer

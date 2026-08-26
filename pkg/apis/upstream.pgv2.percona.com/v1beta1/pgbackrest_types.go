@@ -202,6 +202,7 @@ type BackupJobs struct {
 	// Specifies the duration (in seconds) after a backup Job's start before
 	// Kubernetes terminates it and marks it as failed.
 	// +optional
+	// +kubebuilder:validation:Minimum=60
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// Specifies the duration (in seconds) after a backup resource is created
