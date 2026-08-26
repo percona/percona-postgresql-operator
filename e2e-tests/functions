@@ -9,6 +9,11 @@ BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
+# Retry every kubectl command once after a failure, using 10 seconds delay between attempts.
+function kubectl() {
+	(retry 1 10 "$(type -P kubectl)" "$@")
+}
+
 function init_temp_dir() {
 	rm -rf "$TEMP_DIR"
 	mkdir -p "$TEMP_DIR"
@@ -129,12 +134,11 @@ function remove_all_finalizers() {
 		echo "removing all finalizers for $resource resources"
 
 		kubectl -n "${NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
-			kubectl -n "${NAMESPACE}" delete "$resource" "$name" --wait=0
-
 			if [[ $(kubectl -n "${NAMESPACE}" get "$resource" "$name" -o yaml | yq '.metadata.finalizers | length') == "0" ]]; then
 				continue
 			fi
 			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+			kubectl -n "${NAMESPACE}" delete "$resource" "$name" --wait=0
 		done
 	done
 }
@@ -200,7 +204,7 @@ function wait_for_ready_containers() {
 function destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
 	if [[ $OPERATOR_NS ]]; then
-		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 || true
+		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 --ignore-not-found || true
 	fi
 }
 
@@ -581,7 +585,7 @@ function copy_custom_extensions_form_aws() {
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	retry 2 20 kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
+	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
 		--image=perconalab/awscli \
 		--restart=Never -- \
 		bash -c "
@@ -1113,7 +1117,7 @@ function deploy_chaos_mesh() {
 		--set dashboard.create=false
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
-		retry 12 5 kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" >/dev/null
+		kubectl wait --for=create daemonset/chaos-daemon --namespace="${NAMESPACE}" --timeout=60s
 		chaos_daemon_sa="$(kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" -o jsonpath='{.spec.template.spec.serviceAccountName}')"
 		chaos_daemon_sa="${chaos_daemon_sa:-chaos-daemon}"
 		oc adm policy add-scc-to-user privileged -z "${chaos_daemon_sa}" --namespace="${NAMESPACE}"
@@ -1604,7 +1608,11 @@ function destroy_cert_manager() {
 	fi
 
 	helm uninstall cert-manager -n cert-manager >/dev/null 2>&1 || :
-	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
+	kubectl get crd -o name | grep 'cert-manager.io' | xargs -r kubectl delete 2>&1 || :
+	kubectl get mutatingwebhookconfiguration -o name | grep 'cert-manager' | xargs kubectl delete >/dev/null 2>&1 || :
+	kubectl get validatingwebhookconfiguration -o name | grep 'cert-manager' | xargs kubectl delete >/dev/null 2>&1 || :
+	kubectl get clusterrole,clusterrolebinding -o name | grep 'cert-manager' | xargs -r kubectl delete 2>&1 || :
+	kubectl delete namespace cert-manager --grace-period=0 --force=true --ignore-not-found >/dev/null 2>&1 || :
 }
 
 function get_container_image() {

@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 300
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -96,4 +97,3 @@ commands:
           echo "Cluster certificate does not reference the external ClusterIssuer, got name=$cluster_cert_issuer_name kind=$cluster_cert_issuer_kind"
           exit 1
       fi
-    timeout: 300

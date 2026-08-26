@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 60
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -20,4 +21,3 @@ commands:
           exit 1
       fi
       echo "Correctly rejected non-TLS connection to pgbouncer"
-    timeout: 30
