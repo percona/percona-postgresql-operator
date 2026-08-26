@@ -217,6 +217,88 @@ func TestGeneratePrepareJob(t *testing.T) {
 		assert.Equal(t, path.Join("/", instanceName, "pgwal"), container.VolumeMounts[0].MountPath)
 	})
 
+	t.Run("tolerations from volume snapshot jobs spec", func(t *testing.T) {
+		tolerations := []corev1.Toleration{
+			{
+				Key:      "snapshot-node",
+				Operator: corev1.TolerationOpEqual,
+				Value:    "true",
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+			{
+				Key:      "dedicated",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoExecute,
+			},
+		}
+
+		clusterWithTolerations := cluster.DeepCopy()
+		clusterWithTolerations.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
+			ClassName: "csi-snapshot-class",
+			Jobs: &v2.VolumeSnapshotJobSpec{
+				Tolerations: tolerations,
+			},
+		}
+
+		job := &batchv1.Job{}
+		instances := &appsv1.StatefulSetList{
+			Items: []appsv1.StatefulSet{makeInstance("my-cluster-instance-0")},
+		}
+		restore := &v2.PerconaPGRestore{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
+			Spec: v2.PerconaPGRestoreSpec{
+				PGCluster:                clusterName,
+				VolumeSnapshotBackupName: "my-backup",
+			},
+		}
+
+		generatePrepareJob(job, instances, clusterWithTolerations, restore)
+
+		assert.Equal(t, tolerations, job.Spec.Template.Spec.Tolerations)
+	})
+
+	t.Run("no tolerations when jobs spec is not set", func(t *testing.T) {
+		for name, backups := range map[string]v2.Backups{
+			"volume snapshots not set": {},
+			"jobs not set": {
+				VolumeSnapshots: &v2.VolumeSnapshots{ClassName: "csi-snapshot-class"},
+			},
+			"tolerations not set": {
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					ClassName: "csi-snapshot-class",
+					Jobs:      &v2.VolumeSnapshotJobSpec{},
+				},
+			},
+			"tolerations empty": {
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					ClassName: "csi-snapshot-class",
+					Jobs:      &v2.VolumeSnapshotJobSpec{Tolerations: []corev1.Toleration{}},
+				},
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				clusterCopy := cluster.DeepCopy()
+				clusterCopy.Spec.Backups = backups
+
+				job := &batchv1.Job{}
+				instances := &appsv1.StatefulSetList{
+					Items: []appsv1.StatefulSet{makeInstance("my-cluster-instance-0")},
+				}
+				restore := &v2.PerconaPGRestore{
+					ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
+					Spec: v2.PerconaPGRestoreSpec{
+						PGCluster:                clusterName,
+						VolumeSnapshotBackupName: "my-backup",
+					},
+				}
+
+				generatePrepareJob(job, instances, clusterCopy, restore)
+
+				assert.Empty(t, job.Spec.Template.Spec.Tolerations)
+			})
+		}
+	})
+
 	t.Run("script starts with set -e", func(t *testing.T) {
 		job := &batchv1.Job{}
 		instances := &appsv1.StatefulSetList{

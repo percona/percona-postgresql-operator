@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 90
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      check_logs_for_errors ${test_name} "$(cat ${TEMP_DIR}/update_ts.txt)" ../../tests/operator-upgrade-extensions/conf/log-allowlist.txt

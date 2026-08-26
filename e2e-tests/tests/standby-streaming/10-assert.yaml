@@ -1,6 +1,26 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 480
+commands:
+  - script: |-
+      set -o errexit
+
+      source ../../functions
+
+      echo "Waiting for standby cluster to be ready"
+      kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
+
+      if [[ ${PG_VER} -ge 17 ]]; then
+        wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "Enabled" "pg_tde is enabled in PerconaPGCluster" "2"
+        wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "Configured" "pg_tde vault key provider matches the spec" "2"
+      fi
+
+      until assert_standby_promotion "standby-cluster"; do
+        echo "Waiting standby promotion in standby cluster"
+        sleep 5
+      done
+
+      echo "Standby promotion reached in standby cluster"
 ---
 apiVersion: apps/v1
 kind: StatefulSet

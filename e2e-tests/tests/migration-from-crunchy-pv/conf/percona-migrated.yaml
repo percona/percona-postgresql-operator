@@ -10,11 +10,6 @@ spec:
       dataVolumeClaimSpec:
         accessModes:
           - ReadWriteOnce
-        # Bind to the released Crunchy PV by label rather than by name so the
-        # PVC is not coupled to a specific PV identifier.
-        selector:
-          matchLabels:
-            percona-pv-migration: migrated
         resources:
           requests:
             storage: 1Gi

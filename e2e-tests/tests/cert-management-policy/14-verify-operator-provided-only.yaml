@@ -1,0 +1,82 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      cluster="cert-management-policy"
+
+      verify_secret_data() {
+        local secret="$1"
+        shift
+        for key in "$@"; do
+          local escaped_key="${key//./\\.}"
+          local value
+          value=$(kubectl -n "$NAMESPACE" get secret "$secret" \
+            -o jsonpath="{.data.${escaped_key}}")
+          if [[ -z "$value" ]]; then
+            echo "Secret $secret is missing key: $key" >&2
+            return 1
+          fi
+        done
+      }
+
+      verify_secret_data "${cluster}-cluster-ca-cert" root.crt root.key
+      verify_secret_data "${cluster}-cluster-cert" tls.crt tls.key ca.crt
+      verify_secret_data "${cluster}-replication-cert" tls.crt tls.key ca.crt
+      verify_secret_data "${cluster}-pgbackrest" pgbackrest.ca-roots pgbackrest-client.crt pgbackrest-client.key
+      verify_secret_data "${cluster}-pgbouncer" pgbouncer-frontend.ca-roots pgbouncer-frontend.crt pgbouncer-frontend.key
+
+      for secret in \
+        "${cluster}-cluster-ca-cert" \
+        "${cluster}-cluster-cert" \
+        "${cluster}-replication-cert" \
+        "${cluster}-pgbackrest" \
+        "${cluster}-pgbouncer"; do
+        annotation=$(kubectl -n "$NAMESPACE" get secret "$secret" \
+          -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+        if [[ -n "$annotation" ]]; then
+          echo "Secret $secret is unexpectedly managed by cert-manager" >&2
+          exit 1
+        fi
+      done
+
+      instance_sts=$(kubectl -n "$NAMESPACE" get sts \
+        -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/instance-set=instance1 \
+        -o jsonpath='{.items[*].metadata.name}')
+      if [[ -z "$instance_sts" ]]; then
+        echo "No PostgreSQL instance StatefulSet found for $cluster" >&2
+        exit 1
+      fi
+      for sts_name in $instance_sts; do
+        verify_secret_data "${sts_name}-certs" dns.crt dns.key patroni.ca-roots patroni.crt-combined
+        annotation=$(kubectl -n "$NAMESPACE" get secret "${sts_name}-certs" \
+          -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || true)
+        if [[ -n "$annotation" ]]; then
+          echo "Instance Secret ${sts_name}-certs is unexpectedly managed by cert-manager" >&2
+          exit 1
+        fi
+      done
+
+      certificates=$(kubectl -n "$NAMESPACE" get certificate \
+        -l postgres-operator.crunchydata.com/cluster="$cluster" \
+        -o name)
+      if [[ -n "$certificates" ]]; then
+        echo "Certificate resources were generated in operatorProvidedOnly mode: $certificates" >&2
+        exit 1
+      fi
+
+      issuers=$(kubectl -n "$NAMESPACE" get issuer -o json \
+        | jq -r '.items[].metadata.name | select(startswith("cert-management-policy-"))')
+      if [[ -n "$issuers" ]]; then
+        echo "Issuer resources were generated in operatorProvidedOnly mode: $issuers" >&2
+        exit 1
+      fi
+
+      if kubectl get clusterissuer cert-management-policy-ignored-issuer >/dev/null 2>&1; then
+        echo "operatorProvidedOnly created the ClusterIssuer from issuerConf" >&2
+        exit 1
+      fi
+
+    timeout: 300

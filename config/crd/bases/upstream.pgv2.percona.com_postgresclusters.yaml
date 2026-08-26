@@ -10819,6 +10819,18 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              logicalReplicas:
+                items:
+                  properties:
+                    name:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               metadata:
                 properties:
                   annotations:
@@ -11132,7 +11144,7 @@ spec:
               postGISVersion:
                 type: string
               postgresVersion:
-                maximum: 18
+                maximum: 19
                 minimum: 12
                 type: integer
               proxy:
@@ -13979,6 +13991,7 @@ spec:
                     enum:
                     - auto
                     - userProvidedOnly
+                    - operatorProvidedOnly
                     type: string
                   certValidityDuration:
                     type: string

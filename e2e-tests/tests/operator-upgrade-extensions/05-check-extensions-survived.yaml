@@ -1,0 +1,32 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      wait_cluster_consistency ${test_name}
+      assert_no_operator_rollout ${test_name} ${TEMP_DIR}/revisions.before
+
+      uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
+
+      run_psql_local 'SELECT extname||$$=$$||extversion FROM pg_extension ORDER BY 1' "$uri" \
+        | grep -v '^$' > ${TEMP_DIR}/ext.after
+      diff -u ${TEMP_DIR}/ext.before ${TEMP_DIR}/ext.after || { echo "ERROR: pg_extension changed after operator update"; exit 1; }
+
+      fresh=0
+      for i in $(seq 1 12); do
+          fresh=$(run_psql_local "SELECT count(*) FROM cron_log WHERE ts > \$\$$(cat ${TEMP_DIR}/update_ts.txt)\$\$" "$uri" | tr -d '[:space:]')
+          [[ "$fresh" -ge 1 ]] && break
+          sleep 15
+      done
+      if [[ "$fresh" -lt 1 ]]; then
+          echo "ERROR: pg_cron stopped ticking after operator update"
+          exit 1
+      fi
+
+      vec=$(run_psql_local 'SELECT count(*) FROM vec' "$uri" | tr -d '[:space:]')
+      [[ "$vec" == "1" ]] || { echo "ERROR: vector data lost"; exit 1; }

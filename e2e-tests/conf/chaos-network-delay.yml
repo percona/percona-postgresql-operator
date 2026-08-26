@@ -1,0 +1,25 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: chaos-source-target-delay
+spec:
+  action: bandwidth
+  mode: all
+
+  selector:
+    namespaces:
+      - test-namespace
+    labelSelectors:
+      app.kubernetes.io/instance: standby-cluster
+
+  direction: to
+
+  externalTargets:
+    - source-cluster-ha.test-namespace.svc.cluster.local
+
+  bandwidth:
+    rate: "1kbps"
+    limit: 1024
+    buffer: 1500
+    
+  duration: "20m"
