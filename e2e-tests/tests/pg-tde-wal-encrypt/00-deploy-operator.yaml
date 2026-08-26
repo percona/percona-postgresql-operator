@@ -1,12 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
-  - script: |-
+  - timeout: 30
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "ERROR: pg-tde-wal-encrypt requires PostgreSQL 17 or greater; got ${PG_VER}"
+        exit 1
+      fi
+
       init_temp_dir # do this only in the first TestStep
 
       deploy_operator
