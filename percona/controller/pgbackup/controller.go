@@ -265,6 +265,14 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			}); err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "update PGBackup status")
 			}
+
+			// A scheduled backup whose Job never started also degrades the cluster.
+			if pgCluster != nil && pgBackup.Labels[pNaming.LabelBackupSource] == pNaming.LabelBackupSourceScheduled {
+				if err := r.updateClusterBackupCondition(ctx, pgCluster, v2.BackupFailed); err != nil {
+					log.Error(err, "failed to update cluster ScheduledBackupDegraded condition")
+				}
+			}
+
 			return reconcile.Result{}, nil
 		}
 
@@ -484,12 +492,17 @@ func deleteBackupFinalizer(c client.Client, pg *v2.PerconaPGCluster) func(ctx co
 		if rr != nil && rr.RequeueAfter != 0 {
 			return controller.ErrFinalizerPending
 		}
-		if !pgBackup.DeletionTimestamp.IsZero() && job != nil {
-			// If the backup is deleted too early, the job doesn't have an owner reference
-			// pointing to the backup, so we should delete the job manually
-			if err := c.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationForeground)); client.IgnoreNotFound(err) != nil {
-				return errors.Wrap(err, "delete backup job")
+		if job != nil {
+			if !pgBackup.DeletionTimestamp.IsZero() {
+				// If the backup is deleted too early, the job doesn't have an owner reference
+				// pointing to the backup, so we should delete the job manually
+				if err := c.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationForeground)); client.IgnoreNotFound(err) != nil {
+					return errors.Wrap(err, "delete backup job")
+				}
 			}
+
+			// Release the Job (and its keep-job finalizer) for any terminal backup,
+			// whether it was deleted or not, so it doesn't pin the namespace.
 			if err := controller.RemoveKeepJobFinalizer(ctx, c, job); err != nil {
 				return errors.Wrap(err, "remove keep-job finalizer")
 			}
