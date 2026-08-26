@@ -2169,14 +2169,18 @@ function enable_hugepages_openshift() {
 	echo "MachineConfig created"
 	echo "Waiting for worker pool to update (~10 minutes)..."
 
-	kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
+	kubectl wait --for=condition=Updating=True mcp/worker --timeout=300s 2>/dev/null || {
+		echo "Worker pool did not start updating"
+		return 1
+	}
+
+	kubectl wait --for=condition=Updated=True mcp/worker --timeout=900s 2>/dev/null || {
 		echo "Update taking longer than expected"
 		return 1
 	}
 
 	echo "Worker pool updated"
 
-	sleep 10
 	verify_hugepages_on_nodes
 }
 
@@ -2213,30 +2217,29 @@ function enable_hugepages() {
 function verify_hugepages_on_nodes() {
 	echo "Verifying hugepages on nodes"
 
-	# Get first worker node, fallback to first non-master, fallback to any node
-	local node_name=$(
-		kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
-			|| kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
-			|| kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
-	)
+	local nodes
+	nodes=$(kubectl get nodes -l node-role.kubernetes.io/worker -o name 2>/dev/null)
+	if [ -z "${nodes}" ]; then
+		nodes=$(kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o name 2>/dev/null)
+	fi
+	if [ -z "${nodes}" ]; then
+		nodes=$(kubectl get nodes -o name)
+	fi
 
-	if [ -z "${node_name}" ]; then
+	if [ -z "${nodes}" ]; then
 		echo "No nodes found"
 		return 1
 	fi
 
-	echo "Checking node: ${node_name}"
-
-	local hugepages_capacity=$(kubectl get node ${node_name} \
-		-o jsonpath='{.status.capacity.hugepages-2Mi}')
-
-	if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
-		echo "Node has hugepages capacity: ${hugepages_capacity}"
-		return 0
-	else
-		echo "No hugepages capacity found on node ${node_name}"
-		return 1
-	fi
+	local node hugepages_capacity
+	for node in ${nodes}; do
+		hugepages_capacity=$(kubectl get "${node}" -o jsonpath='{.status.capacity.hugepages-2Mi}')
+		if [ -z "${hugepages_capacity}" ] || [ "${hugepages_capacity}" = "0" ]; then
+			echo "No hugepages capacity found on ${node}"
+			return 1
+		fi
+		echo "${node} has hugepages capacity: ${hugepages_capacity}"
+	done
 }
 
 function verify_hugepages_in_pod() {
