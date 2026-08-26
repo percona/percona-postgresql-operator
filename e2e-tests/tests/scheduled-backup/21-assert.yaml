@@ -30,7 +30,9 @@ commands:
       echo "  Reason: $COND_REASON"
       echo "  Message: $COND_MSG"
       
-      # The condition should be set due to backup creation failure
-      if [[ "$COND_REASON" != "BackupCreationFailed" && "$COND_REASON" != "BackupFailed" ]]; then
-        echo "WARNING: Expected reason to be BackupCreationFailed or BackupFailed, got: $COND_REASON"
+      # The backup Job was blocked by the ResourceQuota and hit the startup timeout,
+      # so the ScheduledBackupDegraded condition is set with reason BackupFailed.
+      if [[ "$COND_REASON" != "BackupFailed" ]]; then
+        echo "ERROR: Expected reason BackupFailed, got: $COND_REASON"
+        exit 1
       fi
