@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 )
 
 func TestServerSideApply(t *testing.T) {
@@ -55,7 +55,7 @@ func TestServerSideApply(t *testing.T) {
 
 		// Create the object.
 		before := constructor()
-		assert.NilError(t, cc.Patch(ctx, before, client.Apply, reconciler.Owner))
+		assert.NilError(t, cc.Patch(ctx, before, client.Apply, reconciler.Owner)) //nolint:staticcheck
 		assert.Assert(t, before.GetResourceVersion() != "")
 
 		// Allow the Kubernetes API clock to advance.
@@ -63,7 +63,7 @@ func TestServerSideApply(t *testing.T) {
 
 		// client.Apply changes the ResourceVersion inadvertently.
 		after := constructor()
-		assert.NilError(t, cc.Patch(ctx, after, client.Apply, reconciler.Owner))
+		assert.NilError(t, cc.Patch(ctx, after, client.Apply, reconciler.Owner)) //nolint:staticcheck
 		assert.Assert(t, after.GetResourceVersion() != "")
 
 		switch {
@@ -115,7 +115,7 @@ func TestServerSideApply(t *testing.T) {
 		assert.NilError(t,
 			controllerutil.SetControllerReference(controller2, applied, cc.Scheme()))
 
-		err1 := cc.Patch(ctx, applied, client.Apply, client.ForceOwnership, reconciler.Owner)
+		err1 := cc.Patch(ctx, applied, client.Apply, client.ForceOwnership, reconciler.Owner) //nolint:staticcheck
 
 		// Patch not accepted; the ownerReferences field is invalid.
 		assert.Assert(t, apierrors.IsInvalid(err1), "got %#v", err1)
@@ -167,13 +167,13 @@ func TestServerSideApply(t *testing.T) {
 		switch {
 		case serverVersion.LessThan(version.MustParseGeneric("1.22")):
 			assert.ErrorContains(t,
-				cc.Patch(ctx, upstream, client.Apply, client.ForceOwnership, reconciler.Owner),
+				cc.Patch(ctx, upstream, client.Apply, client.ForceOwnership, reconciler.Owner), //nolint:staticcheck
 				"field not declared in schema",
 				"expected https://issue.k8s.io/109210")
 
 		default:
 			assert.NilError(t,
-				cc.Patch(ctx, upstream, client.Apply, client.ForceOwnership, reconciler.Owner))
+				cc.Patch(ctx, upstream, client.Apply, client.ForceOwnership, reconciler.Owner)) //nolint:staticcheck
 		}
 
 		// Our apply method generates the correct apply-patch.
@@ -201,7 +201,7 @@ func TestServerSideApply(t *testing.T) {
 			// Create the Service.
 			before := intent.DeepCopy()
 			assert.NilError(t,
-				cc.Patch(ctx, before, client.Apply, client.ForceOwnership, reconciler.Owner))
+				cc.Patch(ctx, before, client.Apply, client.ForceOwnership, reconciler.Owner)) //nolint:staticcheck
 
 			// Something external mucks it up.
 			assert.NilError(t,
@@ -212,7 +212,7 @@ func TestServerSideApply(t *testing.T) {
 			// client.Apply cannot correct it in old versions of Kubernetes.
 			after := intent.DeepCopy()
 			assert.NilError(t,
-				cc.Patch(ctx, after, client.Apply, client.ForceOwnership, reconciler.Owner))
+				cc.Patch(ctx, after, client.Apply, client.ForceOwnership, reconciler.Owner)) //nolint:staticcheck
 
 			switch {
 			case serverVersion.LessThan(version.MustParseGeneric("1.22")):
@@ -242,8 +242,8 @@ func TestServerSideApply(t *testing.T) {
 			assert.Equal(t, managed.Operation, metav1.ManagedFieldsOperationApply)
 
 			assert.Assert(t, managed.FieldsV1 != nil)
-			assert.Assert(t, strings.Contains(string(managed.FieldsV1.Raw), `"f:selector":{`),
-				"expected f:selector in %s", managed.FieldsV1.Raw)
+			assert.Assert(t, strings.Contains(managed.FieldsV1.GetRawString(), `"f:selector":{`),
+				"expected f:selector in %s", managed.FieldsV1.GetRawString())
 		})
 
 		for _, tt := range []struct {
@@ -262,7 +262,7 @@ func TestServerSideApply(t *testing.T) {
 				// Create the Service.
 				before := intent.DeepCopy()
 				assert.NilError(t,
-					cc.Patch(ctx, before, client.Apply, client.ForceOwnership, reconciler.Owner))
+					cc.Patch(ctx, before, client.Apply, client.ForceOwnership, reconciler.Owner)) //nolint:staticcheck
 
 				// Something external mucks it up.
 				assert.NilError(t,
@@ -273,7 +273,7 @@ func TestServerSideApply(t *testing.T) {
 				// client.Apply cannot correct it.
 				after := intent.DeepCopy()
 				assert.NilError(t,
-					cc.Patch(ctx, after, client.Apply, client.ForceOwnership, reconciler.Owner))
+					cc.Patch(ctx, after, client.Apply, client.ForceOwnership, reconciler.Owner)) //nolint:staticcheck
 
 				assert.Assert(t, len(after.Spec.Selector) != len(intent.Spec.Selector),
 					"got %v", after.Spec.Selector)
@@ -300,8 +300,8 @@ func TestServerSideApply(t *testing.T) {
 
 				// The selector field is forgotten, however.
 				assert.Assert(t, managed.FieldsV1 != nil)
-				assert.Assert(t, !strings.Contains(string(managed.FieldsV1.Raw), `"f:selector":{`),
-					"expected f:selector to be missing from %s", managed.FieldsV1.Raw)
+				assert.Assert(t, !strings.Contains(managed.FieldsV1.GetRawString(), `"f:selector":{`),
+					"expected f:selector to be missing from %s", managed.FieldsV1.GetRawString())
 			})
 		}
 	})

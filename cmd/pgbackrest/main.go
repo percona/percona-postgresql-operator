@@ -142,6 +142,10 @@ func (k *KubeAPI) Exec(ctx context.Context, namespace, pod, container string, st
 		}, ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(k.Config, "POST", request.URL())
+	if err != nil {
+		log.Error(err)
+		return err
+	}
 
 	stdoutReader, stdoutWriter := io.Pipe()
 	defer func() {
@@ -384,7 +388,7 @@ else
 fi
 `
 
-	localHashCmd := exec.Command("bash", "-ceu", "--", localScript)
+	localHashCmd := exec.CommandContext(ctx, "bash", "-ceu", "--", localScript)
 	hashOutput, err := localHashCmd.Output()
 	if err != nil {
 		log.Fatalf("unable to calculate hash for pgBackRest config: %v", err)

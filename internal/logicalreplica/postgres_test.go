@@ -11,8 +11,8 @@ import (
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func clusterWithReplicas(names ...string) *v1beta1.PostgresCluster {

@@ -18,12 +18,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {

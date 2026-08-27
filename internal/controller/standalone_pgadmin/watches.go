@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // watchPostgresClusters returns a [handler.EventHandler] for PostgresClusters.
@@ -92,7 +92,7 @@ func (r *PGAdminReconciler) findPGAdminsForSecret(
 	}); err == nil {
 		for i := range pgadmins.Items {
 			for j := range pgadmins.Items[i].Spec.Users {
-				if pgadmins.Items[i].Spec.Users[j].PasswordRef.LocalObjectReference.Name == secret.Name {
+				if pgadmins.Items[i].Spec.Users[j].PasswordRef.Name == secret.Name {
 					matching = append(matching, &pgadmins.Items[i])
 					break
 				}
