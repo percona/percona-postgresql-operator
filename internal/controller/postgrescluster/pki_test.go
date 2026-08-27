@@ -1114,6 +1114,54 @@ func TestIssuerModeAwareness(t *testing.T) {
 		}
 	})
 
+	t.Run("transition from userProvidedOnly to auto resumes operator management", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "user-provided-to-auto"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		certificate, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		privateKey, err := root.PrivateKey.MarshalText()
+		assert.NilError(t, err)
+
+		secret := &corev1.Secret{
+			ObjectMeta: naming.PostgresRootCASecret(cluster),
+			Data: map[string][]byte{
+				"root.crt": certificate,
+				"root.key": privateKey,
+			},
+		}
+		assert.NilError(t, tClient.Create(ctx, secret))
+
+		r := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: rejectingCertManagerCtrlFunc,
+		}
+		providedRoot, err := r.reconcileRootCertificate(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, providedRoot.Certificate, root.Certificate)
+		assert.Assert(t, !metav1.IsControlledBy(secret, cluster))
+
+		cluster.Spec.TLS.CertManagementPolicy = v1beta1.CertManagementAuto
+		assert.NilError(t, tClient.Update(ctx, cluster))
+
+		managedRoot, err := r.reconcileRootCertificate(ctx, cluster)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, managedRoot.Certificate, root.Certificate)
+
+		assert.NilError(t, tClient.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+		assert.Assert(t, metav1.IsControlledBy(secret, cluster))
+		assert.DeepEqual(t, secret.Data["root.crt"], certificate)
+		assert.DeepEqual(t, secret.Data["root.key"], privateKey)
+	})
+
 	t.Run("operatorProvidedOnly uses internal PKI", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Name = "operator-provided-only"

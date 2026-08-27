@@ -16635,8 +16635,10 @@ spec:
                     - operatorProvidedOnly
                     type: string
                     x-kubernetes-validations:
-                    - message: certManagementPolicy is immutable
-                      rule: self == oldSelf
+                    - message: certManagementPolicy can only transition between auto
+                        and userProvidedOnly
+                      rule: self == oldSelf || (oldSelf == 'auto' && self == 'userProvidedOnly')
+                        || (oldSelf == 'userProvidedOnly' && self == 'auto')
                   certValidityDuration:
                     type: string
                   issuerConf:
@@ -34907,8 +34909,10 @@ spec:
                     - operatorProvidedOnly
                     type: string
                     x-kubernetes-validations:
-                    - message: certManagementPolicy is immutable
-                      rule: self == oldSelf
+                    - message: certManagementPolicy can only transition between auto
+                        and userProvidedOnly
+                      rule: self == oldSelf || (oldSelf == 'auto' && self == 'userProvidedOnly')
+                        || (oldSelf == 'userProvidedOnly' && self == 'auto')
                   certValidityDuration:
                     type: string
                   issuerConf:

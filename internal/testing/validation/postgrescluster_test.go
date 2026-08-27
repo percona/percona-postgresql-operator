@@ -172,8 +172,13 @@ func TestCertManagementPolicyTransition(t *testing.T) {
 				updated := cluster.DeepCopy()
 				updated.Spec.TLS.CertManagementPolicy = to
 				err := cc.Update(t.Context(), updated)
+				if (from == v1beta1.CertManagementAuto && to == v1beta1.CertManagementUserProvidedOnly) ||
+					(from == v1beta1.CertManagementUserProvidedOnly && to == v1beta1.CertManagementAuto) {
+					assert.NilError(t, err)
+					return
+				}
 				assert.Assert(t, apierrors.IsInvalid(err))
-				assert.ErrorContains(t, err, "certManagementPolicy is immutable")
+				assert.ErrorContains(t, err, "certManagementPolicy can only transition between auto and userProvidedOnly")
 			})
 		}
 	}
