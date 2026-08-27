@@ -7,13 +7,13 @@ commands:
 
       source ../../functions
 
-      # Remove selector.matchLabels atomically with the scale-up.  If left in place,
-      # the new replica PVCs would also try to bind the labeled PV (only one exists)
-      # and get stuck Pending.  The primary's PVC is unaffected (already bound).
+      # Remove volumeName atomically with the scale-up. If left in place, the new
+      # replica PVCs would also try to bind the migrated PV. The primary PVC is
+      # unaffected because it is already bound.
       kubectl -n "${NAMESPACE}" patch perconapgcluster percona-migrated \
         --type=json \
         -p='[
-          {"op":"remove","path":"/spec/instances/0/dataVolumeClaimSpec/selector"},
+          {"op":"remove","path":"/spec/instances/0/dataVolumeClaimSpec/volumeName"},
           {"op":"replace","path":"/spec/instances/0/replicas","value":3}
         ]'
 

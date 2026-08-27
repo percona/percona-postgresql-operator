@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      uri="postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
+
+      # cron.database_name only exists once the pg_cron library is loaded, so it
+      # tells us the restart of the previous step actually picked up the new
+      # shared_preload_libraries. CREATE EXTENSION fails without it.
+      for i in $(seq 1 30); do
+          if run_psql_local '\c postgres \\\ SHOW cron.database_name' "$uri" >/dev/null 2>&1; then
+              break
+          fi
+          sleep 5
+      done
+      run_psql_local '\c postgres \\\ SHOW cron.database_name' "$uri" \
+          || { echo "ERROR: pg_cron library is not loaded, shared_preload_libraries did not take effect"; exit 1; }
+
+      run_psql_local '\c postgres \\\ CREATE EXTENSION pg_cron' "$uri"
+
+      # a job in cron.job is the data a user loses if pg_cron gets dropped
+      run_psql_local '\c postgres \\\ SELECT cron.schedule($$migration-tick$$,$$* * * * *$$,$$SELECT 1$$)' "$uri"
+
+      jobs=$(run_psql_local '\c postgres \\\ SELECT count(*) FROM cron.job WHERE jobname = $$migration-tick$$' "$uri" | tr -d '[:space:]')
+      [[ "$jobs" == "1" ]] || { echo "ERROR: failed to schedule the pg_cron job"; exit 1; }

@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping TDE verification for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
       result=$(run_psql_command \
         "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
         "$(get_psql_uri standby-cluster postgres)")
@@ -48,4 +53,3 @@ commands:
       assert_pg_tde_key_info_uid \
         "$(get_psql_uri standby-cluster postgres)/myapp2" \
         standby-cluster
-

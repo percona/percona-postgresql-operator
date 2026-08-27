@@ -16,10 +16,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestCreatePGBackRestConfigMapIntent(t *testing.T) {
@@ -275,7 +275,7 @@ func TestReloadCommand(t *testing.T) {
 		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
 
 		// Expect shellcheck to be happy.
-		cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file)
+		cmd := exec.CommandContext(t.Context(), shellcheck, "--enable=all", file) //nolint:noctx //test data
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}

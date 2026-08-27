@@ -1,24 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 30
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: 09-verify-extension-standby
-data:
-  pg_tde_extension: ' pg_tde'
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: 09-verify-encryption-standby
-data:
-  pg_tde_is_encrypted: ' t'
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: 09-verify-data-standby
-data:
-  data: ' 100500'
+commands:
+  - script: |-
+      set -o errexit
+
+      source ../../functions
+
+      assert_configmap_data 09-verify-data-standby data ' 100500'
+      if [[ ${PG_VER} -ge 17 ]]; then
+        assert_configmap_data 09-verify-extension-standby pg_tde_extension ' pg_tde'
+        assert_configmap_data 09-verify-encryption-standby pg_tde_is_encrypted ' t'
+      fi

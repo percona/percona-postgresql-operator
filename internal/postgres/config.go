@@ -11,9 +11,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -68,12 +68,12 @@ tdelink() (
       exit 1
     }
   fi
-  set -x; ln --no-dereference --force --symbolic "${keyring}" "${name}"
+  set -x; ln -snf "${keyring}" "${name}"
 )
 
 tdeunlink() (
   local name="$1"
-  if [[ -L "${name}" ]]; then set -x; rm --force "${name}"; fi
+  if [[ -L "${name}" ]]; then set -x; rm -f "${name}"; fi
 )
 `
 

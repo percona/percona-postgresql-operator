@@ -14,11 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func (r *PGClusterReconciler) deletePVC(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -85,7 +85,6 @@ func (r *PGClusterReconciler) deleteTLSSecrets(ctx context.Context, cr *v2.Perco
 		naming.ClusterPGBouncer(crunchyCluster),
 	}
 	if cr.Spec.Secrets.CustomRootCATLSSecret == nil {
-		secretsMeta = append(secretsMeta, metav1.ObjectMeta{Namespace: crunchyCluster.Namespace, Name: naming.RootCertSecret})
 		secretsMeta = append(secretsMeta, naming.PostgresRootCASecret(crunchyCluster))
 	}
 	if cr.Spec.Secrets.CustomTLSSecret == nil {
@@ -184,7 +183,10 @@ func (r *PGClusterReconciler) deleteBackups(ctx context.Context, cr *v2.PerconaP
 	pod := podList.Items[0]
 
 	var stdout, stderr bytes.Buffer
-	pgBackrestCmd := "pgbackrest --stanza=db --log-level-console=info stop && " +
+	// K8SPG-992: We use --force for a "stop" to stop pgbackrest processes
+	// left by a terminated backup job.
+	// Otherwise, their locks can block stanza-delete.
+	pgBackrestCmd := "pgbackrest --stanza=db --log-level-console=info stop --force && " +
 		"pgbackrest --stanza=db --log-level-console=info --repo=%s stanza-delete --force"
 
 	for _, repo := range cr.Spec.Backups.PGBackRest.Repos {

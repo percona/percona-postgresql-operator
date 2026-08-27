@@ -1,8 +1,16 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 300
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: vault-secret
+commands:
+  - script: |-
+      set -o errexit
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping Vault assertion for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
+      kubectl wait --for=jsonpath='{.metadata.name}'=vault-secret \
+        --timeout=300s -n "${NAMESPACE}" secret/vault-secret

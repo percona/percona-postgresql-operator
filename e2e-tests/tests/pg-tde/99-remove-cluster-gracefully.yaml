@@ -16,12 +16,7 @@ commands:
 
       source ../../functions
 
-      vault_name=vault-service
-
-      helm uninstall "${vault_name}" --namespace "${vault_name}" --ignore-not-found || true
-      kubectl delete namespace "${vault_name}" --ignore-not-found || true
-      kubectl delete csr "vault-csr-${vault_name}" --ignore-not-found || true
-
+      stop_vault "vault-service"
       remove_all_finalizers
       check_operator_panic
       destroy_operator

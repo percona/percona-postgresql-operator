@@ -17,24 +17,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
-
-func compareMaps(x map[string]string, y map[string]string) bool {
-	if len(x) != len(y) {
-		return false
-	}
-
-	for k, v := range x {
-		if y[k] != v {
-			return false
-		}
-	}
-	return true
-}
 
 func TestBackupOwnerReference(t *testing.T) {
 	// The test is disabled, because there are problems with the fake client
@@ -349,4 +336,68 @@ func createFakePodsForStatefulsets(ctx context.Context, cl client.Client, stsLis
 		}
 	}
 	return nil
+}
+
+func TestRemoveStaleBackupAnnotation(t *testing.T) {
+	const crName = "some-cluster"
+	const ns = crName
+	const backupName = "some-backup"
+
+	newBackupForCluster := func(cluster string, deleting bool) *v2.PerconaPGBackup {
+		pb := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: ns},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: cluster,
+				RepoName:  new("repo1"),
+			},
+		}
+		if deleting {
+			pb.Finalizers = []string{pNaming.FinalizerDeleteBackup}
+			pb.DeletionTimestamp = new(metav1.Now())
+		}
+		return pb
+	}
+	newBackup := func(deleting bool) *v2.PerconaPGBackup {
+		return newBackupForCluster(crName, deleting)
+	}
+
+	tests := []struct {
+		name       string
+		backup     *v2.PerconaPGBackup
+		expectKept bool
+	}{
+		// The annotation must not reach crunchy cluster once the backup is gone,
+		// otherwise it starts a backup Job that no PerconaPGBackup owns.
+		{name: "backup is gone", expectKept: false},
+		{name: "backup exists", backup: newBackup(false), expectKept: true},
+		// The delete-backup finalizer still reads the annotation while it cleans up.
+		{name: "backup is terminating", backup: newBackup(true), expectKept: true},
+		// A backup with the same name in the same namespace can belong to another cluster.
+		{name: "backup belongs to another cluster", backup: newBackupForCluster("other-cluster", false), expectKept: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			cr, err := readDefaultCR(crName, ns)
+			require.NoError(t, err)
+			cr.Annotations[naming.PGBackRestBackup] = backupName
+
+			objs := []client.Object{}
+			if tt.backup != nil {
+				objs = append(objs, tt.backup)
+			}
+			cl, err := buildFakeClient(ctx, cr, objs...)
+			require.NoError(t, err)
+
+			r := &PGClusterReconciler{Client: cl}
+			require.NoError(t, r.removeStaleBackupAnnotation(ctx, cr))
+
+			if tt.expectKept {
+				assert.Equal(t, backupName, cr.Annotations[naming.PGBackRestBackup])
+			} else {
+				assert.NotContains(t, cr.Annotations, naming.PGBackRestBackup)
+			}
+		})
+	}
 }

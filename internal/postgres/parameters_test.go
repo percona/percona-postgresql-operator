@@ -21,7 +21,7 @@ func TestNewParameters(t *testing.T) {
 
 		"unix_socket_directories": "/tmp/postgres",
 	})
-	assert.DeepEqual(t, parameters.Default.AsMap(), map[string]string{
+	assert.DeepEqual(t, parameters.Default.AsMap(), map[string]string{ //nolint:gosec //test data
 		"jit": "off",
 
 		"password_encryption": "scram-sha-256",
