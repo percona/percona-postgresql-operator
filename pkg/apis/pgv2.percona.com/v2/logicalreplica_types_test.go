@@ -191,6 +191,44 @@ func TestLogicalReplicasToCrunchy(t *testing.T) {
 		}
 		assert.Equal(t, 1, count)
 	})
+
+	t.Run("keeps the default user and database", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		// The crunchy layer skips its own default as soon as spec.users has an
+		// entry, and logicalrepl owns no database, so without this the cluster
+		// ends up with no database at all and the replica has nothing to seed.
+		var found *crunchyv1beta1.PostgresUserSpec
+		for i := range actual.Spec.Users {
+			if actual.Spec.Users[i].Name == PostgresIdentifierOf(cr.Name) {
+				found = &actual.Spec.Users[i]
+			}
+		}
+		require.NotNil(t, found)
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{PostgresIdentifierOf(cr.Name)},
+			found.Databases)
+	})
+
+	t.Run("does not add a default user beside declared ones", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Spec.Users = []crunchyv1beta1.PostgresUserSpec{{Name: "app"}}
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		names := make([]crunchyv1beta1.PostgresIdentifier, len(actual.Spec.Users))
+		for i, user := range actual.Spec.Users {
+			names[i] = user.Name
+		}
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{
+			"app", PostgresIdentifierOf(UserLogicalReplication),
+		}, names)
+	})
 }
 
 // PostgresIdentifierOf is a readability helper for the tests above.

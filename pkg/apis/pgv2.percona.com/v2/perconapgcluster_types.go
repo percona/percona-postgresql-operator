@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"regexp"
 	"slices"
 
 	gover "github.com/hashicorp/go-version"
@@ -317,6 +318,28 @@ func (s *LogicalReplicaSpec) BootstrapMethodOrDefault() LogicalReplicaBootstrapM
 // configured.
 func (cr *PerconaPGCluster) LogicalReplicasEnabled() bool {
 	return cr.CompareVersion("3.1.0") >= 0 && len(cr.Spec.LogicalReplicas) > 0
+}
+
+// rePostgresIdentifier is the pattern the CRD enforces on spec.users[].name.
+var rePostgresIdentifier = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
+// defaultUser returns the user and database named after the cluster that the
+// crunchy layer creates on its own when spec.users is unset. ok is false when
+// the cluster name cannot be a PostgreSQL identifier, which is exactly when the
+// crunchy layer skips the default too.
+func (cr *PerconaPGCluster) defaultUser() (crunchyv1beta1.PostgresUserSpec, bool) {
+	if len(cr.Name) > 63 || !rePostgresIdentifier.MatchString(cr.Name) {
+		return crunchyv1beta1.PostgresUserSpec{}, false
+	}
+
+	identifier := crunchyv1beta1.PostgresIdentifier(cr.Name)
+	return crunchyv1beta1.PostgresUserSpec{
+		Name:      identifier,
+		Databases: []crunchyv1beta1.PostgresIdentifier{identifier},
+		Password: &crunchyv1beta1.PostgresPasswordSpec{
+			Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+		},
+	}, true
 }
 
 type ContainerOptions struct {
@@ -678,27 +701,23 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		users = append(users, user)
 	}
 
+	// The crunchy layer creates a user and a database named after the cluster
+	// only when spec.users is unset, so the reserved users below would take that
+	// default away from a cluster that declares no users of its own.
+	if len(users) == 0 && (cr.PMMEnabled() || cr.LogicalReplicasEnabled()) {
+		if user, ok := cr.defaultUser(); ok {
+			users = append(users, user)
+		}
+	}
+
 	if cr.PMMEnabled() {
-		users = append(cr.Spec.Users, crunchyv1beta1.PostgresUserSpec{
+		users = append(users, crunchyv1beta1.PostgresUserSpec{
 			Name:    UserMonitoring,
 			Options: "SUPERUSER",
 			Password: &crunchyv1beta1.PostgresPasswordSpec{
 				Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
 			},
 		})
-
-		if len(cr.Spec.Users) == 0 {
-			// Add default user: <cluster-name>-pguser-<cluster-name>
-			users = append(users, crunchyv1beta1.PostgresUserSpec{
-				Name: crunchyv1beta1.PostgresIdentifier(cr.Name),
-				Databases: []crunchyv1beta1.PostgresIdentifier{
-					crunchyv1beta1.PostgresIdentifier(cr.Name),
-				},
-				Password: &crunchyv1beta1.PostgresPasswordSpec{
-					Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
-				},
-			})
-		}
 	}
 
 	// SUPERUSER because pg_createsubscriber creates a publication FOR
