@@ -8,7 +8,6 @@ import (
 	"context"
 	"strings"
 
-	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,12 +16,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -319,20 +318,14 @@ func (r *Reconciler) reconcileRootCertificate(
 
 	// K8SPG-555
 	intent := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      existing.Name,
-			Namespace: existing.Namespace,
-		},
+		ObjectMeta: naming.PostgresRootCASecret(cluster),
 	}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
 
-	if cluster.Labels != nil {
-		currVersion, err := gover.NewVersion(cluster.Labels[naming.LabelVersion])
-		if err == nil && currVersion.GreaterThanOrEqual(gover.Must(gover.NewVersion("2.6.0"))) && cluster.Spec.Metadata != nil {
-			intent.Labels = cluster.Spec.Metadata.Labels
-			intent.Annotations = cluster.Spec.Metadata.Annotations
-		}
+	if cluster.Spec.Metadata != nil {
+		intent.Labels = cluster.Spec.Metadata.Labels
+		intent.Annotations = cluster.Spec.Metadata.Annotations
 	}
 
 	if err == nil {
@@ -477,6 +470,9 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 	err := errors.WithStack(client.IgnoreNotFound(
 		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing),
 	))
+	if err != nil {
+		return nil, errors.Wrap(err, "get secret")
+	}
 
 	leaf := &pki.LeafCertificate{}
 	primaryServiceDNSNames, err := naming.ServiceDNSNames(ctx, primaryService, cluster.Spec.ClusterServiceDNSSuffix)
@@ -506,7 +502,7 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 	intent := &corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)}
 	intent.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	intent.Data = make(map[string][]byte)
-	intent.ObjectMeta.OwnerReferences = existing.ObjectMeta.OwnerReferences
+	intent.OwnerReferences = existing.OwnerReferences
 
 	intent.Annotations = naming.Merge(cluster.Spec.Metadata.GetAnnotationsOrNil())
 	intent.Labels = naming.Merge(

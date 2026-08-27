@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 )
 
 // This example demonstrates how Executor can work with exec.Cmd.
@@ -184,7 +184,7 @@ done <<< "${databases}"
 			assert.NilError(t, os.WriteFile(file, []byte(script), 0o600))
 
 			// Expect shellcheck to be happy.
-			cmd := exec.Command(shellcheck, "--enable=all", file)
+			cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 			output, err := cmd.CombinedOutput()
 			assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 

@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 var _ = Describe("Ensure Version", Ordered, func() {
@@ -227,7 +227,7 @@ func (vs *fakeVS) Start(t *testing.T) error {
 		Handler:           gwmux,
 		ReadHeaderTimeout: time.Second * 10,
 	}
-	gwLis, err := net.Listen("tcp", gwServer.Addr)
+	gwLis, err := new(net.ListenConfig).Listen(context.Background(), "tcp", gwServer.Addr)
 	if err != nil {
 		return errors.Wrap(err, "failed to listen gateway")
 	}
