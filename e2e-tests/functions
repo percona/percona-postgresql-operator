@@ -227,7 +227,7 @@ function retry() {
 				-e "s/(ACCESS_KEY_ID=)'?[^' ]+'?/\1'***'/g" \
 				-e "s/(SECRET_ACCESS_KEY=)'?[^' ]+'?/\1'***'/g" \
 				-e "s/(AZURE_STORAGE_ACCOUNT_KEY=)'?[^' ]+'?/\1'***'/g")
-			echo "The command ${sanitized_command} has failed after $n attempts."
+			echo "The command ${sanitized_command} has failed after $n attempts." >&2
 			exit 1
 		fi
 		((n += 1))
@@ -1546,10 +1546,10 @@ function is_cert_manager_installed_by_test() {
 	local namespace
 	is_cert_manager_installed || return 1
 
-	namespace="$(kubectl get namespace cert-manager \
+	namespace="$(kubectl get namespace \
 		--selector "${CERT_MANAGER_TEST_LABEL}" -o name 2>/dev/null || true)"
 
-	[[ -n ${namespace} ]]
+	[[ ${namespace} == "namespace/cert-manager" ]]
 }
 
 function deploy_cert_manager() {
