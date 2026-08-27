@@ -12,7 +12,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
 )
 
 func TestInitManager(t *testing.T) {

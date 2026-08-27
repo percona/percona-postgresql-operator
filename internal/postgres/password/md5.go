@@ -5,7 +5,7 @@
 package password
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 
 	"github.com/pkg/errors"

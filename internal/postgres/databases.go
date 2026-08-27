@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 )
 
 // CreateDatabasesInPostgreSQL calls exec to create databases that do not exist

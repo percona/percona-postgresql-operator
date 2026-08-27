@@ -21,13 +21,13 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/events"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcileVolumeSnapshots(t *testing.T) {
@@ -57,7 +57,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		// Create cluster (without snapshots spec)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
@@ -194,7 +194,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		// Create a cluster with snapshots enabled
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: volumeSnapshotClassName,
 		}
@@ -309,7 +309,7 @@ func TestReconcileVolumeSnapshots(t *testing.T) {
 		// Create a cluster with snapshots enabled
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: volumeSnapshotClassName,
 		}
@@ -371,7 +371,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		assert.NilError(t, r.Client.Create(ctx, cluster))
 		t.Cleanup(func() { assert.Check(t, r.Client.Delete(ctx, cluster)) })
 
@@ -428,7 +428,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: "my-snapshotclass",
 		}
@@ -460,7 +460,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: "my-snapshotclass",
 		}
@@ -524,7 +524,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: "my-snapshotclass",
 		}
@@ -623,7 +623,7 @@ func TestReconcileDedicatedSnapshotVolume(t *testing.T) {
 		ns := require.Namespace(t, cc)
 		cluster := testCluster()
 		cluster.Namespace = ns.Name
-		cluster.ObjectMeta.UID = "the-uid-123"
+		cluster.UID = "the-uid-123"
 		cluster.Spec.Backups.Snapshots = &v1beta1.VolumeSnapshots{
 			VolumeSnapshotClassName: "my-snapshotclass",
 		}
@@ -725,7 +725,7 @@ func TestCreateDedicatedSnapshotVolume(t *testing.T) {
 	ns := require.Namespace(t, cc)
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
-	cluster.ObjectMeta.UID = "the-uid-123"
+	cluster.UID = "the-uid-123"
 
 	labelMap := map[string]string{
 		naming.LabelCluster: cluster.Name,
@@ -753,7 +753,7 @@ func TestDedicatedSnapshotVolumeRestore(t *testing.T) {
 	ns := require.Namespace(t, cc)
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
-	cluster.ObjectMeta.UID = "the-uid-123"
+	cluster.UID = "the-uid-123"
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -839,7 +839,7 @@ func TestGenerateVolumeSnapshot(t *testing.T) {
 	assert.Equal(t, *snapshot.Spec.VolumeSnapshotClassName, "my-snapshot")
 	assert.Equal(t, *snapshot.Spec.Source.PersistentVolumeClaimName, "dedicated-snapshot-volume")
 	assert.Equal(t, snapshot.Labels[naming.LabelCluster], "hippo")
-	assert.Equal(t, snapshot.ObjectMeta.OwnerReferences[0].Name, "hippo")
+	assert.Equal(t, snapshot.OwnerReferences[0].Name, "hippo")
 }
 
 func TestGetDedicatedSnapshotVolumeRestoreJob(t *testing.T) {
@@ -1111,7 +1111,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 			},
 		}
 		snapshotWithLatestError := getSnapshotWithLatestError(snapshotList)
-		assert.Equal(t, snapshotWithLatestError.ObjectMeta.Name, "bad-snapshot")
+		assert.Equal(t, snapshotWithLatestError.Name, "bad-snapshot")
 	})
 
 	t.Run("TwoSnapshotsWithErrors", func(t *testing.T) {
@@ -1146,7 +1146,7 @@ func TestGetSnapshotWithLatestError(t *testing.T) {
 			},
 		}
 		snapshotWithLatestError := getSnapshotWithLatestError(snapshotList)
-		assert.Equal(t, snapshotWithLatestError.ObjectMeta.Name, "second-bad-snapshot")
+		assert.Equal(t, snapshotWithLatestError.Name, "second-bad-snapshot")
 	})
 }
 
@@ -1342,7 +1342,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 			},
 		}
 		latestReadySnapshot := getLatestReadySnapshot(snapshotList)
-		assert.Equal(t, latestReadySnapshot.ObjectMeta.Name, "good-snapshot")
+		assert.Equal(t, latestReadySnapshot.Name, "good-snapshot")
 	})
 
 	t.Run("TwoReadySnapshots", func(t *testing.T) {
@@ -1373,7 +1373,7 @@ func TestGetLatestReadySnapshot(t *testing.T) {
 			},
 		}
 		latestReadySnapshot := getLatestReadySnapshot(snapshotList)
-		assert.Equal(t, latestReadySnapshot.ObjectMeta.Name, "second-good-snapshot")
+		assert.Equal(t, latestReadySnapshot.Name, "second-good-snapshot")
 	})
 }
 
@@ -1392,13 +1392,13 @@ func TestDeleteSnapshots(t *testing.T) {
 
 	cluster := testCluster()
 	cluster.Namespace = ns.Name
-	cluster.ObjectMeta.UID = "the-uid-123"
+	cluster.UID = "the-uid-123"
 	assert.NilError(t, r.Client.Create(ctx, cluster))
 
 	rhinoCluster := testCluster()
 	rhinoCluster.Name = "rhino"
 	rhinoCluster.Namespace = ns.Name
-	rhinoCluster.ObjectMeta.UID = "the-uid-456"
+	rhinoCluster.UID = "the-uid-456"
 	assert.NilError(t, r.Client.Create(ctx, rhinoCluster))
 
 	t.Cleanup(func() {

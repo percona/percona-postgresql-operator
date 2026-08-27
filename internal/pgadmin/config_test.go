@@ -5,6 +5,7 @@
 package pgadmin
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,9 +15,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestPodConfigFiles(t *testing.T) {
@@ -77,7 +78,7 @@ func TestStartupCommand(t *testing.T) {
 		assert.NilError(t, os.WriteFile(file, []byte(command[3]), 0o600))
 
 		// Expect shellcheck to be happy.
-		cmd := exec.Command(shellcheck, "--enable=all", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	})
@@ -94,7 +95,7 @@ func TestStartupCommand(t *testing.T) {
 		// Expect flake8 to be happy. Ignore "E401 multiple imports on one line"
 		// in addition to the defaults. The file contents appear in PodSpec, so
 		// allow lines longer than the default to save some vertical space.
-		cmd := exec.Command(flake8, "--extend-ignore=E401", "--max-line-length=99", file)
+		cmd := exec.CommandContext(context.Background(), flake8, "--extend-ignore=E401", "--max-line-length=99", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	})
