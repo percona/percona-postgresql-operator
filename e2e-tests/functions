@@ -9,9 +9,9 @@ BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
-# Retry every kubectl command once after a failure, using 10 seconds delay between attempts.
+# Retry every kubectl command once after a failure, using 5 seconds delay between attempts.
 function kubectl() {
-	(retry 1 10 "$(type -P kubectl)" "$@")
+	(retry 2 5 "$(type -P kubectl)" "$@")
 }
 
 function init_temp_dir() {
