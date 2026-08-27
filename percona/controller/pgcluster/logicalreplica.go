@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
@@ -50,7 +51,14 @@ const (
 	// pg_createsubscriber runs the target with during the conversion.
 	logicalReplicaBootstrapConfigFile = "bootstrap.conf"
 
-	logicalReplicaConfigVolume       = "logical-replica-config"
+	logicalReplicaConfigVolume = "logical-replica-config"
+
+	// logicalReplicaSocketVolume holds the directory Postgres binds its socket
+	// in. It is a volume of its own so that nss_wrapper can have the rest of
+	// /tmp: Postgres creates the socket but not the directory holding it, and
+	// the kubelet creates a mounted one with the Pod's filesystem group.
+	logicalReplicaSocketVolume = "postgres-socket"
+
 	logicalReplicaBootstrapContainer = "logical-replica-bootstrap"
 	logicalReplicaComponent          = "logical-replica"
 
@@ -1011,7 +1019,8 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 		Image:           cr.PostgresImage(),
 		ImagePullPolicy: cr.Spec.ImagePullPolicy,
 		Command:         []string{"bash", "-c", script},
-		Env:             logicalReplicaEnvironment(cr, dataDir),
+		Env: append(logicalReplicaEnvironment(cr, dataDir),
+			postgrescluster.NSSWrapperPostgresEnv()...),
 		Resources:       spec.Resources,
 		SecurityContext: initialize.RestrictedSecurityContext(true),
 		VolumeMounts: []corev1.VolumeMount{
@@ -1059,8 +1068,11 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 					Labels: logicalReplicaLabels(cr, spec.Name),
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:                corev1.RestartPolicyNever,
-					InitContainers:               []corev1.Container{initContainer},
+					RestartPolicy: corev1.RestartPolicyNever,
+					InitContainers: []corev1.Container{
+						initContainer,
+						logicalReplicaNSSWrapperInitContainer(cr, container.Resources),
+					},
 					Containers:                   []corev1.Container{container},
 					Volumes:                      logicalReplicaVolumes(cr, crunchyCR, spec),
 					SecurityContext:              postgres.PodSecurityContext(crunchyCR),
@@ -1115,6 +1127,26 @@ func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
 		InitialDelaySeconds: delay,
 		PeriodSeconds:       period,
 		FailureThreshold:    failureThreshold,
+	}
+}
+
+// logicalReplicaNSSWrapperInitContainer writes the passwd and group files that
+// let the Pod resolve its user ID to "postgres". OpenShift assigns an arbitrary
+// UID and CRI-O names its passwd entry after the number, so without this both
+// libpq and the backend's "peer" check see that number, and the
+// `local all "postgres" peer` rule the seed brought back from the primary never
+// matches.
+func logicalReplicaNSSWrapperInitContainer(
+	cr *v2.PerconaPGCluster, resources corev1.ResourceRequirements,
+) corev1.Container {
+	return corev1.Container{
+		Name:            naming.ContainerNSSWrapperInit,
+		Image:           cr.PostgresImage(),
+		ImagePullPolicy: cr.Spec.ImagePullPolicy,
+		Command:         []string{"bash", "-c", postgrescluster.NSSWrapperPostgresCommand()},
+		Resources:       resources,
+		SecurityContext: initialize.RestrictedSecurityContext(true),
+		VolumeMounts:    []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}},
 	}
 }
 
@@ -1294,7 +1326,8 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 				"-D", dataDir,
 				"-c", "config_file=" + logicalReplicaConfigMountPath + "/" + logicalReplicaConfigFile,
 			},
-			Env:       logicalReplicaEnvironment(cr, dataDir),
+			Env: append(logicalReplicaEnvironment(cr, dataDir),
+				postgrescluster.NSSWrapperPostgresEnv()...),
 			Resources: spec.Resources,
 			Ports: []corev1.ContainerPort{{
 				Name:          naming.PortPostgreSQL,
@@ -1305,15 +1338,28 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 			VolumeMounts: []corev1.VolumeMount{
 				logicalReplicaCertVolumeMount(),
 				postgres.DataVolumeMount(),
-				{Name: "tmp", MountPath: postgres.SocketDirectory},
+				{Name: "tmp", MountPath: "/tmp"},
+				{Name: logicalReplicaSocketVolume, MountPath: postgres.SocketDirectory},
 				logicalReplicaConfigVolumeMount(),
 			},
 			ReadinessProbe: logicalReplicaProbe(5, 10, 0),
 			LivenessProbe:  logicalReplicaProbe(30, 20, 6),
 		}
 
+		sts.Spec.Template.Spec.InitContainers = []corev1.Container{
+			logicalReplicaNSSWrapperInitContainer(cr, container.Resources),
+		}
 		sts.Spec.Template.Spec.Containers = []corev1.Container{container}
-		sts.Spec.Template.Spec.Volumes = logicalReplicaVolumes(cr, crunchyCR, spec)
+		sts.Spec.Template.Spec.Volumes = append(
+			logicalReplicaVolumes(cr, crunchyCR, spec),
+			corev1.Volume{
+				Name: logicalReplicaSocketVolume,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						Medium: corev1.StorageMediumMemory,
+					},
+				},
+			})
 		sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(crunchyCR)
 		sts.Spec.Template.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
 		sts.Spec.Template.Spec.Affinity = spec.Affinity
