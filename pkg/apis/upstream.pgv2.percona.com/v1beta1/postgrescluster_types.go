@@ -320,7 +320,7 @@ type TLSSpec struct {
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
 	// +kubebuilder:default=auto
 	// +kubebuilder:validation:Enum={auto,userProvidedOnly,operatorProvidedOnly}
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf || (oldSelf == 'auto' && self == 'userProvidedOnly') || (oldSelf == 'userProvidedOnly' && self == 'auto')",message="certManagementPolicy can only transition between auto and userProvidedOnly"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="certManagementPolicy is immutable"
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
