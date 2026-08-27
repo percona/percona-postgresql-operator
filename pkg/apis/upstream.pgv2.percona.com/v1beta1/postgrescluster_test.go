@@ -17,7 +17,7 @@ import (
 )
 
 func TestPostgresClusterWebhooks(t *testing.T) {
-	var _ webhook.CustomDefaulter = &PostgresCluster{}
+	var _ webhook.CustomDefaulter = &PostgresCluster{} //nolint:staticcheck
 }
 
 func TestPostgresClusterHasReplicas(t *testing.T) {

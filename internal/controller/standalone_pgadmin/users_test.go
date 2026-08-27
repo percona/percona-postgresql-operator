@@ -19,11 +19,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/events"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/events"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcilePGAdminUsers(t *testing.T) {
@@ -305,7 +305,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -365,7 +365,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -437,7 +437,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -482,7 +482,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -524,7 +524,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 		// User in users.json should be unchanged
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -551,7 +551,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 
 		// User in users.json should be unchanged
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -604,7 +604,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 		// have succeeded
 		secret := &corev1.Secret{ObjectMeta: naming.StandalonePGAdmin(pgadmin)}
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -632,7 +632,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 		// User in users.json should be unchanged and attempt to add user should not
 		// have succeeded
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -660,7 +660,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 		// User in users.json should be unchanged and attempt to add user should not
 		// have succeeded
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
@@ -689,7 +689,7 @@ func TestWritePGAdminUsers(t *testing.T) {
 		// User in users.json should be unchanged and attempt to add user should not
 		// have succeeded
 		assert.NilError(t,
-			reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secret), secret))
+			reconciler.Get(ctx, client.ObjectKeyFromObject(secret), secret))
 		if assert.Check(t, secret.Data["users.json"] != nil) {
 			var usersArr []pgAdminUserForJson
 			assert.NilError(t, json.Unmarshal(secret.Data["users.json"], &usersArr))
