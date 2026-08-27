@@ -20,7 +20,7 @@ func TestAccumulate(t *testing.T) {
 	called := 0
 	result, err := accumulate(10, func() (byte, error) {
 		called++
-		return byte('A' + called), nil
+		return byte('A' + called), nil //nolint:gosec //test data
 	})
 
 	assert.NilError(t, err)
@@ -33,7 +33,7 @@ func TestAccumulate(t *testing.T) {
 		result, err := accumulate(10, func() (byte, error) {
 			called++
 			if called < 5 {
-				return byte('A' + called), nil
+				return byte('A' + called), nil //nolint:gosec //test data
 			} else {
 				return 'Z', expected
 			}

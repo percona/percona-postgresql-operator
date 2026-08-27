@@ -20,12 +20,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={list}
@@ -128,6 +128,13 @@ func (r *Reconciler) observePersistentVolumeClaims(
 				// - https://git.k8s.io/enhancements/keps/sig-storage/3751-volume-attributes-class
 				corev1.PersistentVolumeClaimVolumeModifyingVolume,
 				corev1.PersistentVolumeClaimVolumeModifyVolumeError:
+
+			case
+				// These conditions are informational and do not require action
+				// from the operator.
+				corev1.PersistentVolumeClaimControllerResizeError,
+				corev1.PersistentVolumeClaimNodeResizeError,
+				corev1.PersistentVolumeClaimUnused:
 			}
 		}
 	}
@@ -220,7 +227,7 @@ func (r *Reconciler) configureExistingPGVolumes(
 				Spec: cluster.Spec.InstanceSets[0].DataVolumeClaimSpec,
 			}
 
-			volume.ObjectMeta.Labels = naming.WithPerconaLabels(map[string]string{
+			volume.Labels = naming.WithPerconaLabels(map[string]string{
 				naming.LabelCluster:     cluster.Name,
 				naming.LabelInstanceSet: cluster.Spec.InstanceSets[0].Name,
 				naming.LabelInstance:    instanceName,
@@ -275,7 +282,7 @@ func (r *Reconciler) configureExistingPGWALVolume(
 			Spec: cluster.Spec.InstanceSets[0].DataVolumeClaimSpec,
 		}
 
-		volume.ObjectMeta.Labels = naming.WithPerconaLabels(map[string]string{
+		volume.Labels = naming.WithPerconaLabels(map[string]string{
 			naming.LabelCluster:     cluster.Name,
 			naming.LabelInstanceSet: cluster.Spec.InstanceSets[0].Name,
 			naming.LabelInstance:    instanceName,
@@ -434,14 +441,14 @@ func (r *Reconciler) reconcileMovePGDataDir(ctx context.Context,
 
 	// at this point, the Job either wasn't found or it has failed, so the it
 	// should be created
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.Annotations = naming.Merge(cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGDataVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGDataDir: "",
 		})
-	moveDirJob.ObjectMeta.Labels = labels
+	moveDirJob.Labels = labels
 
 	// `patroni.dynamic.json` holds the previous state of the DCS. Since we are
 	// migrating the volumes, we want to clear out any obsolete configuration info.
@@ -558,14 +565,14 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(cluster.Spec.Metadata.
+	moveDirJob.Annotations = naming.Merge(cluster.Spec.Metadata.
 		GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.DataSource.Volumes.PGWALVolume.Labels, cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGWalDir: "",
 		})
-	moveDirJob.ObjectMeta.Labels = labels
+	moveDirJob.Labels = labels
 
 	script := fmt.Sprintf(`echo "Preparing cluster %s volumes for PGO v5.x"
     echo "pg_wal_pvc=%s"
@@ -580,7 +587,7 @@ func (r *Reconciler) reconcileMoveWALDir(ctx context.Context,
 		cluster.Spec.DataSource.Volumes.PGWALVolume.PVCName,
 		cluster.Spec.DataSource.Volumes.PGWALVolume.Directory,
 		cluster.Spec.DataSource.Volumes.PGWALVolume.Directory,
-		cluster.ObjectMeta.Name)
+		cluster.Name)
 
 	container := corev1.Container{
 		Command:         []string{"bash", "-ceu", script},
@@ -678,14 +685,14 @@ func (r *Reconciler) reconcileMoveRepoDir(ctx context.Context,
 		}
 	}
 
-	moveDirJob.ObjectMeta.Annotations = naming.Merge(
+	moveDirJob.Annotations = naming.Merge(
 		cluster.Spec.Metadata.GetAnnotationsOrNil())
 	labels := naming.Merge(cluster.Spec.Metadata.GetLabelsOrNil(),
 		naming.DirectoryMoveJobLabels(cluster.Name),
 		map[string]string{
 			naming.LabelMovePGBackRestRepoDir: "",
 		})
-	moveDirJob.ObjectMeta.Labels = labels
+	moveDirJob.Labels = labels
 
 	script := fmt.Sprintf(`echo "Preparing cluster %s pgBackRest repo volume for PGO v5.x"
     echo "repo_pvc=%s"

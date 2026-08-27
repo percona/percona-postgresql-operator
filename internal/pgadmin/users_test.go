@@ -17,8 +17,8 @@ import (
 	"gotest.tools/v3/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestWriteUsersInPGAdmin(t *testing.T) {
@@ -179,7 +179,7 @@ with create_app().app_context():
 
 			// Expect flake8 to be happy. Ignore "E402 module level import not
 			// at top of file" in addition to the defaults.
-			cmd := exec.Command(flake8, "--extend-ignore=E402", file)
+			cmd := exec.CommandContext(context.Background(), flake8, "--extend-ignore=E402", file)
 			output, err := cmd.CombinedOutput()
 			assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 
