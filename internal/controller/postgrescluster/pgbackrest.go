@@ -2411,6 +2411,10 @@ func (r *Reconciler) reconcileCertManagerPGBackRestSecret(
 	// If cert-manager hasn't issued the secrets yet, fall back to internal PKI
 	// so pgBackRest remains functional during the transition.
 	if clientErr != nil || repoErr != nil {
+		// An external or ACME issuer has no internal root CA to fall back on.
+		if rootCA == nil {
+			return errors.New("waiting for cert-manager to issue pgBackRest certificates")
+		}
 		log.V(1).Info("cert-manager pgbackrest secrets not yet available, using internal PKI")
 		return pgbackrest.Secret(ctx, cluster, repoHost, rootCA, additionalCAs, existing, intent)
 	}
