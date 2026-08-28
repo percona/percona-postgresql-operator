@@ -39,7 +39,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.55.0
 	golang.org/x/tools v0.49.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.36.4
 	k8s.io/apiextensions-apiserver v0.36.4
