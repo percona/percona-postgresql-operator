@@ -25,8 +25,8 @@ require (
 	github.com/pganalyze/pg_query_go/v6 v6.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sirupsen/logrus v1.10.0
-	github.com/stretchr/testify v1.12.0
+	github.com/sirupsen/logrus v1.10.1
+	github.com/stretchr/testify v1.12.1
 	github.com/xdg-go/stringprep v1.0.4
 	go.nhat.io/grpcmock v0.34.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0
@@ -39,7 +39,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.55.0
 	golang.org/x/tools v0.49.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.36.4
 	k8s.io/apiextensions-apiserver v0.36.4
