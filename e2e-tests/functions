@@ -9,13 +9,6 @@ BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
-# Retry every kubectl command once after a failure, using 5 seconds delay between attempts.
-function kubectl() {
-	set +o xtrace
-	(retry 2 5 "$(type -P kubectl)" "$@")
-	set -o xtrace
-}
-
 function init_temp_dir() {
 	rm -rf "$TEMP_DIR"
 	mkdir -p "$TEMP_DIR"

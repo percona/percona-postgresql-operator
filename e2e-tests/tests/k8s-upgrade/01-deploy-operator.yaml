@@ -6,6 +6,8 @@ commands:
       set -o errexit
       set -o xtrace
 
+      source ../../functions
+
       case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
         gke:gke|doks:doks) ;;
         *)
