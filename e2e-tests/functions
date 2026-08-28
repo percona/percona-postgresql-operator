@@ -1548,13 +1548,9 @@ function is_cert_manager_installed_by_test() {
 }
 
 function deploy_cert_manager() {
-	if is_cert_manager_installed; then
-		if ! is_cert_manager_installed_by_test; then
-			echo 'cert-manager is present without the test label; leaving it unchanged'
-			return
-		fi
-
-		echo 'cert-manager installed by the tests is present; destroying and redeploying'
+	if [[ ${PLATFORM} == "rancher" ]] && ! is_cert_manager_installed_by_test; then
+		echo 'cert-manager is present without the test label; leaving it unchanged'
+		return
 	fi
 
 	destroy_cert_manager
@@ -1597,7 +1593,7 @@ function deploy_cert_manager() {
 }
 
 function destroy_cert_manager() {
-	if ! is_cert_manager_installed_by_test; then
+	if [[ ${PLATFORM} == "rancher" ]] && ! is_cert_manager_installed_by_test; then
 		echo 'cert-manager was not installed by this test'
 		return
 	fi
