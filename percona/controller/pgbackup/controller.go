@@ -31,7 +31,6 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/clientcmd"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
 	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgbackup/snapshots"
 	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
@@ -54,6 +53,8 @@ type PGBackupReconciler struct {
 	Client          client.Client
 	DiscoveryClient *discovery.DiscoveryClient
 	PodExec         runtime.PodExecutor
+
+	LatestCommitGetter watcher.LatestCommitGetter
 
 	ExternalChan chan event.GenericEvent
 }
@@ -139,6 +140,10 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
 		}
 		pgCluster = nil
+	}
+
+	if pgCluster != nil && ptr.Deref(pgCluster.Spec.Unmanaged, false) && pgBackup.DeletionTimestamp.IsZero() {
+		return reconcile.Result{}, nil
 	}
 
 	if pgCluster == nil || !pgCluster.DeletionTimestamp.IsZero() {
@@ -359,11 +364,16 @@ func (r *PGBackupReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			return reconcile.Result{}, nil
 		}
 
-		execCli, err := clientcmd.NewClient()
+		latestBackup, err := k8s.GetLatestBackup(ctx, r.Client, pgCluster)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to create exec client")
+			return reconcile.Result{}, errors.Wrap(err, "get latest backup")
 		}
-		latestRestorableTime, err := watcher.GetLatestCommitTimestamp(ctx, r.Client, execCli, pgCluster, pgBackup)
+		// return early if backup is not the latest
+		if client.ObjectKeyFromObject(latestBackup) != client.ObjectKeyFromObject(pgBackup) {
+			return reconcile.Result{}, nil
+		}
+
+		latestRestorableTime, err := r.LatestCommitGetter(ctx, r.Client, pgCluster, pgBackup)
 		if err == nil {
 			log.Info("Got latest restorable timestamp", "timestamp", latestRestorableTime)
 

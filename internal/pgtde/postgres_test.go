@@ -68,17 +68,17 @@ func TestDisableInPostgreSQL(t *testing.T) {
 		return expected
 	}
 
-	ctx := context.Background()
-	assert.Equal(t, expected, disableInPostgreSQL(ctx, exec))
+	assert.Equal(t, expected, disableInPostgreSQL(t.Context(), exec))
 }
 
 func TestPostgreSQLParameters(t *testing.T) {
+	cluster := new(crunchyv1beta1.PostgresCluster)
 	parameters := postgres.Parameters{
 		Mandatory: postgres.NewParameterSet(),
 	}
 
 	// No comma when empty.
-	PostgreSQLParameters(&parameters)
+	PostgreSQLParameters(cluster, &parameters)
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
@@ -88,12 +88,396 @@ func TestPostgreSQLParameters(t *testing.T) {
 
 	// Appended when not empty.
 	parameters.Mandatory.Add("shared_preload_libraries", "some,existing")
-	PostgreSQLParameters(&parameters)
+	PostgreSQLParameters(cluster, &parameters)
 
 	assert.Assert(t, parameters.Default == nil)
 	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
 		"shared_preload_libraries": "some,existing,pg_tde",
 		"pg_tde.wal_encrypt":       "off",
+	})
+
+	// K8SPG-911: asking for WAL encryption is not enough to turn it on. Postgres
+	// refuses to start when pg_tde cannot decrypt the WAL it is told to read, so
+	// the parameter follows the state pg_tde actually reached: the extension is
+	// installed and the vault key provider matches the spec.
+	cluster.Spec.Extensions.PGTDE.WALEncryption = true
+
+	condition := func(conditionType string, status metav1.ConditionStatus) metav1.Condition {
+		return metav1.Condition{Type: conditionType, Status: status, Reason: "Testing"}
+	}
+
+	for _, tc := range []struct {
+		name       string
+		conditions []metav1.Condition
+		expected   string
+	}{
+		{
+			// Nothing has been reconciled yet.
+			"NoConditions", nil, "off",
+		},
+		{
+			"ExtensionOnly", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+			}, "off",
+		},
+		{
+			"Both", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+				condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionTrue),
+			}, "on",
+		},
+		{
+			// A credential change is in progress or has failed. Leaving the
+			// parameter on here is what prevents the Pods from restarting into
+			// a Postgres that cannot start.
+			"ProviderNotReady", []metav1.Condition{
+				condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+				condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionFalse),
+			}, "off",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster.Status.Conditions = tc.conditions
+			parameters := postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+			PostgreSQLParameters(cluster, &parameters)
+
+			assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+				"shared_preload_libraries": "pg_tde",
+				"pg_tde.wal_encrypt":       tc.expected,
+			})
+		})
+	}
+
+	// Turning WAL encryption off in the spec turns the parameter off even when
+	// pg_tde is in the one state that would allow it on.
+	cluster.Spec.Extensions.PGTDE.WALEncryption = false
+	cluster.Status.Conditions = []metav1.Condition{
+		condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+		condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionTrue),
+	}
+	parameters = postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+	PostgreSQLParameters(cluster, &parameters)
+
+	assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+		"shared_preload_libraries": "pg_tde",
+		"pg_tde.wal_encrypt":       "off",
+	})
+
+	// K8SPG-911: a standby cluster cannot install the extension nor configure a
+	// key provider, so the interlock above can never clear. Its pg_tde state
+	// arrives replicated and the WAL it replays is encrypted from its first
+	// start, so the parameter follows the spec until something says otherwise.
+	t.Run("Standby", func(t *testing.T) {
+		standby := new(crunchyv1beta1.PostgresCluster)
+		standby.Spec.Standby = &crunchyv1beta1.PostgresStandbySpec{
+			Enabled: true, RepoName: "repo1",
+		}
+		standby.Spec.Extensions.PGTDE.Enabled = true
+		standby.Spec.Extensions.PGTDE.WALEncryption = true
+
+		for _, tc := range []struct {
+			name       string
+			conditions []metav1.Condition
+			expected   string
+		}{
+			{
+				// The case that matters: the parameter is rendered into the
+				// cluster ConfigMap before any Pod exists to be observed, so a
+				// standby with no conditions has to start with WAL encryption on.
+				"NoConditions", nil, "on",
+			},
+			{
+				// The provider condition is informational on a standby. The
+				// operator cannot repoint the replicated provider, so refusing
+				// WAL encryption over it would only leave the cluster wrong in a
+				// second way.
+				"ProviderNotReady", []metav1.Condition{
+					condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+					condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionFalse),
+				}, "on",
+			},
+			{
+				"Both", []metav1.Condition{
+					condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionTrue),
+					condition(crunchyv1beta1.PGTDEVaultProviderReady, metav1.ConditionTrue),
+				}, "on",
+			},
+			{
+				// Observed to be absent: the source cluster does not have pg_tde,
+				// so there is nothing to encrypt WAL with.
+				"ExtensionAbsent", []metav1.Condition{
+					condition(crunchyv1beta1.PGTDEEnabled, metav1.ConditionFalse),
+				}, "off",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				standby.Status.Conditions = tc.conditions
+				parameters := postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+				PostgreSQLParameters(standby, &parameters)
+
+				assert.DeepEqual(t, parameters.Mandatory.AsMap(), map[string]string{
+					"shared_preload_libraries": "pg_tde",
+					"pg_tde.wal_encrypt":       tc.expected,
+				})
+			})
+		}
+
+		t.Run("WALEncryptionDisabled", func(t *testing.T) {
+			standby.Spec.Extensions.PGTDE.WALEncryption = false
+			standby.Status.Conditions = nil
+			parameters := postgres.Parameters{Mandatory: postgres.NewParameterSet()}
+			PostgreSQLParameters(standby, &parameters)
+
+			assert.Equal(t, parameters.Mandatory.AsMap()["pg_tde.wal_encrypt"], "off")
+		})
+	})
+}
+
+// execReturning builds an Executor that writes the given stdout and stderr and
+// then returns err, so a caller that parses psql output can be tested.
+func execReturning(stdout, stderr string, err error, assertions func(sql string, command []string)) postgres.Executor {
+	return func(
+		_ context.Context, stdin io.Reader, outWriter, errWriter io.Writer, command ...string,
+	) error {
+		if assertions != nil {
+			sql, readErr := io.ReadAll(stdin)
+			if readErr != nil {
+				return readErr
+			}
+			assertions(string(sql), command)
+		}
+		_, _ = outWriter.Write([]byte(stdout))
+		_, _ = errWriter.Write([]byte(stderr))
+		return err
+	}
+}
+
+func TestObserveExtension(t *testing.T) {
+	t.Run("statement", func(t *testing.T) {
+		var seenSQL string
+		var seenCommand []string
+		exec := execReturning("t\n", "", nil, func(sql string, command []string) {
+			seenSQL, seenCommand = sql, command
+		})
+
+		installed, err := ObserveExtension(t.Context(), exec)
+		assert.NilError(t, err)
+		assert.Assert(t, installed)
+
+		assert.Equal(t, seenSQL, `SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'pg_tde')`)
+
+		joined := strings.Join(seenCommand, " ")
+		assert.Assert(t, strings.Contains(joined, "--no-align"))
+		assert.Assert(t, strings.Contains(joined, "--tuples-only"))
+		assert.Assert(t, strings.Contains(joined, "--set=ON_ERROR_STOP=on"))
+	})
+
+	for _, tc := range []struct {
+		name      string
+		stdout    string
+		stderr    string
+		execErr   error
+		installed bool
+		wantErr   string
+	}{
+		{name: "Installed", stdout: "t\n", installed: true},
+		{name: "NotInstalled", stdout: "f\n"},
+		{name: "PaddedOutput", stdout: " t ", installed: true},
+		{
+			// A server that is still starting up refuses the connection. Saying
+			// "not installed" here would strip pg_tde from a cluster that has it.
+			name:    "ExecFails",
+			stderr:  "psql: error: connection to server failed\nsomething else",
+			execErr: errors.New("exit status 2"),
+			wantErr: "connection to server failed",
+		},
+		{name: "EmptyOutput", wantErr: `unexpected result from pg_extension: ""`},
+		{name: "UnexpectedOutput", stdout: "x", wantErr: `unexpected result from pg_extension: "x"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			installed, err := ObserveExtension(t.Context(),
+				execReturning(tc.stdout, tc.stderr, tc.execErr, nil))
+
+			if tc.wantErr == "" {
+				assert.NilError(t, err)
+				assert.Equal(t, installed, tc.installed)
+				return
+			}
+
+			assert.ErrorContains(t, err, tc.wantErr)
+			assert.Assert(t, !installed, "an unreadable answer must not report pg_tde as absent")
+			assert.Assert(t, !strings.Contains(err.Error(), "something else"),
+				"expected only the first line of the psql diagnostic")
+		})
+	}
+}
+
+func TestVerifyPrincipalKey(t *testing.T) {
+	t.Run("statement", func(t *testing.T) {
+		var seenSQL string
+		var seenCommand []string
+		exec := execReturning("", "", nil, func(sql string, command []string) {
+			seenSQL, seenCommand = sql, command
+		})
+
+		assert.NilError(t, VerifyPrincipalKey(t.Context(), exec))
+		assert.Equal(t, seenSQL, `SELECT pg_tde_verify_default_key()`)
+		assert.Assert(t, strings.Contains(strings.Join(seenCommand, " "), "--set=ON_ERROR_STOP=on"))
+	})
+
+	t.Run("reports the first line of the diagnostic", func(t *testing.T) {
+		stderr := strings.Join([]string{
+			`ERROR:  failed to retrieve principal key from keyring "vault-provider"`,
+			`CONTEXT:  SQL statement "SELECT pg_tde_verify_default_key();"`,
+			`STATEMENT:  SELECT pg_tde_verify_default_key();`,
+		}, "\n")
+
+		err := VerifyPrincipalKey(t.Context(),
+			execReturning("", stderr, errors.New("exit status 3"), nil))
+
+		assert.ErrorContains(t, err, `failed to retrieve principal key from keyring "vault-provider"`)
+		assert.Assert(t, !strings.Contains(err.Error(), "CONTEXT:"))
+		assert.Assert(t, !strings.Contains(err.Error(), "STATEMENT:"))
+	})
+}
+
+func TestReportStandby(t *testing.T) {
+	standbyCluster := func(enabled bool, vault *crunchyv1beta1.PGTDEVaultSpec) *crunchyv1beta1.PostgresCluster {
+		cluster := &crunchyv1beta1.PostgresCluster{}
+		cluster.Generation = 3
+		cluster.Spec.Standby = &crunchyv1beta1.PostgresStandbySpec{Enabled: true, RepoName: "repo1"}
+		cluster.Spec.Extensions.PGTDE.Enabled = enabled
+		cluster.Spec.Extensions.PGTDE.Vault = vault
+		return cluster
+	}
+
+	vault := &crunchyv1beta1.PGTDEVaultSpec{
+		Host:      "https://vault.example.com",
+		MountPath: "secret/data",
+		TokenSecret: crunchyv1beta1.PGTDESecretObjectReference{
+			Name: "token-secret", Key: "token-key",
+		},
+	}
+
+	t.Run("installed and enabled", func(t *testing.T) {
+		cluster := standbyCluster(true, vault)
+
+		ReportStandby(cluster, true, nil)
+
+		extension := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, extension != nil)
+		assert.Equal(t, extension.Status, metav1.ConditionTrue)
+		assert.Equal(t, extension.Reason, "ReplicatedFromSource")
+		assert.Equal(t, extension.Message,
+			"pg_tde arrived with the data replicated from the source cluster")
+		assert.Equal(t, extension.ObservedGeneration, int64(3))
+
+		provider := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+		assert.Assert(t, provider != nil)
+		assert.Equal(t, provider.Status, metav1.ConditionTrue)
+		assert.Equal(t, provider.Reason, "ReplicatedFromSource")
+		assert.Equal(t, provider.Message,
+			"pg_tde fetched its principal key using the replicated key provider")
+
+		assert.Equal(t, cluster.Status.PGTDERevision, "",
+			"the operator has run no provider SQL on a standby")
+	})
+
+	t.Run("installed but disabled in the spec", func(t *testing.T) {
+		cluster := standbyCluster(false, vault)
+
+		ReportStandby(cluster, true, nil)
+
+		// A false condition here would strip pg_tde from
+		// shared_preload_libraries and take the vault credentials off the Pods,
+		// leaving a cluster that cannot read the encrypted data it is replaying.
+		extension := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, extension != nil)
+		assert.Equal(t, extension.Status, metav1.ConditionTrue)
+		assert.Equal(t, extension.Reason, "RecoveryCannotDrop")
+		assert.Assert(t, strings.Contains(extension.Message, "promote this one first"))
+
+		// reconcilePGTDEProviders removes this condition when the spec disables
+		// pg_tde, so reporting one here would only fight with it.
+		assert.Assert(t, meta.FindStatusCondition(
+			cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady) == nil)
+	})
+
+	t.Run("enabled but not installed", func(t *testing.T) {
+		cluster := standbyCluster(true, vault)
+
+		ReportStandby(cluster, false, nil)
+
+		extension := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, extension != nil)
+		assert.Equal(t, extension.Status, metav1.ConditionFalse)
+		assert.Equal(t, extension.Reason, "RecoveryCannotInstall")
+
+		provider := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+		assert.Assert(t, provider != nil)
+		assert.Equal(t, provider.Status, metav1.ConditionFalse)
+		assert.Equal(t, provider.Reason, "ExtensionNotInstalled")
+	})
+
+	t.Run("neither installed nor enabled", func(t *testing.T) {
+		cluster := standbyCluster(false, nil)
+
+		ReportStandby(cluster, false, nil)
+
+		extension := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, extension != nil)
+		assert.Equal(t, extension.Status, metav1.ConditionFalse)
+		assert.Equal(t, extension.Reason, "Disabled",
+			"expected the same reason the writable path reports")
+	})
+
+	t.Run("key unavailable", func(t *testing.T) {
+		cluster := standbyCluster(true, vault)
+
+		ReportStandby(cluster, true, errors.New("ERROR:  principal key not found"))
+
+		// The extension really is there; only the key is not reachable.
+		extension := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+		assert.Assert(t, extension != nil)
+		assert.Equal(t, extension.Status, metav1.ConditionTrue)
+
+		provider := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+		assert.Assert(t, provider != nil)
+		assert.Equal(t, provider.Status, metav1.ConditionFalse)
+		assert.Equal(t, provider.Reason, "KeyUnavailable")
+		assert.Assert(t, strings.Contains(provider.Message, "principal key not found"))
+	})
+
+	t.Run("without a vault in the spec", func(t *testing.T) {
+		cluster := standbyCluster(true, nil)
+
+		ReportStandby(cluster, true, nil)
+
+		assert.Assert(t, meta.IsStatusConditionTrue(
+			cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled))
+		assert.Assert(t, meta.FindStatusCondition(
+			cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady) == nil)
+	})
+
+	t.Run("leaves a pending provider change alone", func(t *testing.T) {
+		cluster := standbyCluster(true, vault)
+		cluster.Status.PGTDERevision = "abc123"
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    crunchyv1beta1.PGTDEVaultProviderReady,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ChangeInProgress",
+			Message: "waiting for Pods to restart with the new vault credentials",
+		})
+
+		ReportStandby(cluster, true, nil)
+
+		// A change reconcilePGTDEProviders started is one a cluster in recovery
+		// cannot finish. Papering over it with a cheerful condition would hide a
+		// stall that only promotion can clear.
+		provider := meta.FindStatusCondition(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+		assert.Assert(t, provider != nil)
+		assert.Equal(t, provider.Reason, "ChangeInProgress")
+		assert.Equal(t, cluster.Status.PGTDERevision, "abc123")
 	})
 }
 
@@ -122,7 +506,6 @@ func TestAddVaultProvider(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -136,7 +519,7 @@ func TestAddVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.Equal(t, expected, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.Equal(t, expected, addVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("does not interpret stderr", func(t *testing.T) {
@@ -149,7 +532,6 @@ func TestAddVaultProvider(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -159,7 +541,7 @@ func TestAddVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.NilError(t, addVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.NilError(t, addVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -255,8 +637,7 @@ func TestSetDefaultKey(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
-		assert.Equal(t, expected, setDefaultKey(ctx, exec, clusterID))
+		assert.Equal(t, expected, setDefaultKey(t.Context(), exec, clusterID))
 	})
 }
 
@@ -285,7 +666,6 @@ func TestChangeVaultProvider(t *testing.T) {
 			return expected
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -299,7 +679,7 @@ func TestChangeVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.Equal(t, expected, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.Equal(t, expected, changeVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 
 	t.Run("without CA secret", func(t *testing.T) {
@@ -313,7 +693,6 @@ func TestChangeVaultProvider(t *testing.T) {
 			return nil
 		}
 
-		ctx := context.Background()
 		vault := &crunchyv1beta1.PGTDEVaultSpec{
 			Host:      "https://vault.example.com",
 			MountPath: "secret/data",
@@ -323,7 +702,7 @@ func TestChangeVaultProvider(t *testing.T) {
 			},
 		}
 		tokenPath, caPath := VaultCredentialPaths(vault)
-		assert.NilError(t, changeVaultProvider(ctx, exec, vault, tokenPath, caPath))
+		assert.NilError(t, changeVaultProvider(t.Context(), exec, vault, tokenPath, caPath))
 	})
 }
 

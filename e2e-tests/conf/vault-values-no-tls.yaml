@@ -1,0 +1,18 @@
+global:
+  tlsDisable: true
+  platform: <platform>
+
+injector:
+  image:
+    repository: docker.io/hashicorp/vault-k8s
+
+server:
+  image:
+    repository: docker.io/hashicorp/vault
+  dataStorage:
+    enabled: false
+  standalone:
+    enabled: true
+  ha:
+    raft:
+      enabled: false

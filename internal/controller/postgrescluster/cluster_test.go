@@ -14,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/record"
@@ -833,4 +834,37 @@ postgres-operator.crunchydata.com/cluster: pg2
 postgres-operator.crunchydata.com/role: replica
 		`))
 	})
+}
+
+func TestReconcileClusterReplicaService(t *testing.T) {
+	ctx := t.Context()
+	_, cc := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+
+	reconciler := &Reconciler{Client: cc, Owner: client.FieldOwner(t.Name())}
+
+	cluster := testCluster()
+	cluster.Namespace = setupNamespace(t, cc).Name
+	cluster.Spec.InstanceSets[0].Replicas = new(int32(2))
+	assert.NilError(t, cc.Create(ctx, cluster))
+
+	service, err := reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
+
+	cluster.Spec.InstanceSets[0].Replicas = new(int32(1))
+	cluster.Spec.InstanceSets = append(cluster.Spec.InstanceSets, cluster.Spec.InstanceSets[0])
+	cluster.Spec.InstanceSets[1].Name = "instance2"
+	_, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+
+	service = &corev1.Service{ObjectMeta: naming.ClusterReplicaService(cluster)}
+	err = cc.Get(ctx, client.ObjectKeyFromObject(service), service)
+	assert.Assert(t, apierrors.IsNotFound(err), "expected replica Service to be deleted")
+
+	cluster.Spec.InstanceSets[0].Replicas = nil
+	cluster.Spec.InstanceSets[1].Replicas = new(int32(2))
+	service, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
 }

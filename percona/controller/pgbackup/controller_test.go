@@ -139,6 +139,60 @@ func TestReconcileFailsBackupWhenClusterIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestReconcileNotUpdatingOldBackup(t *testing.T) {
+	ctx := t.Context()
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+
+	now := metav1.NewTime(time.Now().Truncate(time.Microsecond))
+	latestCompletedAt := metav1.NewTime(now.Add(time.Hour))
+	latestRestorableTime := metav1.NewTime(now.Add(30 * time.Minute))
+	newLatestRestorableTime := metav1.NewTime(now.Add(45 * time.Minute))
+	oldBackup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "old-backup", Namespace: cluster.Namespace},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{
+			State:                v2.BackupSucceeded,
+			CompletedAt:          &now,
+			LatestRestorableTime: v2.PITRestoreDateTime{Time: &latestRestorableTime},
+		},
+	}
+	latestBackup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "latest-backup", Namespace: cluster.Namespace},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{
+			State:       v2.BackupSucceeded,
+			CompletedAt: &latestCompletedAt,
+		},
+	}
+
+	cl, err := buildFakeClient(ctx, cluster, oldBackup, latestBackup)
+	require.NoError(t, err)
+	timestampRequested := false
+	r := &PGBackupReconciler{
+		Client: cl,
+		LatestCommitGetter: func(context.Context, client.Client, *v2.PerconaPGCluster, *v2.PerconaPGBackup) (*metav1.Time, error) {
+			timestampRequested = true
+			return &newLatestRestorableTime, nil
+		},
+	}
+
+	_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(oldBackup)})
+	require.NoError(t, err)
+
+	updated := new(v2.PerconaPGBackup)
+	require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(oldBackup), updated))
+	assert.False(t, timestampRequested)
+	require.NotNil(t, updated.Status.LatestRestorableTime.Time)
+	assert.True(t, updated.Status.LatestRestorableTime.Equal(&latestRestorableTime))
+}
+
 func TestFailIfClusterIsNotReady(t *testing.T) {
 	ctx := context.Background()
 
@@ -1131,4 +1185,110 @@ func TestFindBackupInPGBackrestInfo(t *testing.T) {
 			assert.Equal(t, tt.expectSize, backup.Info.Delta, "backup.Info.Delta populates status.Size")
 		})
 	}
+}
+
+func TestReconcileSkipsUnmanagedCluster(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name          string
+		unmanaged     bool
+		expectedState v2.PGBackupState
+	}{
+		{
+			name:          "unmanaged cluster",
+			unmanaged:     true,
+			expectedState: v2.BackupNew,
+		},
+		{
+			name:          "managed cluster",
+			unmanaged:     false,
+			expectedState: v2.BackupStarting,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := readDefaultCR("test-cluster", "test-namespace")
+			require.NoError(t, err)
+			cluster.Spec.Unmanaged = new(tt.unmanaged)
+
+			backup := &v2.PerconaPGBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: cluster.Namespace,
+				},
+				Spec: v2.PerconaPGBackupSpec{
+					PGCluster: cluster.Name,
+					RepoName:  new("repo1"),
+				},
+				Status: v2.PerconaPGBackupStatus{State: v2.BackupNew},
+			}
+
+			cl, err := buildFakeClient(ctx, cluster, backup)
+			require.NoError(t, err)
+
+			r := &PGBackupReconciler{Client: cl}
+			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+			require.NoError(t, err)
+
+			updated := new(v2.PerconaPGBackup)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(backup), updated))
+			assert.Equal(t, tt.expectedState, updated.Status.State)
+
+			updatedCluster := new(v2.PerconaPGCluster)
+			require.NoError(t, cl.Get(ctx, client.ObjectKeyFromObject(cluster), updatedCluster))
+
+			leaseErr := cl.Get(ctx, client.ObjectKey{
+				Name:      backupLeaseName(cluster.Name),
+				Namespace: cluster.Namespace,
+			}, new(coordinationv1.Lease))
+
+			if tt.unmanaged {
+				assert.Empty(t, updated.Finalizers)
+				assert.Empty(t, updated.Status.Conditions)
+				assert.NotContains(t, updatedCluster.Annotations, pNaming.AnnotationBackupInProgress)
+				assert.NotContains(t, updatedCluster.Annotations, naming.PGBackRestBackup)
+				assert.True(t, k8serrors.IsNotFound(leaseErr))
+			} else {
+				assert.Contains(t, updated.Finalizers, pNaming.FinalizerDeleteBackup)
+				assert.True(t, meta.IsStatusConditionTrue(updated.Status.Conditions, v2.ConditionBackupLeaseAcquired))
+				assert.Equal(t, backup.Name, updatedCluster.Annotations[pNaming.AnnotationBackupInProgress])
+				assert.Equal(t, backup.Name, updatedCluster.Annotations[naming.PGBackRestBackup])
+				assert.NoError(t, leaseErr)
+			}
+		})
+	}
+}
+
+func TestReconcileRunsFinalizersForUnmanagedCluster(t *testing.T) {
+	ctx := t.Context()
+
+	cluster, err := readDefaultCR("test-cluster", "test-namespace")
+	require.NoError(t, err)
+	cluster.Spec.Unmanaged = new(true)
+
+	backup := &v2.PerconaPGBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-backup",
+			Namespace:  cluster.Namespace,
+			Finalizers: []string{pNaming.FinalizerDeleteBackup},
+		},
+		Spec: v2.PerconaPGBackupSpec{
+			PGCluster: cluster.Name,
+			RepoName:  new("repo1"),
+		},
+		Status: v2.PerconaPGBackupStatus{State: v2.BackupRunning},
+	}
+
+	cl, err := buildFakeClient(ctx, cluster, backup)
+	require.NoError(t, err)
+	require.NoError(t, cl.Delete(ctx, backup))
+
+	r := &PGBackupReconciler{Client: cl}
+	_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
+	require.NoError(t, err)
+
+	err = cl.Get(ctx, client.ObjectKeyFromObject(backup), new(v2.PerconaPGBackup))
+	assert.True(t, k8serrors.IsNotFound(err))
 }

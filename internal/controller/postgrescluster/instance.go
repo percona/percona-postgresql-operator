@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -286,6 +287,30 @@ func (observed *observedInstances) writablePod(container string) (*corev1.Pod, *
 		}
 		running, known := instance.IsRunning(container)
 		if running && known && len(instance.Pods) > 0 {
+			return instance.Pods[0], instance
+		}
+	}
+
+	return nil, nil
+}
+
+// standbyLeaderPod finds the instance Patroni reports as the standby leader:
+// the one replaying from a source outside this cluster. Unlike writablePod it
+// deliberately accepts an instance in recovery, so callers must send it only
+// statements that read.
+func (observed *observedInstances) standbyLeaderPod(container string) (*corev1.Pod, *Instance) {
+	if observed == nil {
+		return nil, nil
+	}
+
+	for _, instance := range observed.forCluster {
+		if terminating, known := instance.IsTerminating(); terminating || !known {
+			continue
+		}
+		if len(instance.Pods) != 1 || !patroni.PodIsStandbyLeader(instance.Pods[0]) {
+			continue
+		}
+		if running, known := instance.IsRunning(container); running && known {
 			return instance.Pods[0], instance
 		}
 	}
@@ -1261,7 +1286,7 @@ func (r *Reconciler) reconcileInstance(
 
 		// we need to preserve vault secret as long as extension is enabled
 		// otherwise pods won't survive the restart failing to find the token file
-		if !cluster.Spec.Extensions.PGTDE.Enabled && isStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		if !cluster.Spec.Extensions.PGTDE.Enabled && meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 			log.Info("keeping the pg_tde vault volume until the extension is dropped properly")
 			pgtde.PreserveOldTDEVolume(&instance.Spec.Template.Spec, existing)
 		}
@@ -1390,14 +1415,20 @@ func generateInstanceStatefulSetIntent(_ context.Context,
 		)
 	}
 
-	pgTDECondition := meta.FindStatusCondition(cluster.Status.Conditions,
-		v1beta1.PGTDEEnabled)
-	pgTDEEnabled := pgTDECondition != nil && pgTDECondition.Status == metav1.ConditionTrue
 	// we should restart pods only after extension is dropped
-	if cluster.Spec.Extensions.PGTDE.Enabled || pgTDEEnabled {
+	if cluster.Spec.Extensions.PGTDE.Enabled || meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
 		sts.Spec.Template.Annotations = naming.Merge(
 			sts.Spec.Template.Annotations,
-			map[string]string{naming.TDEInstalledAnnotation: "true"},
+			map[string]string{
+				naming.TDEInstalledAnnotation: "true",
+				// pg_tde.wal_encrypt is read at startup, so toggling it has to
+				// recreate the Pods. It reaches PostgreSQL through Patroni's
+				// dynamic configuration, which leaves nothing else in the Pod
+				// template to change; keeping the value here is what
+				// rolloutInstances compares.
+				naming.TDEWALEncryptionAnnotation: strconv.FormatBool(
+					cluster.Spec.Extensions.PGTDE.WALEncryption),
+			},
 		)
 	}
 
@@ -1582,7 +1613,6 @@ func (r *Reconciler) reconcileInstanceCertificates(
 			}
 			return existing, nil
 		}
-
 		certManagerManaged, err := r.isRootCACertManagerManaged(ctx, cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if cert-manager manages root CA")
@@ -1595,7 +1625,7 @@ func (r *Reconciler) reconcileInstanceCertificates(
 		// cluster certificates are not managed by cert-manager
 		// but Certificate object exists due to the bug described in K8SPG-1017
 		// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
-		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+		if cert := certmanager.InstanceCertificateName(instance.Name); r.shouldReconcileCertManagerCertificate(ctx, cluster, cert) {
 			_, err := r.reconcileCertManagerInstanceCertificates(ctx, cluster, spec, instance, rootCertificateAuth)
 			if err != nil {
 				logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)

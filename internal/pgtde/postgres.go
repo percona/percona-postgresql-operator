@@ -114,9 +114,148 @@ func ReportExtension(cluster *crunchyv1beta1.PostgresCluster, record record.Even
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
-func PostgreSQLParameters(outParameters *postgres.Parameters) {
+// readOnlyPSQLArgs make psql print a single value and nothing else, so the
+// result of a one-row, one-column query is exactly "t" or "f".
+var readOnlyPSQLArgs = []string{"--no-align", "--tuples-only"}
+
+// ObserveExtension reports whether pg_tde is installed.
+func ObserveExtension(ctx context.Context, exec postgres.Executor) (bool, error) {
+	log := logging.FromContext(ctx)
+
+	stdout, stderr, err := exec.Exec(ctx,
+		strings.NewReader(`SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'pg_tde')`),
+		map[string]string{
+			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+			"QUIET":         "on", // Do not print successful statements to stdout.
+		}, readOnlyPSQLArgs)
+
+	log.V(1).Info("observed pg_tde extension", "stdout", stdout, "stderr", stderr)
+
+	if err != nil {
+		return false, errors.Wrap(err, psqlStderr(stderr))
+	}
+
+	switch strings.TrimSpace(stdout) {
+	case "t":
+		return true, nil
+	case "f":
+		return false, nil
+	}
+
+	return false, errors.Errorf("unexpected result from pg_extension: %q", stdout)
+}
+
+// VerifyPrincipalKey asks pg_tde to fetch the principal key its key provider names.
+func VerifyPrincipalKey(ctx context.Context, exec postgres.Executor) error {
+	log := logging.FromContext(ctx)
+
+	stdout, stderr, err := exec.Exec(ctx,
+		strings.NewReader(`SELECT pg_tde_verify_default_key()`),
+		map[string]string{
+			"ON_ERROR_STOP": "on", // Abort when any one statement fails.
+			"QUIET":         "on", // Do not print successful statements to stdout.
+		}, readOnlyPSQLArgs)
+
+	log.V(1).Info("verified pg_tde principal key", "stdout", stdout, "stderr", stderr)
+
+	if err != nil {
+		return errors.Wrap(err, psqlStderr(stderr))
+	}
+
+	return nil
+}
+
+func psqlStderr(stderr string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(stderr), "\n")
+	if line == "" {
+		return "psql failed"
+	}
+	return line
+}
+
+// ReportStandby records the pg_tde state of a cluster in recovery from what its
+// standby leader reported.
+func ReportStandby(
+	cluster *crunchyv1beta1.PostgresCluster, installed bool, keyErr error) {
+	pgTDE := cluster.Spec.Extensions.PGTDE
+
+	extension := metav1.Condition{
+		Type:               crunchyv1beta1.PGTDEEnabled,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ReplicatedFromSource",
+		Message:            "pg_tde arrived with the data replicated from the source cluster",
+		ObservedGeneration: cluster.GetGeneration(),
+	}
+
+	switch {
+	case installed && !pgTDE.Enabled:
+		// Stay true. This condition is what holds pg_tde in
+		// shared_preload_libraries and the vault credentials on the Pods, and a
+		// cluster replaying encrypted data cannot read it without both.
+		extension.Reason = "RecoveryCannotDrop"
+		extension.Message = "pg_tde is disabled in PerconaPGCluster but the extension is still" +
+			" installed; a cluster in recovery cannot drop it. Disable pg_tde on the source" +
+			" cluster, or promote this one first."
+
+	case !installed && pgTDE.Enabled:
+		extension.Status = metav1.ConditionFalse
+		extension.Reason = "RecoveryCannotInstall"
+		extension.Message = "pg_tde is enabled in PerconaPGCluster but the extension is not" +
+			" installed; a cluster in recovery cannot install it. Enable pg_tde on the source" +
+			" cluster."
+
+	case !installed && !pgTDE.Enabled:
+		extension.Status = metav1.ConditionFalse
+		extension.Reason = "Disabled"
+		extension.Message = "pg_tde is disabled in PerconaPGCluster"
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, extension)
+
+	if !pgTDE.Enabled || pgTDE.Vault == nil || cluster.Status.PGTDERevision != "" {
+		return
+	}
+
+	provider := metav1.Condition{
+		Type:               crunchyv1beta1.PGTDEVaultProviderReady,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ReplicatedFromSource",
+		Message:            "pg_tde fetched its principal key using the replicated key provider",
+		ObservedGeneration: cluster.GetGeneration(),
+	}
+
+	switch {
+	case !installed:
+		provider.Status = metav1.ConditionFalse
+		provider.Reason = "ExtensionNotInstalled"
+		provider.Message = "pg_tde is not installed, so it has no key provider"
+
+	case keyErr != nil:
+		provider.Status = metav1.ConditionFalse
+		provider.Reason = "KeyUnavailable"
+		provider.Message = "pg_tde could not fetch its principal key on the standby leader: " +
+			keyErr.Error()
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, provider)
+}
+
+func PostgreSQLParameters(cluster *crunchyv1beta1.PostgresCluster, outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_tde")
-	outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
+
+	canEnableWALEncryption := meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled) &&
+		meta.IsStatusConditionTrue(cluster.Status.Conditions, crunchyv1beta1.PGTDEVaultProviderReady)
+
+	if cluster.IsStandby() {
+		canEnableWALEncryption = !meta.IsStatusConditionFalse(
+			cluster.Status.Conditions, crunchyv1beta1.PGTDEEnabled)
+	}
+
+	if cluster.Spec.Extensions.PGTDE.WALEncryption && canEnableWALEncryption {
+		outParameters.Mandatory.Add("pg_tde.wal_encrypt", "on")
+	} else {
+		outParameters.Mandatory.Add("pg_tde.wal_encrypt", "off")
+	}
 }
 
 // VaultCredentialPaths returns the standard volume mount paths for the vault

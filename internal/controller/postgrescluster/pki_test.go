@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
@@ -62,6 +64,22 @@ func TestReconcileTLSCondition(t *testing.T) {
 		assert.Equal(t, condition.ObservedGeneration, int64(7))
 	})
 
+	t.Run("operator-provided certificate management", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Generation = 8
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementOperatorProvidedOnly,
+		}
+
+		r := &Reconciler{}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionTrue)
+		assert.Equal(t, condition.Reason, "TLSSecretsFound")
+		assert.Equal(t, condition.Message, "certManagementPolicy is operatorProvidedOnly")
+		assert.Equal(t, condition.ObservedGeneration, int64(8))
+	})
+
 	t.Run("missing user-provided secrets", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Namespace = "postgres-operator"
@@ -74,6 +92,9 @@ func TestReconcileTLSCondition(t *testing.T) {
 		}
 		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
+		}
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-pgbouncer-tls"},
 		}
 
 		instance := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
@@ -100,7 +121,7 @@ func TestReconcileTLSCondition(t *testing.T) {
 			naming.PostgresTLSSecret(cluster).Name,
 			"custom-replication",
 			naming.PGBackRestSecret(cluster).Name,
-			naming.ClusterPGBouncer(cluster).Name,
+			"custom-pgbouncer-tls",
 			naming.InstanceCertificates(instance).Name,
 		}, ", ")+". certManagementPolicy is userProvidedOnly")
 	})
@@ -121,13 +142,16 @@ func TestReconcileTLSCondition(t *testing.T) {
 		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
 		}
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-pgbouncer-tls"},
+		}
 
 		objects := []client.Object{
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-root-ca", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
 			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
-			&corev1.Secret{ObjectMeta: naming.ClusterPGBouncer(cluster)},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-pgbouncer-tls", Namespace: cluster.Namespace}},
 		}
 
 		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}
@@ -137,6 +161,48 @@ func TestReconcileTLSCondition(t *testing.T) {
 		assert.Equal(t, condition.Reason, "TLSSecretsFound")
 		assert.Equal(t, condition.Message, "")
 		assert.Equal(t, condition.ObservedGeneration, int64(13))
+	})
+
+	t.Run("PgBouncer secret has missing certificate data", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Namespace = "postgres-operator"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+		}
+		cluster.Spec.CustomRootCATLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-root-ca"},
+		}
+		cluster.Spec.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-postgres-tls"},
+		}
+		cluster.Spec.CustomReplicationClientTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-replication"},
+		}
+
+		objects := []client.Object{
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-root-ca", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-postgres-tls", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "custom-replication", Namespace: cluster.Namespace}},
+			&corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)},
+			&corev1.Secret{
+				ObjectMeta: naming.ClusterPGBouncer(cluster),
+				Data: map[string][]byte{
+					pgbouncer.CertFrontendAuthoritySecretKey: []byte("ca"),
+					pgbouncer.CertFrontendSecretKey:          nil,
+				},
+			},
+		}
+
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(objects...).Build()}
+		assert.NilError(t, r.reconcileTLSCondition(t.Context(), cluster))
+
+		condition := condition(t, cluster, metav1.ConditionFalse)
+		assert.Equal(t, condition.Reason, "TLSSecretsInvalid")
+		assert.Equal(t, condition.Message, "Invalid user-provided TLS secrets: "+
+			naming.ClusterPGBouncer(cluster).Name+
+			" (missing or empty keys: "+pgbouncer.CertFrontendSecretKey+", "+
+			pgbouncer.CertFrontendPrivateKeySecretKey+"). "+
+			"certManagementPolicy is userProvidedOnly")
 	})
 }
 
@@ -505,6 +571,7 @@ func TestReconcileCerts(t *testing.T) {
 type mockCertManagerController struct{}
 
 func (m *mockCertManagerController) Check(context.Context, *rest.Config, string) error { return nil }
+
 func (m *mockCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
 	return false, nil
 }
@@ -547,6 +614,56 @@ func (m *mockCertManagerController) ApplyPGBackRestRepoCertificate(context.Conte
 
 func mockCertManagerCtrlFunc(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
 	return &mockCertManagerController{}
+}
+
+type rejectingCertManagerController struct{}
+
+func (rejectingCertManagerController) Check(context.Context, *rest.Config, string) error {
+	panic("unexpected cert-manager availability check")
+}
+
+func (rejectingCertManagerController) CertificateExists(context.Context, string, string) (bool, error) {
+	panic("unexpected cert-manager Certificate check")
+}
+
+func (rejectingCertManagerController) ApplyIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected cert-manager issuer apply")
+}
+
+func (rejectingCertManagerController) ApplyCAIssuer(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected cert-manager CA issuer apply")
+}
+
+func (rejectingCertManagerController) ApplyCACertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected cert-manager CA certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyClusterCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected cert-manager cluster certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyInstanceCertificate(context.Context, *v1beta1.PostgresCluster, string, []string) error {
+	panic("unexpected cert-manager instance certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyPGBouncerCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected cert-manager PgBouncer certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyReplicationCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected cert-manager replication certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyPGBackRestClientCertificate(context.Context, *v1beta1.PostgresCluster) error {
+	panic("unexpected cert-manager pgBackRest client certificate apply")
+}
+
+func (rejectingCertManagerController) ApplyPGBackRestRepoCertificate(context.Context, *v1beta1.PostgresCluster, []string) error {
+	panic("unexpected cert-manager pgBackRest repository certificate apply")
+}
+
+func rejectingCertManagerCtrlFunc(_ client.Client, _ *runtime.Scheme, _ bool) certmanager.Controller {
+	return rejectingCertManagerController{}
 }
 
 // recoveryCertManagerController reports the cert-manager Certificate object as
@@ -688,13 +805,13 @@ func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
 
 	t.Run("shouldReconcileCertManagerCertificate", func(t *testing.T) {
 		t.Run("returns false when cert-manager is not installed", func(t *testing.T) {
-			// RestConfig is nil, so isCertManagerInstalled short-circuits to false.
+			// RestConfig is nil, so shouldUseCertManager short-circuits to false.
 			r := &Reconciler{
 				Client:              tClient,
 				Owner:               ControllerName,
 				CertManagerCtrlFunc: mockCertManagerCtrlFunc,
 			}
-			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, namespace, "any-cert"))
+			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, cluster, "any-cert"))
 		})
 
 		t.Run("returns false when cert-manager Certificate does not exist", func(t *testing.T) {
@@ -705,7 +822,7 @@ func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
 				CertManagerCtrlFunc: mockCertManagerCtrlFunc,
 				RestConfig:          &rest.Config{},
 			}
-			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, namespace, "missing-cert"))
+			assert.Assert(t, !r.shouldReconcileCertManagerCertificate(ctx, cluster, "missing-cert"))
 		})
 
 		t.Run("returns true when cert-manager is installed and Certificate exists", func(t *testing.T) {
@@ -717,7 +834,7 @@ func TestUpgradeCertManagerDoesNotTakeOverInternalPKI(t *testing.T) {
 				},
 				RestConfig: &rest.Config{},
 			}
-			assert.Assert(t, r.shouldReconcileCertManagerCertificate(ctx, namespace, "any-cert"))
+			assert.Assert(t, r.shouldReconcileCertManagerCertificate(ctx, cluster, "any-cert"))
 		})
 	})
 
@@ -920,7 +1037,7 @@ func getCertFromSecret(
 
 // installedCertManagerController reports cert-manager as installed and lets
 // every Apply* call succeed as a no-op — used for issuer-mode
-// tests that only need isCertManagerInstalled to return true, not real
+// tests that only need shouldUseCertManager to return true, not real
 // Issuer/Certificate object creation (envtest has no cert-manager CRDs).
 type installedCertManagerController struct{}
 
@@ -978,6 +1095,103 @@ func TestIssuerModeAwareness(t *testing.T) {
 	ctx := t.Context()
 	namespace := require.Namespace(t, tClient).Name
 
+	t.Run("non-auto policies skip cert-manager availability checks", func(t *testing.T) {
+		for _, policy := range []v1beta1.CertManagementPolicy{
+			v1beta1.CertManagementUserProvidedOnly,
+			v1beta1.CertManagementOperatorProvidedOnly,
+		} {
+			cluster := testCluster()
+			cluster.Namespace = namespace
+			cluster.Spec.TLS = &v1beta1.TLSSpec{CertManagementPolicy: policy}
+			r := &Reconciler{
+				CertManagerCtrlFunc: rejectingCertManagerCtrlFunc,
+				RestConfig:          &rest.Config{},
+			}
+
+			useCertManager, err := r.shouldUseCertManager(ctx, cluster)
+			assert.NilError(t, err)
+			assert.Assert(t, !useCertManager, string(policy))
+		}
+	})
+
+	t.Run("operatorProvidedOnly uses internal PKI", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "operator-provided-only"
+		cluster.Namespace = namespace
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementOperatorProvidedOnly,
+			IssuerConf: &cmmeta.IssuerReference{
+				Name: "ignored-external-issuer", Kind: "VaultClusterIssuer",
+			},
+		}
+		assert.NilError(t, tClient.Create(ctx, cluster))
+
+		r := &Reconciler{
+			Client:              tClient,
+			Owner:               ControllerName,
+			CertManagerCtrlFunc: rejectingCertManagerCtrlFunc,
+			RestConfig:          &rest.Config{},
+		}
+
+		root, err := r.reconcileRootCertificate(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, root != nil)
+
+		primaryService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster.Name + "-primary",
+		}}
+		replicaService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster.Name + "-replicas",
+		}}
+		clusterProjection, err := r.reconcileClusterCertificate(ctx, root, cluster, primaryService, replicaService)
+		assert.NilError(t, err)
+		assert.Equal(t, clusterProjection.Name, naming.PostgresTLSSecret(cluster).Name)
+
+		instance := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster.Name + "-instance1-abcd",
+		}}
+		instance.Spec.ServiceName = cluster.Name + "-pods"
+		instanceSecret, err := r.reconcileInstanceCertificates(ctx, cluster, &cluster.Spec.InstanceSets[0], instance, root)
+		assert.NilError(t, err)
+		assert.Assert(t, len(instanceSecret.Data["dns.crt"]) > 0)
+
+		replicationSecret, err := r.reconcileReplicationSecret(ctx, cluster, root)
+		assert.NilError(t, err)
+		assert.Assert(t, len(replicationSecret.Data[naming.ReplicationCert]) > 0)
+
+		pgbouncerService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster.Name + "-pgbouncer",
+		}}
+		pgbouncerSecret, err := r.reconcilePGBouncerSecret(ctx, cluster, root, pgbouncerService)
+		assert.NilError(t, err)
+		assert.Assert(t, len(pgbouncerSecret.Data[pgbouncer.CertFrontendSecretKey]) > 0)
+
+		repoHost := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster.Name + "-repo-host",
+		}}
+		repoHost.Spec.ServiceName = cluster.Name + "-pods"
+		assert.NilError(t, r.reconcilePGBackRestSecret(ctx, cluster, repoHost, root))
+		pgBackRestSecret := &corev1.Secret{ObjectMeta: naming.PGBackRestSecret(cluster)}
+		assert.NilError(t, tClient.Get(ctx, client.ObjectKeyFromObject(pgBackRestSecret), pgBackRestSecret))
+		for _, key := range []string{
+			pgbackrest.CertAuthoritySecretKey,
+			pgbackrest.CertClientSecretKey,
+			pgbackrest.CertClientPrivateKeySecretKey,
+			pgbackrest.CertRepoSecretKey,
+			pgbackrest.CertRepoPrivateKeySecretKey,
+		} {
+			assert.Assert(t, len(pgBackRestSecret.Data[key]) > 0, key)
+		}
+
+		custom := cluster.DeepCopy()
+		custom.Spec.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "custom-postgres-tls"},
+		}
+		projection, err := r.reconcileClusterCertificate(ctx, root, custom, primaryService, replicaService)
+		assert.NilError(t, err)
+		assert.Equal(t, projection.Name, "custom-postgres-tls")
+	})
+
 	t.Run("reconcileRootCertificate returns nil for external issuer", func(t *testing.T) {
 		cluster := testCluster()
 		cluster.Name = "external-root-cert"
@@ -1011,7 +1225,7 @@ func TestIssuerModeAwareness(t *testing.T) {
 			Client:              tClient,
 			Owner:               ControllerName,
 			CertManagerCtrlFunc: mockCertManagerCtrlFunc,
-			RestConfig:          nil, // isCertManagerInstalled short-circuits to false
+			RestConfig:          nil, // shouldUseCertManager short-circuits to false
 		}
 
 		_, err := r.isRootCACertManagerManaged(ctx, cluster)

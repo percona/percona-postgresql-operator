@@ -1,0 +1,46 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o pipefail
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-management-policy"
+
+      primary="${cluster}-primary"
+      replicas="${cluster}-replicas"
+      primary_names=(
+        "${primary}.${NAMESPACE}.svc.cluster.local"
+        "${primary}.${NAMESPACE}.svc"
+        "${primary}.${NAMESPACE}"
+        "$primary"
+      )
+      replica_names=(
+        "${replicas}.${NAMESPACE}.svc.cluster.local"
+        "${replicas}.${NAMESPACE}.svc"
+        "${replicas}.${NAMESPACE}"
+        "$replicas"
+      )
+      issue_certificate postgres \
+        "$primary" serverAuth \
+        "${primary_names[@]}" "${replica_names[@]}"
+
+      kubectl -n "$NAMESPACE" create secret generic "${cluster}-cluster-cert" \
+        --from-file=tls.crt="$TEMP_DIR/postgres.crt" \
+        --from-file=tls.key="$TEMP_DIR/postgres.key" \
+        --from-file=ca.crt="$TEMP_DIR/root-ca.crt" \
+        --dry-run=client -o yaml \
+        | kubectl label --local -f - -o yaml \
+          postgres-operator.crunchydata.com/cluster="$cluster" \
+        | kubectl -n "$NAMESPACE" apply -f -
+
+      secret="${cluster}-cluster-cert"
+      checksum=$(kubectl -n "$NAMESPACE" get secret "$secret" -o json \
+        | jq --compact-output --sort-keys '.data' \
+        | sha256sum | awk '{print $1}')
+      kubectl -n "$NAMESPACE" annotate secret "$secret" \
+        e2e.percona.com/secret-checksum="$checksum" \
+        --overwrite

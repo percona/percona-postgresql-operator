@@ -216,7 +216,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Find the PostgreSQL instance that can execute SQL that writes system
-	// catalogs. When there is none, return early.
+	// catalogs. When there is none, return early. A standby cluster never has
+	// one; reconcilePGTDEStandby reports its pg_tde state instead. K8SPG-911
 	pod, _ := instances.writablePod(container)
 	if pod == nil {
 		return nil
@@ -471,6 +472,54 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	return err
 }
 
+// reconcilePGTDEStandby reports the pg_tde state of a cluster in recovery.
+func (r *Reconciler) reconcilePGTDEStandby(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+) {
+	const container = naming.ContainerDatabase
+
+	if !cluster.IsStandby() {
+		return
+	}
+
+	if !cluster.Spec.Extensions.PGTDE.Enabled &&
+		!meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		return
+	}
+
+	log := logging.FromContext(ctx).WithName("PGTDE")
+
+	pod, _ := instances.standbyLeaderPod(container)
+	if pod == nil {
+		log.V(1).Info("Waiting for a standby leader")
+		return
+	}
+
+	log = log.WithValues("pod", pod.Name)
+	ctx = logging.NewContext(ctx, log)
+
+	pgExecutor := postgres.Executor(func(
+		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+	})
+
+	installed, err := pgtde.ObserveExtension(ctx, pgExecutor)
+	if err != nil {
+		log.V(1).Info("could not observe pg_tde", "error", err.Error())
+		return
+	}
+
+	var keyErr error
+	if installed {
+		keyErr = pgtde.VerifyPrincipalKey(ctx, pgExecutor)
+	}
+
+	pgtde.ReportStandby(cluster, installed, keyErr)
+}
+
 // reconcilePGTDEProviders configures pg_tde providers using a two-phase
 // approach for vault credential changes:
 //
@@ -498,6 +547,13 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		cluster.Status.PGTDERevision = ""
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady)
 
+		return nil
+	}
+
+	// K8SPG-911: everything below writes, and a cluster in recovery cannot run
+	// any of it. reconcilePGTDEStandby reports the key provider from what pg_tde
+	// says instead.
+	if cluster.IsStandby() {
 		return nil
 	}
 

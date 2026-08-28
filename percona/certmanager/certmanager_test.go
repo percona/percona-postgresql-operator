@@ -1250,6 +1250,29 @@ func TestCertManagerNamespace(t *testing.T) {
 }
 
 func TestResolveIssuerMode(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		policy v1beta1.CertManagementPolicy
+	}{
+		{name: "userProvidedOnly ignores issuerConf", policy: v1beta1.CertManagementUserProvidedOnly},
+		{name: "operatorProvidedOnly ignores issuerConf", policy: v1beta1.CertManagementOperatorProvidedOnly},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := testCluster()
+			cluster.Spec.TLS = &v1beta1.TLSSpec{
+				CertManagementPolicy: tt.policy,
+				IssuerConf: &cmmeta.IssuerReference{
+					Name: "shared-issuer", Kind: v1.ClusterIssuerKind,
+				},
+			}
+			cl := &forbiddenGetClient{Client: setupFakeClient(t, cluster)}
+
+			mode, err := ResolveIssuerMode(t.Context(), cl, cluster)
+			require.NoError(t, err)
+			assert.Equal(t, IssuerModeManagedNamespaced, mode)
+		})
+	}
+
 	t.Run("nil TLS returns managed namespaced", func(t *testing.T) {
 		cluster := testCluster()
 		cl := setupFakeClient(t, cluster)

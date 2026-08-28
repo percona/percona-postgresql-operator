@@ -83,6 +83,26 @@ func TestPerconaPGCluster_BackupsEnabled(t *testing.T) {
 	}
 }
 
+func TestPerconaPGCluster_IsPaused(t *testing.T) {
+	tests := map[string]struct {
+		pause    *bool
+		expected bool
+	}{
+		"unset means running": {pause: nil},
+		"explicitly false":    {pause: new(false)},
+		"true":                {pause: new(true), expected: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := new(PerconaPGCluster)
+			cr.Spec.Pause = tt.pause
+
+			assert.Equal(t, tt.expected, cr.IsPaused())
+		})
+	}
+}
+
 func TestPerconaPGCluster_Validate(t *testing.T) {
 	t.Run("rejects pg_stat_monitor and pg_stat_statements together", func(t *testing.T) {
 		cluster := new(PerconaPGCluster)

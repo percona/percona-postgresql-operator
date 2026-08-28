@@ -13,6 +13,7 @@ extra-volumes
 finalizers
 init-deploy
 huge-pages
+logical-replica
 major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17
@@ -24,8 +25,9 @@ monitoring
 one-pod
 repo-host-autogrow
 operator-self-healing
-pgbouncer-mtls
+pgbouncer
 pg-tde
+pg-tde-wal-encrypt
 pitr
 scaling
 scheduled-backup
@@ -34,6 +36,7 @@ sidecars
 standby-pgbackrest
 standby-streaming
 start-from-backup
+start-from-volumes
 tablespaces
 telemetry-transfer
 upgrade-consistency

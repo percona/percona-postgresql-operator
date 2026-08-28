@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
+	"github.com/percona/percona-postgresql-operator/v2/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -210,7 +211,9 @@ func DynamicConfiguration(
 
 	// Copy the "postgresql" section before making any changes.
 	postgresql := map[string]any{
-		// TODO(cbandy): explain this. requires an archive, perhaps.
+		// Replicas stream from the archive rather than from a slot on the
+		// primary, so leaving slots off means a lagging or removed replica
+		// cannot pin WAL on the primary.
 		"use_slots": false,
 	}
 
@@ -330,6 +333,13 @@ func DynamicConfiguration(
 
 		standby["create_replica_methods"] = methods
 		root["standby_cluster"] = standby
+	}
+
+	if matchers := logicalreplica.IgnoreSlotsMatchers(cluster); len(matchers) > 0 {
+		existing, _ := root["ignore_slots"].([]any)
+		// Concat rather than append: root is a shallow copy of configuration, so
+		// appending could write into the user's own slice.
+		root["ignore_slots"] = slices.Concat(existing, matchers)
 	}
 
 	return root

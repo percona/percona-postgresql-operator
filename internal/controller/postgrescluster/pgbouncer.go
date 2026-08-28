@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	pgbruntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
@@ -27,6 +28,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v2/internal/util"
 	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
 	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -56,6 +58,9 @@ func (r *Reconciler) reconcilePGBouncer(
 	}
 	if err == nil {
 		err = r.reconcilePGBouncerInPostgreSQL(ctx, cluster, instances, secret)
+	}
+	if err == nil {
+		err = r.reconcilePGBouncerPause(ctx, secret, cluster)
 	}
 	return err
 }
@@ -246,6 +251,8 @@ func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cl
 // When the root CA is internal but a stale Certificate CR was left by
 // K8SPG-1017, the CR is reconciled to update its ownerRef (K8SPG-1007
 // recovery) before populating the secret from the internal PKI.
+// In userProvidedOnly mode, the operator preserves the user-provided
+// certificates.
 func (r *Reconciler) reconcilePGBouncerSecret(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	root *pki.RootCertificateAuthority, service *corev1.Service,
@@ -269,11 +276,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 	err = client.IgnoreNotFound(err)
 
-	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
 		if !secretFound {
 			return nil, errors.Errorf("user-provided PgBouncer secret %q is missing", naming.ClusterPGBouncer(cluster).Name)
 		}
-		return existing, nil
 	}
 	var userSecret *corev1.Secret
 	if ref := cluster.Spec.Proxy.PGBouncer.UsersSecret; ref != nil && ref.Name != "" {
@@ -284,7 +291,8 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 	}
 
 	var frontendCertManagerSecret *corev1.Secret
-	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
+	if cluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil &&
+		cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly {
 		certManagerManaged, certErr := r.isRootCACertManagerManaged(ctx, cluster)
 		if certErr != nil {
 			return nil, errors.Wrap(certErr, "failed to check if cert-manager manages root CA")
@@ -302,7 +310,7 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 			// cluster certificates are not managed by cert-manager
 			// but Certificate object exists due to the bug described in K8SPG-1017
 			// we need to reconcile them anyway to update ownerRef for K8SPG-1007.
-			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster.Namespace, cert) {
+			if cert := certmanager.PGBouncerCertificateName(cluster); r.shouldReconcileCertManagerCertificate(ctx, cluster, cert) {
 				_, err := r.reconcileCertManagerPGBouncerSecret(ctx, cluster, service)
 				if err != nil {
 					logging.FromContext(ctx).Error(err, "failed to reconcile Certificate", "name", cert)
@@ -350,6 +358,11 @@ func (r *Reconciler) reconcilePGBouncerSecret(
 
 func (r *Reconciler) getAdditionalTrustedCAs(ctx context.Context, cluster *v1beta1.PostgresCluster) ([][]byte, error) {
 	pgBouncer := cluster.Spec.Proxy.PGBouncer
+	// K8SPG-1045: operator should keep user-provided CA bundle as-is in the userProvidedOnly mode
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly &&
+		pgBouncer.CustomTLSSecret == nil {
+		return nil, nil
+	}
 	if len(pgBouncer.AdditionalTrustedCAs) == 0 {
 		return nil, nil
 	}
@@ -627,8 +640,14 @@ func (r *Reconciler) generatePGBouncerDeployment(
 
 	err := errors.WithStack(r.setControllerReference(cluster, deploy))
 
+	var initImage string
+	if err == nil && cluster.CompareVersion("3.1.0") >= 0 {
+		initImage, err = k8s.InitImage(ctx, r.Client, cluster, nil)
+		err = errors.Wrap(err, "get init image")
+	}
+
 	if err == nil {
-		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec)
+		pgbouncer.Pod(ctx, cluster, configmap, primaryCertificate, secret, &deploy.Spec.Template.Spec, initImage)
 	}
 
 	return deploy, true, err
@@ -752,4 +771,101 @@ func (r *Reconciler) reconcilePGBouncerPodDisruptionBudget(
 		err = errors.WithStack(r.apply(ctx, pdb))
 	}
 	return err
+}
+
+func (r *Reconciler) reconcilePGBouncerPause(ctx context.Context, secret *corev1.Secret, cluster *v1beta1.PostgresCluster) error {
+	if cluster.CompareVersion("3.1.0") < 0 {
+		return nil
+	}
+
+	proxy := cluster.Spec.Proxy
+	if !proxy.PGBouncerEnabled() {
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+		return nil
+	}
+
+	shouldPause := proxy.PGBouncerPaused()
+	isPaused := meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+	if shouldPause == isPaused {
+		return nil
+	}
+	if err := r.handlePGBouncerPause(ctx, secret, cluster, shouldPause); err != nil {
+		return errors.Wrap(err, "handle pgbouncer pause")
+	}
+	return nil
+}
+
+func listPGBouncerPods(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (*corev1.PodList, error) {
+	selector, err := naming.AsSelector(naming.ClusterPGBouncerSelector(cluster))
+	if err != nil {
+		return nil, errors.Wrap(err, "pgbouncer selector")
+	}
+	podList := &corev1.PodList{}
+	if err := cl.List(
+		ctx, podList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, errors.Wrap(err, "list pgbouncer pods")
+	}
+	return podList, nil
+}
+
+func (r *Reconciler) handlePGBouncerPause(ctx context.Context, secret *corev1.Secret, cluster *v1beta1.PostgresCluster, pause bool) error {
+	podList, err := listPGBouncerPods(ctx, r.Client, cluster)
+	if err != nil {
+		return errors.Wrap(err, "list pgbouncer pods")
+	}
+
+	if len(podList.Items) < int(*cluster.Spec.Proxy.PGBouncer.Replicas) {
+		return errors.Errorf("pgbouncer pods are not ready, expected %d, got %d", *cluster.Spec.Proxy.PGBouncer.Replicas, len(podList.Items))
+	}
+
+	password, ok := secret.Data[pgbouncer.AdminPasswordSecretKey]
+	if !ok {
+		return errors.New("pgbouncer admin password not found in secret")
+	}
+
+	verb, command := "resume", pgbruntime.AdminClient.Resume
+	if pause {
+		verb, command = "pause", pgbruntime.AdminClient.Pause
+	}
+
+	for _, pod := range podList.Items {
+		if pod.Status.PodIP == "" {
+			return errors.Errorf("pgbouncer pod %s has no IP yet", pod.Name)
+		}
+
+		adminClient, err := r.newPGBouncerAdmin(pgbruntime.AdminClientOptions{
+			User:     pgbouncer.AdminUser,
+			Password: string(password),
+			Host:     pod.Status.PodIP,
+			Port:     fmt.Sprintf("%d", *cluster.Spec.Proxy.PGBouncer.Port),
+		})
+		if err != nil {
+			return errors.Wrapf(err, "create pgbouncer admin client for pod %s", pod.Name)
+		}
+
+		err = command(adminClient, ctx)
+		_ = adminClient.Close()
+
+		if err != nil {
+			return errors.Wrapf(err, "%s pgbouncer on pod %s", verb, pod.Name)
+		}
+	}
+
+	log := logging.FromContext(ctx)
+	log.Info("pgbouncer pause state changed", "pause", pause)
+
+	if pause {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    v1beta1.PGBouncerPaused,
+			Status:  metav1.ConditionTrue,
+			Reason:  "Paused",
+			Message: "pgbouncer is paused",
+		})
+	} else {
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, v1beta1.PGBouncerPaused)
+	}
+	return nil
 }
