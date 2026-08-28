@@ -6,6 +6,15 @@ commands:
       set -o errexit
       set -o xtrace
 
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
+
       source ../../functions
       init_temp_dir # do this only in the first TestStep
 

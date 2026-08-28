@@ -3,6 +3,19 @@ kind: TestAssert
 timeout: 360
 commands:
   - script: |
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
       until kubectl assert exist-enhanced perconapgbackup k8s-upgrade-full-repo1 -n ${NAMESPACE} --field-selector status.state=Succeeded; do
         echo "Waiting for backup to have succeeded state..."
         sleep 10
