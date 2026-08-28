@@ -730,7 +730,8 @@ func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	r := &PGClusterReconciler{Client: cl}
 
 	spec := &v2.LogicalReplicaSpec{Name: "analytics"}
-	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec))
+	status := &v2.LogicalReplicaStatus{Name: spec.Name, Databases: []string{"cluster1"}}
+	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status))
 
 	sts := &appsv1.StatefulSet{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
@@ -745,6 +746,25 @@ func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	// postmaster and resolves the password out of its environment. Without this
 	// the replica bootstraps and then never replicates.
 	assertLogicalReplicaPassword(t, cr, podSpec.Containers[0].Env)
+
+	t.Run("readiness follows the subscriptions, liveness does not", func(t *testing.T) {
+		container := podSpec.Containers[0]
+		pgIsReady := []string{"pg_isready", "-h", postgres.SocketDirectory}
+
+		// Whether the postmaster is up at all, which is also what
+		// logicalReplicaPod reads.
+		require.NotNil(t, container.StartupProbe)
+		assert.Equal(t, pgIsReady, container.StartupProbe.Exec.Command)
+
+		// A disabled subscription takes the replica out of its Service...
+		require.NotNil(t, container.ReadinessProbe)
+		assert.Contains(t, strings.Join(container.ReadinessProbe.Exec.Command, " "),
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery(spec.Name, status.Databases)))
+
+		// ...and never restarts it: disable_on_error does not undo itself.
+		require.NotNil(t, container.LivenessProbe)
+		assert.Equal(t, pgIsReady, container.LivenessProbe.Exec.Command)
+	})
 
 	t.Run("resolves an arbitrary user ID to postgres", func(t *testing.T) {
 		// The operator queries the replica by running psql inside this Pod, so
@@ -1506,12 +1526,30 @@ func TestBootstrapIsNotRepeated(t *testing.T) {
 	})
 }
 
-func TestLogicalReplicaPodRequiresReady(t *testing.T) {
+func TestLogicalReplicaReadinessProbe(t *testing.T) {
+	probe := logicalReplicaReadinessProbe("analytics", []string{"one", "two"}, 10, 3)
+	command := strings.Join(probe.Exec.Command, " ")
+
+	assert.Contains(t, command, "pg_isready -q -h "+shellQuote(postgres.SocketDirectory))
+	// Quoted as one shell word: the subscription names it carries are themselves
+	// single-quoted SQL literals.
+	assert.Contains(t, command,
+		shellQuote(logicalreplica.SubscriptionsEnabledQuery("analytics", []string{"one", "two"})))
+	assert.Equal(t, int32(10), probe.PeriodSeconds)
+	assert.Equal(t, int32(3), probe.FailureThreshold)
+
+	// A replica whose databases are not resolved yet has no subscriptions to
+	// check, and an empty "IN ()" list would make the probe fail for good.
+	assert.Equal(t, []string{"pg_isready", "-h", postgres.SocketDirectory},
+		logicalReplicaReadinessProbe("analytics", nil, 10, 3).Exec.Command)
+}
+
+func TestLogicalReplicaPodRequiresStarted(t *testing.T) {
 	cr, err := readDefaultCR("cluster1", "pg")
 	require.NoError(t, err)
 	cr.Default()
 
-	pod := func(ready corev1.ConditionStatus) *corev1.Pod {
+	pod := func(state corev1.ContainerState, started bool) *corev1.Pod {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster1-lr-analytics-0",
@@ -1522,24 +1560,45 @@ func TestLogicalReplicaPodRequiresReady(t *testing.T) {
 				},
 			},
 			Status: corev1.PodStatus{
-				Phase:      corev1.PodRunning,
-				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: ready}},
+				Phase: corev1.PodRunning,
+				// Readiness also covers the subscriptions, so this is false for a
+				// replica whose replication has broken - the one case where the
+				// callers most need to reach it.
+				Conditions: []corev1.PodCondition{{
+					Type: corev1.PodReady, Status: corev1.ConditionFalse}},
+				ContainerStatuses: []corev1.ContainerStatus{{
+					Name:    naming.ContainerDatabase,
+					State:   state,
+					Started: &started,
+				}},
 			},
 		}
 	}
 
-	// Running but not ready is the state a replica pod is in for the first few
-	// seconds. Returning it made psql fail and the replica look broken.
-	cl, err := buildFakeClient(t.Context(), cr.DeepCopy(), pod(corev1.ConditionFalse))
-	require.NoError(t, err)
-	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
-	require.Error(t, err)
+	running := corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
 
-	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(), pod(corev1.ConditionTrue))
+	// Started but not ready is what a replica out of its Service looks like, and
+	// psql reaches it perfectly well.
+	cl, err := buildFakeClient(t.Context(), cr.DeepCopy(), pod(running, true))
 	require.NoError(t, err)
 	found, err := (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
 	require.NoError(t, err)
 	assert.Equal(t, "cluster1-lr-analytics-0", found.Name)
+
+	// Running is not enough: the postmaster is not accepting connections for the
+	// first few seconds, and returning it made the replica look broken.
+	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(), pod(running, false))
+	require.NoError(t, err)
+	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
+	require.Error(t, err)
+
+	// A container that is not running cannot be reached whatever its startup
+	// probe last reported.
+	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(),
+		pod(corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{}}, true))
+	require.NoError(t, err)
+	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
+	require.Error(t, err)
 }
 
 func TestUpdateLogicalReplicaStatus(t *testing.T) {

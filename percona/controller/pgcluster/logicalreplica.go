@@ -483,7 +483,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 
 	// Asserts one replica, which is also what starts one again after a restore
 	// that was abandoned before it replaced the data directory.
-	if err := r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec); err != nil {
+	if err := r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status); err != nil {
 		return status, errors.Wrap(err, "reconcile statefulset")
 	}
 	if err := r.reconcileLogicalReplicaService(ctx, cr, spec); err != nil {
@@ -1130,6 +1130,30 @@ func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
 	}
 }
 
+// logicalReplicaReadinessProbe returns the probe that takes a replica out of its
+// Service once replication has broken.
+func logicalReplicaReadinessProbe(
+	replica string, databases []string, period, failureThreshold int32,
+) *corev1.Probe {
+	probe := logicalReplicaProbe(0, period, failureThreshold)
+
+	// The StatefulSet is only reconciled once the replica is seeded, so there is
+	// always at least one database here. An empty "IN ()" list is a syntax error.
+	if len(databases) == 0 {
+		return probe
+	}
+
+	probe.Exec.Command = []string{"bash", "-c", strings.Join([]string{
+		`set -euo pipefail`,
+		`pg_isready -q -h ` + shellQuote(postgres.SocketDirectory),
+		`psql -XAtqw --command=` +
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery(replica, databases)) +
+			` | grep -qx t`,
+	}, "\n")}
+
+	return probe
+}
+
 // logicalReplicaNSSWrapperInitContainer writes the passwd and group files that
 // let the Pod resolve its user ID to "postgres". OpenShift assigns an arbitrary
 // UID and CRI-O names its passwd entry after the number, so without this both
@@ -1299,7 +1323,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaConfigMap(
 // replica. Stopping one goes through scaleLogicalReplica instead.
 func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 	ctx context.Context, cr *v2.PerconaPGCluster, crunchyCR *v1beta1.PostgresCluster,
-	spec *v2.LogicalReplicaSpec,
+	spec *v2.LogicalReplicaSpec, status *v2.LogicalReplicaStatus,
 ) error {
 	name := logicalReplicaObjectName(cr, spec.Name)
 	dataDir := postgres.DataDirectory(crunchyCR)
@@ -1342,7 +1366,8 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 				{Name: logicalReplicaSocketVolume, MountPath: postgres.SocketDirectory},
 				logicalReplicaConfigVolumeMount(),
 			},
-			ReadinessProbe: logicalReplicaProbe(5, 10, 0),
+			StartupProbe:   logicalReplicaProbe(5, 5, 30),
+			ReadinessProbe: logicalReplicaReadinessProbe(spec.Name, status.Databases, 5, 2),
 			LivenessProbe:  logicalReplicaProbe(30, 20, 6),
 		}
 
@@ -1731,14 +1756,18 @@ func (r *PGClusterReconciler) logicalReplicaPod(ctx context.Context, cr *v2.Perc
 		// Running is not enough: psql fails against a postmaster that is not
 		// accepting connections yet, and callers treat an exec failure as broken,
 		// which would turn a few seconds of startup into a hard error.
-		if slices.ContainsFunc(pod.Status.Conditions, func(c corev1.PodCondition) bool {
-			return c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue
+		//
+		// The startup probe is the signal this needs: true once the postmaster
+		// has accepted connections, false again when the container restarts.
+		if slices.ContainsFunc(pod.Status.ContainerStatuses, func(c corev1.ContainerStatus) bool {
+			return c.Name == naming.ContainerDatabase &&
+				c.State.Running != nil && c.Started != nil && *c.Started
 		}) {
 			return pod, nil
 		}
 	}
 
-	return nil, errors.New("no ready logical replica pod")
+	return nil, errors.New("no running logical replica pod")
 }
 
 // execOnPod runs sql inside a logical replica pod and returns its trimmed
