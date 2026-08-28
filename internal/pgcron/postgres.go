@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 )
 
 // EnableInPostgreSQL installs pg_cron in the postgres database.

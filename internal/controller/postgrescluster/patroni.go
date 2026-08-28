@@ -14,14 +14,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni/dcs"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni/dcs"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="endpoints",verbs={deletecollection}

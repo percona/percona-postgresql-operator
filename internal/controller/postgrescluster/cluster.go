@@ -15,14 +15,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni"
-	"github.com/percona/percona-postgresql-operator/v2/internal/patroni/dcs"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/util"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni/dcs"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/util"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // +kubebuilder:rbac:groups="",resources="configmaps",verbs={create,patch}
@@ -95,7 +95,7 @@ func (r *Reconciler) reconcileClusterPodService(
 // resolve to the PostgreSQL primary instance.
 func (r *Reconciler) generateClusterPrimaryService(
 	cluster *v1beta1.PostgresCluster, leader *corev1.Service,
-) (*corev1.Service, *corev1.Endpoints, error) {
+) (*corev1.Service, *corev1.Endpoints, error) { //nolint:staticcheck // SA1019
 	// We want to name and label our primary Service consistently. When Patroni is
 	// using Endpoints for its DCS, however, they and any Service that uses them
 	// must use the same name as the Patroni "scope" which has its own constraints.

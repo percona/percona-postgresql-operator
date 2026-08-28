@@ -20,9 +20,9 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type fakeClientWithError struct {
@@ -47,8 +47,8 @@ func (f *fakeClientWithError) Get(ctx context.Context, key types.NamespacedName,
 func (f *fakeClientWithError) Patch(ctx context.Context, obj crclient.Object,
 	patch crclient.Patch, opts ...crclient.PatchOption,
 ) error {
-	switch {
-	case f.errorType == "patch error":
+	switch f.errorType {
+	case "patch error":
 		return errors.New("patch error")
 	default:
 		return f.Client.Patch(ctx, obj, patch, opts...)
@@ -77,7 +77,7 @@ func setupDeploymentID(t *testing.T) string {
 // setupFakeClientWithPGOScheme returns a fake client with the PGO scheme added;
 // if `includeCluster` is true, also adds some empty PostgresCluster and CrunchyBridgeCluster
 // items to the client
-func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client {
+func setupFakeClientWithPGOScheme(t *testing.T, includeCluster bool) crclient.Client { //nolint:unparam
 	t.Helper()
 	if includeCluster {
 		pc := &v1beta1.PostgresClusterList{

@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestReconcilePatroniLeaderLease(t *testing.T) {
@@ -270,12 +270,12 @@ func TestReconcilePatroniStatus(t *testing.T) {
 			},
 		}
 
-		endpoints := &corev1.Endpoints{
+		endpoints := &corev1.Endpoints{ //nolint:staticcheck // SA1019: matches production code
 			ObjectMeta: naming.PatroniDistributedConfiguration(postgresCluster),
 		}
 		if writeAnnotation {
-			endpoints.ObjectMeta.Annotations = make(map[string]string)
-			endpoints.ObjectMeta.Annotations["initialize"] = systemIdentifier
+			endpoints.Annotations = make(map[string]string)
+			endpoints.Annotations["initialize"] = systemIdentifier
 		}
 		assert.NilError(t, tClient.Create(ctx, endpoints, &client.CreateOptions{}))
 
