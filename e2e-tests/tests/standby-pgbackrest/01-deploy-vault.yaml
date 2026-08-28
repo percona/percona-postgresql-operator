@@ -7,5 +7,10 @@ commands:
 
       source ../../functions
 
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping Vault deployment for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
       start_vault vault-service https
     timeout: 600

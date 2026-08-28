@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      kubectl -n "${NAMESPACE}" apply -f - << BACKUP
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGBackup
+      metadata:
+        name: backup-before-update
+      spec:
+        pgCluster: operator-upgrade-cert-manager
+        repoName: repo2
+        options:
+          - --type=full
+      BACKUP
