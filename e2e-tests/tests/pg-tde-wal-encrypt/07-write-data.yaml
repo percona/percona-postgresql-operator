@@ -1,12 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - timeout: 60
+  - timeout: 120
     script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
+
+      collect_pg_logs_on_failure
 
       run_psql_local \
         '\c myapp \\\ INSERT INTO myTable (id) VALUES (100501)' \

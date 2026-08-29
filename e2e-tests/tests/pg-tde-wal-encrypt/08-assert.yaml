@@ -1,6 +1,9 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 240
+collectors:
+  - type: command
+    command: bash -c "source ../../functions && collect_pg_logs"
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster

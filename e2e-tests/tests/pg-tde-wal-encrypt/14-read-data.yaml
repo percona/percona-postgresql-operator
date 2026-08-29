@@ -8,6 +8,8 @@ commands:
 
       source ../../functions
 
+      collect_pg_logs_on_failure
+
       # enabling WAL encryption restarts the postgres process, so both the primary
       # election and the query itself can fail while the instances come back up
       read_from_primary() {

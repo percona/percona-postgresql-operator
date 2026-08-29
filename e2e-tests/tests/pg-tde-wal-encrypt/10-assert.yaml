@@ -8,6 +8,9 @@ commands:
       [[ $(cat ${tmp} | yq .message) == "pg_tde is enabled in PerconaPGCluster" ]]
       [[ $(cat ${tmp} | yq .reason) == "Enabled" ]]
       [[ $(cat ${tmp} | yq .status) == "True" ]]
+collectors:
+  - type: command
+    command: bash -c "source ../../functions && collect_pg_logs"
 ---
 kind: StatefulSet
 apiVersion: apps/v1

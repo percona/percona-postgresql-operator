@@ -61,6 +61,9 @@ commands:
         echo "archive-async is not disabled in pgbackrest_instance.conf"
         exit 1
       fi
+collectors:
+  - type: command
+    command: bash -c "source ../../functions && collect_pg_logs"
 ---
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster

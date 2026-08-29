@@ -1,6 +1,9 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 30
+collectors:
+  - type: command
+    command: bash -c "source ../../functions && collect_pg_logs"
 ---
 kind: ConfigMap
 apiVersion: v1

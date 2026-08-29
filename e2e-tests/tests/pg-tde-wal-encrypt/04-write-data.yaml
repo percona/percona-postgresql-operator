@@ -8,6 +8,8 @@ commands:
 
       source ../../functions
 
+      collect_pg_logs_on_failure
+
       # K8SPG-911: drop the marker archive_command writes, so that the check in step 05
       # can only pass if pg_tde_waldump read one of the encrypted segments archived below.
       primary=$(get_pod_by_role pg-tde-wal-encrypt primary name)

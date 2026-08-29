@@ -9,6 +9,9 @@ commands:
       [[ $(cat ${tmp_file} | yq .observedGeneration) == "1" ]]
       [[ $(cat ${tmp_file} | yq .reason) == "Enabled" ]]
       [[ $(cat ${tmp_file} | yq .status) == "True" ]]
+collectors:
+  - type: command
+    command: bash -c "source ../../functions && collect_pg_logs"
 ---
 kind: StatefulSet
 apiVersion: apps/v1

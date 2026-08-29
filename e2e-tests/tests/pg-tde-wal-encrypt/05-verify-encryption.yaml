@@ -1,11 +1,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - timeout: 60
+  - timeout: 120
     script: |-
       set -o xtrace
 
       source ../../functions
+
+      collect_pg_logs_on_failure
 
       result=$(run_psql_command \
         "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \

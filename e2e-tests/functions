@@ -1669,18 +1669,92 @@ function get_container_image() {
 	fi
 }
 
-function get_postgresql_logs() {
-	local pgVersion=$1
+# Patroni is the database container's main process, so Patroni logs are the
+# container's stdout. Postgres keeps its own log files, see get_postgresql_logs.
+function get_patroni_logs() {
+	local tail=${1:-200}
 
-	for pod in $(kubectl get pods -l postgres-operator.crunchydata.com/data=postgres --no-headers | awk '{print $1}'); do
-		local phase=$(kubectl -n ${NAMESPACE} get ${pod} -o jsonpath={".status.phase"})
+	local pod
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -l postgres-operator.crunchydata.com/data=postgres -o name); do
+		echo "=== patroni logs from ${pod} ==="
+		kubectl -n "${NAMESPACE}" logs "${pod}" -c database --tail="${tail}" || :
+		if kubectl -n "${NAMESPACE}" logs "${pod}" -c database --previous --tail=1 >/dev/null 2>&1; then
+			echo "=== patroni logs from ${pod} (previous container) ==="
+			kubectl -n "${NAMESPACE}" logs "${pod}" -c database --previous --tail="${tail}" || :
+		fi
+	done
+}
+
+# PostgreSQL writes to files under its log_directory, which the operator keeps
+# on the data volume.
+function get_postgresql_logs() {
+	local pgVersion=${1:-${PG_VER}}
+	local tail=${2:-200}
+
+	local pod phase
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -l postgres-operator.crunchydata.com/data=postgres -o name); do
+		phase=$(kubectl -n "${NAMESPACE}" get "${pod}" -o jsonpath='{.status.phase}')
 		if [[ ${phase} != "Running" ]]; then
-			echo "Waiting for ${pod} to start running"
+			echo "${pod} is ${phase}, skipping its postgresql logs"
 			continue
 		fi
-		echo "find /pgdata/pg${pgVersion}/log -type f -iname 'postgresql*.log' -exec tail -n 30 {} \;" \
-			| kubectl -n ${NAMESPACE} exec -it ${pod} -- bash 2>/dev/null
+		echo "=== postgresql logs from ${pod} ==="
+		kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+			bash -c "find /pgdata/pg${pgVersion}/log -type f -name 'postgresql*.log' -exec tail -n ${tail} {} +" || :
 	done
+}
+
+# pgBackRest logs to files on the instances, because archive-push runs from the
+# archive_command, and to stdout in the repo host, backup and restore pods.
+function get_pgbackrest_logs() {
+	local tail=${1:-200}
+
+	local pod phase
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -l postgres-operator.crunchydata.com/data=postgres -o name); do
+		phase=$(kubectl -n "${NAMESPACE}" get "${pod}" -o jsonpath='{.status.phase}')
+		[[ ${phase} == "Running" ]] || continue
+		echo "=== pgbackrest logs from ${pod} ==="
+		kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+			bash -c "find /pgdata/pgbackrest/log -type f -name '*.log' -exec tail -n ${tail} {} +" || :
+	done
+
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -l postgres-operator.crunchydata.com/pgbackrest-dedicated -o name); do
+		phase=$(kubectl -n "${NAMESPACE}" get "${pod}" -o jsonpath='{.status.phase}')
+		[[ ${phase} == "Running" ]] || continue
+		echo "=== pgbackrest logs from the repo host ${pod} ==="
+		kubectl -n "${NAMESPACE}" exec "${pod}" -c pgbackrest -- \
+			bash -c "find /pgbackrest -type f -name '*.log' -exec tail -n ${tail} {} +" || :
+	done
+
+	# backup and restore Jobs only log to stdout
+	for pod in $(kubectl -n "${NAMESPACE}" get pods -l postgres-operator.crunchydata.com/pgbackrest -o name); do
+		echo "=== pgbackrest pod logs from ${pod} ==="
+		kubectl -n "${NAMESPACE}" logs "${pod}" --all-containers --tail="${tail}" || :
+	done
+}
+
+# Everything needed to debug a cluster that misbehaved: pod and custom resource
+# state, events, Patroni, PostgreSQL and pgBackRest logs. Meant for kuttl
+# collectors, which only run once the assert has failed.
+function collect_pg_logs() {
+	local tail=${1:-200}
+
+	echo "=== pods in ${NAMESPACE} ==="
+	kubectl -n "${NAMESPACE}" get pods -o wide || :
+	echo "=== percona custom resources in ${NAMESPACE} ==="
+	kubectl -n "${NAMESPACE}" get pg,pg-backup,pg-restore || :
+	echo "=== events in ${NAMESPACE} ==="
+	kubectl -n "${NAMESPACE}" get events --sort-by=.lastTimestamp || :
+
+	get_patroni_logs "${tail}"
+	get_postgresql_logs "${PG_VER}" "${tail}"
+	get_pgbackrest_logs "${tail}"
+}
+
+# kuttl returns from a TestStep before it runs the assert collectors, so scripts
+# that talk to the cluster themselves have to dump the logs on their way out.
+function collect_pg_logs_on_failure() {
+	trap 'rc=$?; if [[ ${rc} -ne 0 ]]; then set +o xtrace; collect_pg_logs; fi; exit ${rc}' EXIT
 }
 
 function wait_for_generation() {
