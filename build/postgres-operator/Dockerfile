@@ -4,11 +4,13 @@ WORKDIR /go/src/github.com/percona/percona-postgresql-operator
 COPY . .
 RUN go mod download
 
+ARG COMPILER_NAME TARGETOS TARGETARCH
+
 ARG GIT_COMMIT
 ARG GIT_BRANCH
 ARG GO_LDFLAGS
-ARG GOOS=linux
-ARG GOARCH=amd64
+ARG GOOS=$TARGETOS
+ARG GOARCH=$TARGETARCH
 ARG CGO_ENABLED=0
 
 RUN mkdir -p build/_output/bin \

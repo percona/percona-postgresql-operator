@@ -3,7 +3,7 @@
 NAME ?= percona-postgresql-operator
 VERSION ?= $(shell git rev-parse --abbrev-ref HEAD | sed -e 's^/^-^g; s^[.]^-^g;' | tr '[:upper:]' '[:lower:]')
 ROOT_REPO ?= ${PWD}
-IMAGE_TAG_BASE ?= perconalab/$(NAME)
+IMAGE_TAG_BASE ?= gru.ocir.io/grq1iurfepyg/percona-pg/$(NAME)
 IMAGE ?= $(IMAGE_TAG_BASE):$(VERSION)
 
 PGOROOT ?= $(CURDIR)
@@ -41,7 +41,7 @@ export BUILDAH_FORMAT ?= docker
 
 # Allows simplification of IMGBUILDER switching
 ifeq ("$(IMGBUILDER)","docker")
-        IMGCMDSTEM=docker build
+        IMGCMDSTEM=docker buildx build  --platform linux/arm64/v8,linux/amd64 --push
 endif
 
 # set the proper packager, registry and base image based on the PGO_BASEOS configured
