@@ -16162,6 +16162,8 @@ spec:
                       type: string
                     name:
                       type: string
+                    postgresVersion:
+                      type: integer
                     reason:
                       type: string
                     seededAt:

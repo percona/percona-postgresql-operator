@@ -945,6 +945,10 @@ const (
 	// short of seeding it again fixes it.
 	LogicalReplicaReasonSourceRestored = "SourceRestored"
 
+	// LogicalReplicaReasonSourceUpgraded means the cluster went through a major
+	// version upgrade after this replica was seeded.
+	LogicalReplicaReasonSourceUpgraded = "SourceUpgraded"
+
 	// LogicalReplicaReasonWaitingForDataVolume means the data volume of an
 	// earlier incarnation of this replica is still being deleted.
 	LogicalReplicaReasonWaitingForDataVolume = "WaitingForDataVolume"
@@ -982,11 +986,18 @@ type LogicalReplicaStatus struct {
 	// +optional
 	SeededAt *metav1.Time `json:"seededAt,omitempty"`
 
+	// PostgresVersion is the major PostgreSQL version of the data directory this
+	// replica holds, recorded when it was seeded. The data directory is scoped to
+	// a major version and pg_upgrade never touches it, so once spec.postgresVersion
+	// moves past this the replica cannot be started again.
+	// +optional
+	PostgresVersion int `json:"postgresVersion,omitempty"`
+
 	// InvalidatedAt is when the operator established that the data on this
 	// replica can no longer be reconciled with the cluster, because the cluster
-	// was restored in place after the replica was seeded from it. The replica
-	// stays stopped until it is removed from spec.logicalReplicas and added
-	// back, which seeds it again from scratch.
+	// was restored in place or upgraded to a new major version after the replica
+	// was seeded from it. The replica stays stopped until it is removed from
+	// spec.logicalReplicas and added back, which seeds it again from scratch.
 	// +optional
 	InvalidatedAt *metav1.Time `json:"invalidatedAt,omitempty"`
 }
