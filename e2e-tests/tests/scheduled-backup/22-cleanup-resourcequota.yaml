@@ -7,7 +7,7 @@ commands:
 
       # Remove the ResourceQuota to allow jobs to be created again
       kubectl delete resourcequota no-jobs-quota -n "${NAMESPACE}"
-      
+
       # Disable the schedule to prevent further backup attempts during cleanup
       kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
       {
