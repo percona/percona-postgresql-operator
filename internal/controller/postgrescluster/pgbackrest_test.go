@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:staticcheck // SA1019: uses deprecated APIs that match production code
 package postgrescluster
 
 import (
@@ -31,20 +32,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var testCronSchedule string = "*/15 * * * *"
@@ -578,9 +580,10 @@ topologySpreadConstraints:
 			var instanceConfFound, dedicatedRepoConfFound bool
 			for k, v := range config.Data {
 				if v != "" {
-					if k == pgbackrest.CMInstanceKey {
+					switch k {
+					case pgbackrest.CMInstanceKey:
 						instanceConfFound = true
-					} else if k == pgbackrest.CMRepoKey {
+					case pgbackrest.CMRepoKey:
 						dedicatedRepoConfFound = true
 					}
 				}
@@ -1134,6 +1137,7 @@ func TestReconcileManualBackup(t *testing.T) {
 			Tracer:   otel.Tracer(ControllerName),
 			Owner:    ControllerName,
 		}
+		r.APIReader = mgr.GetAPIReader()
 	})
 	t.Cleanup(func() { teardownManager(cancel, t) })
 
@@ -1144,9 +1148,11 @@ func TestReconcileManualBackup(t *testing.T) {
 	fakeJob := func(clusterName, repoName string) *batchv1.Job {
 		return &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        "manual-backup-" + rand.String(4),
-				Namespace:   ns.GetName(),
-				Annotations: map[string]string{naming.PGBackRestBackup: defaultBackupId},
+				Name:      "manual-backup-" + rand.String(4),
+				Namespace: ns.GetName(),
+				Annotations: map[string]string{
+					naming.PGBackRestBackup: clusterName + "-" + defaultBackupId,
+				},
 				Labels: naming.PGBackRestBackupJobLabels(clusterName, repoName,
 					naming.BackupManual),
 			},
@@ -1186,6 +1192,8 @@ func TestReconcileManualBackup(t *testing.T) {
 		status *v1beta1.PostgresClusterStatus
 		// the ID used to populate the "backup" annotation for the test (can be empty)
 		backupId string
+		// K8SPG-992: whether to skip creating the PerconaPGBackup that owns the backup ID
+		noPGBackup bool
 		// the manual backup field to define in the postgrescluster spec for the test
 		manual *v1beta1.PGBackRestManualBackup
 		// whether or not the test should expect a Job to be reconciled
@@ -1393,6 +1401,23 @@ func TestReconcileManualBackup(t *testing.T) {
 		expectReconcile:          true,
 		verifyStaleJobConflict:   true,
 	}, {
+		testDesc:         "no PerconaPGBackup for backup id should not reconcile",
+		createCurrentJob: false,
+		noPGBackup:       true,
+		clusterConditions: map[string]metav1.ConditionStatus{
+			ConditionRepoHostReady: metav1.ConditionTrue,
+			ConditionReplicaCreate: metav1.ConditionTrue,
+		},
+		status: &v1beta1.PostgresClusterStatus{
+			PGBackRest: &v1beta1.PGBackRestStatus{
+				Repos: []v1beta1.RepoStatus{{Name: "repo1", StanzaCreated: true}},
+			},
+		},
+		backupId:                 backupId,
+		manual:                   &v1beta1.PGBackRestManualBackup{RepoName: "repo1"},
+		expectCurrentJobDeletion: false,
+		expectReconcile:          false,
+	}, {
 		testDesc:         "reconcile new job when in-progress job exists for another id",
 		createCurrentJob: true,
 		clusterConditions: map[string]metav1.ConditionStatus{
@@ -1460,12 +1485,33 @@ func TestReconcileManualBackup(t *testing.T) {
 
 				ctx := context.Background()
 
+				if !tc.noPGBackup {
+					for _, id := range []string{defaultBackupId, backupId} {
+						assert.NilError(t, tClient.Create(ctx, &v2.PerconaPGBackup{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      clusterName + "-" + id,
+								Namespace: ns.GetName(),
+							},
+							Spec: v2.PerconaPGBackupSpec{
+								PGCluster: clusterName,
+								RepoName:  new("repo1"),
+							},
+						}))
+					}
+				}
+
 				postgresCluster := fakePostgresCluster(clusterName, ns.GetName(), "", dedicated)
 				postgresCluster.Spec.Backups.PGBackRest.Manual = tc.manual
-				postgresCluster.Annotations = map[string]string{naming.PGBackRestBackup: tc.backupId}
+				postgresCluster.Annotations = map[string]string{}
+				if tc.backupId != "" {
+					postgresCluster.Annotations[naming.PGBackRestBackup] = clusterName + "-" + tc.backupId
+				}
 				assert.NilError(t, tClient.Create(ctx, postgresCluster))
 
-				postgresCluster.Status = *tc.status
+				postgresCluster.Status = *tc.status.DeepCopy()
+				if mb := postgresCluster.Status.PGBackRest.ManualBackup; mb != nil {
+					mb.ID = clusterName + "-" + mb.ID
+				}
 				for condition, status := range tc.clusterConditions {
 					meta.SetStatusCondition(&postgresCluster.Status.Conditions, metav1.Condition{
 						Type: condition, Reason: "testing", Status: status,
@@ -3403,11 +3449,11 @@ func TestGenerateRestoreJobIntent(t *testing.T) {
 		t.Run(fmt.Sprintf("openshift-%v", openshift), func(t *testing.T) {
 			t.Run("ObjectMeta", func(t *testing.T) {
 				t.Run("Name", func(t *testing.T) {
-					assert.Equal(t, job.ObjectMeta.Name,
+					assert.Equal(t, job.Name,
 						naming.PGBackRestRestoreJob(cluster).Name)
 				})
 				t.Run("Namespace", func(t *testing.T) {
-					assert.Equal(t, job.ObjectMeta.Namespace,
+					assert.Equal(t, job.Namespace,
 						naming.PGBackRestRestoreJob(cluster).Namespace)
 				})
 				t.Run("Annotations", func(t *testing.T) {
@@ -3871,17 +3917,17 @@ func TestObserveRestoreEnv(t *testing.T) {
 		}{{
 			desc: "restore job and all patroni endpoints exist",
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
-				fakeLeaderEP := &corev1.Endpoints{}
+				fakeLeaderEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
-				fakeDCSEP := &corev1.Endpoints{}
+				fakeDCSEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
-				fakeFailoverEP := &corev1.Endpoints{}
+				fakeFailoverEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
 
 				job := generateJob(cluster.Name, new(false), new(false))
@@ -3895,17 +3941,17 @@ func TestObserveRestoreEnv(t *testing.T) {
 		}, {
 			desc: "patroni endpoints only exist",
 			createResources: func(t *testing.T, cluster *v1beta1.PostgresCluster) {
-				fakeLeaderEP := &corev1.Endpoints{}
+				fakeLeaderEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeLeaderEP))
-				fakeDCSEP := &corev1.Endpoints{}
+				fakeDCSEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeDCSEP))
-				fakeFailoverEP := &corev1.Endpoints{}
+				fakeFailoverEP := &corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, fakeFailoverEP))
 			},
 			result: testResult{
@@ -4049,14 +4095,14 @@ func TestPrepareForRestore(t *testing.T) {
 	for _, dedicated := range []bool{true, false} {
 		testCases := []struct {
 			desc            string
-			createResources func(t *testing.T, cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints)
+			createResources func(t *testing.T, cluster *v1beta1.PostgresCluster) (*batchv1.Job, []corev1.Endpoints) //nolint:staticcheck // SA1019: matches production code
 			fakeObserved    *observedInstances
 			result          testResult
 		}{{
 			desc: "remove restore jobs",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
 				job := generateJob(cluster.Name)
 				assert.NilError(t, r.Client.Create(ctx, job))
 				return job, nil
@@ -4075,20 +4121,20 @@ func TestPrepareForRestore(t *testing.T) {
 			desc: "remove patroni endpoints",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
-				fakeLeaderEP := corev1.Endpoints{}
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
+				fakeLeaderEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeLeaderEP.ObjectMeta = naming.PatroniLeaderEndpoints(cluster)
-				fakeLeaderEP.ObjectMeta.Namespace = namespace
+				fakeLeaderEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeLeaderEP))
-				fakeDCSEP := corev1.Endpoints{}
+				fakeDCSEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeDCSEP.ObjectMeta = naming.PatroniDistributedConfiguration(cluster)
-				fakeDCSEP.ObjectMeta.Namespace = namespace
+				fakeDCSEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeDCSEP))
-				fakeFailoverEP := corev1.Endpoints{}
+				fakeFailoverEP := corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 				fakeFailoverEP.ObjectMeta = naming.PatroniTrigger(cluster)
-				fakeFailoverEP.ObjectMeta.Namespace = namespace
+				fakeFailoverEP.Namespace = namespace
 				assert.NilError(t, r.Client.Create(ctx, &fakeFailoverEP))
-				return nil, []corev1.Endpoints{fakeLeaderEP, fakeDCSEP, fakeFailoverEP}
+				return nil, []corev1.Endpoints{fakeLeaderEP, fakeDCSEP, fakeFailoverEP} //nolint:staticcheck // SA1019
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -4104,8 +4150,8 @@ func TestPrepareForRestore(t *testing.T) {
 			desc: "cluster fully prepared",
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
-				return nil, []corev1.Endpoints{}
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
+				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -4132,8 +4178,8 @@ func TestPrepareForRestore(t *testing.T) {
 			}},
 			createResources: func(t *testing.T,
 				cluster *v1beta1.PostgresCluster,
-			) (*batchv1.Job, []corev1.Endpoints) {
-				return nil, []corev1.Endpoints{}
+			) (*batchv1.Job, []corev1.Endpoints) { //nolint:staticcheck // SA1019: matches production code
+				return nil, []corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
 			},
 			result: testResult{
 				restoreJobExists: false,
@@ -4195,8 +4241,8 @@ func TestPrepareForRestore(t *testing.T) {
 						naming.GenerateStartupInstance(cluster, &cluster.Spec.InstanceSets[0]).Name)
 				}
 
-				leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{}
-				currentEndpoints := []corev1.Endpoints{}
+				leaderEP, dcsEP, failoverEP := corev1.Endpoints{}, corev1.Endpoints{}, corev1.Endpoints{} //nolint:staticcheck // SA1019: matches production code
+				currentEndpoints := []corev1.Endpoints{}                                                  //nolint:staticcheck // SA1019
 				if err := r.Client.Get(ctx, naming.AsObjectKey(naming.PatroniLeaderEndpoints(cluster)),
 					&leaderEP); err != nil {
 					assert.NilError(t, client.IgnoreNotFound(err))
@@ -4792,4 +4838,87 @@ func TestPgBackRestCACert(t *testing.T) {
 		_, err := pgBackRestCACert(nil, &corev1.Secret{}, &corev1.Secret{})
 		assert.ErrorContains(t, err, "did not return a CA certificate")
 	})
+}
+
+// K8SPG-992
+func TestManualBackupJobNeeded(t *testing.T) {
+	backup := func(f func(*v2.PerconaPGBackup)) *v2.PerconaPGBackup {
+		b := &v2.PerconaPGBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "backup1", Namespace: "postgres-operator"},
+			Spec: v2.PerconaPGBackupSpec{
+				PGCluster: "hippo",
+				RepoName:  new("repo1"),
+			},
+		}
+		if f != nil {
+			f(b)
+		}
+		return b
+	}
+
+	for _, tt := range []struct {
+		name     string
+		pgBackup *v2.PerconaPGBackup
+		expected bool
+	}{{
+		name:     "no PerconaPGBackup",
+		expected: false,
+	}, {
+		name:     "new backup without a Job",
+		pgBackup: backup(nil),
+		expected: true,
+	}, {
+		name: "starting backup without a Job",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupStarting
+		}),
+		expected: true,
+	}, {
+		name: "backup that already had a Job",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupRunning
+			b.Status.JobName = "hippo-backup-abcd"
+		}),
+		expected: false,
+	}, {
+		name: "backup for another cluster",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Spec.PGCluster = "elephant"
+		}),
+		expected: false,
+	}, {
+		name: "backup being deleted",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.DeletionTimestamp = new(metav1.Now())
+			b.Finalizers = []string{"internal.percona.com/delete-backup"}
+		}),
+		expected: false,
+	}, {
+		name: "failed backup",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupFailed
+		}),
+		expected: false,
+	}, {
+		name: "succeeded backup",
+		pgBackup: backup(func(b *v2.PerconaPGBackup) {
+			b.Status.State = v2.BackupSucceeded
+		}),
+		expected: false,
+	}} {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(runtime.Scheme)
+			if tt.pgBackup != nil {
+				builder = builder.WithObjects(tt.pgBackup)
+			}
+
+			cluster := &v1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "hippo", Namespace: "postgres-operator"},
+			}
+
+			needed, err := manualBackupJobNeeded(t.Context(), builder.Build(), cluster, "backup1")
+			assert.NilError(t, err)
+			assert.Equal(t, needed, tt.expected)
+		})
+	}
 }

@@ -1,31 +1,47 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
 commands:
-  - script: |-
+  - timeout: 300
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
 
-      primary=$(get_pod_by_role pg-tde-wal-encrypt primary name)
-      echo "Primary pod: ${primary}"
-      data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      # enabling WAL encryption restarts the postgres process, so both the primary
+      # election and the query itself can fail while the instances come back up
+      read_from_primary() {
+        local primary
+        primary=$(get_pod_by_role pg-tde-wal-encrypt primary name)
+        echo "Primary pod: ${primary}"
+        [[ -n ${primary} ]] || return 1
+        data=$(kubectl exec ${primary} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      }
+
+      read_from_pod() {
+        local pod=$1
+        data=$(kubectl exec ${pod} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+      }
+
+      retry 12 5 read_from_primary
       kubectl create configmap -n "${NAMESPACE}" 14-read-from-primary --from-literal=data="${data}"
 
       t=1
       for i in $(kubectl get pods -n "${NAMESPACE}" -l postgres-operator.crunchydata.com/cluster=pg-tde-wal-encrypt,postgres-operator.crunchydata.com/role=replica -o jsonpath='{.items[*].metadata.name}'); do
         echo "Replica pod: ${i}"
-        data=$(kubectl exec ${i} -n "${NAMESPACE}" -- bash -c 'psql -q -t -d myapp -c "SELECT * from myTable;"')
+        retry 12 5 read_from_pod "${i}"
         kubectl create configmap -n "${NAMESPACE}" 14-read-from-replica-${t} --from-literal=data="${data}"
         t=$((t+1))
       done
 
       # the backup was taken with the rotated vault credentials, so the restored
       # cluster must still be able to reach the principal key
-      run_psql_command \
-        "SELECT pg_tde_verify_key();" \
-        "$(get_psql_uri pg-tde-wal-encrypt postgres)/myapp"
+      verify_key() {
+        run_psql_command \
+          "SELECT pg_tde_verify_key();" \
+          "$(get_psql_uri pg-tde-wal-encrypt postgres)/myapp"
+      }
+      retry 12 5 verify_key
 
       # K8SPG-911: the restore Job renames the data directory on its way out and Patroni
       # moves it back, so check the keyring link still resolves afterwards.

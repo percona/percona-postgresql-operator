@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -170,7 +170,7 @@ func pod(
 	// Check the configmap to see  if we think TLS is enabled
 	// If so, update the readiness check scheme to HTTPS
 	if strings.Contains(gunicornData, "certfile") && strings.Contains(gunicornData, "keyfile") {
-		readinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		readinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
 	}
 	container.ReadinessProbe = readinessProbe
 

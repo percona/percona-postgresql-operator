@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func init() {
@@ -140,7 +140,7 @@ type SnapshotStatus struct {
 }
 
 // +kubebuilder:validation:Type=string
-type PITRestoreDateTime struct {
+type PITRestoreDateTime struct { //nolint:recvcheck
 	*metav1.Time `json:",inline"`
 }
 
@@ -184,7 +184,7 @@ func (t PITRestoreDateTime) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.Time.Format("2006-01-02 15:04:05.000000-0700"))
+	return json.Marshal(t.Format("2006-01-02 15:04:05.000000-0700"))
 }
 
 type PGBackupStorageType string

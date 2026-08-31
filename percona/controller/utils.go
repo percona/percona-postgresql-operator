@@ -8,13 +8,15 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 )
 
 // jobCompleted returns "true" if the Job provided completed successfully.  Otherwise it returns
@@ -27,6 +29,21 @@ func JobCompleted(job *batchv1.Job) bool {
 		}
 	}
 	return false
+}
+
+func RemoveKeepJobFinalizer(ctx context.Context, cl client.Client, job *batchv1.Job) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		j := new(batchv1.Job)
+		if err := cl.Get(ctx, client.ObjectKeyFromObject(job), j); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+
+		if !controllerutil.RemoveFinalizer(j, pNaming.FinalizerKeepJob) {
+			return nil
+		}
+
+		return cl.Update(ctx, j)
+	})
 }
 
 // jobFailed returns "true" if the Job provided has failed.  Otherwise it returns "false".

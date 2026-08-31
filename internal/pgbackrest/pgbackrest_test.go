@@ -16,8 +16,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestStanzaCreateOrUpgrade(t *testing.T) {
@@ -92,7 +92,7 @@ fi
 	assert.NilError(t, os.WriteFile(file, []byte(shellCheckScript), 0o600))
 
 	// Expect shellcheck to be happy.
-	cmd := exec.Command(shellcheck, "--enable=all", file)
+	cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 	output, err := cmd.CombinedOutput()
 	assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 }

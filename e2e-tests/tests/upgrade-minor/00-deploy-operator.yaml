@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
+timeout: 300
 commands:
   - script: |-
       set -o errexit
@@ -8,7 +8,36 @@ commands:
 
       source ../../functions
       init_temp_dir # do this only in the first TestStep
+      destroy_cert_manager 
 
       git_tag="v$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
       deploy_operator_gh $git_tag
       deploy_client
+
+      # minio + pgbackrest credentials for repo2 (cross-version backup/restore)
+      kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret \
+        -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/minio.key" \
+        -out "${TEMP_DIR}/minio.crt" \
+        -subj "/CN=minio-service"
+      kubectl -n "${NAMESPACE}" create secret generic minio-tls \
+        --from-file=public.crt="${TEMP_DIR}/minio.crt" \
+        --from-file=private.key="${TEMP_DIR}/minio.key"
+
+      deploy_minio minio-service minio-tls
+
+      cat > "${TEMP_DIR}/pgbackrest-minio.ini" << INI
+      [global]
+      repo2-s3-key=${access_key}
+      repo2-s3-key-secret=${secret_key}
+      INI
+      kubectl -n "${NAMESPACE}" create secret generic upgrade-minor-pgbackrest-secrets \
+        --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-minio.ini"
+
+      kubectl -n "${NAMESPACE}" create configmap upgrade-minor-init-sql \
+        --from-literal=init.sql='CREATE SCHEMA IF NOT EXISTS app;'

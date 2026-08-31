@@ -16,12 +16,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var allowedWALLevels = []string{"logical", "replica"}
@@ -43,7 +43,7 @@ func init() {
 // +operator-sdk:csv:customresourcedefinitions:resources={{ConfigMap,v1},{Secret,v1},{Service,v1},{CronJob,v1beta1},{Deployment,v1},{Job,v1},{StatefulSet,v1},{PersistentVolumeClaim,v1}}
 //
 // PerconaPGCluster is the CRD that defines a Percona PG Cluster
-type PerconaPGCluster struct {
+type PerconaPGCluster struct { //nolint:recvcheck
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
@@ -109,7 +109,7 @@ type PerconaPGClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=18
+	// +kubebuilder:validation:Maximum=19
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -493,6 +493,23 @@ func (cr *PerconaPGCluster) Validate() error {
 	if ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatMonitor, false) &&
 		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
 		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
+	}
+	// Extension packages are not built for PostgreSQL 19 (beta) yet; loading them
+	// via shared_preload_libraries would make postgres fail to start.
+	// pgAudit is the exception: the PG 19 community image compiles it from source.
+	// Remove this check once PostgreSQL 19 goes GA and the extensions are available.
+	if cr.Spec.PostgresVersion >= 19 {
+		for _, ext := range []struct {
+			name    string
+			enabled *bool
+		}{
+			{"pg_cron", cr.Spec.Extensions.PGCron.Enabled},
+			{"set_user", cr.Spec.Extensions.SetUser.Enabled},
+		} {
+			if ptr.Deref(ext.enabled, false) {
+				return errors.Errorf("spec.extensions.%s.enabled cannot be set for PostgreSQL %d: extension packages are not built for beta releases", ext.name, cr.Spec.PostgresVersion)
+			}
+		}
 	}
 	if err := cr.ValidateDynamicConfiguration(); err != nil {
 		return err
@@ -966,7 +983,7 @@ type Patroni struct {
 
 // Backups struct.
 // +kubebuilder:validation:XValidation:rule="(has(self.enabled) && self.enabled == false) || (has(self.pgbackrest.repos) && size(self.pgbackrest.repos) > 0)",message="At least one repository must be configured when backups are enabled"
-type Backups struct {
+type Backups struct { //nolint:recvcheck
 	// Enabled controls whether backups are enabled for the cluster.
 	// Defaulted to true by the operator for crVersion >= 3.1.0.
 	// +optional
@@ -1408,7 +1425,7 @@ func (p PGInstanceSets) ToCrunchy() []crunchyv1beta1.PostgresInstanceSetSpec {
 	return set
 }
 
-type PGInstanceSetSpec struct {
+type PGInstanceSetSpec struct { //nolint:recvcheck
 	// +optional
 	Metadata *crunchyv1beta1.Metadata `json:"metadata,omitempty"`
 

@@ -15,13 +15,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/pgbackrest"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/pgbackrest"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 func (r *PGClusterReconciler) reconcileBackups(ctx context.Context, cr *v2.PerconaPGCluster) error {
@@ -133,6 +133,30 @@ func (r *PGClusterReconciler) cleanupOutdatedBackups(ctx context.Context, cr *v2
 			log.Info("Deleting outdated backup", "backup name", pgBackup.Name)
 		}
 	}
+	return nil
+}
+
+// removeStaleBackupAnnotation removes the manual backup annotation when the PerconaPGBackup is gone.
+// Otherwise crunchy would start a backup job that no PerconaPGBackup owns.
+func (r *PGClusterReconciler) removeStaleBackupAnnotation(ctx context.Context, cr *v2.PerconaPGCluster) error {
+	backupName := cr.Annotations[naming.PGBackRestBackup]
+	if backupName == "" {
+		return nil
+	}
+
+	pgBackup := new(v2.PerconaPGBackup)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: backupName, Namespace: cr.Namespace}, pgBackup); err != nil {
+		if k8serrors.IsNotFound(err) {
+			delete(cr.Annotations, naming.PGBackRestBackup)
+			return nil
+		}
+		return errors.Wrapf(err, "get PerconaPGBackup %s", backupName)
+	}
+
+	if pgBackup.Spec.PGCluster != cr.Name {
+		delete(cr.Annotations, naming.PGBackRestBackup)
+	}
+
 	return nil
 }
 

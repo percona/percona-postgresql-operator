@@ -1,0 +1,50 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      lower_ver="$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
+      curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${lower_ver}/deploy/cr.yaml" >"${TEMP_DIR}/cr_lower.yaml"
+
+      pg_ver=$PG_VER
+      pg_exists=$(curl -s https://check.percona.com/versions/v1/pg-operator/${lower_ver} | jq '.versions[].matrix.postgresql | with_entries(select(.key | startswith("'$pg_ver'"))) | length')
+      if [ $pg_exists -eq 0 ]; then
+          pg_ver=$((pg_ver - 1))
+      fi
+      echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
+
+      backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
+      pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
+      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+      operator_image=$(get_version_images $lower_ver OPERATOR)
+
+      yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
+        "${TEMP_DIR}/cr_lower.yaml" ../../tests/operator-upgrade-extensions/conf/operator-upgrade-extensions.yaml \
+        >"${TEMP_DIR}/cr.yaml"
+
+      yq -i eval '
+          .metadata.name = "'${test_name}'" |
+          .metadata.labels = {"e2e":"'${test_name}'"} |
+          .spec.postgresVersion = '$pg_ver' |
+          .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
+          .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
+          .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'"' "${TEMP_DIR}/cr.yaml"
+
+      # extensions installer runs from the operator image of the RELEASED version
+      $sed -i "s|<extensions-image>|${REGISTRY_NAME_FULL}${operator_image}|g" "${TEMP_DIR}/cr.yaml"
+
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr.yaml"
+
+      # released-CRD canary: unknown fields are silently pruned — fail loudly instead
+      applied_builtin=$(kubectl -n "${NAMESPACE}" get perconapgcluster ${test_name} -o jsonpath='{.spec.extensions.builtin}')
+      for ext in pg_stat_monitor pg_audit pgvector pg_repack; do
+          if ! echo "$applied_builtin" | grep -q "\"$ext\":true"; then
+              echo "ERROR: builtin extension '$ext' was pruned by the released CRD: $applied_builtin"
+              exit 1
+          fi
+      done
