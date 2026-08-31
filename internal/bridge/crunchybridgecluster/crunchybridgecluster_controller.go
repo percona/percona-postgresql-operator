@@ -21,10 +21,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/bridge"
-	pgoRuntime "github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/bridge"
+	pgoRuntime "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // CrunchyBridgeClusterReconciler reconciles a CrunchyBridgeCluster object
@@ -79,7 +79,7 @@ func (r *CrunchyBridgeClusterReconciler) SetupWithManager(
 func (r *CrunchyBridgeClusterReconciler) setControllerReference(
 	owner *v1beta1.CrunchyBridgeCluster, controlled client.Object,
 ) error {
-	return controllerutil.SetControllerReference(owner, controlled, r.Client.Scheme())
+	return controllerutil.SetControllerReference(owner, controlled, r.Scheme())
 }
 
 //+kubebuilder:rbac:groups="upstream.pgv2.percona.com",resources="crunchybridgeclusters",verbs={get,patch,update}
@@ -669,7 +669,7 @@ func (r *CrunchyBridgeClusterReconciler) GetSecretKeys(
 	}}
 
 	err := errors.WithStack(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(existing), existing))
+		r.Get(ctx, client.ObjectKeyFromObject(existing), existing))
 
 	if err == nil {
 		if existing.Data["key"] != nil && existing.Data["team"] != nil {
@@ -692,7 +692,7 @@ func (r *CrunchyBridgeClusterReconciler) deleteControlled(
 		version := object.GetResourceVersion()
 		exactly := client.Preconditions{UID: &uid, ResourceVersion: &version}
 
-		return r.Client.Delete(ctx, object, exactly)
+		return r.Delete(ctx, object, exactly)
 	}
 
 	return nil

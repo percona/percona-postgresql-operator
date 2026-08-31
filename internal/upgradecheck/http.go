@@ -17,7 +17,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 )
 
 var (
@@ -72,7 +72,7 @@ func checkForUpgrades(ctx context.Context, url, versionString string, backoff wa
 	var headerPayloadStruct *clientUpgradeData
 
 	// Prep request
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err == nil {
 		// generateHeader always returns some sort of struct, using defaults/nil values
 		// in case some of the checks return errors
