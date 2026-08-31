@@ -1,28 +1,50 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 300
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
 
-      primary=$(get_pod_by_role major-upgrade-17-to-18 primary name)
-      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages --missing-stats-only
-      kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
-      kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
+      # the major upgrade restarts the postgres process, so both the primary
+      # election and the queries can fail while the instances come back up
+      finalize_upgrade() {
+        local primary
+        primary=$(get_pod_by_role major-upgrade-17-to-18 primary name)
+        echo "Primary pod: ${primary}"
+        [[ -n ${primary} ]] || return 1
+        kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-in-stages --missing-stats-only
+        kubectl -n ${NAMESPACE} exec ${primary} -- vacuumdb --all --analyze-only
+        kubectl -n ${NAMESPACE} exec ${primary} -- /pgdata/delete_old_cluster.sh
+      }
 
-      result=$(run_psql_command \
-        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
-        "$(get_psql_uri major-upgrade-17-to-18 postgres)")
+      verify_extension() {
+        result=$(run_psql_command \
+          "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+          "$(get_psql_uri major-upgrade-17-to-18 postgres)")
+      }
+
+      verify_encryption() {
+        result=$(run_psql_command \
+          "SELECT pg_tde_is_encrypted('myapp');" \
+          "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp")
+      }
+
+      verify_key() {
+        run_psql_command \
+          "SELECT pg_tde_verify_key();" \
+          "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp"
+      }
+
+      retry 12 5 finalize_upgrade
+
+      retry 12 5 verify_extension
       kubectl -n "${NAMESPACE}" create configmap 05-verify-extension --from-literal=pg_tde_extension="$result"
 
-      result=$(run_psql_command \
-        "SELECT pg_tde_is_encrypted('myapp');" \
-        "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp")
+      retry 12 5 verify_encryption
       kubectl -n "${NAMESPACE}" create configmap 05-verify-encryption --from-literal=pg_tde_is_encrypted="$result"
 
       # pg_tde_verify_key will throw an error if it fails
-      run_psql_command \
-        "SELECT pg_tde_verify_key();" \
-        "$(get_psql_uri major-upgrade-17-to-18 postgres)/myapp"
+      retry 12 5 verify_key
