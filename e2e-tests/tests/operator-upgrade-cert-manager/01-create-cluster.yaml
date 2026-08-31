@@ -46,4 +46,4 @@ commands:
       $sed -i "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" "${TEMP_DIR}/cr_lower.yaml"
       $sed -i 's|repo2-s3-verify-tls: n$|repo2-s3-verify-tls: "n"|' "${TEMP_DIR}/cr_lower.yaml"
 
-      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"
+      add_arch_to_pg "${TEMP_DIR}/cr_lower.yaml" | kubectl -n "${NAMESPACE}" apply -f -

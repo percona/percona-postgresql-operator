@@ -38,6 +38,7 @@ commands:
       # extensions installer runs from the operator image of the RELEASED version
       $sed -i "s|<extensions-image>|${REGISTRY_NAME_FULL}${operator_image}|g" "${TEMP_DIR}/cr.yaml"
 
+      add_arch_to_pg "${TEMP_DIR}/cr.yaml" >"${TEMP_DIR}/cr.yaml.arch" && mv "${TEMP_DIR}/cr.yaml.arch" "${TEMP_DIR}/cr.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr.yaml"
 
       # released-CRD canary: unknown fields are silently pruned — fail loudly instead

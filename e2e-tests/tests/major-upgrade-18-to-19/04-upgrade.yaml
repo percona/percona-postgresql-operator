@@ -10,7 +10,7 @@ commands:
 
       source ../../functions
 
-      kubectl apply -n ${NAMESPACE} -f - <<-EOF
+      add_arch_to_pg_upgrade - <<-EOF | kubectl apply -n ${NAMESPACE} -f -
         apiVersion: pgv2.percona.com/v2
         kind: PerconaPGUpgrade
         metadata:

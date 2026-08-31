@@ -53,4 +53,5 @@ commands:
 
       yq '.spec.crVersion' "${TEMP_DIR}/cr_lower.yaml" >"${TEMP_DIR}/cr_ver_released.txt"
 
+      add_arch_to_pg "${TEMP_DIR}/cr.yaml" >"${TEMP_DIR}/cr.yaml.arch" && mv "${TEMP_DIR}/cr.yaml.arch" "${TEMP_DIR}/cr.yaml"
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr.yaml"

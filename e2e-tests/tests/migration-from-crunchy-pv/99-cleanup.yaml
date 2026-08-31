@@ -18,9 +18,9 @@ commands:
 
       # Remove Crunchy source cluster if it still exists (e.g. test failed
       # before step 03 could delete it).
-      kubectl patch postgrescluster crunchy-source -n "${NAMESPACE}" \
+      kubectl patch postgrescluster.postgres-operator.crunchydata.com crunchy-source -n "${NAMESPACE}" \
         --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
-      kubectl delete postgrescluster crunchy-source -n "${NAMESPACE}" \
+      kubectl delete postgrescluster.postgres-operator.crunchydata.com crunchy-source -n "${NAMESPACE}" \
         --ignore-not-found || true
 
       # pgo was already uninstalled in step 03; this is a safety net in case

@@ -17,6 +17,17 @@ arch_scheduling_enabled() {
 	[[ -n ${ARCH} ]]
 }
 
+# S3 object is <name>-pg<VER>-<version>.tar.gz.
+# ARM packages use a -arm64 version suffix so amd64 objects stay unchanged.
+custom_ext_version() {
+	local version=$1
+	if [[ ${ARCH} == arm64 ]]; then
+		echo "${version}-arm64"
+	else
+		echo "${version}"
+	fi
+}
+
 if arch_scheduling_enabled; then
 	echo "ARCH=${ARCH}: adding architecture nodeSelector/affinity and toleration to e2e workloads"
 fi
@@ -54,42 +65,64 @@ add_arch_to_pg() {
 	fi
 
 	ARCH="${ARCH}" yq eval '
-		(select(.kind == "PerconaPGCluster").spec.instances[]?) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("instances")) | .spec.instances[]?) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster").spec.proxy.pgBouncer | select(. != null)) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("logicalReplicas")).spec.logicalReplicas[]?) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster").spec.backups.pgbackrest.repoHost | select(. != null)) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("proxy")) | select(.spec.proxy | has("pgBouncer")) | .spec.proxy.pgBouncer) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster").spec.backups.pgbackrest | select(. != null)).jobs |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | select(.spec.backups.pgbackrest | has("repoHost")) | .spec.backups.pgbackrest.repoHost) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | .spec.backups.pgbackrest).jobs |= (
 			. = (. // {}) |
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster").spec.backups.pgbackrest.restore | select(. != null)) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | select(.spec.backups.pgbackrest | has("restore")) | .spec.backups.pgbackrest.restore) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("postgresCluster")) | .spec.dataSource.postgresCluster) |= (
+		(select(.kind == "PerconaPGCluster") | select(.spec | has("backups")) | select(.spec.backups | has("volumeSnapshots")) | .spec.backups.volumeSnapshots).jobs |= (
+			. = (. // {}) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("postgresCluster")) | .spec.dataSource.postgresCluster) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("pgbackrest")) | .spec.dataSource.pgbackrest) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("pgbackrest")) | .spec.dataSource.pgbackrest) |= (
 			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgDataVolume")) | .spec.dataSource.volumes.pgDataVolume) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgDataVolume")) | .spec.dataSource.volumes.pgDataVolume) |= (
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgWALVolume")) | .spec.dataSource.volumes.pgWALVolume) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgWALVolume")) | .spec.dataSource.volumes.pgWALVolume) |= (
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		) |
-		(select(.kind == "PerconaPGCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgBackRestVolume")) | .spec.dataSource.volumes.pgBackRestVolume) |= (
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgBackRestVolume")) | .spec.dataSource.volumes.pgBackRestVolume) |= (
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		)
+	' "$@"
+}
+
+add_arch_to_pg_upgrade() {
+	if ! arch_scheduling_enabled; then
+		cat "$@"
+		return
+	fi
+
+	ARCH="${ARCH}" yq eval '
+		(select(.kind == "PerconaPGUpgrade").spec) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
 			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
 		)
 	' "$@"
@@ -115,6 +148,13 @@ helm_arch_args() {
 
 arch_run_overrides() {
 	printf '{"spec":{"nodeSelector":{"kubernetes.io/arch":"%s"},"tolerations":[{"key":"kubernetes.io/arch","operator":"Equal","value":"%s","effect":"NoSchedule"}]}}' "${ARCH}" "${ARCH}"
+}
+
+merge_patch_pg() {
+	local name=$1
+	local patch
+	patch=$(add_arch_to_pg - | yq -o=json '{"spec": .spec}')
+	kubectl -n "${NAMESPACE}" patch pg "${name}" --type=merge --patch "${patch}"
 }
 
 function create_namespace() {

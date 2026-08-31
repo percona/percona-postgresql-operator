@@ -16,18 +16,17 @@ commands:
       # left nothing of the old incarnation behind, so this is an ordinary first
       # bootstrap. One replica is enough here: both methods are already covered
       # above, and this seeds from the repository the restore came from.
-      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=merge --patch '{
-        "spec": {
-          "logicalReplicas": [
-            {
-              "name": "analytics",
-              "databases": ["logical-replica"],
-              "bootstrapMethod": "pgbackrest",
-              "dataVolumeClaimSpec": {
-                "accessModes": ["ReadWriteOnce"],
-                "resources": {"requests": {"storage": "1Gi"}}
-              }
-            }
-          ]
-        }
-      }'
+      merge_patch_pg logical-replica <<EOF
+      apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      spec:
+        logicalReplicas:
+        - name: analytics
+          databases: ["logical-replica"]
+          bootstrapMethod: pgbackrest
+          dataVolumeClaimSpec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 1Gi
+      EOF
