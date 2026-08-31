@@ -191,6 +191,88 @@ func TestLogicalReplicasToCrunchy(t *testing.T) {
 		}
 		assert.Equal(t, 1, count)
 	})
+
+	t.Run("keeps the default user and database", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		// The crunchy layer skips its own default as soon as spec.users has an
+		// entry, and logicalrepl owns no database, so without this the cluster
+		// ends up with no database at all and the replica has nothing to seed.
+		var found *crunchyv1beta1.PostgresUserSpec
+		for i := range actual.Spec.Users {
+			if actual.Spec.Users[i].Name == PostgresIdentifierOf(cr.Name) {
+				found = &actual.Spec.Users[i]
+			}
+		}
+		require.NotNil(t, found)
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{PostgresIdentifierOf(cr.Name)},
+			found.Databases)
+	})
+
+	t.Run("does not add a default user beside declared ones", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Spec.Users = []crunchyv1beta1.PostgresUserSpec{{Name: "app"}}
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		names := make([]crunchyv1beta1.PostgresIdentifier, len(actual.Spec.Users))
+		for i, user := range actual.Spec.Users {
+			names[i] = user.Name
+		}
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{
+			"app", PostgresIdentifierOf(UserLogicalReplication),
+		}, names)
+	})
+
+	t.Run("adds no default user when the cluster name is not an identifier", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Name = "my.cluster"
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		names := make([]crunchyv1beta1.PostgresIdentifier, len(actual.Spec.Users))
+		for i, user := range actual.Spec.Users {
+			names[i] = user.Name
+		}
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{
+			PostgresIdentifierOf(UserLogicalReplication),
+		}, names)
+	})
+}
+
+func TestLogicalReplicaSpecDeepCopyProbes(t *testing.T) {
+	spec := LogicalReplicaSpec{
+		Name:           "analytics",
+		StartupProbe:   &corev1.Probe{FailureThreshold: 60},
+		LivenessProbe:  &corev1.Probe{PeriodSeconds: 45},
+		ReadinessProbe: &corev1.Probe{FailureThreshold: 7},
+	}
+
+	copied := spec.DeepCopy()
+
+	assert.Equal(t, spec.StartupProbe, copied.StartupProbe)
+	assert.Equal(t, spec.LivenessProbe, copied.LivenessProbe)
+	assert.Equal(t, spec.ReadinessProbe, copied.ReadinessProbe)
+
+	require.NotSame(t, spec.StartupProbe, copied.StartupProbe)
+	require.NotSame(t, spec.LivenessProbe, copied.LivenessProbe)
+	require.NotSame(t, spec.ReadinessProbe, copied.ReadinessProbe)
+
+	copied.StartupProbe.FailureThreshold = 1
+	copied.LivenessProbe.PeriodSeconds = 1
+	copied.ReadinessProbe.FailureThreshold = 1
+
+	assert.Equal(t, int32(60), spec.StartupProbe.FailureThreshold)
+	assert.Equal(t, int32(45), spec.LivenessProbe.PeriodSeconds)
+	assert.Equal(t, int32(7), spec.ReadinessProbe.FailureThreshold)
 }
 
 // PostgresIdentifierOf is a readability helper for the tests above.

@@ -103,6 +103,23 @@ func TestAuthFileContentsAdminUser(t *testing.T) {
 	})
 }
 
+func TestAuthFileContentsReservedLogicalReplicationUser(t *testing.T) {
+	t.Parallel()
+
+	// Reserved regardless of the admin user's crVersion gate, and regardless of
+	// whether the cluster currently has logical replicas.
+	for _, adminPassword := range []string{"", "admin-password"} {
+		_, err := authFileContents("pgbouncer-password", adminPassword, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "custom-users"},
+			Data: map[string][]byte{
+				"logicalrepl": []byte("hijacked"),
+			},
+		})
+		assert.ErrorContains(t, err, `"logicalrepl"`)
+		assert.ErrorContains(t, err, "reserved operator user")
+	}
+}
+
 func TestAuthFileContentsUsers(t *testing.T) {
 	t.Parallel()
 

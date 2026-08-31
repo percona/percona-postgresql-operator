@@ -539,6 +539,48 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.False(t, contains(userNames, UserMonitoring))
 			},
 		},
+		"keeps the default user when only reserved ones are declared": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       "2.5.0",
+					PostgresVersion: 15,
+					Users: []crunchyv1beta1.PostgresUserSpec{
+						{Name: UserMonitoring},
+					},
+					PMM: &PMMSpec{Enabled: true},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{
+								{Name: "repo1"},
+							},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, result *crunchyv1beta1.PostgresCluster, original *PerconaPGCluster) {
+				userNames := make([]string, len(result.Spec.Users))
+				for i, user := range result.Spec.Users {
+					userNames[i] = string(user.Name)
+				}
+				// The declared monitor is dropped and the injected one takes its
+				// place, so the cluster still has no user of its own and keeps
+				// the default the crunchy layer would otherwise create.
+				assert.Equal(t, []string{original.Name, UserMonitoring}, userNames)
+			},
+		},
 		"handles nil proxy": {
 			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
