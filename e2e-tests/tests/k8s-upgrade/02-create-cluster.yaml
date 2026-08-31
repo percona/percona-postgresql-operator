@@ -8,4 +8,12 @@ commands:
 
       source ../../functions
 
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
       get_cr "k8s-upgrade" ${RANDOM} | kubectl -n "${NAMESPACE}" apply -f -
