@@ -16676,6 +16676,9 @@ spec:
                     - userProvidedOnly
                     - operatorProvidedOnly
                     type: string
+                    x-kubernetes-validations:
+                    - message: certManagementPolicy is immutable
+                      rule: self == oldSelf
                   certValidityDuration:
                     type: string
                   issuerConf:
