@@ -31,7 +31,7 @@ commands:
 
       # Replication itself is unaffected by default_transaction_read_only: the
       # apply worker does not go through the executor, which enforces it.
-      # 05-stream-new-data already proved a post-conversion row arrives; assert
+      # 06-stream-new-data already proved a post-conversion row arrives; assert
       # the write above did not land either.
       data=$(run_psql \
         '\c logical-replica \\\ SELECT count(*) FROM lr_test;' \
