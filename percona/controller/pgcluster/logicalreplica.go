@@ -1171,9 +1171,7 @@ func logicalReplicaConfigVolumeMount() corev1.VolumeMount {
 	}
 }
 
-// logicalReplicaProbe returns a probe that waits for the replica's postmaster to
-// accept connections on its socket.
-func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
+func defaultProbe(delay, period, failureThreshold, successThreshold int32) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
@@ -1183,23 +1181,55 @@ func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
 		InitialDelaySeconds: delay,
 		PeriodSeconds:       period,
 		FailureThreshold:    failureThreshold,
+		SuccessThreshold:    successThreshold,
 	}
 }
 
-// logicalReplicaReadinessProbe returns the probe that takes a replica out of its
-// Service once replication has broken.
-func logicalReplicaReadinessProbe(
-	replica string, databases []string, period, failureThreshold int32,
-) *corev1.Probe {
-	probe := logicalReplicaProbe(0, period, failureThreshold)
+func overrideProbe(probe, override *corev1.Probe) *corev1.Probe {
+	if override == nil {
+		return probe
+	}
+
+	if override.InitialDelaySeconds != 0 {
+		probe.InitialDelaySeconds = override.InitialDelaySeconds
+	}
+	if override.PeriodSeconds != 0 {
+		probe.PeriodSeconds = override.PeriodSeconds
+	}
+	if override.FailureThreshold != 0 {
+		probe.FailureThreshold = override.FailureThreshold
+	}
+	if override.SuccessThreshold != 0 {
+		probe.SuccessThreshold = override.SuccessThreshold
+	}
+	if override.TimeoutSeconds != 0 {
+		probe.TimeoutSeconds = override.TimeoutSeconds
+	}
+	if override.Exec != nil {
+		probe.Exec = override.Exec
+	}
+
+	return probe
+}
+
+func startupProbe(probe *corev1.Probe) *corev1.Probe {
+	return overrideProbe(defaultProbe(5, 5, 30, 1), probe)
+}
+
+func livenessProbe(probe *corev1.Probe) *corev1.Probe {
+	return overrideProbe(defaultProbe(30, 20, 6, 1), probe)
+}
+
+func readinessProbe(replica string, databases []string, probe *corev1.Probe) *corev1.Probe {
+	readiness := defaultProbe(0, 5, 2, 1)
 
 	// The StatefulSet is only reconciled once the replica is seeded, so there is
 	// always at least one database here. An empty "IN ()" list is a syntax error.
 	if len(databases) == 0 {
-		return probe
+		return overrideProbe(readiness, probe)
 	}
 
-	probe.Exec.Command = []string{"bash", "-c", strings.Join([]string{
+	readiness.Exec.Command = []string{"bash", "-c", strings.Join([]string{
 		`set -euo pipefail`,
 		`pg_isready -q -h ` + shellQuote(postgres.SocketDirectory),
 		`psql -XAtqw --command=` +
@@ -1207,7 +1237,7 @@ func logicalReplicaReadinessProbe(
 			` | grep -qx t`,
 	}, "\n")}
 
-	return probe
+	return overrideProbe(readiness, probe)
 }
 
 // logicalReplicaNSSWrapperInitContainer writes the passwd and group files that
@@ -1422,9 +1452,9 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 				{Name: logicalReplicaSocketVolume, MountPath: postgres.SocketDirectory},
 				logicalReplicaConfigVolumeMount(),
 			},
-			StartupProbe:   logicalReplicaProbe(5, 5, 30),
-			ReadinessProbe: logicalReplicaReadinessProbe(spec.Name, status.Databases, 5, 2),
-			LivenessProbe:  logicalReplicaProbe(30, 20, 6),
+			StartupProbe:   startupProbe(spec.StartupProbe),
+			LivenessProbe:  livenessProbe(spec.LivenessProbe),
+			ReadinessProbe: readinessProbe(spec.Name, status.Databases, spec.ReadinessProbe),
 		}
 
 		sts.Spec.Template.Spec.InitContainers = []corev1.Container{

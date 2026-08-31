@@ -288,6 +288,18 @@ type LogicalReplicaSpec struct {
 	// Specification of the service that exposes this logical replica.
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
+
+	// StartupProbe sets the startup probe for the logical replica container.
+	// +optional
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+
+	// LivenessProbe sets the liveness probe for the logical replica container.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the logical replica container.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
 }
 
 func (cr *PerconaPGCluster) IsPaused() bool {

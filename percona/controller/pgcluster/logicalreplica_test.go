@@ -798,6 +798,51 @@ func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	})
 }
 
+func TestReconcileLogicalReplicaStatefulSetProbeOverrides(t *testing.T) {
+	ctx := context.Background()
+
+	cr := testLogicalReplicaCluster()
+	crunchyCR := &crunchyv1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace},
+	}
+	crunchyCR.Spec.PostgresVersion = 17
+
+	cl, err := buildFakeClient(ctx, cr)
+	require.NoError(t, err)
+	r := &PGClusterReconciler{Client: cl}
+
+	spec := &v2.LogicalReplicaSpec{
+		Name:           "analytics",
+		StartupProbe:   &corev1.Probe{FailureThreshold: 60},
+		LivenessProbe:  &corev1.Probe{PeriodSeconds: 45},
+		ReadinessProbe: &corev1.Probe{FailureThreshold: 7, TimeoutSeconds: 3},
+	}
+	status := &v2.LogicalReplicaStatus{Name: spec.Name, Databases: []string{"cluster1"}}
+	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status))
+
+	sts := &appsv1.StatefulSet{}
+	require.NoError(t, cl.Get(ctx, client.ObjectKey{
+		Name: logicalReplicaObjectName(cr, spec.Name), Namespace: cr.Namespace,
+	}, sts))
+
+	require.Len(t, sts.Spec.Template.Spec.Containers, 1)
+	container := sts.Spec.Template.Spec.Containers[0]
+
+	require.NotNil(t, container.StartupProbe)
+	assert.Equal(t, int32(60), container.StartupProbe.FailureThreshold)
+	assert.Equal(t, int32(5), container.StartupProbe.PeriodSeconds)
+
+	require.NotNil(t, container.LivenessProbe)
+	assert.Equal(t, int32(45), container.LivenessProbe.PeriodSeconds)
+	assert.Equal(t, int32(6), container.LivenessProbe.FailureThreshold)
+
+	require.NotNil(t, container.ReadinessProbe)
+	assert.Equal(t, int32(7), container.ReadinessProbe.FailureThreshold)
+	assert.Equal(t, int32(3), container.ReadinessProbe.TimeoutSeconds)
+	assert.Contains(t, strings.Join(container.ReadinessProbe.Exec.Command, " "),
+		shellQuote(logicalreplica.SubscriptionsEnabledQuery(spec.Name, status.Databases)))
+}
+
 func TestGenerateLogicalReplicaBootstrapJobPGBackRestConfig(t *testing.T) {
 	ctx := context.Background()
 
@@ -1527,7 +1572,7 @@ func TestBootstrapIsNotRepeated(t *testing.T) {
 }
 
 func TestLogicalReplicaReadinessProbe(t *testing.T) {
-	probe := logicalReplicaReadinessProbe("analytics", []string{"one", "two"}, 10, 3)
+	probe := readinessProbe("analytics", []string{"one", "two"}, nil)
 	command := strings.Join(probe.Exec.Command, " ")
 
 	assert.Contains(t, command, "pg_isready -q -h "+shellQuote(postgres.SocketDirectory))
@@ -1535,13 +1580,131 @@ func TestLogicalReplicaReadinessProbe(t *testing.T) {
 	// single-quoted SQL literals.
 	assert.Contains(t, command,
 		shellQuote(logicalreplica.SubscriptionsEnabledQuery("analytics", []string{"one", "two"})))
-	assert.Equal(t, int32(10), probe.PeriodSeconds)
-	assert.Equal(t, int32(3), probe.FailureThreshold)
+	assert.Equal(t, int32(5), probe.PeriodSeconds)
+	assert.Equal(t, int32(2), probe.FailureThreshold)
 
 	// A replica whose databases are not resolved yet has no subscriptions to
 	// check, and an empty "IN ()" list would make the probe fail for good.
 	assert.Equal(t, []string{"pg_isready", "-h", postgres.SocketDirectory},
-		logicalReplicaReadinessProbe("analytics", nil, 10, 3).Exec.Command)
+		readinessProbe("analytics", nil, nil).Exec.Command)
+}
+
+func TestLogicalReplicaProbeDefaults(t *testing.T) {
+	pgIsReady := []string{"pg_isready", "-h", postgres.SocketDirectory}
+
+	for name, tt := range map[string]struct {
+		probe            *corev1.Probe
+		delay            int32
+		period           int32
+		failureThreshold int32
+	}{
+		"startup":   {startupProbe(nil), 5, 5, 30},
+		"liveness":  {livenessProbe(nil), 30, 20, 6},
+		"readiness": {readinessProbe("analytics", nil, nil), 0, 5, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, tt.probe.Exec)
+			assert.Equal(t, pgIsReady, tt.probe.Exec.Command)
+			assert.Equal(t, tt.delay, tt.probe.InitialDelaySeconds)
+			assert.Equal(t, tt.period, tt.probe.PeriodSeconds)
+			assert.Equal(t, tt.failureThreshold, tt.probe.FailureThreshold)
+			assert.Equal(t, int32(1), tt.probe.SuccessThreshold)
+			assert.Equal(t, int32(0), tt.probe.TimeoutSeconds)
+		})
+	}
+}
+
+func TestOverrideProbe(t *testing.T) {
+	base := func() *corev1.Probe { return defaultProbe(1, 2, 3, 4) }
+
+	t.Run("no override keeps the default", func(t *testing.T) {
+		assert.Equal(t, base(), overrideProbe(base(), nil))
+		assert.Equal(t, base(), overrideProbe(base(), new(corev1.Probe)))
+	})
+
+	t.Run("every timing comes from the override", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{
+			InitialDelaySeconds: 11,
+			PeriodSeconds:       12,
+			FailureThreshold:    13,
+			SuccessThreshold:    14,
+			TimeoutSeconds:      15,
+		})
+
+		assert.Equal(t, int32(11), probe.InitialDelaySeconds)
+		assert.Equal(t, int32(12), probe.PeriodSeconds)
+		assert.Equal(t, int32(13), probe.FailureThreshold)
+		assert.Equal(t, int32(14), probe.SuccessThreshold)
+		assert.Equal(t, int32(15), probe.TimeoutSeconds)
+		assert.Equal(t, base().Exec.Command, probe.Exec.Command)
+	})
+
+	t.Run("a field left at zero keeps the default", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{PeriodSeconds: 12})
+
+		assert.Equal(t, int32(12), probe.PeriodSeconds)
+		assert.Equal(t, int32(1), probe.InitialDelaySeconds)
+		assert.Equal(t, int32(3), probe.FailureThreshold)
+		assert.Equal(t, int32(4), probe.SuccessThreshold)
+	})
+
+	t.Run("an exec override replaces the command", func(t *testing.T) {
+		command := []string{"bash", "-c", "true"}
+		probe := overrideProbe(base(), &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: command}},
+		})
+
+		assert.Equal(t, command, probe.Exec.Command)
+	})
+
+	t.Run("other handlers are ignored", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: "/health"}},
+		})
+
+		assert.Nil(t, probe.HTTPGet)
+		assert.Equal(t, base().Exec.Command, probe.Exec.Command)
+	})
+}
+
+func TestLogicalReplicaProbeOverrides(t *testing.T) {
+	databases := []string{"one", "two"}
+	override := &corev1.Probe{
+		InitialDelaySeconds: 11,
+		PeriodSeconds:       12,
+		FailureThreshold:    13,
+		TimeoutSeconds:      15,
+	}
+
+	for name, probe := range map[string]*corev1.Probe{
+		"startup":   startupProbe(override),
+		"liveness":  livenessProbe(override),
+		"readiness": readinessProbe("analytics", databases, override),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, int32(11), probe.InitialDelaySeconds)
+			assert.Equal(t, int32(12), probe.PeriodSeconds)
+			assert.Equal(t, int32(13), probe.FailureThreshold)
+			assert.Equal(t, int32(15), probe.TimeoutSeconds)
+			assert.Equal(t, int32(1), probe.SuccessThreshold)
+		})
+	}
+
+	t.Run("readiness still follows the subscriptions", func(t *testing.T) {
+		probe := readinessProbe("analytics", databases, override)
+
+		assert.Contains(t, strings.Join(probe.Exec.Command, " "),
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery("analytics", databases)))
+	})
+
+	t.Run("an exec override replaces the subscription check", func(t *testing.T) {
+		command := []string{"bash", "-c", "true"}
+		probe := readinessProbe("analytics", databases, &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: command}},
+		})
+
+		assert.Equal(t, command, probe.Exec.Command)
+	})
 }
 
 func TestLogicalReplicaPodRequiresStarted(t *testing.T) {

@@ -229,6 +229,50 @@ func TestLogicalReplicasToCrunchy(t *testing.T) {
 			"app", PostgresIdentifierOf(UserLogicalReplication),
 		}, names)
 	})
+
+	t.Run("adds no default user when the cluster name is not an identifier", func(t *testing.T) {
+		cr := logicalReplicaCR(LogicalReplicaSpec{Name: "analytics"})
+		cr.Name = "my.cluster"
+		cr.Default()
+
+		actual, err := cr.ToCrunchy(context.Background(), nil, scheme)
+		require.NoError(t, err)
+
+		names := make([]crunchyv1beta1.PostgresIdentifier, len(actual.Spec.Users))
+		for i, user := range actual.Spec.Users {
+			names[i] = user.Name
+		}
+		assert.Equal(t, []crunchyv1beta1.PostgresIdentifier{
+			PostgresIdentifierOf(UserLogicalReplication),
+		}, names)
+	})
+}
+
+func TestLogicalReplicaSpecDeepCopyProbes(t *testing.T) {
+	spec := LogicalReplicaSpec{
+		Name:           "analytics",
+		StartupProbe:   &corev1.Probe{FailureThreshold: 60},
+		LivenessProbe:  &corev1.Probe{PeriodSeconds: 45},
+		ReadinessProbe: &corev1.Probe{FailureThreshold: 7},
+	}
+
+	copied := spec.DeepCopy()
+
+	assert.Equal(t, spec.StartupProbe, copied.StartupProbe)
+	assert.Equal(t, spec.LivenessProbe, copied.LivenessProbe)
+	assert.Equal(t, spec.ReadinessProbe, copied.ReadinessProbe)
+
+	require.NotSame(t, spec.StartupProbe, copied.StartupProbe)
+	require.NotSame(t, spec.LivenessProbe, copied.LivenessProbe)
+	require.NotSame(t, spec.ReadinessProbe, copied.ReadinessProbe)
+
+	copied.StartupProbe.FailureThreshold = 1
+	copied.LivenessProbe.PeriodSeconds = 1
+	copied.ReadinessProbe.FailureThreshold = 1
+
+	assert.Equal(t, int32(60), spec.StartupProbe.FailureThreshold)
+	assert.Equal(t, int32(45), spec.LivenessProbe.PeriodSeconds)
+	assert.Equal(t, int32(7), spec.ReadinessProbe.FailureThreshold)
 }
 
 // PostgresIdentifierOf is a readability helper for the tests above.
