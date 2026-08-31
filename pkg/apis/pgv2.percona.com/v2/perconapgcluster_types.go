@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"os"
+	"regexp"
 	"slices"
 
 	gover "github.com/hashicorp/go-version"
@@ -287,6 +288,18 @@ type LogicalReplicaSpec struct {
 	// Specification of the service that exposes this logical replica.
 	// +optional
 	Expose *ServiceExpose `json:"expose,omitempty"`
+
+	// StartupProbe sets the startup probe for the logical replica container.
+	// +optional
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+
+	// LivenessProbe sets the liveness probe for the logical replica container.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe sets the readiness probe for the logical replica container.
+	// +optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
 }
 
 func (cr *PerconaPGCluster) IsPaused() bool {
@@ -317,6 +330,28 @@ func (s *LogicalReplicaSpec) BootstrapMethodOrDefault() LogicalReplicaBootstrapM
 // configured.
 func (cr *PerconaPGCluster) LogicalReplicasEnabled() bool {
 	return cr.CompareVersion("3.1.0") >= 0 && len(cr.Spec.LogicalReplicas) > 0
+}
+
+// rePostgresIdentifier is the pattern the CRD enforces on spec.users[].name.
+var rePostgresIdentifier = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
+// defaultUser returns the user and database named after the cluster that the
+// crunchy layer creates on its own when spec.users is unset. ok is false when
+// the cluster name cannot be a PostgreSQL identifier, which is exactly when the
+// crunchy layer skips the default too.
+func (cr *PerconaPGCluster) defaultUser() (crunchyv1beta1.PostgresUserSpec, bool) {
+	if len(cr.Name) > 63 || !rePostgresIdentifier.MatchString(cr.Name) {
+		return crunchyv1beta1.PostgresUserSpec{}, false
+	}
+
+	identifier := crunchyv1beta1.PostgresIdentifier(cr.Name)
+	return crunchyv1beta1.PostgresUserSpec{
+		Name:      identifier,
+		Databases: []crunchyv1beta1.PostgresIdentifier{identifier},
+		Password: &crunchyv1beta1.PostgresPasswordSpec{
+			Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
+		},
+	}, true
 }
 
 type ContainerOptions struct {
@@ -678,27 +713,23 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 		users = append(users, user)
 	}
 
+	// The crunchy layer creates a user and a database named after the cluster
+	// only when spec.users is unset, so the reserved users below would take that
+	// default away from a cluster that declares no users of its own.
+	if len(users) == 0 && (cr.PMMEnabled() || cr.LogicalReplicasEnabled()) {
+		if user, ok := cr.defaultUser(); ok {
+			users = append(users, user)
+		}
+	}
+
 	if cr.PMMEnabled() {
-		users = append(cr.Spec.Users, crunchyv1beta1.PostgresUserSpec{
+		users = append(users, crunchyv1beta1.PostgresUserSpec{
 			Name:    UserMonitoring,
 			Options: "SUPERUSER",
 			Password: &crunchyv1beta1.PostgresPasswordSpec{
 				Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
 			},
 		})
-
-		if len(cr.Spec.Users) == 0 {
-			// Add default user: <cluster-name>-pguser-<cluster-name>
-			users = append(users, crunchyv1beta1.PostgresUserSpec{
-				Name: crunchyv1beta1.PostgresIdentifier(cr.Name),
-				Databases: []crunchyv1beta1.PostgresIdentifier{
-					crunchyv1beta1.PostgresIdentifier(cr.Name),
-				},
-				Password: &crunchyv1beta1.PostgresPasswordSpec{
-					Type: crunchyv1beta1.PostgresPasswordTypeAlphaNumeric,
-				},
-			})
-		}
 	}
 
 	// SUPERUSER because pg_createsubscriber creates a publication FOR
@@ -926,6 +957,10 @@ const (
 	// short of seeding it again fixes it.
 	LogicalReplicaReasonSourceRestored = "SourceRestored"
 
+	// LogicalReplicaReasonSourceUpgraded means the cluster went through a major
+	// version upgrade after this replica was seeded.
+	LogicalReplicaReasonSourceUpgraded = "SourceUpgraded"
+
 	// LogicalReplicaReasonWaitingForDataVolume means the data volume of an
 	// earlier incarnation of this replica is still being deleted.
 	LogicalReplicaReasonWaitingForDataVolume = "WaitingForDataVolume"
@@ -963,11 +998,18 @@ type LogicalReplicaStatus struct {
 	// +optional
 	SeededAt *metav1.Time `json:"seededAt,omitempty"`
 
+	// PostgresVersion is the major PostgreSQL version of the data directory this
+	// replica holds, recorded when it was seeded. The data directory is scoped to
+	// a major version and pg_upgrade never touches it, so once spec.postgresVersion
+	// moves past this the replica cannot be started again.
+	// +optional
+	PostgresVersion int `json:"postgresVersion,omitempty"`
+
 	// InvalidatedAt is when the operator established that the data on this
 	// replica can no longer be reconciled with the cluster, because the cluster
-	// was restored in place after the replica was seeded from it. The replica
-	// stays stopped until it is removed from spec.logicalReplicas and added
-	// back, which seeds it again from scratch.
+	// was restored in place or upgraded to a new major version after the replica
+	// was seeded from it. The replica stays stopped until it is removed from
+	// spec.logicalReplicas and added back, which seeds it again from scratch.
 	// +optional
 	InvalidatedAt *metav1.Time `json:"invalidatedAt,omitempty"`
 }
