@@ -36,9 +36,10 @@ IMAGE_POSTGIS18=perconalab/percona-postgresql-operator:main-ppg18-postgres-gis
 IMAGE_BACKREST18=perconalab/percona-postgresql-operator:main-pgbackrest18
 
 IMAGE_POSTGRESQL19=perconalab/percona-postgresql-operator:main-ppg19-postgres
-IMAGE_PGBOUNCER19=perconalab/percona-postgresql-operator:main-pgbouncer19
-IMAGE_BACKREST19=perconalab/percona-postgresql-operator:main-pgbackrest19
-IMAGE_UPGRADE19=perconalab/percona-postgresql-operator:main-upgrade19
+IMAGE_POSTGRESQL19_UBI9_COMMUNITY=perconalab/percona-postgresql-operator:main-postgres19-community
+IMAGE_PGBOUNCER19_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbouncer19-community
+IMAGE_PGBACKREST19_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbackrest19-community
+IMAGE_UPGRADE19_UBI9_COMMUNITY=perconalab/percona-postgresql-operator:main-upgrade19-community
 
 IMAGE_PGBOUNCER_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbouncer-community
 IMAGE_PGBACKREST_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbackrest-community
