@@ -436,6 +436,10 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 
 	dnsNames := append(primaryServiceDNSNames, replicaServiceDNSNames...)
 	dnsFQDN := dnsNames[0]
+	// ponytail: SANs land in DNSNames verbatim, matching the MySQL operators.
+	// A bare IP entry is a dNSName, not an iPAddress SAN; thread IPAddresses
+	// through internal/pki if real IP SANs are ever needed.
+	dnsNames = append(dnsNames, cluster.Spec.TLS.GetSANs()...)
 
 	if err == nil {
 		// Unmarshal and validate the stored leaf. These first errors can
@@ -523,6 +527,7 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 		return nil, errors.Wrap(err, "get replica service DNS names")
 	}
 	dnsNames := append(primaryDNSNames, replicaDNSNames...)
+	dnsNames = append(dnsNames, cluster.Spec.TLS.GetSANs()...)
 
 	err = c.ApplyClusterCertificate(ctx, cluster, dnsNames)
 	if err != nil {
