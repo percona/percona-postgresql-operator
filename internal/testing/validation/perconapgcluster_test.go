@@ -2,6 +2,7 @@ package validation
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -70,6 +71,25 @@ func TestPerconaPGClusterExternalDNS(t *testing.T) {
 			assert.Assert(t, apierrors.IsInvalid(err), "hostname %s: got %v", hostname, err)
 			assert.ErrorContains(t, err, "hostname")
 		}
+	})
+
+	t.Run("hostname is bounded by RFC 1035", func(t *testing.T) {
+		longLabel := strings.Repeat("a", 64) + ".example.com"
+		// 24 labels of 10 characters, plus the 23 dots, is 263.
+		longName := strings.TrimSuffix(strings.Repeat("aaaaaaaaaa.", 24), ".")
+
+		for _, hostname := range []string{longLabel, longName} {
+			cr := base(t, `{ externalDNS: { hostname: `+hostname+` } }`)
+			err := cc.Create(ctx, cr, client.DryRunAll)
+
+			assert.Assert(t, apierrors.IsInvalid(err), "hostname %s: got %v", hostname, err)
+			assert.ErrorContains(t, err, "hostname")
+		}
+	})
+
+	t.Run("a label of exactly 63 is accepted", func(t *testing.T) {
+		cr := base(t, `{ externalDNS: { hostname: `+strings.Repeat("a", 63)+`.example.com } }`)
+		assert.NilError(t, cc.Create(ctx, cr, client.DryRunAll))
 	})
 
 	t.Run("ttl must not be negative", func(t *testing.T) {

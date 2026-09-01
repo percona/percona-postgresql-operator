@@ -1659,9 +1659,13 @@ type ServiceExpose struct {
 
 type ExternalDNSConfig struct {
 	// Hostname is the DNS name external-dns publishes for this service.
+	// The bounds are RFC 1035: at most 253 characters overall, each label at
+	// most 63. Anything longer is rejected by external-dns and by certificate
+	// issuance, so it is rejected at admission instead.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$`
 	Hostname string `json:"hostname"`
 
 	// TTL in seconds of the published record. No ttl annotation is written when
@@ -1684,6 +1688,10 @@ func (s *ServiceExpose) ServiceAnnotations() map[string]string {
 
 	annotations := naming.Merge(s.Annotations)
 	annotations[pNaming.AnnotationExternalDNSHostname] = s.ExternalDNS.Hostname
+	// externalDNS owns the ttl key the same way it owns the hostname above, so an
+	// unset ttl falls back to the external-dns default rather than to a ttl left
+	// behind in expose.annotations.
+	delete(annotations, pNaming.AnnotationExternalDNSTTL)
 	if s.ExternalDNS.TTL > 0 {
 		annotations[pNaming.AnnotationExternalDNSTTL] = strconv.Itoa(s.ExternalDNS.TTL)
 	}

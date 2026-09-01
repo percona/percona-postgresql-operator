@@ -1136,6 +1136,38 @@ func TestServiceExposeServiceAnnotations(t *testing.T) {
 				managedKey:  "true",
 			},
 		},
+		"externalDNS overrides a hand-written hostname and ttl": {
+			expose: &ServiceExpose{
+				Metadata: crunchyv1beta1.Metadata{
+					Annotations: map[string]string{
+						hostnameKey: "manual.example.com",
+						ttlKey:      "300",
+					},
+				},
+				ExternalDNS: &ExternalDNSConfig{Hostname: "pg.example.com", TTL: 60},
+			},
+			expected: map[string]string{
+				hostnameKey: "pg.example.com",
+				ttlKey:      "60",
+				managedKey:  "true",
+			},
+		},
+		"an unset ttl drops a hand-written one": {
+			expose: &ServiceExpose{
+				Metadata: crunchyv1beta1.Metadata{
+					Annotations: map[string]string{
+						"my-annotation": "value1",
+						ttlKey:          "300",
+					},
+				},
+				ExternalDNS: &ExternalDNSConfig{Hostname: "pg.example.com"},
+			},
+			expected: map[string]string{
+				"my-annotation": "value1",
+				hostnameKey:     "pg.example.com",
+				managedKey:      "true",
+			},
+		},
 		"user annotations coexist": {
 			expose: &ServiceExpose{
 				Metadata: crunchyv1beta1.Metadata{
