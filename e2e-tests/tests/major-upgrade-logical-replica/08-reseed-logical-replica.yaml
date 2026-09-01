@@ -1,0 +1,48 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 900
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # The documented recovery: remove the replica, wait for its entry to leave
+      # the status, and add it back to seed it again from the upgraded cluster.
+      kubectl -n "${NAMESPACE}" patch pg major-upgrade-logical-replica --type=json \
+        --patch '[{"op": "remove", "path": "/spec/logicalReplicas"}]'
+
+      status_gone() {
+        local got
+        got=$(kubectl -n "${NAMESPACE}" get pg major-upgrade-logical-replica \
+          -o jsonpath='{.status.logicalReplicas}')
+
+        echo "status.logicalReplicas: '${got}'"
+        [[ -z ${got} || ${got} == "[]" ]]
+      }
+
+      objects_gone() {
+        kubectl -n "${NAMESPACE}" get statefulset major-upgrade-logical-replica-lr-analytics >/dev/null 2>&1 && return 1
+        kubectl -n "${NAMESPACE}" get pvc major-upgrade-logical-replica-lr-analytics-pgdata >/dev/null 2>&1 && return 1
+        return 0
+      }
+
+      retry 60 5 status_gone
+      retry 60 5 objects_gone
+
+      kubectl -n "${NAMESPACE}" patch pg major-upgrade-logical-replica --type=merge --patch '{
+        "spec": {
+          "logicalReplicas": [
+            {
+              "name": "analytics",
+              "databases": ["myapp"],
+              "bootstrapMethod": "pgbackrest",
+              "dataVolumeClaimSpec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "1Gi"}}
+              }
+            }
+          ]
+        }
+      }'

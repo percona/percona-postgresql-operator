@@ -202,24 +202,36 @@ func addTMPEmptyDir(template *corev1.PodTemplateSpec, sizeLimit resource.Quantit
 	}
 }
 
+// NSSWrapperPostgresCommand returns the shell command that sets up an
+// nss_wrapper environment mapping the container's user ID to the "postgres"
+// user.
+func NSSWrapperPostgresCommand() string {
+	return postgresNSSWrapperPrefix + nssWrapperScript
+}
+
+// NSSWrapperPostgresEnv returns the variables that make a container resolve
+// users through the files [NSSWrapperPostgresCommand] writes.
+func NSSWrapperPostgresEnv() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{Name: "LD_PRELOAD", Value: "/usr/lib64/libnss_wrapper.so"},
+		{Name: "NSS_WRAPPER_PASSWD", Value: fmt.Sprintf(nssWrapperDir, "postgres", "passwd")},
+		{Name: "NSS_WRAPPER_GROUP", Value: fmt.Sprintf(nssWrapperDir, "postgres", "group")},
+	}
+}
+
 // addNSSWrapper adds nss_wrapper environment variables to the database and pgBackRest
 // containers in the Pod template.  Additionally, an init container is added to the Pod template
 // as needed to setup the nss_wrapper. Please note that the nss_wrapper is required for
 // compatibility with OpenShift: https://access.redhat.com/articles/4859371.
 func addNSSWrapper(cluster *v1beta1.PostgresCluster, image string, imagePullPolicy corev1.PullPolicy, template *corev1.PodTemplateSpec) {
 
-	nssWrapperCmd := postgresNSSWrapperPrefix + nssWrapperScript
+	nssWrapperCmd := NSSWrapperPostgresCommand()
 	for i, c := range template.Spec.Containers {
 		switch c.Name {
 		case naming.ContainerDatabase, naming.PGBackRestRepoContainerName,
 			naming.PGBackRestRestoreContainerName:
-			passwd := fmt.Sprintf(nssWrapperDir, "postgres", "passwd")
-			group := fmt.Sprintf(nssWrapperDir, "postgres", "group")
-			template.Spec.Containers[i].Env = append(template.Spec.Containers[i].Env, []corev1.EnvVar{
-				{Name: "LD_PRELOAD", Value: "/usr/lib64/libnss_wrapper.so"},
-				{Name: "NSS_WRAPPER_PASSWD", Value: passwd},
-				{Name: "NSS_WRAPPER_GROUP", Value: group},
-			}...)
+			template.Spec.Containers[i].Env = append(
+				template.Spec.Containers[i].Env, NSSWrapperPostgresEnv()...)
 		case naming.ContainerPGAdmin:
 			nssWrapperCmd = pgAdminNSSWrapperPrefix + nssWrapperScript
 			passwd := fmt.Sprintf(nssWrapperDir, "pgadmin", "passwd")

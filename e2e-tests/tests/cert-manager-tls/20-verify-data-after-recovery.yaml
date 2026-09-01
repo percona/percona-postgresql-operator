@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 30
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -13,4 +14,3 @@ commands:
           echo "Missing data in primary"
           exit 1
       fi
-    timeout: 30

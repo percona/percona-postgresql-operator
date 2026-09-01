@@ -1,0 +1,19 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      PASS=$(get_psql_user_pass major-upgrade-logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host major-upgrade-logical-replica-pguser-postgres)
+
+      run_psql_local \
+        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
+        "postgres:${PASS}@${HOST}"
+      
+      run_psql_local \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
+        "postgres:${PASS}@${HOST}"
