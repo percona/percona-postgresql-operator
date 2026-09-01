@@ -12,7 +12,7 @@ spec:
   crVersion: 3.1.0
 #  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
-#    image: docker.io/perconalab/percona-postgresql-operator:main
+#    image: docker.io/percona/percona-postgresql-operator:3.1.0
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -188,7 +188,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
+  image: docker.io/percona/percona-distribution-postgresql:18.6.1-1
   imagePullPolicy: Always
   postgresVersion: 18
 #  port: 5432
@@ -222,7 +222,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: docker.io/perconalab/percona-postgresql-operator:main
+#      image: docker.io/percona/percona-postgresql-operator:3.1.0
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -396,7 +396,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+      image: docker.io/percona/percona-pgbouncer:1.25.2-6
 #      paused: true
 #      env:
 #      - name: MY_ENV
@@ -527,7 +527,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
+      image: docker.io/percona/percona-pgbackrest:2.59.0-1
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -535,7 +535,7 @@ spec:
 #      - secretRef:
 #          name: repo-host-env-secret
 #      initContainer:
-#        image: docker.io/perconalab/percona-postgresql-operator:main
+#        image: docker.io/percona/percona-postgresql-operator:3.1.0
 #        resources:
 #          limits:
 #            cpu: 2.0
@@ -756,7 +756,7 @@ spec:
 
   pmm:
     enabled: false
-    image: docker.io/perconalab/pmm-client:3-dev-latest
+    image: docker.io/percona/pmm-client:3.9.1
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
@@ -772,7 +772,7 @@ spec:
 #    querySource: pgstatmonitor
   logcollector:
     enabled: true
-    image: docker.io/perconalab/fluentbit:main-logcollector
+    image: docker.io/percona/fluentbit:5.1.1-1
 #    imagePullPolicy: IfNotPresent
 #    # Extra fluent-bit configuration merged with the operator-managed config.
 #    # Must be in Fluent Bit's YAML configuration format.
@@ -895,7 +895,7 @@ spec:
 #    - basebackup
 
 #  extensions:
-#    image: docker.io/perconalab/percona-postgresql-operator:main
+#    image: docker.io/percona/percona-postgresql-operator:3.1.0
 #    imagePullPolicy: Always
 #    storage:
 #      type: s3
