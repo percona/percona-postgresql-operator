@@ -5,10 +5,41 @@ metadata:
 timeout: 120
 commands:
   - script: |
-      set -euo pipefail
+      set -o errexit
+      set -o xtrace
 
-      kubectl assert exist-enhanced crd perconapgclusters.pgv2.percona.com
-      kubectl assert exist-enhanced crd perconapgbackups.pgv2.percona.com
-      kubectl assert exist-enhanced crd perconapgrestores.pgv2.percona.com
-      kubectl assert exist-enhanced crd perconapgupgrades.pgv2.percona.com
-      kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
+      source ../../functions
+
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
+      until kubectl assert exist-enhanced crd perconapgclusters.pgv2.percona.com; do
+        echo "Waiting for PerconaPGCluster CRD"
+        sleep 5
+      done
+
+      until kubectl assert exist-enhanced crd perconapgbackups.pgv2.percona.com; do
+        echo "Waiting for PerconaPGBackup CRD"
+        sleep 5
+      done
+
+      until kubectl assert exist-enhanced crd perconapgrestores.pgv2.percona.com; do
+        echo "Waiting for PerconaPGRestore CRD"
+        sleep 5
+      done
+
+      until kubectl assert exist-enhanced crd perconapgupgrades.pgv2.percona.com; do
+        echo "Waiting for PerconaPGUpgrade CRD"
+        sleep 5
+      done
+
+      until kubectl assert exist-enhanced deployment percona-postgresql-operator \
+        -n "${OPERATOR_NS:-$NAMESPACE}" --field-selector status.readyReplicas=1; do
+        echo "Waiting for percona-postgresql-operator deployment"
+        sleep 5
+      done

@@ -3,6 +3,19 @@ kind: TestAssert
 timeout: 30
 commands:
   - script: |
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
       kubectl get configmap 10-read-data \
         -n "${NAMESPACE}" -o json \
         | jq -e '.data["data"] == " 100500"'
