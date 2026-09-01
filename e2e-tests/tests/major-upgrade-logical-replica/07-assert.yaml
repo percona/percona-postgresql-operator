@@ -9,4 +9,4 @@ commands:
       source ../../functions
 
       kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=Succeeded \
-        --timeout=560s pg-backup/major-upgrade-logical-replica-seed-repo1
+        --timeout=560s pg-backup/major-upgrade-logical-replica-reseed-repo1
