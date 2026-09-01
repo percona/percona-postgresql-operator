@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: external-dns
+status:
+  pgbouncer:
+    ready: 1
+    size: 1
+  postgres:
+    instances:
+    - name: instance1
+      ready: 2
+      size: 2
+    ready: 2
+    size: 2
+  state: ready
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns-ha
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: primary.external-dns.example.com
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    percona.com/external-dns-managed: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns-replicas
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: replicas.external-dns.example.com
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    percona.com/external-dns-managed: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns-pgbouncer
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: pgbouncer.external-dns.example.com
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    percona.com/external-dns-managed: "true"

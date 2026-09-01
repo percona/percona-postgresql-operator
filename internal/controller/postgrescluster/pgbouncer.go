@@ -29,6 +29,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/util"
 	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
 	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -220,6 +221,11 @@ func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cl
 	if dnsErr != nil {
 		return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
 	}
+
+	// K8SPG-1149: see reconcileInternalClusterCertificate.
+	dnsNames = append(dnsNames, pNaming.ManagedExternalDNSHostnames(
+		cluster.Spec.Proxy.PGBouncer.Service.GetMetadata().GetAnnotationsOrNil(),
+	)...)
 
 	err := c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
 	if err != nil {
