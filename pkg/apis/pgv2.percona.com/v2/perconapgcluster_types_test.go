@@ -1154,7 +1154,7 @@ func TestServiceExposeServiceAnnotations(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, map[string]string(tt.expose.ServiceAnnotations()))
+			assert.Equal(t, tt.expected, tt.expose.ServiceAnnotations())
 		})
 	}
 
