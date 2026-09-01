@@ -596,6 +596,11 @@ func (r *Reconciler) reconcilePGTDEProviders(
 	pods, allRunning := instances.runningPods(container)
 	if !allRunning {
 		log.V(1).Info("Waiting for all pods to be running")
+
+		if meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady) {
+			return nil
+		}
+
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:               v1beta1.PGTDEVaultProviderReady,
 			Status:             metav1.ConditionFalse,
