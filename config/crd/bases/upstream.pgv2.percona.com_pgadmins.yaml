@@ -522,6 +522,9 @@ spec:
                               type: string
                             signerName:
                               type: string
+                            user:
+                              format: int64
+                              type: integer
                           required:
                           - path
                           type: object
@@ -537,6 +540,9 @@ spec:
                                     type: integer
                                   path:
                                     type: string
+                                  user:
+                                    format: int64
+                                    type: integer
                                 required:
                                 - key
                                 - path
@@ -587,6 +593,9 @@ spec:
                                     - resource
                                     type: object
                                     x-kubernetes-map-type: atomic
+                                  user:
+                                    format: int64
+                                    type: integer
                                 required:
                                 - path
                                 type: object
@@ -608,6 +617,9 @@ spec:
                               type: integer
                             signerName:
                               type: string
+                            user:
+                              format: int64
+                              type: integer
                             userAnnotations:
                               additionalProperties:
                                 type: string
@@ -628,6 +640,9 @@ spec:
                                     type: integer
                                   path:
                                     type: string
+                                  user:
+                                    format: int64
+                                    type: integer
                                 required:
                                 - key
                                 - path
@@ -651,6 +666,9 @@ spec:
                               type: integer
                             path:
                               type: string
+                            user:
+                              format: int64
+                              type: integer
                           required:
                           - path
                           type: object
