@@ -651,6 +651,8 @@ spec:
                                   - type: integer
                                   - type: string
                                   x-kubernetes-int-or-string: true
+                                protocol:
+                                  type: string
                                 scheme:
                                   type: string
                               required:
@@ -711,6 +713,8 @@ spec:
                                   - type: integer
                                   - type: string
                                   x-kubernetes-int-or-string: true
+                                protocol:
+                                  type: string
                                 scheme:
                                   type: string
                               required:
@@ -755,6 +759,8 @@ spec:
                           type: integer
                         grpc:
                           properties:
+                            mode:
+                              type: string
                             port:
                               format: int32
                               type: integer
@@ -788,6 +794,8 @@ spec:
                               - type: integer
                               - type: string
                               x-kubernetes-int-or-string: true
+                            protocol:
+                              type: string
                             scheme:
                               type: string
                           required:
@@ -862,6 +870,8 @@ spec:
                           type: integer
                         grpc:
                           properties:
+                            mode:
+                              type: string
                             port:
                               format: int32
                               type: integer
@@ -895,6 +905,8 @@ spec:
                               - type: integer
                               - type: string
                               x-kubernetes-int-or-string: true
+                            protocol:
+                              type: string
                             scheme:
                               type: string
                           required:
@@ -1086,6 +1098,8 @@ spec:
                           type: integer
                         grpc:
                           properties:
+                            mode:
+                              type: string
                             port:
                               format: int32
                               type: integer
@@ -1119,6 +1133,8 @@ spec:
                               - type: integer
                               - type: string
                               x-kubernetes-int-or-string: true
+                            protocol:
+                              type: string
                             scheme:
                               type: string
                           required:
@@ -1180,6 +1196,11 @@ spec:
                     volumeMounts:
                       items:
                         properties:
+                          bindMountOptions:
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: set
                           mountPath:
                             type: string
                           mountPropagation:
@@ -1286,6 +1307,11 @@ spec:
               volumeMounts:
                 items:
                   properties:
+                    bindMountOptions:
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
                     mountPath:
                       type: string
                     mountPropagation:
