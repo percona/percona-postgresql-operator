@@ -2328,8 +2328,9 @@ function get_available_k8s_versions() {
 			versions=$(
 				gcloud container get-server-config \
 					--region "${region}" \
-					--format="value(validMasterVersions)" 2>/dev/null \
-					| tr ';' '\n' \
+					--flatten='channels[].validVersions[]' \
+					--filter='channels.channel=STABLE' \
+					--format='value(channels.validVersions)' 2>/dev/null \
 					| awk -F'.' '!seen[$1"."$2]++'
 			)
 			;;
