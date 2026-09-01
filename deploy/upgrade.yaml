@@ -4,9 +4,9 @@ metadata:
   name: cluster1-17-to-18
 spec:
   postgresClusterName: cluster1
-  image: docker.io/perconalab/percona-postgresql-operator:main-upgrade
+  image: docker.io/percona/percona-distribution-postgresql-upgrade:18.6-17.11-16.15-15.19-14.24-1
   fromPostgresVersion: 17
   toPostgresVersion: 18
-  toPostgresImage: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
-  toPgBouncerImage: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
-  toPgBackRestImage: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
+  toPostgresImage: docker.io/percona/percona-distribution-postgresql:18.6.1-1
+  toPgBouncerImage: docker.io/percona/percona-pgbouncer:1.25.2-6
+  toPgBackRestImage: docker.io/percona/percona-pgbackrest:2.59.0-1
