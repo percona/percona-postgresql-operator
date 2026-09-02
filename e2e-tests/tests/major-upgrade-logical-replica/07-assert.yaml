@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 660
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=Succeeded \
+        --timeout=560s pg-backup/major-upgrade-logical-replica-reseed-repo1

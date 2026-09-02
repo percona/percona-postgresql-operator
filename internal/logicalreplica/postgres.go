@@ -168,6 +168,26 @@ func SubscriptionName(replica, db string) string {
 	return identifier("pgo_lr_sub", replica, db)
 }
 
+// SubscriptionsEnabledQuery returns a query that yields "t" only when every
+// subscription of the given replica is present and enabled. The bootstrap sets
+// disable_on_error on all of them, so a disabled subscription is what an apply
+// error looks like from the outside.
+//
+// One connection covers every database: unlike most catalogs, pg_subscription is
+// shared across the databases of a cluster.
+func SubscriptionsEnabledQuery(replica string, databases []string) string {
+	names := make([]string, 0, len(databases))
+	for _, db := range databases {
+		names = append(names, postgres.QuoteLiteral(SubscriptionName(replica, db)))
+	}
+
+	// Counting the expected names rather than looking for a disabled one also
+	// catches a subscription that is gone entirely.
+	return fmt.Sprintf(
+		"SELECT count(*) = %d FROM pg_catalog.pg_subscription WHERE subenabled AND subname IN (%s);",
+		len(databases), strings.Join(names, ", "))
+}
+
 // DisableOnErrorSQL returns the statement that puts the subscription of database
 // db on the given logical replica into "disable_on_error" mode.
 //

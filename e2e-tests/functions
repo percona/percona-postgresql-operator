@@ -279,12 +279,11 @@ function remove_all_finalizers() {
 		echo "removing all finalizers for $resource resources"
 
 		kubectl -n "${NAMESPACE}" get "$resource" -o json | jq '.items[] | .metadata.name' -r | while IFS= read -r name; do
-			kubectl -n "${NAMESPACE}" delete "$resource" "$name" --wait=0
-
 			if [[ $(kubectl -n "${NAMESPACE}" get "$resource" "$name" -o yaml | yq '.metadata.finalizers | length') == "0" ]]; then
 				continue
 			fi
-			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=merge -p='{"metadata":{"finalizers":[]}}'
+			kubectl -n "${NAMESPACE}" delete "$resource" "$name" --wait=0
 		done
 	done
 }
@@ -350,7 +349,7 @@ function wait_for_ready_containers() {
 function destroy_operator() {
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" delete deployment percona-postgresql-operator --force --grace-period=0 || true
 	if [[ $OPERATOR_NS ]]; then
-		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 || true
+		kubectl delete namespace $OPERATOR_NS --force --grace-period=0 --ignore-not-found || true
 	fi
 }
 
@@ -373,7 +372,7 @@ function retry() {
 				-e "s/(ACCESS_KEY_ID=)'?[^' ]+'?/\1'***'/g" \
 				-e "s/(SECRET_ACCESS_KEY=)'?[^' ]+'?/\1'***'/g" \
 				-e "s/(AZURE_STORAGE_ACCOUNT_KEY=)'?[^' ]+'?/\1'***'/g")
-			echo "The command ${sanitized_command} has failed after $n attempts."
+			echo "The command ${sanitized_command} has failed after $n attempts." >&2
 			exit 1
 		fi
 		((n += 1))
@@ -476,7 +475,7 @@ aws_cli() {
 	fi
 }
 
-copy_custom_extensions_form_aws() {
+copy_custom_extensions_from_aws() {
 	set +o xtrace
 
 	local minio_key minio_secret
@@ -1292,7 +1291,7 @@ function deploy_chaos_mesh() {
 	helm install chaos-mesh chaos-mesh/chaos-mesh "${chaos_args[@]}"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
-		retry 12 5 kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" >/dev/null
+		kubectl wait --for=create daemonset/chaos-daemon --namespace="${NAMESPACE}" --timeout=60s
 		chaos_daemon_sa="$(kubectl get daemonset/chaos-daemon --namespace="${NAMESPACE}" -o jsonpath='{.spec.template.spec.serviceAccountName}')"
 		chaos_daemon_sa="${chaos_daemon_sa:-chaos-daemon}"
 		oc adm policy add-scc-to-user privileged -z "${chaos_daemon_sa}" --namespace="${NAMESPACE}"
@@ -1721,20 +1720,16 @@ function is_cert_manager_installed_by_test() {
 	local namespace
 	is_cert_manager_installed || return 1
 
-	namespace="$(kubectl get namespace cert-manager \
+	namespace="$(kubectl get namespace \
 		--selector "${CERT_MANAGER_TEST_LABEL}" -o name 2>/dev/null || true)"
 
-	[[ -n ${namespace} ]]
+	[[ ${namespace} == "namespace/cert-manager" ]]
 }
 
 function deploy_cert_manager() {
-	if is_cert_manager_installed; then
-		if ! is_cert_manager_installed_by_test; then
-			echo 'cert-manager is present without the test label; leaving it unchanged'
-			return
-		fi
-
-		echo 'cert-manager installed by the tests is present; destroying and redeploying'
+	if [[ ${PLATFORM} == "rancher" ]] && ! is_cert_manager_installed_by_test; then
+		echo 'cert-manager is present without the test label; leaving it unchanged'
+		return
 	fi
 
 	destroy_cert_manager
@@ -1783,13 +1778,17 @@ function deploy_cert_manager() {
 }
 
 function destroy_cert_manager() {
-	if ! is_cert_manager_installed_by_test; then
+	if [[ ${PLATFORM} == "rancher" ]] && ! is_cert_manager_installed_by_test; then
 		echo 'cert-manager was not installed by this test'
 		return
 	fi
 
 	helm uninstall cert-manager -n cert-manager >/dev/null 2>&1 || :
-	kubectl delete --grace-period=0 --force=true namespace cert-manager >/dev/null 2>&1 || :
+	kubectl get crd -o name | grep 'cert-manager.io' | xargs -r kubectl delete 2>&1 || :
+	kubectl get mutatingwebhookconfiguration -o name | grep 'cert-manager' | xargs kubectl delete >/dev/null 2>&1 || :
+	kubectl get validatingwebhookconfiguration -o name | grep 'cert-manager' | xargs kubectl delete >/dev/null 2>&1 || :
+	kubectl get clusterrole,clusterrolebinding -o name | grep 'cert-manager' | xargs -r kubectl delete 2>&1 || :
+	kubectl delete namespace cert-manager --grace-period=0 --force=true --ignore-not-found >/dev/null 2>&1 || :
 }
 
 function get_container_image() {
@@ -2347,14 +2346,18 @@ function enable_hugepages_openshift() {
 	echo "MachineConfig created"
 	echo "Waiting for worker pool to update (~10 minutes)..."
 
-	kubectl wait --for=condition=Updated mcp/worker --timeout=900s 2>/dev/null || {
+	kubectl wait --for=condition=Updating=True mcp/worker --timeout=300s 2>/dev/null || {
+		echo "Worker pool did not start updating"
+		return 1
+	}
+
+	kubectl wait --for=condition=Updated=True mcp/worker --timeout=900s 2>/dev/null || {
 		echo "Update taking longer than expected"
 		return 1
 	}
 
 	echo "Worker pool updated"
 
-	sleep 10
 	verify_hugepages_on_nodes
 }
 
@@ -2391,30 +2394,29 @@ function enable_hugepages() {
 function verify_hugepages_on_nodes() {
 	echo "Verifying hugepages on nodes"
 
-	# Get first worker node, fallback to first non-master, fallback to any node
-	local node_name=$(
-		kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
-			|| kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null \
-			|| kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
-	)
+	local nodes
+	nodes=$(kubectl get nodes -l node-role.kubernetes.io/worker -o name 2>/dev/null)
+	if [ -z "${nodes}" ]; then
+		nodes=$(kubectl get nodes -l '!node-role.kubernetes.io/master,!node-role.kubernetes.io/control-plane' -o name 2>/dev/null)
+	fi
+	if [ -z "${nodes}" ]; then
+		nodes=$(kubectl get nodes -o name)
+	fi
 
-	if [ -z "${node_name}" ]; then
+	if [ -z "${nodes}" ]; then
 		echo "No nodes found"
 		return 1
 	fi
 
-	echo "Checking node: ${node_name}"
-
-	local hugepages_capacity=$(kubectl get node ${node_name} \
-		-o jsonpath='{.status.capacity.hugepages-2Mi}')
-
-	if [ -n "${hugepages_capacity}" ] && [ "${hugepages_capacity}" != "0" ]; then
-		echo "Node has hugepages capacity: ${hugepages_capacity}"
-		return 0
-	else
-		echo "No hugepages capacity found on node ${node_name}"
-		return 1
-	fi
+	local node hugepages_capacity
+	for node in ${nodes}; do
+		hugepages_capacity=$(kubectl get "${node}" -o jsonpath='{.status.capacity.hugepages-2Mi}')
+		if [ -z "${hugepages_capacity}" ] || [ "${hugepages_capacity}" = "0" ]; then
+			echo "No hugepages capacity found on ${node}"
+			return 1
+		fi
+		echo "${node} has hugepages capacity: ${hugepages_capacity}"
+	done
 }
 
 function verify_hugepages_in_pod() {
@@ -2512,8 +2514,9 @@ function get_available_k8s_versions() {
 			versions=$(
 				gcloud container get-server-config \
 					--region "${region}" \
-					--format="value(validMasterVersions)" 2>/dev/null \
-					| tr ';' '\n' \
+					--flatten='channels[].validVersions[]' \
+					--filter='channels.channel=STABLE' \
+					--format='value(channels.validVersions)' 2>/dev/null \
 					| awk -F'.' '!seen[$1"."$2]++'
 			)
 			;;
@@ -2820,7 +2823,13 @@ check_logs_for_errors() {
 	# the operator logs JSON only with LOG_STRUCTURED=true, deploy/operator.yaml
 	# sets it to false, so match the console encoder format as well
 	kubectl -n "$op_ns" logs deployment/percona-postgresql-operator --since-time="$since" 2>/dev/null \
-		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
+		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' \
+		| awk -v namespace="$NAMESPACE" '
+			!match($0, /"namespace"[[:space:]]*:[[:space:]]*"[^"]+"/) ||
+			index($0, "\"namespace\":\"" namespace "\"") ||
+			index($0, "\"namespace\": \"" namespace "\"")
+		' \
+		| grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
 	for pod in $(kubectl -n "$NAMESPACE" get pods -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/data=postgres -o name); do
 		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
 			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true

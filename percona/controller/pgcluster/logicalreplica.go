@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
@@ -50,7 +51,14 @@ const (
 	// pg_createsubscriber runs the target with during the conversion.
 	logicalReplicaBootstrapConfigFile = "bootstrap.conf"
 
-	logicalReplicaConfigVolume       = "logical-replica-config"
+	logicalReplicaConfigVolume = "logical-replica-config"
+
+	// logicalReplicaSocketVolume holds the directory Postgres binds its socket
+	// in. It is a volume of its own so that nss_wrapper can have the rest of
+	// /tmp: Postgres creates the socket but not the directory holding it, and
+	// the kubelet creates a mounted one with the Pod's filesystem group.
+	logicalReplicaSocketVolume = "postgres-socket"
+
 	logicalReplicaBootstrapContainer = "logical-replica-bootstrap"
 	logicalReplicaComponent          = "logical-replica"
 
@@ -206,6 +214,12 @@ func logicalReplicaSettled(status *v2.LogicalReplicaStatus) bool {
 	}
 
 	switch status.Reason {
+	case v2.LogicalReplicaReasonSourceUpgraded:
+		// Also unrecoverable, but the slots the upgrade carried over to the new
+		// cluster still have to be dropped, and the database list is what names the
+		// ones still to go.
+		return len(status.Databases) == 0
+
 	case v2.LogicalReplicaReasonSourceRestored,
 		v2.LogicalReplicaReasonSourceSlotMissing,
 		v2.LogicalReplicaReasonBootstrapFailed:
@@ -287,6 +301,27 @@ func (r *PGClusterReconciler) observePrimaryReadiness(
 const logicalReplicaReseedInstructions = "remove it from spec.logicalReplicas, " +
 	"wait for its entry to leave status.logicalReplicas, and add it back to seed it again"
 
+// logicalReplicaInvalidation reports why a replica can no longer be reconciled
+// with the cluster.
+func logicalReplicaInvalidation(
+	cr *v2.PerconaPGCluster, status *v2.LogicalReplicaStatus,
+) (reason, message, cause string) {
+	if status.PostgresVersion != 0 && status.PostgresVersion != cr.Spec.PostgresVersion {
+		return v2.LogicalReplicaReasonSourceUpgraded,
+			fmt.Sprintf("this replica holds a PostgreSQL %d data directory and the cluster now runs "+
+				"%d; the pg_upgrade job only rewrites the data directories of the instance sets, so "+
+				"this one cannot be started again; "+logicalReplicaReseedInstructions,
+				status.PostgresVersion, cr.Spec.PostgresVersion),
+			fmt.Sprintf("the cluster was upgraded from PostgreSQL %d to %d after it was seeded",
+				status.PostgresVersion, cr.Spec.PostgresVersion)
+	}
+
+	return v2.LogicalReplicaReasonSourceRestored,
+		"the cluster was restored in place after this replica was seeded, so its data " +
+			"can no longer be reconciled with the primary; " + logicalReplicaReseedInstructions,
+		"the cluster was restored in place after it was seeded"
+}
+
 // recordedLogicalReplicaReason reports whether the persisted status of a replica
 // already carries reason, so callers can log and emit an event once rather than
 // on every pass.
@@ -360,7 +395,18 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 	log := logging.FromContext(ctx).WithValues("logicalReplica", spec.Name)
 	status := logicalReplicaStatusFor(cr, spec.Name)
 
-	// See v2.LogicalReplicaReasonSourceRestored: not recoverable in place, and
+	// The pg_upgrade job rewrites the data directories of the instance sets and
+	// nothing else, so a major upgrade leaves this replica holding /pgdata/pg<old>
+	// while reconcileLogicalReplicaStatefulSet would now render
+	// "postgres -D /pgdata/pg<new>" with the new image. Stop before that: the pod
+	// could never start, and nothing would say why.
+	if status.InvalidatedAt == nil && status.SeededAt != nil &&
+		status.PostgresVersion != 0 && status.PostgresVersion != cr.Spec.PostgresVersion {
+		status.InvalidatedAt = new(metav1.Now())
+	}
+
+	// See v2.LogicalReplicaReasonSourceRestored and
+	// v2.LogicalReplicaReasonSourceUpgraded: neither is recoverable in place, and
 	// the system identifier is unchanged, so starting it again would have it
 	// serve data the cluster no longer has.
 	if status.InvalidatedAt != nil {
@@ -368,18 +414,31 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 			return status, errors.Wrap(err, "stop invalidated replica")
 		}
 
-		if !recordedLogicalReplicaReason(cr, spec.Name, v2.LogicalReplicaReasonSourceRestored) {
-			log.Info("logical replica needs to be seeded again after a restore of the cluster",
-				"invalidatedAt", status.InvalidatedAt)
+		reason, message, cause := logicalReplicaInvalidation(cr, status)
+
+		if !recordedLogicalReplicaReason(cr, spec.Name, reason) {
+			log.Info("logical replica needs to be seeded again",
+				"reason", reason, "invalidatedAt", status.InvalidatedAt)
 			r.Recorder.Eventf(cr, corev1.EventTypeWarning, "LogicalReplicaInvalidated",
-				"Logical replica %q must be seeded again: the cluster was restored in place after it was seeded",
-				spec.Name)
+				"Logical replica %q must be seeded again: %s", spec.Name, cause)
+		}
+
+		// pg_upgrade carries the logical slots over to the new cluster, where nothing
+		// will ever read from them again, and Patroni's ignore_slots keeps it from
+		// reaping them. Drop them rather than pin WAL on the primary until someone
+		// gets around to seeding this replica again. Clearing the database list is
+		// what records that they are gone, so a failure here is retried.
+		if reason == v2.LogicalReplicaReasonSourceUpgraded && len(status.Databases) > 0 {
+			if err := r.dropLogicalReplicaObjects(ctx, cr, spec.Name, status.Databases); err != nil {
+				log.Error(err, "could not drop the replication objects of an invalidated replica")
+			} else {
+				status.Databases = nil
+			}
 		}
 
 		status.State = v2.LogicalReplicaStateBroken
-		status.Reason = v2.LogicalReplicaReasonSourceRestored
-		status.Message = "the cluster was restored in place after this replica was seeded, so its data " +
-			"can no longer be reconciled with the primary; " + logicalReplicaReseedInstructions
+		status.Reason = reason
+		status.Message = message
 		return status, nil
 	}
 
@@ -470,12 +529,17 @@ func (r *PGClusterReconciler) reconcileLogicalReplica(
 		if status.SeededAt == nil {
 			status.SeededAt = new(metav1.Now())
 		}
-		log.Info("logical replica bootstrapped", "databases", status.Databases, "seededAt", status.SeededAt)
+		// The data directory is named after the major version, see
+		// postgres.DataDirectory. Record which one this volume holds.
+		status.PostgresVersion = cr.Spec.PostgresVersion
+
+		log.Info("logical replica bootstrapped", "databases", status.Databases,
+			"seededAt", status.SeededAt, "postgresVersion", status.PostgresVersion)
 	}
 
 	// Asserts one replica, which is also what starts one again after a restore
 	// that was abandoned before it replaced the data directory.
-	if err := r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec); err != nil {
+	if err := r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status); err != nil {
 		return status, errors.Wrap(err, "reconcile statefulset")
 	}
 	if err := r.reconcileLogicalReplicaService(ctx, cr, spec); err != nil {
@@ -1011,7 +1075,8 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 		Image:           cr.PostgresImage(),
 		ImagePullPolicy: cr.Spec.ImagePullPolicy,
 		Command:         []string{"bash", "-c", script},
-		Env:             logicalReplicaEnvironment(cr, dataDir),
+		Env: append(logicalReplicaEnvironment(cr, dataDir),
+			postgrescluster.NSSWrapperPostgresEnv()...),
 		Resources:       spec.Resources,
 		SecurityContext: initialize.RestrictedSecurityContext(true),
 		VolumeMounts: []corev1.VolumeMount{
@@ -1059,8 +1124,11 @@ func (r *PGClusterReconciler) generateLogicalReplicaBootstrapJob(
 					Labels: logicalReplicaLabels(cr, spec.Name),
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:                corev1.RestartPolicyNever,
-					InitContainers:               []corev1.Container{initContainer},
+					RestartPolicy: corev1.RestartPolicyNever,
+					InitContainers: []corev1.Container{
+						initContainer,
+						logicalReplicaNSSWrapperInitContainer(cr, container.Resources),
+					},
 					Containers:                   []corev1.Container{container},
 					Volumes:                      logicalReplicaVolumes(cr, crunchyCR, spec),
 					SecurityContext:              postgres.PodSecurityContext(crunchyCR),
@@ -1103,9 +1171,7 @@ func logicalReplicaConfigVolumeMount() corev1.VolumeMount {
 	}
 }
 
-// logicalReplicaProbe returns a probe that waits for the replica's postmaster to
-// accept connections on its socket.
-func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
+func defaultProbe(delay, period, failureThreshold, successThreshold int32) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
@@ -1115,6 +1181,82 @@ func logicalReplicaProbe(delay, period, failureThreshold int32) *corev1.Probe {
 		InitialDelaySeconds: delay,
 		PeriodSeconds:       period,
 		FailureThreshold:    failureThreshold,
+		SuccessThreshold:    successThreshold,
+	}
+}
+
+func overrideProbe(probe, override *corev1.Probe) *corev1.Probe {
+	if override == nil {
+		return probe
+	}
+
+	if override.InitialDelaySeconds != 0 {
+		probe.InitialDelaySeconds = override.InitialDelaySeconds
+	}
+	if override.PeriodSeconds != 0 {
+		probe.PeriodSeconds = override.PeriodSeconds
+	}
+	if override.FailureThreshold != 0 {
+		probe.FailureThreshold = override.FailureThreshold
+	}
+	if override.SuccessThreshold != 0 {
+		probe.SuccessThreshold = override.SuccessThreshold
+	}
+	if override.TimeoutSeconds != 0 {
+		probe.TimeoutSeconds = override.TimeoutSeconds
+	}
+	if override.Exec != nil {
+		probe.Exec = override.Exec
+	}
+
+	return probe
+}
+
+func startupProbe(probe *corev1.Probe) *corev1.Probe {
+	return overrideProbe(defaultProbe(5, 5, 30, 1), probe)
+}
+
+func livenessProbe(probe *corev1.Probe) *corev1.Probe {
+	return overrideProbe(defaultProbe(30, 20, 6, 1), probe)
+}
+
+func readinessProbe(replica string, databases []string, probe *corev1.Probe) *corev1.Probe {
+	readiness := defaultProbe(0, 5, 2, 1)
+
+	// The StatefulSet is only reconciled once the replica is seeded, so there is
+	// always at least one database here. An empty "IN ()" list is a syntax error.
+	if len(databases) == 0 {
+		return overrideProbe(readiness, probe)
+	}
+
+	readiness.Exec.Command = []string{"bash", "-c", strings.Join([]string{
+		`set -euo pipefail`,
+		`pg_isready -q -h ` + shellQuote(postgres.SocketDirectory),
+		`psql -XAtqw --command=` +
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery(replica, databases)) +
+			` | grep -qx t`,
+	}, "\n")}
+
+	return overrideProbe(readiness, probe)
+}
+
+// logicalReplicaNSSWrapperInitContainer writes the passwd and group files that
+// let the Pod resolve its user ID to "postgres". OpenShift assigns an arbitrary
+// UID and CRI-O names its passwd entry after the number, so without this both
+// libpq and the backend's "peer" check see that number, and the
+// `local all "postgres" peer` rule the seed brought back from the primary never
+// matches.
+func logicalReplicaNSSWrapperInitContainer(
+	cr *v2.PerconaPGCluster, resources corev1.ResourceRequirements,
+) corev1.Container {
+	return corev1.Container{
+		Name:            naming.ContainerNSSWrapperInit,
+		Image:           cr.PostgresImage(),
+		ImagePullPolicy: cr.Spec.ImagePullPolicy,
+		Command:         []string{"bash", "-c", postgrescluster.NSSWrapperPostgresCommand()},
+		Resources:       resources,
+		SecurityContext: initialize.RestrictedSecurityContext(true),
+		VolumeMounts:    []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}},
 	}
 }
 
@@ -1267,7 +1409,7 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaConfigMap(
 // replica. Stopping one goes through scaleLogicalReplica instead.
 func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 	ctx context.Context, cr *v2.PerconaPGCluster, crunchyCR *v1beta1.PostgresCluster,
-	spec *v2.LogicalReplicaSpec,
+	spec *v2.LogicalReplicaSpec, status *v2.LogicalReplicaStatus,
 ) error {
 	name := logicalReplicaObjectName(cr, spec.Name)
 	dataDir := postgres.DataDirectory(crunchyCR)
@@ -1294,7 +1436,8 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 				"-D", dataDir,
 				"-c", "config_file=" + logicalReplicaConfigMountPath + "/" + logicalReplicaConfigFile,
 			},
-			Env:       logicalReplicaEnvironment(cr, dataDir),
+			Env: append(logicalReplicaEnvironment(cr, dataDir),
+				postgrescluster.NSSWrapperPostgresEnv()...),
 			Resources: spec.Resources,
 			Ports: []corev1.ContainerPort{{
 				Name:          naming.PortPostgreSQL,
@@ -1305,15 +1448,29 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 			VolumeMounts: []corev1.VolumeMount{
 				logicalReplicaCertVolumeMount(),
 				postgres.DataVolumeMount(),
-				{Name: "tmp", MountPath: postgres.SocketDirectory},
+				{Name: "tmp", MountPath: "/tmp"},
+				{Name: logicalReplicaSocketVolume, MountPath: postgres.SocketDirectory},
 				logicalReplicaConfigVolumeMount(),
 			},
-			ReadinessProbe: logicalReplicaProbe(5, 10, 0),
-			LivenessProbe:  logicalReplicaProbe(30, 20, 6),
+			StartupProbe:   startupProbe(spec.StartupProbe),
+			LivenessProbe:  livenessProbe(spec.LivenessProbe),
+			ReadinessProbe: readinessProbe(spec.Name, status.Databases, spec.ReadinessProbe),
 		}
 
+		sts.Spec.Template.Spec.InitContainers = []corev1.Container{
+			logicalReplicaNSSWrapperInitContainer(cr, container.Resources),
+		}
 		sts.Spec.Template.Spec.Containers = []corev1.Container{container}
-		sts.Spec.Template.Spec.Volumes = logicalReplicaVolumes(cr, crunchyCR, spec)
+		sts.Spec.Template.Spec.Volumes = append(
+			logicalReplicaVolumes(cr, crunchyCR, spec),
+			corev1.Volume{
+				Name: logicalReplicaSocketVolume,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						Medium: corev1.StorageMediumMemory,
+					},
+				},
+			})
 		sts.Spec.Template.Spec.SecurityContext = postgres.PodSecurityContext(crunchyCR)
 		sts.Spec.Template.Spec.ImagePullSecrets = cr.Spec.ImagePullSecrets
 		sts.Spec.Template.Spec.Affinity = spec.Affinity
@@ -1685,14 +1842,18 @@ func (r *PGClusterReconciler) logicalReplicaPod(ctx context.Context, cr *v2.Perc
 		// Running is not enough: psql fails against a postmaster that is not
 		// accepting connections yet, and callers treat an exec failure as broken,
 		// which would turn a few seconds of startup into a hard error.
-		if slices.ContainsFunc(pod.Status.Conditions, func(c corev1.PodCondition) bool {
-			return c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue
+		//
+		// The startup probe is the signal this needs: true once the postmaster
+		// has accepted connections, false again when the container restarts.
+		if slices.ContainsFunc(pod.Status.ContainerStatuses, func(c corev1.ContainerStatus) bool {
+			return c.Name == naming.ContainerDatabase &&
+				c.State.Running != nil && c.Started != nil && *c.Started
 		}) {
 			return pod, nil
 		}
 	}
 
-	return nil, errors.New("no ready logical replica pod")
+	return nil, errors.New("no running logical replica pod")
 }
 
 // execOnPod runs sql inside a logical replica pod and returns its trimmed
