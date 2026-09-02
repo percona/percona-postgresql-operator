@@ -42,7 +42,7 @@ commands:
 
       # released-CRD canary: unknown fields are silently pruned — fail loudly instead
       applied_builtin=$(kubectl -n "${NAMESPACE}" get perconapgcluster ${test_name} -o jsonpath='{.spec.extensions.builtin}')
-      for ext in pg_stat_monitor pg_audit pgvector pg_repack; do
+      for ext in pg_stat_statements pg_audit pgvector pg_repack; do
           if ! echo "$applied_builtin" | grep -q "\"$ext\":true"; then
               echo "ERROR: builtin extension '$ext' was pruned by the released CRD: $applied_builtin"
               exit 1

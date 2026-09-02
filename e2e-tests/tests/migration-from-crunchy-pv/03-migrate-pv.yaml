@@ -50,7 +50,7 @@ commands:
       # 3. Delete the Crunchy cluster and operator — no longer needed once the PV
       #    is retained.  Strip finalizers first so the CR is removed cleanly.
       kubectl patch postgrescluster crunchy-source -n "${NAMESPACE}" \
-        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+        --type=json -p='[{"op":"replace","path":"/metadata/finalizers","value":[]}]' 2>/dev/null || true
 
       kubectl delete postgrescluster crunchy-source -n "${NAMESPACE}" --ignore-not-found
 
