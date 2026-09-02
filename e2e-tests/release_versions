@@ -67,6 +67,7 @@ IMAGE_UPGRADE_UBI8_COMMUNITY=perconalab/percona-postgresql-operator:3.1.0-ubi8-u
 IMAGE_UPGRADE_UBI9_COMMUNITY=perconalab/percona-postgresql-operator:3.1.0-upgrade-community
 
 IMAGE_LOGCOLLECTOR=percona/fluentbit:5.1.1-1
+IMAGE_LOGCOLLECTOR_UBI10=percona/fluentbit:5.1.1-1-ubi10
 
 IMAGE_PMM_CLIENT=percona/pmm-client:3.9.1
 IMAGE_PMM_SERVER=percona/pmm-server:3.9.1
