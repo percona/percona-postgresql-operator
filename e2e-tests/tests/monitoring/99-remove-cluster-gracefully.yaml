@@ -1,14 +1,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-delete:
-- apiVersion: pgv2.percona.com/v2
-  kind: PerconaPGCluster
-  metadata:
-    name: monitoring
-- apiVersion: upstream.pgv2.percona.com/v1beta1
-  kind: PostgresCluster
-  metadata:
-    name: monitoring
 commands:
   - script: |-
       set -o errexit
@@ -21,6 +12,7 @@ commands:
         exit 0
       fi
 
+      kubectl -n "${NAMESPACE}" delete pg monitoring --ignore-not-found || true
       remove_all_finalizers
       check_operator_panic
       destroy_operator
