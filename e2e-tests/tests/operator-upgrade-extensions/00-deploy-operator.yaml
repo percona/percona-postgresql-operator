@@ -18,4 +18,4 @@ commands:
       # extension artifacts storage (same flow as the custom-extensions suite)
       deploy_s3_secrets
       deploy_minio
-      copy_custom_extensions_form_aws
+      copy_custom_extensions_from_aws

@@ -2537,16 +2537,21 @@ function create_k8s_cluster() {
 	local platform="$3"
 	local region="$4"
 	local ttl="${5:-"1"}"
+	local gke_machine_type="${K8S_UPGRADE_MACHINE_TYPE:-n1-standard-4}"
+	local doks_node_size="${K8S_UPGRADE_NODE_SIZE:-s-4vcpu-16gb-amd}"
+	if [[ ${ARCH} == arm64 ]]; then
+		gke_machine_type="${K8S_UPGRADE_MACHINE_TYPE:-t2a-standard-4}"
+	fi
 
 	case "$platform" in
 
 		doks)
-			echo "Creating DOKS cluster: $name ($version)"
+			echo "Creating DOKS cluster: $name ($version, size=$doks_node_size)"
 			creation_time=$(date +%s)
 			doctl kubernetes cluster create "$name" \
 				--region "$region" \
 				--version "$version" \
-				--size "s-4vcpu-16gb-amd" \
+				--size "$doks_node_size" \
 				--count "3" \
 				--tag "delete-cluster-after-hours:$ttl" \
 				--tag "creation-time:$creation_time" \
@@ -2563,13 +2568,13 @@ function create_k8s_cluster() {
 			;;
 
 		gke)
-			echo "Creating GKE cluster: $name ($version)"
+			echo "Creating GKE cluster: $name ($version, machine-type=$gke_machine_type)"
 			gcloud container clusters create "$name" \
 				--zone "$region" \
 				--cluster-ipv4-cidr=/21 \
 				--cluster-version "$version" \
 				--num-nodes "3" \
-				--machine-type "n1-standard-4" \
+				--machine-type "$gke_machine_type" \
 				--labels="delete-cluster-after-hours=$ttl,team=cloud,product=pg-operator" \
 				--no-enable-autoupgrade \
 				--monitoring=NONE \

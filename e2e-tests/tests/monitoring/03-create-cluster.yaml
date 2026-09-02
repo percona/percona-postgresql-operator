@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping monitoring test on arm64: PMM server does not support ARM"
+        exit 0
+      fi
+
       get_cr \
         | yq eval '.spec.pmm.enabled=true' - \
         | yq eval ".spec.pmm.image=\"${IMAGE_PMM_CLIENT}\"" - \
