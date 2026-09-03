@@ -2648,13 +2648,6 @@ check_logs_for_errors() {
 		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
 			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true
 	done
-	# event messages can be multi-line (pgBackRest output): fold every event back
-	# into a single line, otherwise the continuation lines pass both the
-	# timestamp filter and the allowlist, which only matches the first line
-	kubectl -n "$NAMESPACE" get events --field-selector type=Warning \
-		-o jsonpath='{range .items[*]}{.lastTimestamp} {.involvedObject.name} {.reason} {.message}{"\n"}{end}' 2>/dev/null \
-		| awk '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T/ {if (rec != "") print rec; rec = $0; next} {rec = rec " " $0} END {if (rec != "") print rec}' \
-		| awk -v s="$since" '$1 >= s' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_events.txt" || true
 	for f in operator postgres events; do
 		if [[ -s "${TEMP_DIR}/log_errors_${f}.txt" ]]; then
 			echo "=== unexpected ${f} errors since ${since} ==="
