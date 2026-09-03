@@ -1637,11 +1637,7 @@ function get_container_image() {
 				echo "${IMAGE_BASE}:${operatorVersion}-${component}-community"
 				;;
 			upgrade)
-				if [[ ${pgVersion} -ge 19 ]]; then
-					echo "${IMAGE_BASE}:${operatorVersion}-upgrade${pgVersion}-community"
-				else
-					echo "${IMAGE_BASE}:${operatorVersion}-upgrade-community"
-				fi
+				echo "${IMAGE_BASE}:${operatorVersion}-upgrade-community"
 				;;
 			*)
 				echo "${IMAGE_BASE}:${operatorVersion}-postgres${pgVersion}-community"
