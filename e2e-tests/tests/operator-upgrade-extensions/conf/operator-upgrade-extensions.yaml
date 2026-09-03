@@ -23,7 +23,7 @@ spec:
       secret:
         name: minio-secret
     builtin:
-      pg_stat_monitor: true
+      pg_stat_statements: true
       pg_audit: true
       pgvector: true
       pg_repack: true
