@@ -10,16 +10,15 @@ commands:
 
       source ../../functions
 
-      if [[ ${ARCH} == arm64 ]]; then
-        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
-        exit 0
-      fi
-
       until kubectl assert exist-enhanced deployment percona-postgresql-operator \
         -n "${OPERATOR_NS:-$NAMESPACE}" --field-selector status.readyReplicas=1; do
         echo "Waiting for percona-postgresql-operator deployment"
         sleep 5
       done
+
+      if [[ ${ARCH} == arm64 ]]; then
+        exit 0
+      fi
 
       until kubectl assert exist-enhanced deployment minio-service \
         -n "${NAMESPACE}" --field-selector status.readyReplicas=1; do
