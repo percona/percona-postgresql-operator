@@ -1631,22 +1631,13 @@ function get_container_image() {
 		operatorVersion=main
 	fi
 
-	# Community images are built from upstream PGDG packages and published under
-	# their own tags. pgBouncer is version agnostic there, so a single image
-	# serves every PostgreSQL version. PostgreSQL 19 is the exception: it is in
-	# beta and its images carry the version in the tag, because they are built
-	# separately (PGDG testing packages, pgBackRest 2.59, PG 19 upgrade binaries).
 	if [[ ${PG_DISTRIBUTION} == "community" ]]; then
 		case $component in
-			pgbouncer)
-				echo "${IMAGE_BASE}:${operatorVersion}-pgbouncer-community"
+			pgbouncer | pgbackrest)
+				echo "${IMAGE_BASE}:${operatorVersion}-${component}-community"
 				;;
-			pgbackrest | upgrade)
-				if [[ ${pgVersion} -ge 19 ]]; then
-					echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
-				else
-					echo "${IMAGE_BASE}:${operatorVersion}-${component}-community"
-				fi
+			upgrade)
+				echo "${IMAGE_BASE}:${operatorVersion}-upgrade-community"
 				;;
 			*)
 				echo "${IMAGE_BASE}:${operatorVersion}-postgres${pgVersion}-community"
