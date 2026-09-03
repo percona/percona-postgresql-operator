@@ -15,7 +15,7 @@ commands:
           local san="$2"
 
           for i in {1..60}; do
-              if kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{range .spec.dnsNames[*]}{.}{"\n"}{end}' | grep -Fxq -- "$san"; then
+              if kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{range .spec.dnsNames[*]}{@}{"\n"}{end}' | grep -Fxq -- "$san"; then
                   return 0
               fi
               sleep 5
