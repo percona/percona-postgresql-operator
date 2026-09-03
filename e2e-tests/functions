@@ -132,7 +132,7 @@ function remove_all_finalizers() {
 			if [[ $(kubectl -n "${NAMESPACE}" get "$resource" "$name" -o yaml | yq '.metadata.finalizers | length') == "0" ]]; then
 				continue
 			fi
-			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+			kubectl -n "${NAMESPACE}" patch "$resource" "$name" --type=merge -p='{"metadata":{"finalizers":[]}}'
 			kubectl -n "${NAMESPACE}" delete "$resource" "$name" --wait=0
 		done
 	done
@@ -2328,8 +2328,9 @@ function get_available_k8s_versions() {
 			versions=$(
 				gcloud container get-server-config \
 					--region "${region}" \
-					--format="value(validMasterVersions)" 2>/dev/null \
-					| tr ';' '\n' \
+					--flatten='channels[].validVersions[]' \
+					--filter='channels.channel=STABLE' \
+					--format='value(channels.validVersions)' 2>/dev/null \
 					| awk -F'.' '!seen[$1"."$2]++'
 			)
 			;;
@@ -2636,7 +2637,13 @@ check_logs_for_errors() {
 	# the operator logs JSON only with LOG_STRUCTURED=true, deploy/operator.yaml
 	# sets it to false, so match the console encoder format as well
 	kubectl -n "$op_ns" logs deployment/percona-postgresql-operator --since-time="$since" 2>/dev/null \
-		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
+		| grep -E '"level":"error"|[[:space:]]ERROR[[:space:]]|panic:' \
+		| awk -v namespace="$NAMESPACE" '
+			!match($0, /"namespace"[[:space:]]*:[[:space:]]*"[^"]+"/) ||
+			index($0, "\"namespace\":\"" namespace "\"") ||
+			index($0, "\"namespace\": \"" namespace "\"")
+		' \
+		| grep -Evf "$allow" >"${TEMP_DIR}/log_errors_operator.txt" || true
 	for pod in $(kubectl -n "$NAMESPACE" get pods -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/data=postgres -o name); do
 		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
 			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true

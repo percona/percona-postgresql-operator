@@ -10,7 +10,7 @@ commands:
 
       uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
 
-      for ext in pg_stat_monitor pgaudit vector pg_repack pg_cron; do
+      for ext in pg_stat_statements pgaudit vector pg_repack pg_cron; do
           run_psql_local "\c postgres \\\\\\ CREATE EXTENSION IF NOT EXISTS \"$ext\"" "$uri"
       done
 
