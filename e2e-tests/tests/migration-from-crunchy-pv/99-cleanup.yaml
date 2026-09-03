@@ -19,7 +19,7 @@ commands:
       # Remove Crunchy source cluster if it still exists (e.g. test failed
       # before step 03 could delete it).
       kubectl patch postgrescluster crunchy-source -n "${NAMESPACE}" \
-        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+        --type=json -p='[{"op":"replace","path":"/metadata/finalizers","value":[]}]' 2>/dev/null || true
       kubectl delete postgrescluster crunchy-source -n "${NAMESPACE}" \
         --ignore-not-found || true
 

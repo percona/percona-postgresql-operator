@@ -20,7 +20,7 @@ commands:
 
       kubectl delete postgrescluster crunchy-source -n "${CRUNCHY_NS}" --ignore-not-found || true
       kubectl patch postgrescluster crunchy-source -n "${CRUNCHY_NS}" \
-        --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+        --type=json -p='[{"op":"replace","path":"/metadata/finalizers","value":[]}]' 2>/dev/null || true
 
       helm uninstall pgo --namespace "${CRUNCHY_NS}" --ignore-not-found || true
 
