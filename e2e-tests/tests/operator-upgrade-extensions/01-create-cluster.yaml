@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
       lower_ver="$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
       curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${lower_ver}/deploy/cr.yaml" >"${TEMP_DIR}/cr_lower.yaml"
 

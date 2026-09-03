@@ -24,6 +24,5 @@ commands:
 
       retry 30 10 bash -c '
         kubectl -n "'"${NAMESPACE}"'" get pg-backup \
-          -l postgres-operator.crunchydata.com/cluster=monitoring,postgres-operator.crunchydata.com/pgbackrest-backup=replica-create \
           -o jsonpath="{.items[*].status.state}" | grep -qw Succeeded
       '

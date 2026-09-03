@@ -7,6 +7,12 @@ commands:
       set -o xtrace
 
       source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
       init_temp_dir # do this only in the first TestStep
 
       destroy_cert_manager

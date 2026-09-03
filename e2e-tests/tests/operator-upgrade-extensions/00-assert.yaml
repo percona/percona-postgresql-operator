@@ -4,5 +4,25 @@ metadata:
   name: check-operator-and-minio
 timeout: 180
 commands:
-  - script: kubectl assert exist-enhanced deployment percona-postgresql-operator -n ${OPERATOR_NS:-$NAMESPACE} --field-selector status.readyReplicas=1
-  - script: kubectl assert exist-enhanced deployment minio-service -n ${NAMESPACE} --field-selector status.readyReplicas=1
+  - script: |
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
+      until kubectl assert exist-enhanced deployment percona-postgresql-operator \
+        -n "${OPERATOR_NS:-$NAMESPACE}" --field-selector status.readyReplicas=1; do
+        echo "Waiting for percona-postgresql-operator deployment"
+        sleep 5
+      done
+
+      until kubectl assert exist-enhanced deployment minio-service \
+        -n "${NAMESPACE}" --field-selector status.readyReplicas=1; do
+        echo "Waiting for minio-service deployment"
+        sleep 5
+      done
