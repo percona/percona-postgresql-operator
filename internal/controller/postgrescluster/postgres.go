@@ -1645,6 +1645,63 @@ func (r *Reconciler) reconcilePostgresWALVolume(
 	return pvc, err
 }
 
+// +kubebuilder:rbac:groups="",resources="persistentvolumeclaims",verbs={create,patch}
+
+// K8SPG-1086
+// reconcilePostgresLogVolume writes the PersistentVolumeClaim for instance's
+// PostgreSQL log volume. When no log volume is specified, it returns nil and
+// the PVC is retained for manual cleanup or future reuse.
+func (r *Reconciler) reconcilePostgresLogVolume(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+	instanceSpec *v1beta1.PostgresInstanceSetSpec, instance *appsv1.StatefulSet,
+	clusterVolumes []corev1.PersistentVolumeClaim,
+) (*corev1.PersistentVolumeClaim, error) {
+	if cluster.CompareVersion("3.2.0") < 0 || instanceSpec.LogVolumeClaimSpec == nil {
+		return nil, nil
+	}
+
+	labelMap := map[string]string{
+		naming.LabelCluster:     cluster.Name,
+		naming.LabelInstanceSet: instanceSpec.Name,
+		naming.LabelInstance:    instance.Name,
+		naming.LabelRole:        naming.RolePostgresLog,
+		naming.LabelData:        naming.DataPostgres,
+	}
+
+	var pvc *corev1.PersistentVolumeClaim
+	existingPVCName, err := getPGPVCName(labelMap, clusterVolumes)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if existingPVCName != "" {
+		pvc = &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.GetNamespace(),
+			Name:      existingPVCName,
+		}}
+	} else {
+		pvc = &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresLogVolume(instance)}
+	}
+
+	pvc.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
+
+	pvc.Annotations = naming.Merge(
+		cluster.Spec.Metadata.GetAnnotationsOrNil(),
+		instanceSpec.Metadata.GetAnnotationsOrNil())
+
+	pvc.Labels = naming.Merge(
+		cluster.Spec.Metadata.GetLabelsOrNil(),
+		instanceSpec.Metadata.GetLabelsOrNil(),
+		naming.WithPerconaLabels(labelMap, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
+	)
+
+	pvc.Spec = *instanceSpec.LogVolumeClaimSpec
+
+	err = r.handlePersistentVolumeClaimError(cluster,
+		errors.WithStack(r.apply(ctx, pvc)))
+
+	return pvc, err
+}
+
 // reconcileDatabaseInitSQL runs custom SQL files in the database. When
 // DatabaseInitSQL is defined, the function will find the primary pod and run
 // SQL from the defined ConfigMap
