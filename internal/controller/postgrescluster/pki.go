@@ -21,6 +21,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -437,6 +438,13 @@ func (r *Reconciler) reconcileInternalClusterCertificate(
 	dnsNames := append(primaryServiceDNSNames, replicaServiceDNSNames...)
 	dnsFQDN := dnsNames[0]
 
+	// K8SPG-1149: the hostnames published by external-dns are appended after the
+	// in-cluster names so the FQDN above stays the common name.
+	dnsNames = append(dnsNames, pNaming.ManagedExternalDNSHostnames(
+		cluster.Spec.Service.GetMetadata().GetAnnotationsOrNil(),
+		cluster.Spec.ReplicaService.GetMetadata().GetAnnotationsOrNil(),
+	)...)
+
 	if err == nil {
 		// Unmarshal and validate the stored leaf. These first errors can
 		// be ignored because they result in an invalid leaf which is then
@@ -523,6 +531,12 @@ func (r *Reconciler) reconcileCertManagerClusterCertificate(
 		return nil, errors.Wrap(err, "get replica service DNS names")
 	}
 	dnsNames := append(primaryDNSNames, replicaDNSNames...)
+
+	// K8SPG-1149: see reconcileInternalClusterCertificate.
+	dnsNames = append(dnsNames, pNaming.ManagedExternalDNSHostnames(
+		cluster.Spec.Service.GetMetadata().GetAnnotationsOrNil(),
+		cluster.Spec.ReplicaService.GetMetadata().GetAnnotationsOrNil(),
+	)...)
 
 	err = c.ApplyClusterCertificate(ctx, cluster, dnsNames)
 	if err != nil {

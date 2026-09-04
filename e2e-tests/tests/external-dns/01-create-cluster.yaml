@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 20
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      get_cr \
+        | yq eval '
+            .spec.proxy.pgBouncer.replicas=1 |
+            .spec.instances[].replicas=2 |
+            .spec.expose.externalDNS.hostname="primary.external-dns.example.com" |
+            .spec.expose.externalDNS.ttl=60 |
+            .spec.exposeReplicas.externalDNS.hostname="replicas.external-dns.example.com" |
+            .spec.exposeReplicas.externalDNS.ttl=60 |
+            .spec.proxy.pgBouncer.expose.externalDNS.hostname="pgbouncer.external-dns.example.com" |
+            .spec.proxy.pgBouncer.expose.externalDNS.ttl=60' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
