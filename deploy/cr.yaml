@@ -376,10 +376,28 @@ spec:
 #          - mountPath: /pgdata/dicts
 #            readOnly: true
 
+#  logicalReplicas:
+#  - name: analytics
+#    databases: []  # empty = all non-template databases except "postgres"
+#    bootstrapMethod: pgbackrest
+#    dataVolumeClaimSpec:
+#      accessModes:
+#      - ReadWriteOnce
+#      resources:
+#        requests:
+#          storage: 1Gi
+#    resources:
+#      limits:
+#        cpu: 2.0
+#        memory: 4Gi
+#    expose:
+#      type: LoadBalancer
+
   proxy:
     pgBouncer:
       replicas: 3
       image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+#      paused: true
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -864,6 +882,14 @@ spec:
 #          max_worker_processes: 2
 #          shared_buffers: 1GB
 #          work_mem: 2MB
+#        use_slots: true
+#      slots:
+#        cdc_consumer:
+#          type: logical
+#          database: myapp
+#          plugin: pgoutput
+#        external_replica:
+#          type: physical
 #    createReplicaMethods:
 #    - pgbackrest
 #    - basebackup

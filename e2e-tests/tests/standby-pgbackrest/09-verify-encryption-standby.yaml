@@ -1,0 +1,69 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 480
+    script: |-
+      set -o xtrace
+      set -o errexit
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        data=''
+        timer=0
+        until data=$(run_psql_local \
+            '\c myapp \\\ SELECT * from myTable;' \
+            "$(get_standby_psql_uri standby-cluster postgres source-cluster)") \
+            && [[ -n "$data" ]]; do
+          if [[ $timer -ge 20 ]]; then
+            echo "ERROR: data not replicated after 400 seconds"
+            exit 1
+          fi
+          sleep 20
+          timer=$((timer + 1))
+        done
+        kubectl create configmap -n "${NAMESPACE}" 09-verify-data-standby --from-literal=data="${data}"
+        exit 0
+      fi
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)")
+      kubectl -n "${NAMESPACE}" create configmap 09-verify-extension-standby --from-literal=pg_tde_extension="$result"
+
+      # with pgbackrest standby replicating data may take time. We need to give some time for this before failing
+      data=''
+      timer=0
+      until data=$(run_psql_local \
+          '\c myapp \\\ SELECT * from myTable;' \
+          "$(get_standby_psql_uri standby-cluster postgres source-cluster)") \
+          && [[ -n "$data" ]]; do
+        if [[ $timer -ge 20 ]]; then
+          echo "ERROR: data not replicated after 400 seconds"
+          exit 1
+        fi
+        sleep 20
+        timer=$((timer + 1))
+      done
+
+      kubectl create configmap -n "${NAMESPACE}" 09-verify-data-standby --from-literal=data="${data}"
+
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 09-verify-encryption-standby --from-literal=pg_tde_is_encrypted="$result"
+
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)")
+      kubectl -n "${NAMESPACE}" create configmap 09-verify-wal-encryption-standby --from-literal=pg_tde_wal_encrypt="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp"
+
+      # Before switchover the standby still uses the source PostgresCluster uid in the TDE key.
+      assert_pg_tde_key_info_uid \
+        "$(get_standby_psql_uri standby-cluster postgres source-cluster)/myapp" \
+        source-cluster

@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 type Controller interface {
@@ -76,6 +76,11 @@ func issuerConf(cluster *v1beta1.PostgresCluster) *cmmeta.IssuerReference {
 
 // ResolveIssuerMode determines how the operator should handle cluster.Spec.TLS.IssuerConf.
 func ResolveIssuerMode(ctx context.Context, cl client.Client, cluster *v1beta1.PostgresCluster) (IssuerMode, error) {
+	// Only auto uses cert-manager
+	if cluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementAuto {
+		return IssuerModeManagedNamespaced, nil
+	}
+
 	ic := issuerConf(cluster)
 	if ic == nil {
 		return IssuerModeManagedNamespaced, nil

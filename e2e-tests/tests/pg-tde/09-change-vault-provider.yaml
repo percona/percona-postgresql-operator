@@ -1,17 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 120
 commands:
-  - script: |-
+  - timeout: 120
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
 
+      vault_namespace=vault
       vault_name=vault-service
 
       old_token=$(kubectl -n "${NAMESPACE}" get secret vault-secret -o jsonpath='{.data.token}' | base64 -d)
-      new_token=$(kubectl -n ${vault_name} exec ${vault_name}-0 -- \
+      new_token=$(kubectl -n ${vault_namespace} exec ${vault_name}-0 -- \
         sh -c "VAULT_TOKEN=${old_token} vault token create -tls-skip-verify -format=json" | jq -r '.auth.client_token')
 
       kubectl -n "${NAMESPACE}" get secret vault-secret -o jsonpath='{.data.ca\.crt}' \
@@ -23,7 +24,7 @@ commands:
 
       get_cr \
         | yq '.spec.extensions.pg_tde.enabled = true' \
-        | yq '.spec.extensions.pg_tde.vault.host = "https://vault-service.vault-service.svc:8200"' \
+        | yq '.spec.extensions.pg_tde.vault.host = "https://vault-service.vault.svc:8200"' \
         | yq '.spec.extensions.pg_tde.vault.mountPath = "tde"' \
         | yq '.spec.extensions.pg_tde.vault.tokenSecret.name = "vault-secret-rotated"' \
         | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \

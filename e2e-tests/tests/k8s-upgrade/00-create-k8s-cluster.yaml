@@ -8,12 +8,15 @@ commands:
 
       source ../../functions
 
-      name="k8s-upgrade-$RANDOM"
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
 
-      if [[ "${K8S_UPGRADE_PLATFORM}" != "gke" && "${K8S_UPGRADE_PLATFORM}" != "digitalocean" ]]; then
-        echo "Unsupported platform: ${K8S_UPGRADE_PLATFORM}"
-        exit 1
-      fi
+      name="k8s-upgrade-$RANDOM"
 
       if [[ -n "${K8S_UPGRADE_INITIAL_VERSION}" && -z "${K8S_UPGRADE_FINAL_VERSION}" ]] ||
         [[ -z "${K8S_UPGRADE_INITIAL_VERSION}" && -n "${K8S_UPGRADE_FINAL_VERSION}" ]]; then

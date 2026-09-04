@@ -1,29 +1,15 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 10
 commands:
-  - script: |-
+  - timeout: 60
+    script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
-      
-      snapshot_class='gke-snapshot-class'
-      platform=$(detect_k8s_platform)
-      case "$platform" in
-        eks)
-          snapshot_class='eks-snapshot-class'
-          ;;
-        openshift)
-          snapshot_class='openshift-snapshot-class'
-          ;;
-        aks)
-          snapshot_class='aks-snapshot-class'
-          ;;
-        digitalocean)
-          snapshot_class='do-block-storage'
-          ;;
-      esac
+
+      platform="${PLATFORM}"
+      snapshot_class=$(get_volume_snapshot_class "$platform")
 
       export platform snapshot_class
       get_cr "backup-snapshot" ${RANDOM} \

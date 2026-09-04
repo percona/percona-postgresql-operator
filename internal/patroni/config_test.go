@@ -18,13 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestClusterYAML(t *testing.T) {
@@ -408,6 +408,38 @@ func TestDynamicConfiguration(t *testing.T) {
 					"pg_hba":        []string{},
 					"use_pg_rewind": true,
 					"use_slots":     "input",
+				},
+			},
+		},
+		{
+			name: "postgresql: use_slots enabled with permanent slots",
+			input: map[string]any{
+				"postgresql": map[string]any{
+					"use_slots": true,
+				},
+				"slots": map[string]any{
+					"my_slot": map[string]any{
+						"type":     "logical",
+						"database": "mydb",
+						"plugin":   "pgoutput",
+					},
+				},
+			},
+			expected: map[string]any{
+				"loop_wait": int32(10),
+				"ttl":       int32(30),
+				"postgresql": map[string]any{
+					"parameters":    map[string]any{},
+					"pg_hba":        []string{},
+					"use_pg_rewind": true,
+					"use_slots":     true,
+				},
+				"slots": map[string]any{
+					"my_slot": map[string]any{
+						"type":     "logical",
+						"database": "mydb",
+						"plugin":   "pgoutput",
+					},
 				},
 			},
 		},
@@ -1037,6 +1069,62 @@ func TestDynamicConfiguration(t *testing.T) {
 	}
 }
 
+func TestDynamicConfigurationIgnoreSlots(t *testing.T) {
+	t.Parallel()
+
+	newCluster := func(replicas ...string) *v1beta1.PostgresCluster {
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.Spec.PostgresVersion = 17
+		for _, name := range replicas {
+			cluster.Spec.LogicalReplicas = append(cluster.Spec.LogicalReplicas,
+				v1beta1.LogicalReplicaSpec{Name: name})
+		}
+		assert.NilError(t, cluster.Default(context.Background(), nil))
+		return cluster
+	}
+
+	t.Run("absent without logical replicas", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster(), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		_, ok := actual["ignore_slots"]
+		assert.Assert(t, !ok)
+	})
+
+	t.Run("added for logical replicas", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster("analytics"), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		// Without this Patroni deletes the slot pg_createsubscriber leaves on
+		// the primary: dropping unknown slots is not gated on use_slots, which
+		// this operator pins to false.
+		assert.DeepEqual(t, actual["ignore_slots"], []any{
+			map[string]any{"type": "logical", "plugin": "pgoutput"},
+		})
+	})
+
+	t.Run("user entries are preserved", func(t *testing.T) {
+		input := map[string]any{
+			"ignore_slots": []any{
+				map[string]any{"name": "mine", "type": "physical"},
+			},
+		}
+
+		actual := DynamicConfiguration(newCluster("analytics"), input, postgres.HBAs{}, postgres.Parameters{})
+
+		assert.DeepEqual(t, actual["ignore_slots"], []any{
+			map[string]any{"name": "mine", "type": "physical"},
+			map[string]any{"type": "logical", "plugin": "pgoutput"},
+		})
+	})
+
+	t.Run("one matcher regardless of replica count", func(t *testing.T) {
+		actual := DynamicConfiguration(newCluster("a", "b", "c"), nil, postgres.HBAs{}, postgres.Parameters{})
+
+		ignored, ok := actual["ignore_slots"].([]any)
+		assert.Assert(t, ok)
+		assert.Equal(t, len(ignored), 1)
+	})
+}
+
 func TestInstanceConfigFiles(t *testing.T) {
 	t.Parallel()
 
@@ -1272,7 +1360,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "command.sh")
 		assert.NilError(t, os.WriteFile(file, []byte(command), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", "--shell=sh", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", "--shell=sh", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}
@@ -1294,7 +1382,7 @@ func TestPGBackRestCreateReplicaCommand(t *testing.T) {
 		file := filepath.Join(dir, "script.bash")
 		assert.NilError(t, os.WriteFile(file, []byte(script), 0o600))
 
-		cmd := exec.Command(shellcheck, "--enable=all", file)
+		cmd := exec.CommandContext(context.Background(), shellcheck, "--enable=all", file)
 		output, err := cmd.CombinedOutput()
 		assert.NilError(t, err, "%q\n%s", cmd.Args, output)
 	}

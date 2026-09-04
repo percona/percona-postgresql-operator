@@ -1,0 +1,110 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  - script: |-
+      kubectl wait --for=jsonpath='{.metadata.annotations.pgv2\.percona\.com/replication-main-site}'="${NAMESPACE}"/source-cluster --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
+  - script: |
+      set -o errexit
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping TDE assertions for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
+      echo "Waiting for standby cluster to be ready"
+      kubectl wait --for=jsonpath='{.status.state}'=ready --timeout=480s -n "${NAMESPACE}" pg/standby-cluster
+
+      wait_pg_condition "standby-cluster" "PGTDEEnabled" "True" "ReplicatedFromSource" "pg_tde arrived with the data replicated from the source cluster" "2"
+      wait_pg_condition "standby-cluster" "PGTDEVaultProviderReady" "True" "ReplicatedFromSource" "pg_tde fetched its principal key using the replicated key provider" "2"
+
+      until assert_tde_state "standby-cluster" "true"; do
+        sleep 5
+      done
+
+      echo "PG TDE expected state reached in standby cluster"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    postgres-operator.crunchydata.com/cluster: standby-cluster
+    postgres-operator.crunchydata.com/data: postgres
+    postgres-operator.crunchydata.com/instance-set: instance1
+  ownerReferences:
+  - apiVersion: upstream.pgv2.percona.com/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PostgresCluster
+    name: standby-cluster
+status:
+  availableReplicas: 1
+  currentReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: standby-cluster-pgbouncer
+  labels:
+    postgres-operator.crunchydata.com/cluster: standby-cluster
+    postgres-operator.crunchydata.com/role: pgbouncer
+  ownerReferences:
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
+      kind: PostgresCluster
+      name: standby-cluster
+      controller: true
+      blockOwnerDeletion: true
+status:
+  observedGeneration: 1
+  replicas: 3
+  updatedReplicas: 3
+  readyReplicas: 3
+---
+apiVersion: upstream.pgv2.percona.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: standby-cluster
+  ownerReferences:
+    - apiVersion: pgv2.percona.com/v2
+      kind: PerconaPGCluster
+      name: standby-cluster
+      controller: true
+      blockOwnerDeletion: true
+  finalizers:
+    - postgres-operator.crunchydata.com/finalizer
+status:
+  instances:
+    - name: instance1
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  observedGeneration: 1
+  pgbackrest:
+    repos:
+      - name: repo1
+  proxy:
+    pgBouncer:
+      readyReplicas: 3
+      replicas: 3
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: standby-cluster
+status:
+  pgbouncer:
+    ready: 3
+    size: 3
+  postgres:
+    instances:
+    - name: instance1
+      ready: 3
+      size: 3
+    ready: 3
+    size: 3
+  state: ready

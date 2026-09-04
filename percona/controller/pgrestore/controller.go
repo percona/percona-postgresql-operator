@@ -10,19 +10,20 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller"
-	"github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/snapshot"
-	restoreutils "github.com/percona/percona-postgresql-operator/v2/percona/controller/pgrestore/utils"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller"
+	"github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/snapshot"
+	restoreutils "github.com/percona/percona-postgresql-operator/v3/percona/controller/pgrestore/utils"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 )
 
 const (
@@ -75,6 +76,10 @@ func (r *PGRestoreReconciler) Reconcile(ctx context.Context, request reconcile.R
 	err := r.Client.Get(ctx, types.NamespacedName{Name: pgRestore.Spec.PGCluster, Namespace: request.Namespace}, pgCluster)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "get PerconaPGCluster")
+	}
+
+	if ptr.Deref(pgCluster.Spec.Unmanaged, false) && pgRestore.DeletionTimestamp.IsZero() {
+		return reconcile.Result{}, nil
 	}
 
 	if pgRestore.Spec.VolumeSnapshotBackupName != "" {

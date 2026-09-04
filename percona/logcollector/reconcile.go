@@ -15,11 +15,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/logcollector/logrotate"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/logcollector/logrotate"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // Reconcile wires the log collector sidecars, volumes, and backing ConfigMaps for the given cluster.
@@ -56,9 +56,26 @@ func resolveDefaultEnabled(ctx context.Context, c client.Client, cr *v2.PerconaP
 		return errors.Wrap(err, "get postgres cluster")
 	}
 
-	isNewCluster := k8serrors.IsNotFound(err)
-	cr.Spec.LogCollector.Enabled = &isNewCluster
+	var enabled bool
+	if k8serrors.IsNotFound(err) {
+		enabled = true
+	} else {
+		// preserve the existing state
+		enabled = hasLogCollectorSidecar(existing)
+	}
+	cr.Spec.LogCollector.Enabled = &enabled
 	return nil
+}
+
+func hasLogCollectorSidecar(pg *crunchyv1beta1.PostgresCluster) bool {
+	for i := range pg.Spec.InstanceSets {
+		for _, c := range pg.Spec.InstanceSets[i].Containers {
+			if c.Name == containerName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func wireSidecars(ctx context.Context, c client.Client, cr *v2.PerconaPGCluster) error {

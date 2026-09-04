@@ -12,12 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func (r *PGClusterReconciler) getHost(ctx context.Context, cr *v2.PerconaPGCluster) (string, error) {
@@ -168,12 +168,14 @@ func (r *PGClusterReconciler) updateStatus(ctx context.Context, cr *v2.PerconaPG
 func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterStatus) {
 	setClusterNotReadyCondition := func(status metav1.ConditionStatus, reason string) {
 		existing := meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionClusterIsReadyForBackup)
-		if existing == nil || existing.Status != status || existing.Reason != reason {
+		if existing == nil || existing.Status != status || existing.Reason != reason ||
+			existing.ObservedGeneration != cr.Generation {
 			_ = meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 				Type:               pNaming.ConditionClusterIsReadyForBackup,
 				Status:             status,
 				LastTransitionTime: metav1.Now(),
 				Reason:             reason,
+				ObservedGeneration: cr.Generation,
 			})
 		}
 	}
@@ -206,6 +208,7 @@ var perconaOwnedConditions = []string{
 	pNaming.ConditionClusterIsReadyForBackup,
 	pNaming.ConditionAPIGroupMigration,
 	pNaming.ConditionStandbyLagging,
+	pNaming.ConditionReadyForLogicalReplication,
 	v2.ConditionPMMReady,
 }
 

@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      init_temp_dir # do this only in the first TestStep
+
+      destroy_cert_manager
+
+      git_tag="v$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
+      deploy_operator_gh $git_tag
+      deploy_client
+
+      # extension artifacts storage (same flow as the custom-extensions suite)
+      deploy_s3_secrets
+      deploy_minio
+      copy_custom_extensions_form_aws

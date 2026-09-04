@@ -6,19 +6,40 @@ package pgbouncer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer/startup"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/util"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
+
+// crunchyBinVolumeMount is where the PgBouncer container finds the
+// operator binaries installed by the init container.
+var crunchyBinVolumeMount = corev1.VolumeMount{
+	Name:      pNaming.CrunchyBinVolumeName,
+	MountPath: pNaming.CrunchyBinVolumePath,
+}
+
+// crunchyBinVolume is the volume the init container installs the
+// operator binaries into.
+var crunchyBinVolume = corev1.Volume{
+	Name: pNaming.CrunchyBinVolumeName,
+	VolumeSource: corev1.VolumeSource{
+		EmptyDir: &corev1.EmptyDirVolumeSource{},
+	},
+}
 
 // ConfigMap populates the PgBouncer ConfigMap.
 func ConfigMap(
@@ -39,6 +60,16 @@ func ConfigMap(
 		outConfigMap.Data[hbaFileConfigMapKey] = pgbouncerHBAFileContents(inCluster)
 	} else {
 		delete(outConfigMap.Data, hbaFileConfigMapKey)
+	}
+
+	// This ConfigMap key allows us to preserve pause state across restarts.
+	// PAUSE is an in-memory operation only. The key must be removed once the
+	// cluster is resumed, otherwise the marker outlives the pause and the next
+	// restart would pause a cluster the user has already resumed.
+	if inCluster.CompareVersion("3.1.0") >= 0 && inCluster.Spec.Proxy.PGBouncerPaused() {
+		outConfigMap.Data[pausedConfigMapKey] = PausedValue
+	} else {
+		delete(outConfigMap.Data, pausedConfigMapKey)
 	}
 }
 
@@ -75,22 +106,42 @@ func Secret(ctx context.Context,
 		err = errors.WithStack(err)
 	}
 
+	var adminPassword string
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		adminPassword = string(inSecret.Data[AdminPasswordSecretKey])
+
+		if err == nil && len(adminPassword) == 0 {
+			adminPassword, err = util.GenerateASCIIPassword(32)
+			err = errors.WithStack(err)
+		}
+	}
+
 	if err == nil {
 		// Store the SCRAM verifier alongside the plaintext password so that
 		// later reconciles don't generate it repeatedly.
-		outSecret.Data[authFileSecretKey], err = authFileContents(password, inUserSecret)
+		outSecret.Data[authFileSecretKey], err = authFileContents(password, adminPassword, inUserSecret)
 		outSecret.Data[passwordSecretKey] = []byte(password)
 		outSecret.Data[verifierSecretKey] = []byte(verifier)
+
+		if len(adminPassword) > 0 {
+			outSecret.Data[AdminPasswordSecretKey] = []byte(adminPassword)
+		}
 	}
 
 	if inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret == nil {
-		if frontendCertManagerSecret != nil {
+		if inCluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+			// In userProvidedOnly mode, the certificates should be the only
+			// user-managed values in the secret. We should preserve them.
+			outSecret.Data[CertFrontendAuthoritySecretKey] = inSecret.Data[CertFrontendAuthoritySecretKey]
+			outSecret.Data[CertFrontendPrivateKeySecretKey] = inSecret.Data[CertFrontendPrivateKeySecretKey]
+			outSecret.Data[CertFrontendSecretKey] = inSecret.Data[CertFrontendSecretKey]
+		} else if frontendCertManagerSecret != nil {
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
+				outSecret.Data[CertFrontendAuthoritySecretKey], err = frontendAuthorityCert(inRoot, frontendCertManagerSecret)
 			}
 			if err == nil {
-				outSecret.Data[certFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
-				outSecret.Data[certFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
+				outSecret.Data[CertFrontendSecretKey] = frontendCertManagerSecret.Data[corev1.TLSCertKey]
+				outSecret.Data[CertFrontendPrivateKeySecretKey] = frontendCertManagerSecret.Data[corev1.TLSPrivateKeyKey]
 			}
 		} else if inRoot == nil {
 			err = errors.New("waiting for cert-manager to issue pgbouncer frontend certificate")
@@ -111,21 +162,21 @@ func Secret(ctx context.Context,
 				// Unmarshal and validate the stored leaf. These first errors can
 				// be ignored because they result in an invalid leaf which is then
 				// correctly regenerated.
-				_ = leaf.Certificate.UnmarshalText(inSecret.Data[certFrontendSecretKey])
-				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[certFrontendPrivateKeySecretKey])
+				_ = leaf.Certificate.UnmarshalText(inSecret.Data[CertFrontendSecretKey])
+				_ = leaf.PrivateKey.UnmarshalText(inSecret.Data[CertFrontendPrivateKeySecretKey])
 
 				leaf, err = inRoot.RegenerateLeafWhenNecessary(leaf, dnsFQDN, dnsNames)
 				err = errors.WithStack(err)
 			}
 
 			if err == nil {
-				outSecret.Data[certFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
+				outSecret.Data[CertFrontendAuthoritySecretKey], err = inRoot.Certificate.MarshalText()
 			}
 			if err == nil {
-				outSecret.Data[certFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
+				outSecret.Data[CertFrontendPrivateKeySecretKey], err = leaf.PrivateKey.MarshalText()
 			}
 			if err == nil {
-				outSecret.Data[certFrontendSecretKey], err = leaf.Certificate.MarshalText()
+				outSecret.Data[CertFrontendSecretKey], err = leaf.Certificate.MarshalText()
 			}
 		}
 	}
@@ -134,15 +185,22 @@ func Secret(ctx context.Context,
 	// bundle so PgBouncer also trusts them when verifying client
 	// certificates. Entries keep their given order so identical inputs
 	// always produce identical bundle bytes.
-	if err == nil && len(additionalCAs) > 0 {
-		bundle := outSecret.Data[certFrontendAuthoritySecretKey]
+	//
+	// K8SPG-1045: Add additional CAs when the certManagementPolicy is auto
+	// or when a custom pgbouncer tls secret is configured.
+	// In userProvidedOnly mode without a custom Secret, operator should
+	// keep the user-provided CA bundle unchanged.
+	if err == nil && len(additionalCAs) > 0 &&
+		(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret != nil ||
+			inCluster.Spec.TLS.GetCertManagementPolicy() != v1beta1.CertManagementUserProvidedOnly) {
+		bundle := outSecret.Data[CertFrontendAuthoritySecretKey]
 		for _, ca := range additionalCAs {
 			if len(bundle) > 0 && bundle[len(bundle)-1] != '\n' {
 				bundle = append(bundle, '\n')
 			}
 			bundle = append(bundle, ca...)
 		}
-		outSecret.Data[certFrontendAuthoritySecretKey] = bundle
+		outSecret.Data[CertFrontendAuthoritySecretKey] = bundle
 	}
 
 	return err
@@ -170,6 +228,7 @@ func Pod(
 	inPostgreSQLCertificate *corev1.SecretProjection,
 	inSecret *corev1.Secret,
 	outPod *corev1.PodSpec,
+	initImage string,
 ) {
 	if !inCluster.Spec.Proxy.PGBouncerEnabled() {
 		// PgBouncer is disabled; there is nothing to do.
@@ -181,10 +240,11 @@ func Pod(
 	}
 	configVolume := corev1.Volume{Name: configVolumeMount.Name}
 	configVolume.Projected = &corev1.ProjectedVolumeSource{
-		Sources: append(append(append([]corev1.VolumeProjection{},
-			podConfigFiles(inCluster.Spec.Proxy.PGBouncer.Config, inConfigMap, inSecret)...),
-			frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
-				len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
+		Sources: append(
+			append(append([]corev1.VolumeProjection{},
+				podConfigFiles(inCluster, inConfigMap, inSecret)...),
+				frontendCertificate(inCluster.Spec.Proxy.PGBouncer.CustomTLSSecret, inSecret,
+					len(inCluster.Spec.Proxy.PGBouncer.AdditionalTrustedCAs) > 0)...),
 			backendAuthority(inPostgreSQLCertificate),
 		),
 	}
@@ -226,6 +286,44 @@ func Pod(
 		})
 	}
 
+	logVolumeMount := corev1.VolumeMount{
+		Name: logVolumeName, MountPath: logDirectory,
+	}
+	logVolume := corev1.Volume{Name: logVolumeMount.Name}
+	logVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		container.Env = append(container.Env, []corev1.EnvVar{
+			{
+				Name: AdminPasswordEnvVar,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: inSecret.Name,
+						},
+						Key: AdminPasswordSecretKey,
+					},
+				},
+			},
+			{
+				Name:  PGBouncerPortEnvVar,
+				Value: fmt.Sprintf("%d", *inCluster.Spec.Proxy.PGBouncer.Port),
+			},
+		}...)
+		container.VolumeMounts = append(container.VolumeMounts, logVolumeMount, crunchyBinVolumeMount)
+
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{startupBinaryPath},
+				},
+			},
+			TimeoutSeconds:   startup.PauseTimeoutSeconds + 5,
+			PeriodSeconds:    10,
+			FailureThreshold: 3,
+		}
+	}
+
 	// TODO container.LivenessProbe?
 	// TODO container.ReadinessProbe?
 
@@ -261,6 +359,24 @@ func Pod(
 	outPod.Containers = []corev1.Container{container, reloader}
 
 	outPod.Volumes = []corev1.Volume{configVolume}
+
+	// The init container installs the operator binaries into the
+	// shared bin volume before the PgBouncer container starts.
+	if inCluster.CompareVersion("3.1.0") >= 0 {
+		outPod.Volumes = append(outPod.Volumes, logVolume, crunchyBinVolume)
+
+		outPod.InitContainers = []corev1.Container{
+			k8s.InitContainer(
+				inCluster,
+				naming.ContainerPGBouncer,
+				initImage,
+				inCluster.Spec.ImagePullPolicy,
+				initialize.RestrictedSecurityContext(true),
+				container.Resources,
+				nil,
+			),
+		}
+	}
 
 	// If the PGBouncerSidecars feature gate is enabled and custom pgBouncer
 	// sidecars are defined, add the defined container to the Pod.

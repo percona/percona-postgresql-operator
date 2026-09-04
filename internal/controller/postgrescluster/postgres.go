@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,24 +31,25 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgrepack"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgvector"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgis"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	pgpassword "github.com/percona/percona-postgresql-operator/v2/internal/postgres/password"
-	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
-	"github.com/percona/percona-postgresql-operator/v2/internal/util"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgcron"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgrepack"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgtde"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgvector"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgis"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	pgpassword "github.com/percona/percona-postgresql-operator/v3/internal/postgres/password"
+	"github.com/percona/percona-postgresql-operator/v3/internal/setuser"
+	"github.com/percona/percona-postgresql-operator/v3/internal/util"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // generatePostgresUserSecret returns a Secret containing a password and
@@ -195,6 +197,22 @@ func (r *Reconciler) generatePostgresUserSecret(
 	return intent, nil
 }
 
+// K8SPG-786
+func (r *Reconciler) customExtensionNames(
+	ctx context.Context, cluster *v1beta1.PostgresCluster,
+) ([]string, error) {
+	perconaPGCluster := &v2.PerconaPGCluster{}
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(cluster), perconaPGCluster)
+	if k8serrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "get PerconaPGCluster for custom extensions")
+	}
+
+	return perconaPGCluster.Status.InstalledCustomExtensions, nil
+}
+
 // reconcilePostgresDatabases creates databases inside of PostgreSQL.
 func (r *Reconciler) reconcilePostgresDatabases(
 	ctx context.Context,
@@ -216,7 +234,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	}
 
 	// Find the PostgreSQL instance that can execute SQL that writes system
-	// catalogs. When there is none, return early.
+	// catalogs. When there is none, return early. A standby cluster never has
+	// one; reconcilePGTDEStandby reports its pg_tde state instead. K8SPG-911
 	pod, _ := instances.writablePod(container)
 	if pod == nil {
 		return nil
@@ -265,6 +284,11 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	// result is kept separately from the flag above.
 	var pgTdeRan bool
 	var pgTdeErr error
+
+	customExtensions, err := r.customExtensionNames(ctx, cluster)
+	if err != nil {
+		return err
+	}
 
 	create := func(ctx context.Context, exec postgres.Executor) error {
 		// validate version string before running it in database
@@ -357,6 +381,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronDisabled",
 					"Unable to install pg_cron")
 			}
+		} else if slices.Contains(customExtensions, "pg_cron") {
+			pgCronOK = true
 		} else {
 			if pgCronOK = pgcron.DisableInPostgreSQL(ctx, exec) == nil; !pgCronOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "pgCronEnabled",
@@ -369,6 +395,8 @@ func (r *Reconciler) reconcilePostgresDatabases(
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserDisabled",
 					"Unable to install set_user")
 			}
+		} else if slices.Contains(customExtensions, "set_user") {
+			setUserOK = true
 		} else {
 			if setUserOK = setuser.DisableInPostgreSQL(ctx, exec) == nil; !setUserOK {
 				r.Recorder.Event(cluster, corev1.EventTypeWarning, "setUserEnabled",
@@ -471,6 +499,54 @@ func (r *Reconciler) reconcilePostgresDatabases(
 	return err
 }
 
+// reconcilePGTDEStandby reports the pg_tde state of a cluster in recovery.
+func (r *Reconciler) reconcilePGTDEStandby(
+	ctx context.Context,
+	cluster *v1beta1.PostgresCluster,
+	instances *observedInstances,
+) {
+	const container = naming.ContainerDatabase
+
+	if !cluster.IsStandby() {
+		return
+	}
+
+	if !cluster.Spec.Extensions.PGTDE.Enabled &&
+		!meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEEnabled) {
+		return
+	}
+
+	log := logging.FromContext(ctx).WithName("PGTDE")
+
+	pod, _ := instances.standbyLeaderPod(container)
+	if pod == nil {
+		log.V(1).Info("Waiting for a standby leader")
+		return
+	}
+
+	log = log.WithValues("pod", pod.Name)
+	ctx = logging.NewContext(ctx, log)
+
+	pgExecutor := postgres.Executor(func(
+		ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+	) error {
+		return r.PodExec(ctx, pod.Namespace, pod.Name, container, stdin, stdout, stderr, command...)
+	})
+
+	installed, err := pgtde.ObserveExtension(ctx, pgExecutor)
+	if err != nil {
+		log.V(1).Info("could not observe pg_tde", "error", err.Error())
+		return
+	}
+
+	var keyErr error
+	if installed {
+		keyErr = pgtde.VerifyPrincipalKey(ctx, pgExecutor)
+	}
+
+	pgtde.ReportStandby(cluster, installed, keyErr)
+}
+
 // reconcilePGTDEProviders configures pg_tde providers using a two-phase
 // approach for vault credential changes:
 //
@@ -501,6 +577,13 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		return nil
 	}
 
+	// K8SPG-911: everything below writes, and a cluster in recovery cannot run
+	// any of it. reconcilePGTDEStandby reports the key provider from what pg_tde
+	// says instead.
+	if cluster.IsStandby() {
+		return nil
+	}
+
 	// Wait for all instances to match their pod templates before configuring
 	// the vault provider. This prevents running SQL on pods that are mid-rollout.
 	for _, inst := range instances.forCluster {
@@ -510,17 +593,35 @@ func (r *Reconciler) reconcilePGTDEProviders(
 		}
 	}
 
+	pods, allRunning := instances.runningPods(container)
+	if !allRunning {
+		log.V(1).Info("Waiting for all pods to be running")
+
+		if meta.IsStatusConditionTrue(cluster.Status.Conditions, v1beta1.PGTDEVaultProviderReady) {
+			return nil
+		}
+
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:               v1beta1.PGTDEVaultProviderReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "WaitingForInstances",
+			Message:            "waiting for all instances to be running to stage vault credentials",
+			ObservedGeneration: cluster.GetGeneration(),
+		})
+		return patchStatus()
+	}
+
+	for _, p := range pods {
+		// We need to configure pg_tde after volumes are mounted and extension is created
+		if _, ok := p.Annotations[naming.TDEInstalledAnnotation]; !ok {
+			log.V(1).Info("Waiting for pg_tde to be installed", "pod", p.Name)
+			return nil
+		}
+	}
+
 	pod, _ := instances.writablePod(container)
 	if pod == nil {
 		log.V(1).Info("Waiting for a writable instance")
-		return nil
-	}
-
-	pods, allRunning := instances.runningPods(container)
-
-	// We need to configure pg_tde after volumes are mounted and extension is created
-	if _, ok := pod.Annotations[naming.TDEInstalledAnnotation]; !ok {
-		log.V(1).Info("Waiting for pg_tde to be installed", "pod", pod.Name)
 		return nil
 	}
 
@@ -596,18 +697,6 @@ func (r *Reconciler) reconcilePGTDEProviders(
 			// naming those paths. Staging on only some of them would leave the
 			// rest unable to resolve the key, and a replica promoted before
 			// phase 2 would come up without the credentials it needs.
-			if !allRunning {
-				log.Info("waiting for all instances to be running before staging vault credentials")
-				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-					Type:               v1beta1.PGTDEVaultProviderReady,
-					Status:             metav1.ConditionFalse,
-					Reason:             "WaitingForInstances",
-					Message:            "waiting for all instances to be running to stage vault credentials",
-					ObservedGeneration: cluster.GetGeneration(),
-				})
-				return patchStatus()
-			}
-
 			log.Info("changing vault provider using temporary credentials", "instances", len(pods))
 			if err = r.stagePGTDEVaultCredentials(ctx, cluster.Namespace,
 				vault, pods, container, change.TempTokenPath, change.TempCAPath); err != nil {
@@ -980,7 +1069,7 @@ func (r *Reconciler) reconcilePostgresUserSecrets(
 
 		// If both secrets have "pguser" or neither have "pguser",
 		// sort by creation timestamp
-		return secrets.Items[i].CreationTimestamp.Time.After(secrets.Items[j].CreationTimestamp.Time)
+		return secrets.Items[i].CreationTimestamp.After(secrets.Items[j].CreationTimestamp.Time)
 	})
 
 	// Index secrets by PostgreSQL user name and delete any that are not in the

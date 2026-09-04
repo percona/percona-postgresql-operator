@@ -1,0 +1,103 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      POD="logical-replica-lr-analytics-0"
+      SERVICE="logical-replica-lr-analytics"
+
+      # The replica defaults to read-only, and ALTER SUBSCRIPTION is refused in a
+      # read-only transaction, so lift it for this session only.
+      replica_psql() {
+        kubectl -n "${NAMESPACE}" exec "${POD}" -c database -- \
+          env PGOPTIONS='-c default_transaction_read_only=off' \
+          psql -XAtqw -d logical-replica --command="${1}"
+      }
+
+      # pg_subscription is shared across the databases of a cluster, and this
+      # replica covers exactly one.
+      SUB=$(replica_psql 'SELECT subname FROM pg_catalog.pg_subscription;' | xargs)
+      if [[ -z ${SUB} ]]; then
+        echo "ERROR: the logical replica has no subscription"
+        exit 1
+      fi
+
+      # What an apply error looks like: the subscriptions carry disable_on_error,
+      # so a single conflicting row leaves the replica in exactly this state.
+      replica_psql "ALTER SUBSCRIPTION \"${SUB}\" DISABLE;"
+
+      database_ready() {
+        local ready
+        ready=$(kubectl -n "${NAMESPACE}" get pod "${POD}" \
+          -o jsonpath='{.status.containerStatuses[?(@.name=="database")].ready}')
+
+        echo "database container ready: ${ready}"
+        [[ ${ready} == "${1}" ]]
+      }
+
+      endpoints() {
+        kubectl -n "${NAMESPACE}" get endpoints "${SERVICE}" \
+          -o jsonpath='{.subsets[*].addresses[*].ip}'
+      }
+
+      service_has_no_endpoint() {
+        local addresses
+        addresses=$(endpoints)
+
+        echo "endpoints of ${SERVICE}: '${addresses}'"
+        [[ -z ${addresses} ]]
+      }
+
+      # The point of the whole step: clients must stop being routed to a replica
+      # that is frozen in the past.
+      retry 24 5 database_ready false
+      retry 24 5 service_has_no_endpoint
+
+      # The operator has to keep reaching the unready pod, or the status would
+      # say the pod is missing instead of why the replica is broken.
+      reports_subscription_disabled() {
+        local state reason
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].state}')
+        reason=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].reason}')
+
+        echo "logical replica analytics: state='${state}' reason='${reason}'"
+        [[ ${state} == "broken" && ${reason} == "SubscriptionDisabled" ]]
+      }
+
+      retry 36 5 reports_subscription_disabled
+
+      # Nothing was applied while it was disabled, so enabling it again is all it
+      # takes: the probe has to let the replica back into its Service.
+      replica_psql "ALTER SUBSCRIPTION \"${SUB}\" ENABLE;"
+
+      service_has_an_endpoint() {
+        local addresses
+        addresses=$(endpoints)
+
+        echo "endpoints of ${SERVICE}: '${addresses}'"
+        [[ -n ${addresses} ]]
+      }
+
+      replica_ready_again() {
+        local state
+        state=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].state}')
+
+        echo "logical replica analytics state: ${state}"
+        [[ ${state} == "ready" ]]
+      }
+
+      retry 24 5 database_ready true
+      retry 24 5 service_has_an_endpoint
+      retry 36 5 replica_ready_again

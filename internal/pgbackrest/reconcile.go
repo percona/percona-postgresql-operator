@@ -12,13 +12,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 // AddRepoVolumesToPod adds pgBackRest repository volumes to the provided Pod template spec, while
@@ -235,17 +235,22 @@ func AddConfigToRestorePod(
 	addConfigVolumeAndMounts(pod, append(sources, configmap, secret))
 }
 
+// ConfigVolumeMount returns the mount [AddConfigToRestorePod] adds to a Pod.
+func ConfigVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "pgbackrest-config",
+		MountPath: configDirectory,
+		ReadOnly:  true,
+	}
+}
+
 // addConfigVolumeAndMounts adds the config projections to pod as the
 // configuration volume. It mounts that volume to the database container and
 // all pgBackRest containers in pod.
 func addConfigVolumeAndMounts(
 	pod *corev1.PodSpec, config []corev1.VolumeProjection,
 ) {
-	configVolumeMount := corev1.VolumeMount{
-		Name:      "pgbackrest-config",
-		MountPath: configDirectory,
-		ReadOnly:  true,
-	}
+	configVolumeMount := ConfigVolumeMount()
 
 	configVolume := corev1.Volume{
 		Name: configVolumeMount.Name,
@@ -568,7 +573,8 @@ func Secret(ctx context.Context,
 		// The client verifies the "pg-host" or "repo-host" option it used is
 		// present in the DNS names of the server certificate.
 		leaf := &pki.LeafCertificate{}
-		dnsNames, err := naming.RepoHostPodDNSNames(ctx, inRepoHost, inCluster.Spec.ClusterServiceDNSSuffix)
+		var dnsNames []string
+		dnsNames, err = naming.RepoHostPodDNSNames(ctx, inRepoHost, inCluster.Spec.ClusterServiceDNSSuffix)
 		if err != nil {
 			return errors.Wrap(err, "failed to resolve repo host pod DNS names")
 		}

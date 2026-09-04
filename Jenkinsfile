@@ -486,7 +486,7 @@ pipeline {
                                 echo '\$PASS' | docker login -u '\$USER' --password-stdin
                                 export RELEASE=0
                                 export IMAGE=\$DOCKER_TAG
-                                docker buildx create --use
+                                docker buildx use multiarch 2>/dev/null || docker buildx create --name multiarch --use
                                 make build
                                 docker logout
                             "
@@ -517,7 +517,7 @@ pipeline {
                                  -e GO111MODULE=on \
                                  golang:1.26.0 sh -c '
                                      go install github.com/google/go-licenses@latest;
-                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/v2/cmd/postgres-operator \
+                                     /go/bin/go-licenses csv github.com/percona/percona-postgresql-operator/v3/cmd/postgres-operator \
                                          | cut -d , -f 3 \
                                          | sort -u \
                                          > go-licenses-new || :

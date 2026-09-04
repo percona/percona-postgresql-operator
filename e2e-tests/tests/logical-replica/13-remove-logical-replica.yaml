@@ -1,0 +1,73 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 900
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        exit 0
+      fi
+
+      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host logical-replica-pguser-postgres)
+
+      kubectl -n "${NAMESPACE}" patch pg logical-replica --type=json \
+        --patch '[{"op": "remove", "path": "/spec/logicalReplicas"}]'
+
+      no_slots_left() {
+        local got
+        got=$(run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin IS NOT NULL;" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "logical slots left on the primary: ${got}"
+        [[ ${got} == "0" ]]
+      }
+
+      no_publications_left() {
+        local got
+        got=$(run_psql \
+          '\c logical-replica \\\ SELECT count(*) FROM pg_publication;' \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "publications left on the primary: ${got}"
+        [[ ${got} == "0" ]]
+      }
+
+      objects_gone() {
+        local replica
+        for replica in analytics reporting; do
+          kubectl -n "${NAMESPACE}" get statefulset "logical-replica-lr-${replica}" >/dev/null 2>&1 && return 1
+          kubectl -n "${NAMESPACE}" get pvc "logical-replica-lr-${replica}-pgdata" >/dev/null 2>&1 && return 1
+        done
+
+        return 0
+      }
+
+      condition_gone() {
+        local got
+        got=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.conditions[?(@.type=="ReadyForLogicalReplication")].status}')
+
+        echo "ReadyForLogicalReplication: '${got}'"
+        [[ -z ${got} ]]
+      }
+
+      status_gone() {
+        local got
+        got=$(kubectl -n "${NAMESPACE}" get pg logical-replica \
+          -o jsonpath='{.status.logicalReplicas}')
+
+        echo "status.logicalReplicas: '${got}'"
+        [[ -z ${got} || ${got} == "[]" ]]
+      }
+
+      retry 30 5 no_slots_left
+      retry 30 5 no_publications_left
+      retry 30 5 objects_gone
+      retry 30 5 condition_gone
+      retry 30 5 status_gone

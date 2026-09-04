@@ -11,17 +11,6 @@ commands:
       cluster=logcollection
       primary=$(get_pod_by_role ${cluster} primary name)
 
-      retry() {
-        local deadline=$((SECONDS + $1)); shift
-        until "$@"; do
-          if [ "${SECONDS}" -ge "${deadline}" ]; then
-            echo "FAIL: timed out waiting for: $*"
-            return 1
-          fi
-          sleep 5
-        done
-      }
-
       # 1. sidecar containers present on the instance pod
       instance_containers=$(kubectl -n "${NAMESPACE}" get pod "${primary}" \
         -o 'jsonpath={.spec.containers[*].name}')
@@ -41,16 +30,16 @@ commands:
       # log_statement=all logs the marker SELECT from step 02 into the postgres log,
       # so requiring the marker proves the postgres server logs (not just pgbackrest)
       # were read from that dir and emitted by fluent-bit.
-      retry 60 bash -c "kubectl -n '${NAMESPACE}' exec '${primary}' -c database -- \
+      retry 5 12 bash -c "kubectl -n '${NAMESPACE}' exec '${primary}' -c database -- \
         sh -c 'ls /pgdata/custom-log/*.log /pgdata/custom-log/*.csv 2>/dev/null | head -1' | grep -q ."
-      retry 120 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 \
+      retry 5 24 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 \
         | grep -q 'e2e-postgres-log-marker'"
 
       # 4. pgBackRest client/archive logs collected on the instance
-      retry 180 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q pgbackrest"
+      retry 5 36 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q pgbackrest"
 
       # 5. custom fluent-bit configuration was loaded
-      retry 120 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q e2e_marker"
+      retry 5 24 bash -c "kubectl -n '${NAMESPACE}' logs '${primary}' -c logs --tail=-1 | grep -q e2e_marker"
 
       # 6. custom logrotate configuration is mounted
       kubectl -n "${NAMESPACE}" exec "${primary}" -c logrotate -- \

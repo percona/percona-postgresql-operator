@@ -21,12 +21,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func TestGeneratePrepareJob(t *testing.T) {
@@ -215,6 +215,88 @@ func TestGeneratePrepareJob(t *testing.T) {
 		require.Len(t, container.VolumeMounts, 1)
 		assert.Equal(t, instanceName+"-pgwal", container.VolumeMounts[0].Name)
 		assert.Equal(t, path.Join("/", instanceName, "pgwal"), container.VolumeMounts[0].MountPath)
+	})
+
+	t.Run("tolerations from volume snapshot jobs spec", func(t *testing.T) {
+		tolerations := []corev1.Toleration{
+			{
+				Key:      "snapshot-node",
+				Operator: corev1.TolerationOpEqual,
+				Value:    "true",
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+			{
+				Key:      "dedicated",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoExecute,
+			},
+		}
+
+		clusterWithTolerations := cluster.DeepCopy()
+		clusterWithTolerations.Spec.Backups.VolumeSnapshots = &v2.VolumeSnapshots{
+			ClassName: "csi-snapshot-class",
+			Jobs: &v2.VolumeSnapshotJobSpec{
+				Tolerations: tolerations,
+			},
+		}
+
+		job := &batchv1.Job{}
+		instances := &appsv1.StatefulSetList{
+			Items: []appsv1.StatefulSet{makeInstance("my-cluster-instance-0")},
+		}
+		restore := &v2.PerconaPGRestore{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
+			Spec: v2.PerconaPGRestoreSpec{
+				PGCluster:                clusterName,
+				VolumeSnapshotBackupName: "my-backup",
+			},
+		}
+
+		generatePrepareJob(job, instances, clusterWithTolerations, restore)
+
+		assert.Equal(t, tolerations, job.Spec.Template.Spec.Tolerations)
+	})
+
+	t.Run("no tolerations when jobs spec is not set", func(t *testing.T) {
+		for name, backups := range map[string]v2.Backups{
+			"volume snapshots not set": {},
+			"jobs not set": {
+				VolumeSnapshots: &v2.VolumeSnapshots{ClassName: "csi-snapshot-class"},
+			},
+			"tolerations not set": {
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					ClassName: "csi-snapshot-class",
+					Jobs:      &v2.VolumeSnapshotJobSpec{},
+				},
+			},
+			"tolerations empty": {
+				VolumeSnapshots: &v2.VolumeSnapshots{
+					ClassName: "csi-snapshot-class",
+					Jobs:      &v2.VolumeSnapshotJobSpec{Tolerations: []corev1.Toleration{}},
+				},
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				clusterCopy := cluster.DeepCopy()
+				clusterCopy.Spec.Backups = backups
+
+				job := &batchv1.Job{}
+				instances := &appsv1.StatefulSetList{
+					Items: []appsv1.StatefulSet{makeInstance("my-cluster-instance-0")},
+				}
+				restore := &v2.PerconaPGRestore{
+					ObjectMeta: metav1.ObjectMeta{Name: "my-restore", Namespace: ns},
+					Spec: v2.PerconaPGRestoreSpec{
+						PGCluster:                clusterName,
+						VolumeSnapshotBackupName: "my-backup",
+					},
+				}
+
+				generatePrepareJob(job, instances, clusterCopy, restore)
+
+				assert.Empty(t, job.Spec.Template.Spec.Tolerations)
+			})
+		}
 	})
 
 	t.Run("script starts with set -e", func(t *testing.T) {

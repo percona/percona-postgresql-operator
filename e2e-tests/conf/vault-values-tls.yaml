@@ -1,0 +1,35 @@
+global:
+  tlsDisable: false
+  platform: <platform>
+
+injector:
+  image:
+    repository: docker.io/hashicorp/vault-k8s
+
+server:
+  image:
+    repository: docker.io/hashicorp/vault
+  dataStorage:
+    enabled: false
+  standalone:
+    enabled: true
+    config: |
+      listener "tcp" {
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+        tls_cert_file = "/vault/userconfig/<name>/vault.crt"
+        tls_key_file = "/vault/userconfig/<name>/vault.key"
+        tls_client_ca_file = "/vault/userconfig/<name>/vault.ca"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }
+  ha:
+    raft:
+      enabled: false
+  extraVolumes:
+    - type: secret
+      name: <name>
+  extraEnvironmentVars:
+    VAULT_CACERT: /vault/userconfig/<name>/vault.ca

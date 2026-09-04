@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 )
 
 // PostgresClusterSpec defines the desired state of PostgresCluster
@@ -134,7 +134,7 @@ type PostgresClusterSpec struct {
 	// The major version of PostgreSQL installed in the PostgreSQL image
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=12
-	// +kubebuilder:validation:Maximum=18
+	// +kubebuilder:validation:Maximum=19
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	PostgresVersion int `json:"postgresVersion"`
 
@@ -174,6 +174,14 @@ type PostgresClusterSpec struct {
 	// +optional
 	Standby *PostgresStandbySpec `json:"standby,omitempty"`
 
+	// Logical replicas of this cluster, managed by the Percona layer. Only the
+	// names are mirrored here: this layer uses their presence to render the
+	// pg_hba rules for the logical replication user and Patroni's ignore_slots.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	LogicalReplicas []LogicalReplicaSpec `json:"logicalReplicas,omitempty"`
+
 	// A list of group IDs applied to the process of a container. These can be
 	// useful when accessing shared file systems with constrained permissions.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
@@ -206,6 +214,20 @@ type PostgresClusterSpec struct {
 
 	// K8SPG-694
 	ClusterServiceDNSSuffix string `json:"clusterServiceDNSSuffix,omitempty"`
+}
+
+func (cluster *PostgresCluster) HasReplicas() bool {
+	if cluster == nil {
+		return false
+	}
+
+	for _, set := range cluster.Spec.InstanceSets {
+		if set.Replicas != nil && *set.Replicas > 1 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (cluster *PostgresCluster) PGBouncerUserSecrets() []string {
@@ -297,7 +319,8 @@ type TLSSpec struct {
 	// +optional
 	PGBackRestCertValidityDuration *metav1.Duration `json:"pgBackRestCertValidityDuration,omitempty"`
 	// +kubebuilder:default=auto
-	// +kubebuilder:validation:Enum={auto,userProvidedOnly}
+	// +kubebuilder:validation:Enum={auto,userProvidedOnly,operatorProvidedOnly}
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="certManagementPolicy is immutable"
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
@@ -313,8 +336,9 @@ func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {
 type CertManagementPolicy string
 
 const (
-	CertManagementAuto             CertManagementPolicy = "auto"
-	CertManagementUserProvidedOnly CertManagementPolicy = "userProvidedOnly"
+	CertManagementAuto                 CertManagementPolicy = "auto"
+	CertManagementUserProvidedOnly     CertManagementPolicy = "userProvidedOnly"
+	CertManagementOperatorProvidedOnly CertManagementPolicy = "operatorProvidedOnly"
 )
 
 const (
@@ -579,6 +603,8 @@ const (
 	// does not influence shared_preload_libraries or Pod contents; it exists
 	// so a stalled credential change is visible to the user.
 	PGTDEVaultProviderReady = "PGTDEVaultProviderReady"
+
+	PGBouncerPaused = "PGBouncerPaused"
 )
 
 type PostgresInstanceSetSpec struct {
@@ -795,6 +821,10 @@ func (s *PostgresProxySpec) PGBouncerEnabled() bool {
 	return s != nil && s.PGBouncer != nil && (s.PGBouncer.Replicas == nil || *s.PGBouncer.Replicas != 0)
 }
 
+func (s *PostgresProxySpec) PGBouncerPaused() bool {
+	return s != nil && s.PGBouncer != nil && s.PGBouncer.Paused != nil && *s.PGBouncer.Paused
+}
+
 type RegistrationRequirementStatus struct {
 	PGOVersion string `json:"pgoVersion,omitempty"`
 }
@@ -825,6 +855,16 @@ type PostgresStandbySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1024
 	Port *int32 `json:"port,omitempty"`
+}
+
+// LogicalReplicaSpec is the projection of a Percona logical replica onto this
+// spec. The Percona layer owns the full definition and the whole lifecycle of
+// the replica; only what this layer needs to render server configuration is
+// carried over.
+type LogicalReplicaSpec struct {
+	// Name of the logical replica.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 }
 
 // UserInterfaceSpec is a union of the supported PostgreSQL user interfaces.
@@ -1054,6 +1094,11 @@ func (cr *PostgresCluster) IsPatroniVer4() (bool, error) {
 
 func (cr *PostgresCluster) BackupSpecFound() bool {
 	return !reflect.DeepEqual(cr.Spec.Backups, Backups{PGBackRest: PGBackRestArchive{}})
+}
+
+// IsStandby returns whether this cluster replays WAL from a source outside of itself.
+func (cr *PostgresCluster) IsStandby() bool {
+	return cr.Spec.Standby != nil && cr.Spec.Standby.Enabled
 }
 
 // K8SPG-864

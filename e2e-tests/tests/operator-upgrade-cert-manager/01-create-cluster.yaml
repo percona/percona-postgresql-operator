@@ -1,0 +1,49 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # plain RELEASED cr.yaml: no custom TLS -> secrets come from the operator internal PKI
+      lower_ver="$(curl -s https://check.percona.com/versions/v1/pg-operator | jq -r '.versions[].operator' | sort -V | tail -n1)"
+      curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/v${lower_ver}/deploy/cr.yaml" >"${TEMP_DIR}/cr_lower.yaml"
+
+      pg_ver=$PG_VER
+      pg_exists=$(curl -s https://check.percona.com/versions/v1/pg-operator/${lower_ver} | jq '.versions[].matrix.postgresql | with_entries(select(.key | startswith("'$pg_ver'"))) | length')
+      if [ $pg_exists -eq 0 ]; then
+          pg_ver=$((pg_ver - 1))
+      fi
+      echo $pg_ver >"${TEMP_DIR}/pg_ver.txt"
+
+      backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
+      pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
+      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+      operator_image=$(get_version_images $lower_ver OPERATOR)
+
+      # pin the database-init image: without it InitImage() derives the image
+      # from the RUNNING operator's repo + the crVersion tag, so an operator
+      # under test from a non-release org would roll the instances on upgrade
+      yq -i eval '
+          .metadata.name = "'${test_name}'" |
+          .metadata.labels = {"e2e":"'${test_name}'"} |
+          .spec.postgresVersion = '$pg_ver' |
+          .spec.initContainer.image = "'${REGISTRY_NAME_FULL}''${operator_image}'" |
+          .spec.users = [{"name":"postgres","password":{"type":"AlphaNumeric"}}] |
+          .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
+          .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
+          .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'" |
+          .spec.backups.pgbackrest.configuration = [{"secret":{"name":"'${test_name}'-pgbackrest-secrets"}}] |
+          .spec.backups.pgbackrest.global."repo2-s3-uri-style" = "path" |
+          .spec.backups.pgbackrest.global."repo2-s3-verify-tls" = "n" |
+          .spec.backups.pgbackrest.repos += [{"name":"repo2","s3":{"bucket":"operator-testing","endpoint":"<minio-endpoint>","region":"us-east-1"}}]' \
+          "${TEMP_DIR}/cr_lower.yaml"
+
+      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      $sed -i "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" "${TEMP_DIR}/cr_lower.yaml"
+      $sed -i 's|repo2-s3-verify-tls: n$|repo2-s3-verify-tls: "n"|' "${TEMP_DIR}/cr_lower.yaml"
+
+      kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr_lower.yaml"

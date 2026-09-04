@@ -19,10 +19,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/postgrescluster"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var _ = Describe("PG Cluster status", Ordered, func() {
@@ -672,6 +672,11 @@ func TestUpdateConditions(t *testing.T) {
 					Status: metav1.ConditionFalse,
 					Reason: "LagNotDetected",
 				},
+				{
+					Type:   pNaming.ConditionReadyForLogicalReplication,
+					Status: metav1.ConditionTrue,
+					Reason: "PrimaryReady",
+				},
 			},
 			statusConditions: []metav1.Condition{
 				{
@@ -695,6 +700,7 @@ func TestUpdateConditions(t *testing.T) {
 				v2.ConditionPMMReady,
 				pNaming.ConditionAPIGroupMigration,
 				pNaming.ConditionStandbyLagging,
+				pNaming.ConditionReadyForLogicalReplication,
 			},
 		},
 	}
@@ -730,6 +736,7 @@ func TestUpdateConditions(t *testing.T) {
 			require.NotNil(t, condition, "ClusterIsReadyForBackup condition should be set")
 			assert.Equal(t, tt.expectedReadyForBackupStatus, condition.Status, "ClusterIsReadyForBackup status mismatch")
 			assert.Equal(t, tt.expectedReadyForBackupReason, condition.Reason, "ClusterIsReadyForBackup reason mismatch")
+			assert.Equal(t, cr.Generation, condition.ObservedGeneration, "ClusterIsReadyForBackup generation mismatch")
 
 			// Verify synced conditions
 			for _, expected := range tt.expectedSyncedConditions {

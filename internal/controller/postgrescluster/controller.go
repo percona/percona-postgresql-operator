@@ -38,27 +38,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/config"
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/initialize"
-	"github.com/percona/percona-postgresql-operator/v2/internal/logging"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgaudit"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbackrest"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgbouncer"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgcron"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatmonitor"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgstatstatements"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pgtde"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pki"
-	"github.com/percona/percona-postgresql-operator/v2/internal/pmm"
-	"github.com/percona/percona-postgresql-operator/v2/internal/postgres"
-	"github.com/percona/percona-postgresql-operator/v2/internal/registration"
-	"github.com/percona/percona-postgresql-operator/v2/internal/setuser"
-	"github.com/percona/percona-postgresql-operator/v2/percona/certmanager"
-	"github.com/percona/percona-postgresql-operator/v2/percona/k8s"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/config"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	pgbruntime "github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgaudit"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgcron"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatmonitor"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgstatstatements"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgtde"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pmm"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/internal/registration"
+	"github.com/percona/percona-postgresql-operator/v3/internal/setuser"
+	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
+	"github.com/percona/percona-postgresql-operator/v3/percona/k8s"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 const (
@@ -68,7 +70,9 @@ const (
 
 // Reconciler holds resources for the PostgresCluster reconciler
 type Reconciler struct {
-	Client                       client.Client
+	Client client.Client
+	// K8SPG-992: APIReader reads directly from the API server, bypassing the cache
+	APIReader                    client.Reader
 	Scheme                       *k8sruntime.Scheme
 	DiscoveryClient              *discovery.DiscoveryClient
 	IsOpenShift                  bool
@@ -82,6 +86,14 @@ type Reconciler struct {
 	Controller                   controller.Controller
 	Cache                        cache.Cache
 	certManagerWatchesRegistered atomic.Bool
+	newPGBouncerAdmin            func(opts pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error)
+}
+
+func (r *Reconciler) apiReader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
 }
 
 // +kubebuilder:rbac:groups="",resources="events",verbs={create,patch}
@@ -280,6 +292,7 @@ func (r *Reconciler) Reconcile(
 	pmm.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgmonitor.PostgreSQLHBAs(cluster, &pgHBAs)
 	pgbouncer.PostgreSQL(cluster, &pgHBAs)
+	logicalreplica.PostgreSQLHBAs(cluster, &pgHBAs)
 
 	// K8SPG-554
 	if cluster.Spec.TLSOnly {
@@ -457,6 +470,11 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		err = r.reconcilePostgresDatabases(ctx, cluster, instances, patchClusterStatus)
 	}
+	// K8SPG-911: the two reconcilers around this one need a writable instance.
+	// A standby has none, so its pg_tde status comes from what it reports.
+	if err == nil {
+		r.reconcilePGTDEStandby(ctx, cluster, instances)
+	}
 	if err == nil {
 		err = r.reconcilePGTDEProviders(ctx, cluster, instances, patchClusterStatus)
 	}
@@ -467,9 +485,8 @@ func (r *Reconciler) Reconcile(
 	if err == nil {
 		var next reconcile.Result
 		if next, err = r.reconcilePGBackRest(ctx, cluster,
-			instances, rootCA, backupsSpecFound); err == nil && !next.IsZero() {
-			result.Requeue = result.Requeue || next.Requeue
-			if next.RequeueAfter > 0 {
+			instances, rootCA, backupsSpecFound); err == nil && next.RequeueAfter > 0 {
+			if result.RequeueAfter == 0 || next.RequeueAfter < result.RequeueAfter {
 				result.RequeueAfter = next.RequeueAfter
 			}
 		}
@@ -590,6 +607,12 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		}
 	}
 
+	if r.newPGBouncerAdmin == nil {
+		r.newPGBouncerAdmin = func(o pgbruntime.AdminClientOptions) (pgbruntime.AdminClient, error) {
+			return pgbruntime.NewAdminClient(o)
+		}
+	}
+
 	if r.DiscoveryClient == nil {
 		var err error
 		r.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
@@ -625,7 +648,7 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 	bldr := builder.ControllerManagedBy(mgr).
 		For(&v1beta1.PostgresCluster{}).
 		Owns(&corev1.ConfigMap{}, configMapPredicate). // K8SPG-712
-		Owns(&corev1.Endpoints{}).
+		Owns(&corev1.Endpoints{}).                     //nolint:staticcheck // SA1019: matches production code
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).

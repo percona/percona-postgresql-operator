@@ -14,10 +14,13 @@ finalizers
 init-deploy
 k8s-upgrade
 huge-pages
+logical-replica
 major-upgrade-14-to-15
 major-upgrade-15-to-16
 major-upgrade-16-to-17
 major-upgrade-17-to-18
+major-upgrade-18-to-19
+major-upgrade-logical-replica
 major-upgrade-14-to-15-postgis
 major-upgrade-15-to-16-postgis
 major-upgrade-16-to-17-postgis
@@ -26,10 +29,12 @@ ldap
 ldap-tls
 logcollection
 monitoring
+operator-upgrade-cert-manager
+operator-upgrade-extensions
 one-pod
 repo-host-autogrow
 operator-self-healing
-pgbouncer-mtls
+pgbouncer
 pg-tde
 pg-tde-wal-encrypt
 pitr
@@ -41,6 +46,8 @@ sidecars
 standby-pgbackrest
 standby-streaming
 start-from-backup
+start-from-volumes
+start-from-backup-tde
 tablespaces
 telemetry-transfer
 upgrade-consistency

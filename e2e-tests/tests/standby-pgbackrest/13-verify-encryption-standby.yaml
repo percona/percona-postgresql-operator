@@ -1,0 +1,55 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  - script: |-
+      set -o xtrace
+      set -o errexit
+
+      source ../../functions
+
+      if [[ ${PG_VER} -lt 17 ]]; then
+        echo "Skipping TDE verification for PostgreSQL ${PG_VER}"
+        exit 0
+      fi
+
+      result=$(run_psql_command \
+        "SELECT extname FROM pg_extension WHERE extname = 'pg_tde';" \
+        "$(get_psql_uri standby-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-extension-standby --from-literal=pg_tde_extension="$result"
+
+      # verify encryption of database created before switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby --from-literal=pg_tde_is_encrypted="$result"
+
+      result=$(run_psql_command \
+        "SHOW pg_tde.wal_encrypt;" \
+        "$(get_psql_uri standby-cluster postgres)")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-wal-encryption-standby --from-literal=pg_tde_wal_encrypt="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp"
+
+      # After switchover the standby uses its own PostgresCluster uid in the TDE key.
+      assert_pg_tde_key_info_uid \
+        "$(get_psql_uri standby-cluster postgres)/myapp" \
+        standby-cluster
+
+      # verify encryption of second database created after switchover
+      result=$(run_psql_command \
+        "SELECT pg_tde_is_encrypted('myTable2');" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2")
+      kubectl -n "${NAMESPACE}" create configmap 13-verify-encryption-standby2 --from-literal=pg_tde_is_encrypted="$result"
+
+      # pg_tde_verify_key will throw an error if it fails
+      run_psql_command \
+        "SELECT pg_tde_verify_key();" \
+        "$(get_psql_uri standby-cluster postgres)/myapp2"
+
+      assert_pg_tde_key_info_uid \
+        "$(get_psql_uri standby-cluster postgres)/myapp2" \
+        standby-cluster

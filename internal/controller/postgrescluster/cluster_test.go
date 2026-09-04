@@ -14,17 +14,18 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/controller/runtime"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/cmp"
-	"github.com/percona/percona-postgresql-operator/v2/internal/testing/require"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
+	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var gvks = []runtime.GVK{{
@@ -101,7 +102,7 @@ func TestCustomLabels(t *testing.T) {
 			NamespacedName: client.ObjectKeyFromObject(cluster),
 		})
 		assert.NilError(t, err)
-		assert.Assert(t, result.Requeue == false)
+		assert.Assert(t, result.RequeueAfter == 0)
 	}
 
 	getUnstructuredLabels := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
@@ -135,8 +136,8 @@ func TestCustomLabels(t *testing.T) {
 
 	t.Run("Cluster", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "global-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "global-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name: "daisy-instance1",
 			InitContainer: &v1beta1.InitContainerSpec{
@@ -189,8 +190,8 @@ func TestCustomLabels(t *testing.T) {
 
 	t.Run("Instance", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "instance-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "instance-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name: "max-instance",
 			InitContainer: &v1beta1.InitContainerSpec{
@@ -245,8 +246,8 @@ func TestCustomLabels(t *testing.T) {
 
 	t.Run("PGBackRest", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "pgbackrest-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "pgbackrest-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.Backups.PGBackRest.Metadata = &v1beta1.Metadata{
 			Labels: map[string]string{"my.pgbackrest.label": "lucy"},
 		}
@@ -289,8 +290,8 @@ func TestCustomLabels(t *testing.T) {
 
 	t.Run("PGBouncer", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "pgbouncer-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "pgbouncer-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.Proxy.PGBouncer.Metadata = &v1beta1.Metadata{
 			Labels: map[string]string{"my.pgbouncer.label": "lucy"},
 		}
@@ -351,7 +352,7 @@ func TestCustomAnnotations(t *testing.T) {
 			NamespacedName: client.ObjectKeyFromObject(cluster),
 		})
 		assert.NilError(t, err)
-		assert.Assert(t, result.Requeue == false)
+		assert.Assert(t, result.RequeueAfter == 0)
 	}
 
 	getUnstructuredAnnotations := func(t *testing.T, cluster *v1beta1.PostgresCluster, u *unstructured.Unstructured) map[string]map[string]string {
@@ -385,8 +386,8 @@ func TestCustomAnnotations(t *testing.T) {
 
 	t.Run("Cluster", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "global-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "global-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name: "daisy-instance1",
 			InitContainer: &v1beta1.InitContainerSpec{
@@ -440,8 +441,8 @@ func TestCustomAnnotations(t *testing.T) {
 
 	t.Run("Instance", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "instance-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "instance-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.InstanceSets = []v1beta1.PostgresInstanceSetSpec{{
 			Name: "max-instance",
 			InitContainer: &v1beta1.InitContainerSpec{
@@ -496,8 +497,8 @@ func TestCustomAnnotations(t *testing.T) {
 
 	t.Run("PGBackRest", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "pgbackrest-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "pgbackrest-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.Backups.PGBackRest.Metadata = &v1beta1.Metadata{
 			Annotations: map[string]string{"my.pgbackrest.annotation": "lucy"},
 		}
@@ -540,8 +541,8 @@ func TestCustomAnnotations(t *testing.T) {
 
 	t.Run("PGBouncer", func(t *testing.T) {
 		cluster := testCluster()
-		cluster.ObjectMeta.Name = "pgbouncer-cluster"
-		cluster.ObjectMeta.Namespace = ns.Name
+		cluster.Name = "pgbouncer-cluster"
+		cluster.Namespace = ns.Name
 		cluster.Spec.Proxy.PGBouncer.Metadata = &v1beta1.Metadata{
 			Annotations: map[string]string{"my.pgbouncer.annotation": "lucy"},
 		}
@@ -596,7 +597,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	_, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
 	assert.ErrorContains(t, err, "not implemented")
 
-	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) {
+	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) { //nolint:staticcheck // SA1019
 		assert.Assert(t, cmp.MarshalMatches(service.TypeMeta, `
 apiVersion: v1
 kind: Service
@@ -811,12 +812,12 @@ type: ClusterIP
 		assert.NilError(t, err)
 
 		// Annotations present in the metadata.
-		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta.Annotations, `
+		assert.Assert(t, cmp.MarshalMatches(service.Annotations, `
 some: note
 		`))
 
 		// Labels present in the metadata.
-		assert.Assert(t, cmp.MarshalMatches(service.ObjectMeta.Labels, `
+		assert.Assert(t, cmp.MarshalMatches(service.Labels, `
 app.kubernetes.io/component: pg
 app.kubernetes.io/instance: pg2
 app.kubernetes.io/managed-by: percona-postgresql-operator
@@ -833,4 +834,37 @@ postgres-operator.crunchydata.com/cluster: pg2
 postgres-operator.crunchydata.com/role: replica
 		`))
 	})
+}
+
+func TestReconcileClusterReplicaService(t *testing.T) {
+	ctx := t.Context()
+	_, cc := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+
+	reconciler := &Reconciler{Client: cc, Owner: client.FieldOwner(t.Name())}
+
+	cluster := testCluster()
+	cluster.Namespace = setupNamespace(t, cc).Name
+	cluster.Spec.InstanceSets[0].Replicas = new(int32(2))
+	assert.NilError(t, cc.Create(ctx, cluster))
+
+	service, err := reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
+
+	cluster.Spec.InstanceSets[0].Replicas = new(int32(1))
+	cluster.Spec.InstanceSets = append(cluster.Spec.InstanceSets, cluster.Spec.InstanceSets[0])
+	cluster.Spec.InstanceSets[1].Name = "instance2"
+	_, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+
+	service = &corev1.Service{ObjectMeta: naming.ClusterReplicaService(cluster)}
+	err = cc.Get(ctx, client.ObjectKeyFromObject(service), service)
+	assert.Assert(t, apierrors.IsNotFound(err), "expected replica Service to be deleted")
+
+	cluster.Spec.InstanceSets[0].Replicas = nil
+	cluster.Spec.InstanceSets[1].Replicas = new(int32(2))
+	service, err = reconciler.reconcileClusterReplicaService(ctx, cluster)
+	assert.NilError(t, err)
+	assert.Assert(t, service != nil && service.UID != "", "expected created Service")
 }

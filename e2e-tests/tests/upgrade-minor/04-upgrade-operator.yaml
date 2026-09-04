@@ -1,12 +1,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
+timeout: 180
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
+
+      # reference state for the no-rollout check in step 05
+      snapshot_workload_revisions ${test_name} ${TEMP_DIR}/revisions.before
+      date -u +%Y-%m-%dT%H:%M:%SZ > ${TEMP_DIR}/update_ts.txt
+      # background writes: step 05 asserts the cluster stayed available
+      start_heartbeat ${test_name}
 
       update_operator
       kubectl wait -n ${OPERATOR_NS:-$NAMESPACE} --timeout 30s --for=jsonpath='{.spec.template.spec.containers[0].image}'=$IMAGE deployment/percona-postgresql-operator

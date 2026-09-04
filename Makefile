@@ -9,9 +9,7 @@ KUTTL ?= kubectl-kuttl
 KUTTL_TEST ?= $(KUTTL) test
 SED := $(shell which gsed || which sed)
 
-# CRDs without descriptions are used in Helm and Bundles to avoid hitting the maximum file size limit.
-CRD_OPTIONS ?= crd:crdVersions='v1'
-CRD_OPTIONS_WITHOUT_DESCRIPTION = crd:crdVersions='v1',maxDescLen=0
+CRD_OPTIONS ?= crd:crdVersions='v1',maxDescLen=0
 
 ##@ General
 
@@ -119,6 +117,12 @@ build-postgres-operator: ## Build the postgres-operator binary
 		) --trimpath -o bin/postgres-operator ./cmd/postgres-operator
 
 ##@ Test
+GOLANGCI_LINT_VERSION ?= v2.12.2
+
+.PHONY: lint
+lint: ## Run golangci-lint (same as CI)
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout 5m --max-issues-per-linter 0 --max-same-issues 0
+
 .PHONY: check
 check: ## Run basic go tests with coverage output
 check: get-pgmonitor
@@ -157,8 +161,8 @@ go-fix: ## Run go fix on all packages
 
 .PHONY: generate
 generate: ## Generate crd, crd-docs, deepcopy functions, and rbac
-	$(MAKE) go-fix
 	$(MAKE) generate-all
+	$(MAKE) go-fix
 
 .PHONY: generate-all
 generate-all: kustomize
@@ -211,10 +215,6 @@ generate-rbac: ## Generate rbac
 .PHONY: generate-crd
 generate-crd: generate-crunchy-crd generate-percona-crd
 	$(KUSTOMIZE) build ./config/crd/ > ./deploy/crd.yaml
-
-.PHONY: generate-crd-without-description
-generate-crd-without-description: CRD_OPTIONS = $(CRD_OPTIONS_WITHOUT_DESCRIPTION)
-generate-crd-without-description: kustomize generate-crd
 
 .PHONY: generate-percona-crd
 generate-percona-crd:
@@ -344,7 +344,8 @@ release: generate license
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
-		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" deploy/cr.yaml
+		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" \
+		-e "/^  logcollector:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_LOGCOLLECTOR)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
@@ -372,6 +373,7 @@ after-release: update-version generate after-release-versions
 		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
 		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
+		-e "/^  logcollector:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/fluentbit:main-logcollector#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
@@ -411,7 +413,11 @@ after-release-versions:
 		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
 		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
 		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
+		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=$(IMAGE_TAG_BASE):main-ppg19-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=$(IMAGE_TAG_BASE):main-pgbouncer19#" \
+		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=$(IMAGE_TAG_BASE):main-pgbackrest19#" \
 		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
 		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
 		-e "s#^IMAGE_PMM_SERVER=.*#IMAGE_PMM_SERVER=perconalab/pmm-server:3-dev-latest#" \
+		-e "s#^IMAGE_LOGCOLLECTOR=.*#IMAGE_LOGCOLLECTOR=perconalab/fluentbit:main-logcollector#" \
 		e2e-tests/release_versions

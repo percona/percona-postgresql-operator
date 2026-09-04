@@ -8,10 +8,15 @@ commands:
 
       source ../../functions
 
+      table_method=''
+      if [[ ${PG_VER} -ge 17 ]]; then
+        table_method=' USING tde_heap'
+      fi
+
       run_psql_local \
-        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE myTable (id int PRIMARY KEY);' \
-        "postgres:$(get_psql_user_pass source-cluster-pguser-postgres)@$(get_psql_user_host source-cluster-pguser-postgres)"
+        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE myTable (id int PRIMARY KEY)'"${table_method}"';' \
+        "$(get_psql_uri source-cluster postgres)"
 
       run_psql_local \
         '\c myapp \\\ INSERT INTO myTable (id) VALUES (100500)' \
-        "postgres:$(get_psql_user_pass source-cluster-pguser-postgres)@$(get_psql_user_host source-cluster-pguser-postgres)"
+        "$(get_psql_uri source-cluster postgres)"

@@ -24,12 +24,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v2/internal/feature"
-	"github.com/percona/percona-postgresql-operator/v2/internal/naming"
-	pNaming "github.com/percona/percona-postgresql-operator/v2/percona/naming"
-	"github.com/percona/percona-postgresql-operator/v2/percona/version"
-	v2 "github.com/percona/percona-postgresql-operator/v2/pkg/apis/pgv2.percona.com/v2"
-	"github.com/percona/percona-postgresql-operator/v2/pkg/apis/upstream.pgv2.percona.com/v1beta1"
+	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
+	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
+	"github.com/percona/percona-postgresql-operator/v3/percona/version"
+	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 var _ = Describe("PG Cluster", Ordered, func() {
@@ -280,7 +280,7 @@ var _ = Describe("PMM sidecar", Ordered, func() {
 
 			It("should have PMM secret hash", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&sts), &sts)).Should(Succeed())
-				Expect(sts.Spec.Template.ObjectMeta.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
+				Expect(sts.Spec.Template.Annotations).To(HaveKey(pNaming.AnnotationPMMSecretHash))
 			})
 
 			It("should label PMM secret", func() {
@@ -410,9 +410,8 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
-			secretString := fmt.Sprintln(monitorUserSecret.Data)
 			// #nosec G401
-			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+			currentHash := fmt.Sprintf("%x", md5.Sum(monitorUserSecret.Data["password"]))
 
 			stsList := &appsv1.StatefulSetList{}
 			labels := map[string]string{
@@ -448,9 +447,8 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 			nn := types.NamespacedName{Namespace: ns, Name: cr.Name + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring}
 			Expect(k8sClient.Get(ctx, nn, monitorUserSecret)).NotTo(HaveOccurred())
 
-			secretString := fmt.Sprintln(monitorUserSecret.Data)
 			// #nosec G401
-			currentHash := fmt.Sprintf("%x", md5.Sum([]byte(secretString)))
+			currentHash := fmt.Sprintf("%x", md5.Sum(monitorUserSecret.Data["password"]))
 
 			err = k8sClient.List(ctx, stsList, client.InNamespace(cr.Namespace), client.MatchingLabels(labels))
 			Expect(err).NotTo(HaveOccurred())
@@ -466,13 +464,13 @@ var _ = Describe("Monitor user password change", Ordered, func() {
 })
 
 // tracerWithCounter is a tracer that counts the number of times the Reconcile is called. It should be used for crunchy reconciler.
-type tracerWithCounter struct {
+type tracerWithCounter struct { //nolint:unused
 	noop.Tracer
 	counter int
 	t       trace.Tracer
 }
 
-func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (t *tracerWithCounter) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) { //nolint:unused
 	ctx, span := t.t.Start(ctx, spanName, opts...)
 	if spanName == "Reconcile" {
 		t.counter++
@@ -2448,11 +2446,11 @@ var _ = Describe("CR Validations", Ordered, func() {
 		})
 
 		When("creating a CR with invalid pg_tde configurations", func() {
-			It("should reject pg_tde enabled on PG < 17", func() {
+			It("should reject pg_tde enabled on PG < 16", func() {
 				cr, err := readDefaultCR("cr-validation-tde-5", ns)
 				Expect(err).NotTo(HaveOccurred())
 
-				cr.Spec.PostgresVersion = 16
+				cr.Spec.PostgresVersion = 15
 				cr.Spec.Extensions.PGTDE = v1beta1.PGTDESpec{
 					Enabled: true,
 					Vault: &v1beta1.PGTDEVaultSpec{
@@ -2467,7 +2465,7 @@ var _ = Describe("CR Validations", Ordered, func() {
 				err = k8sClient.Create(ctx, cr)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
-					"pg_tde is only supported for PG17 and above",
+					"pg_tde is only supported for PG16 and above",
 				))
 			})
 
@@ -3080,5 +3078,127 @@ var _ = Describe("CR Version Management", Ordered, func() {
 				Expect(err.Error()).To(ContainSubstring("patch CR"))
 			})
 		})
+	})
+})
+
+var _ = Describe("Monitor user secret pre-creation", Ordered, func() {
+	ctx := context.Background()
+
+	const crName = "monitor-secret-precreate"
+	const ns = crName
+	crNamespacedName := types.NamespacedName{Name: crName, Namespace: ns}
+	monitorSecretName := types.NamespacedName{
+		Name:      crName + "-" + naming.RolePostgresUser + "-" + v2.UserMonitoring,
+		Namespace: ns,
+	}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crName,
+			Namespace: ns,
+		},
+	}
+
+	BeforeAll(func() {
+		By("Creating the Namespace to perform the tests")
+		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
+	})
+
+	AfterAll(func() {
+		By("Deleting the Namespace to perform the tests")
+		_ = k8sClient.Delete(ctx, namespace)
+	})
+
+	cr, err := readDefaultCR(crName, ns)
+	It("should read default cr.yaml", func() {
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create PerconaPGCluster with pmm enabled", func() {
+		cr.Spec.PMM.Enabled = true
+		status := cr.Status
+		Expect(k8sClient.Create(ctx, cr)).Should(Succeed())
+		cr.Status = status
+		Expect(k8sClient.Status().Update(ctx, cr)).Should(Succeed())
+	})
+
+	stsLabels := map[string]string{
+		"postgres-operator.crunchydata.com/data":    "postgres",
+		"postgres-operator.crunchydata.com/cluster": crName,
+	}
+
+	var initialPassword []byte
+	var initialHash string
+
+	It("should create the monitor user secret during the first reconcile", func() {
+		_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		secret := new(corev1.Secret)
+		Expect(k8sClient.Get(ctx, monitorSecretName, secret)).To(Succeed())
+		Expect(secret.Data["password"]).NotTo(BeEmpty())
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelCluster, crName))
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelPostgresUser, v2.UserMonitoring))
+		Expect(secret.Labels).To(HaveKeyWithValue(naming.LabelRole, naming.RolePostgresUser))
+
+		initialPassword = secret.Data["password"]
+	})
+
+	It("should annotate the PostgresCluster instance sets during the first reconcile", func() {
+		postgresCluster := new(v1beta1.PostgresCluster)
+		Expect(k8sClient.Get(ctx, crNamespacedName, postgresCluster)).To(Succeed())
+		Expect(postgresCluster.Spec.InstanceSets).NotTo(BeEmpty())
+
+		for _, set := range postgresCluster.Spec.InstanceSets {
+			Expect(set.Metadata).NotTo(BeNil())
+			Expect(set.Metadata.Annotations).To(HaveKey(pNaming.AnnotationMonitorUserSecretHash))
+		}
+
+		initialHash = postgresCluster.Spec.InstanceSets[0].Metadata.Annotations[pNaming.AnnotationMonitorUserSecretHash]
+		Expect(initialHash).NotTo(BeEmpty())
+	})
+
+	It("should create StatefulSets that already carry the hash annotation", func() {
+		stsList := new(appsv1.StatefulSetList)
+
+		// Only the Crunchy reconciler runs here: the annotation has to reach the
+		// StatefulSets from the PostgresCluster written by the first reconcile.
+		for i := 0; i < 3 && len(stsList.Items) == 0; i++ {
+			_, err := crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabels(stsLabels))).To(Succeed())
+		}
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations).To(HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, initialHash))
+		}
+	})
+
+	It("should keep the pre-created password when Crunchy adopts the secret", func() {
+		secret := new(corev1.Secret)
+		Expect(k8sClient.Get(ctx, monitorSecretName, secret)).To(Succeed())
+
+		// Crunchy fills in the connection details and the SCRAM verifier...
+		Expect(secret.Data["verifier"]).NotTo(BeEmpty())
+		// ... but must not rotate the password we generated.
+		Expect(secret.Data["password"]).To(Equal(initialPassword))
+	})
+
+	It("should not change the hash annotation on later reconciles", func() {
+		for range 3 {
+			_, err := reconciler(cr).Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = crunchyReconciler().Reconcile(ctx, ctrl.Request{NamespacedName: crNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		stsList := new(appsv1.StatefulSetList)
+		Expect(k8sClient.List(ctx, stsList, client.InNamespace(ns), client.MatchingLabels(stsLabels))).To(Succeed())
+		Expect(stsList.Items).NotTo(BeEmpty())
+
+		for _, sts := range stsList.Items {
+			Expect(sts.Spec.Template.Annotations).To(HaveKeyWithValue(pNaming.AnnotationMonitorUserSecretHash, initialHash))
+		}
 	})
 })

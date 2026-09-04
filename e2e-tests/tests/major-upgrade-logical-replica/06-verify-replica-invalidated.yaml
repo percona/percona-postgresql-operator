@@ -1,0 +1,55 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      primary=$(get_pod_by_role major-upgrade-logical-replica primary name)
+      kubectl -n "${NAMESPACE}" exec "${primary}" -- /pgdata/delete_old_cluster.sh
+
+      # pg_upgrade only rewrites the data directories of the instance sets, so the
+      # replica still holds a PostgreSQL 17 one. It has to be reported as broken
+      # rather than handed the new binary and left to crash.
+      retry 60 10 bash -c '
+        state=$(kubectl -n "'"${NAMESPACE}"'" get pg major-upgrade-logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"analytics\")].state}")
+        reason=$(kubectl -n "'"${NAMESPACE}"'" get pg major-upgrade-logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"analytics\")].reason}")
+        echo "logical replica analytics: ${state}/${reason}"
+        [[ ${state} == "broken" && ${reason} == "SourceUpgraded" ]]
+      '
+
+      message=$(kubectl -n "${NAMESPACE}" get pg major-upgrade-logical-replica \
+        -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].message}')
+      echo "message: ${message}"
+      echo "${message}" | grep -q "remove it from spec.logicalReplicas"
+
+      # The StatefulSet is stopped, so nothing is left crash-looping against a data
+      # directory the new binary cannot open.
+      retry 30 5 bash -c '
+        replicas=$(kubectl -n "'"${NAMESPACE}"'" get statefulset \
+          major-upgrade-logical-replica-lr-analytics -o jsonpath="{.spec.replicas}")
+        echo "logical replica statefulset replicas: ${replicas}"
+        [[ ${replicas} == "0" ]]
+      '
+
+      # pg_upgrade carries the logical slots over to the new cluster. Nothing will
+      # ever read from them again, so they must not be left pinning WAL.
+      PASS=$(get_psql_user_pass major-upgrade-logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host major-upgrade-logical-replica-pguser-postgres)
+
+      no_slots_left() {
+        local got
+        got=$(run_psql \
+          "SELECT count(*) FROM pg_replication_slots WHERE plugin IS NOT NULL;" \
+          "postgres://postgres:${PASS}@${HOST}" | xargs)
+
+        echo "logical slots left on the primary: ${got}"
+        [[ ${got} == "0" ]]
+      }
+
+      retry 30 5 no_slots_left
