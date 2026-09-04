@@ -664,6 +664,59 @@ function get_release_image() {
 	grep -E "^${key}=" "$release_versions_file" | cut -d'=' -f2
 }
 
+# Suffix after the PG major in release_versions keys, including the leading
+# underscore: "" (official UBI9), _UBI8, _UBI10, _UBI8_COMMUNITY, _UBI9_COMMUNITY.
+#
+# Release jobs export IMAGE_POSTGRESQL as the pillar image (PostgreSQL or
+# PostGIS). Match that value in e2e-tests/release_versions and reuse the same
+# key suffix for every major the test asks for. Fall back to the image tag if
+# the value is not in the file. A test that sets PG_DISTRIBUTION=community
+# remaps an official suffix onto the matching *_COMMUNITY keys.
+function release_image_suffix() {
+	local suffix=""
+	local img="${IMAGE_POSTGRESQL:-}"
+	img="${img#docker.io/}"
+	local file="${ROOT_REPO}/e2e-tests/release_versions"
+	local key=""
+
+	if [[ -n ${img} && -f ${file} ]]; then
+		key=$(awk -F= -v img="${img}" '
+			$1 ~ /^(IMAGE_POSTGRESQL|IMAGE_POSTGIS)[0-9]+/ {
+				val = $2
+				sub(/^docker.io\//, "", val)
+				if (val == img) {
+					print $1
+					exit
+				}
+			}' "${file}")
+	fi
+
+	if [[ -n ${key} ]]; then
+		suffix="${key#IMAGE_POSTGRESQL}"
+		suffix="${suffix#IMAGE_POSTGIS}"
+		suffix="${suffix#[0-9]}"
+		suffix="${suffix#[0-9]}"
+	else
+		case ${img} in
+			*community*ubi8* | *ubi8*community*) suffix="_UBI8_COMMUNITY" ;;
+			*community*ubi9* | *ubi9*community*) suffix="_UBI9_COMMUNITY" ;;
+			*-community*) suffix="_UBI9_COMMUNITY" ;;
+			*-ubi10 | *-ubi10:*) suffix="_UBI10" ;;
+			*-ubi8 | *-ubi8:*) suffix="_UBI8" ;;
+		esac
+	fi
+
+	if [[ ${PG_DISTRIBUTION} == "community" ]]; then
+		case ${suffix} in
+			*_COMMUNITY) ;;
+			_UBI8) suffix="_UBI8_COMMUNITY" ;;
+			*) suffix="_UBI9_COMMUNITY" ;;
+		esac
+	fi
+
+	echo "${suffix}"
+}
+
 function wait_for_delete() {
 	local res="$1"
 
@@ -1611,15 +1664,35 @@ function get_container_image() {
 	local pgVersion=$2
 
 	if [[ ${IMAGE} == percona/* || ${IMAGE} == docker.io/percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
+		local suffix
+		suffix=$(release_image_suffix)
 		local key
 		case $component in
-			pgbouncer) key="IMAGE_PGBOUNCER${pgVersion}" ;;
-			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
-			postgis) key="IMAGE_POSTGIS${pgVersion}" ;;
-			upgrade) key="IMAGE_UPGRADE${pgVersion}" ;;
-			*) key="IMAGE_POSTGRESQL${pgVersion}" ;;
+			pgbouncer)
+				if [[ ${suffix} == *_COMMUNITY ]]; then
+					key="IMAGE_PGBOUNCER_COMMUNITY"
+				else
+					key="IMAGE_PGBOUNCER${pgVersion}"
+				fi
+				;;
+			pgbackrest)
+				if [[ ${suffix} == *_COMMUNITY ]]; then
+					key="IMAGE_PGBACKREST_COMMUNITY"
+				else
+					key="IMAGE_BACKREST${pgVersion}"
+				fi
+				;;
+			postgis) key="IMAGE_POSTGIS${pgVersion}${suffix}" ;;
+			upgrade) key="IMAGE_UPGRADE${suffix}" ;;
+			*) key="IMAGE_POSTGRESQL${pgVersion}${suffix}" ;;
 		esac
-		get_release_image "$key"
+		local image
+		image=$(get_release_image "$key")
+		if [[ -z ${image} ]]; then
+			echo "release image key ${key} is not defined in e2e-tests/release_versions (variant suffix '${suffix}')" >&2
+			return 1
+		fi
+		echo "${image}"
 		return
 	fi
 
