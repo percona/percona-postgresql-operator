@@ -20,5 +20,6 @@ commands:
         yq eval ".spec.postgresVersion = ${PG_VER}" | \
         $sed "s|<repo-path>|${CRUNCHY_REPO_PATH}|g" | \
         $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
+        add_arch_to_pg - | \
         kubectl -n "${CRUNCHY_NS}" apply -f -
     timeout: 20

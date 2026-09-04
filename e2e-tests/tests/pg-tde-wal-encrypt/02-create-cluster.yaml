@@ -17,4 +17,5 @@ commands:
         | yq '.spec.extensions.pg_tde.vault.tokenSecret.key = "token"' \
         | yq '.spec.extensions.pg_tde.vault.caSecret.name = "vault-secret"' \
         | yq '.spec.extensions.pg_tde.vault.caSecret.key = "ca.crt"' \
+        | add_arch_to_pg - \
         | kubectl -n "${NAMESPACE}" apply -f -
