@@ -13740,6 +13740,7 @@ spec:
                     enum:
                     - pgstatmonitor
                     - pgstatstatements
+                    - none
                     type: string
                   resources:
                     properties:
