@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
       snapshot_workload_revisions ${test_name} ${TEMP_DIR}/revisions.before
       date -u +%Y-%m-%dT%H:%M:%SZ > ${TEMP_DIR}/update_ts.txt
 
