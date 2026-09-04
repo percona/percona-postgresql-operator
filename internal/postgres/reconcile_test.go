@@ -120,7 +120,7 @@ func TestInstancePod(t *testing.T) {
 	// without WAL volume nor WAL volume spec
 	pod := new(corev1.PodSpec)
 	InstancePod(ctx, cluster, instance,
-		serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+		serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
@@ -380,7 +380,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -489,7 +489,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithConfig, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -526,7 +526,7 @@ volumes:
 
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+				serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 2, "expected 2 containers in Pod, got %d", len(pod.Containers))
 		})
@@ -539,7 +539,7 @@ volumes:
 			ctx := feature.NewContext(ctx, gate)
 
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+				serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 3, "expected 3 containers in Pod, got %d", len(pod.Containers))
 
@@ -576,7 +576,7 @@ volumes:
 		tablespaceVolumes := []*corev1.PersistentVolumeClaim{tablespaceVolume1, tablespaceVolume2}
 
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, tablespaceVolumes, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, tablespaceVolumes, pod)
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
 - mountPath: /pgconf/tls
@@ -614,7 +614,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -735,7 +735,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, extraInstance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		// Extra volume mounts are appended to the postgres container, not the
 		// startup init container.
@@ -847,7 +847,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, oldCluster, extraInstance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		for _, m := range pod.Containers[0].VolumeMounts {
 			assert.Assert(t, m.Name != "fts-dicts", "extra volumes must not be mounted before 3.1.0")
@@ -925,7 +925,7 @@ func TestInstancePodAllowVolumeGrow(t *testing.T) {
 	// without WAL volume nor WAL volume spec
 	pod := new(corev1.PodSpec)
 	InstancePod(ctx, cluster, instance,
-		serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+		serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 	assert.Assert(t, cmp.MarshalMatches(pod, `
 containers:
@@ -1199,7 +1199,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -1308,7 +1308,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithConfig, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -1345,7 +1345,7 @@ volumes:
 
 		t.Run("SidecarNotEnabled", func(t *testing.T) {
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+				serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 2, "expected 2 containers in Pod, got %d", len(pod.Containers))
 		})
@@ -1358,7 +1358,7 @@ volumes:
 			ctx := feature.NewContext(ctx, gate)
 
 			InstancePod(ctx, cluster, sidecarInstance,
-				serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+				serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 			assert.Equal(t, len(pod.Containers), 3, "expected 3 containers in Pod, got %d", len(pod.Containers))
 
@@ -1395,7 +1395,7 @@ volumes:
 		tablespaceVolumes := []*corev1.PersistentVolumeClaim{tablespaceVolume1, tablespaceVolume2}
 
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, tablespaceVolumes, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, tablespaceVolumes, pod)
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Containers[0].VolumeMounts, `
 - mountPath: /pgconf/tls
@@ -1433,7 +1433,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, cluster, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, walVolume, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, walVolume, nil, pod)
 
 		assert.Assert(t, len(pod.Containers) > 0)
 		assert.Assert(t, len(pod.InitContainers) > 0)
@@ -1539,7 +1539,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithHugepages2Mi, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: cert-volume
@@ -1629,7 +1629,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithHugepages1Gi, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: cert-volume
@@ -1720,7 +1720,7 @@ volumes:
 
 		pod := new(corev1.PodSpec)
 		InstancePod(ctx, clusterWithHugepages, instance,
-			serverSecretProjection, clientSecretProjection, dataVolume, nil, nil, pod)
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: cert-volume
@@ -1841,5 +1841,80 @@ supplementalGroups:
 
 		cluster.Spec.SupplementalGroups = []int64{0}
 		assert.Assert(t, PodSecurityContext(cluster).SupplementalGroups == nil)
+	})
+}
+
+func TestInstancePodCABundle(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	cluster := new(v1beta1.PostgresCluster)
+	assert.NilError(t, cluster.Default(ctx, nil))
+	instance := new(v1beta1.PostgresInstanceSetSpec)
+	instance.Default(0)
+	dataVolume := new(corev1.PersistentVolumeClaim)
+	dataVolume.Name = "datavol"
+
+	serverSecretProjection := &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "srv-secret"},
+		Items: []corev1.KeyToPath{
+			{Key: "tls.crt", Path: "tls.crt"},
+			{Key: "tls.key", Path: "tls.key"},
+		},
+	}
+	clientSecretProjection := &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "repl-secret"},
+		Items: []corev1.KeyToPath{
+			{Key: "tls.crt", Path: "replication/tls.crt"},
+			{Key: "tls.key", Path: "replication/tls.key"},
+		},
+	}
+	bundle := &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "ca-bundle"},
+		Items: []corev1.KeyToPath{
+			{Key: "ca.crt", Path: "ca.crt"},
+			{Key: "ca.crt", Path: "replication/ca.crt"},
+		},
+	}
+
+	certVolume := func(pod *corev1.PodSpec) *corev1.Volume {
+		for i := range pod.Volumes {
+			if pod.Volumes[i].Name == naming.CertVolume {
+				return &pod.Volumes[i]
+			}
+		}
+		return nil
+	}
+
+	t.Run("NilBundleLeavesTwoSources", func(t *testing.T) {
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, cluster, instance,
+			serverSecretProjection, clientSecretProjection, nil, dataVolume, nil, nil, pod)
+
+		volume := certVolume(pod)
+		assert.Assert(t, volume != nil)
+		assert.Equal(t, len(volume.Projected.Sources), 2)
+	})
+
+	t.Run("BundleIsAppended", func(t *testing.T) {
+		pod := new(corev1.PodSpec)
+		InstancePod(ctx, cluster, instance,
+			serverSecretProjection, clientSecretProjection, bundle, dataVolume, nil, nil, pod)
+
+		volume := certVolume(pod)
+		assert.Assert(t, volume != nil)
+		assert.Equal(t, len(volume.Projected.Sources), 3)
+		assert.Equal(t, volume.Projected.Sources[2].Secret.Name, "ca-bundle")
+
+		// Two sources writing one path make the Pod unschedulable, so every
+		// path in the volume has to be unique.
+		seen := map[string]bool{}
+		for _, source := range volume.Projected.Sources {
+			for _, item := range source.Secret.Items {
+				assert.Assert(t, !seen[item.Path], "duplicate path %q", item.Path)
+				seen[item.Path] = true
+			}
+		}
+		assert.Assert(t, seen["ca.crt"] && seen["replication/ca.crt"])
 	})
 }

@@ -30,8 +30,21 @@ const (
 )
 
 // backendAuthority creates a volume projection of the PostgreSQL server
-// certificate authority.
-func backendAuthority(postgres *corev1.SecretProjection) corev1.VolumeProjection {
+// certificate authority. When caBundle is non-nil, its "ca.crt" is mounted
+// in place of postgres' own: caBundle already merges any CAs from
+// spec.tls.additionalTrustedCAs, and postgres' own ca.crt is absent for an
+// ACME issuer that only writes tls.crt and tls.key.
+func backendAuthority(postgres, caBundle *corev1.SecretProjection) corev1.VolumeProjection {
+	if caBundle != nil {
+		return corev1.VolumeProjection{Secret: &corev1.SecretProjection{
+			LocalObjectReference: caBundle.LocalObjectReference,
+			Items: []corev1.KeyToPath{{
+				Key:  tlsAuthoritySecretKey,
+				Path: certBackendAuthorityProjectionPath,
+			}},
+		}}
+	}
+
 	var items []corev1.KeyToPath
 	result := postgres.DeepCopy()
 
