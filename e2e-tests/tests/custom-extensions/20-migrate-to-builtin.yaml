@@ -1,20 +1,28 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: custom-extensions
-spec:
-  # pg_cron moves from a custom extension to a builtin one: the operator takes
-  # over its lifecycle, but the extension and its data must survive the move.
-  # Dropping it here used to be the default behavior, because the extension
-  # disappears from the custom list.
-  extensions:
-    pg_cron:
-      enabled: true
-    custom:
-    - name: pg_stat_kcache
-      version: 2.3.2
-  patroni:
-    dynamicConfiguration:
-      postgresql:
-        parameters:
-          shared_preload_libraries: pg_stat_statements,pg_stat_kcache,pg_cron
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping custom-to-builtin pg_cron migration on arm64: custom pg_cron was not installed"
+        exit 0
+      fi
+
+      # pg_cron moves from a custom extension to a builtin one: the operator takes
+      # over its lifecycle, but the extension and its data must survive the move.
+      # Dropping it here used to be the default behavior, because the extension
+      # disappears from the custom list.
+      kcache_ver=$(custom_ext_version 2.3.2)
+      kubectl -n "${NAMESPACE}" patch pg custom-extensions --type merge -p "{
+        \"spec\": {
+          \"extensions\": {
+            \"pg_cron\": {\"enabled\": true},
+            \"custom\": [{\"name\": \"pg_stat_kcache\", \"version\": \"${kcache_ver}\"}]
+          },
+          \"patroni\": {\"dynamicConfiguration\": {\"postgresql\": {\"parameters\": {\"shared_preload_libraries\": \"pg_stat_statements,pg_stat_kcache,pg_cron\"}}}}
+        }
+      }"

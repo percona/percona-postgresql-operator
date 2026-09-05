@@ -19,7 +19,7 @@ commands:
         --for=condition=Ready \
         --timeout=120s
 
-      kubectl wait postgrescluster/crunchy-source \
+      kubectl wait postgrescluster.postgres-operator.crunchydata.com/crunchy-source \
         -n "${CRUNCHY_NS}" \
         --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
         --timeout=300s
