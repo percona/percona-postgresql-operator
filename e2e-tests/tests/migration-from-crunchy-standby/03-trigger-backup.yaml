@@ -12,5 +12,5 @@ commands:
       # Doing the backup AFTER writing data means the Percona standby will
       # restore close to the current state and replay only a small amount of WAL,
       # which is the realistic production migration pattern.
-      kubectl -n "${CRUNCHY_NS}" annotate postgrescluster crunchy-source \
+      kubectl -n "${CRUNCHY_NS}" annotate postgrescluster.postgres-operator.crunchydata.com crunchy-source \
         postgres-operator.crunchydata.com/pgbackrest-backup="$(date +%s)"

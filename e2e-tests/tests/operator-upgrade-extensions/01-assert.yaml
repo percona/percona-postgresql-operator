@@ -1,13 +1,16 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: operator-upgrade-extensions
-status:
-  state: ready
-  postgres:
-    ready: 3
-    size: 3
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
+      wait_cluster_consistency operator-upgrade-extensions 60

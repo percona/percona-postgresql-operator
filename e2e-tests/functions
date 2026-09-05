@@ -5,13 +5,156 @@ ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
 CERT_MANAGER_VER="1.20.2"
 CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-tests"
 CHAOS_MESH_VER="2.5.1"
-BUSYBOX_VER="1.36"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
 
 function init_temp_dir() {
 	rm -rf "$TEMP_DIR"
 	mkdir -p "$TEMP_DIR"
+}
+
+arch_scheduling_enabled() {
+	[[ -n ${ARCH} ]]
+}
+
+# S3 object is <name>-pg<VER>-<version>.tar.gz.
+# ARM packages use a -arm64 version suffix so amd64 objects stay unchanged.
+custom_ext_version() {
+	local version=$1
+	if [[ ${ARCH} == arm64 ]]; then
+		echo "${version}-arm64"
+	else
+		echo "${version}"
+	fi
+}
+
+if arch_scheduling_enabled; then
+	echo "ARCH=${ARCH}: adding architecture nodeSelector/affinity and toleration to e2e workloads"
+fi
+
+add_arch_to_podspecs() {
+	if ! arch_scheduling_enabled; then
+		cat "$@"
+		return
+	fi
+
+	ARCH="${ARCH}" yq eval '
+		(select(.kind == "Pod").spec) |= (
+			.nodeSelector."kubernetes.io/arch" = strenv(ARCH) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "ReplicaSet").spec.template.spec) |= (
+			.nodeSelector."kubernetes.io/arch" = strenv(ARCH) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "Job").spec.template.spec) |= (
+			.nodeSelector."kubernetes.io/arch" = strenv(ARCH) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "CronJob").spec.jobTemplate.spec.template.spec) |= (
+			.nodeSelector."kubernetes.io/arch" = strenv(ARCH) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		)
+	' "$@"
+}
+
+add_arch_to_pg() {
+	if ! arch_scheduling_enabled; then
+		cat "$@"
+		return
+	fi
+
+	ARCH="${ARCH}" yq eval '
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("instances")) | .spec.instances[]?) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("logicalReplicas")).spec.logicalReplicas[]?) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("proxy")) | select(.spec.proxy | has("pgBouncer")) | .spec.proxy.pgBouncer) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | select(.spec.backups.pgbackrest | has("repoHost")) | .spec.backups.pgbackrest.repoHost) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | .spec.backups.pgbackrest).jobs |= (
+			. = (. // {}) |
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("backups")) | select(.spec.backups | has("pgbackrest")) | select(.spec.backups.pgbackrest | has("restore")) | .spec.backups.pgbackrest.restore) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster") | select(.spec | has("backups")) | select(.spec.backups | has("volumeSnapshots")) | .spec.backups.volumeSnapshots).jobs |= (
+			. = (. // {}) |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("postgresCluster")) | .spec.dataSource.postgresCluster) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("pgbackrest")) | .spec.dataSource.pgbackrest) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgDataVolume")) | .spec.dataSource.volumes.pgDataVolume) |= (
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgWALVolume")) | .spec.dataSource.volumes.pgWALVolume) |= (
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		) |
+		(select(.kind == "PerconaPGCluster" or .kind == "PostgresCluster") | select(.spec | has("dataSource")) | select(.spec.dataSource | has("volumes")) | select(.spec.dataSource.volumes | has("pgBackRestVolume")) | .spec.dataSource.volumes.pgBackRestVolume) |= (
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		)
+	' "$@"
+}
+
+add_arch_to_pg_upgrade() {
+	if ! arch_scheduling_enabled; then
+		cat "$@"
+		return
+	fi
+
+	ARCH="${ARCH}" yq eval '
+		(select(.kind == "PerconaPGUpgrade").spec) |= (
+			.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "kubernetes.io/arch", "operator": "In", "values": [strenv(ARCH)]}]}] |
+			.tolerations = ((.tolerations // []) + [{"key": "kubernetes.io/arch", "operator": "Equal", "value": strenv(ARCH), "effect": "NoSchedule"}] | unique_by(.key + "|" + .operator + "|" + (.value // "") + "|" + .effect))
+		)
+	' "$@"
+}
+
+helm_arch_args() {
+	local arr_name=$1
+	local prefix="${2:-}"
+
+	if ! arch_scheduling_enabled; then
+		return
+	fi
+
+	# Append into the caller array by name (avoid `local -n` — unsupported on macOS bash 3.2).
+	eval "$arr_name"'+=(
+		--set "'"${prefix}"'nodeSelector.kubernetes\.io/arch='"${ARCH}"'"
+		--set "'"${prefix}"'tolerations[0].key=kubernetes.io/arch"
+		--set "'"${prefix}"'tolerations[0].operator=Equal"
+		--set "'"${prefix}"'tolerations[0].value='"${ARCH}"'"
+		--set "'"${prefix}"'tolerations[0].effect=NoSchedule"
+	)'
+}
+
+arch_run_overrides() {
+	printf '{"spec":{"nodeSelector":{"kubernetes.io/arch":"%s"},"tolerations":[{"key":"kubernetes.io/arch","operator":"Equal","value":"%s","effect":"NoSchedule"}]}}' "${ARCH}" "${ARCH}"
+}
+
+merge_patch_pg() {
+	local name=$1
+	local patch
+	patch=$(add_arch_to_pg - | yq -o=json '{"spec": .spec}')
+	kubectl -n "${NAMESPACE}" patch pg "${name}" --type=merge --patch "${patch}"
 }
 
 function create_namespace() {
@@ -79,6 +222,7 @@ function deploy_operator() {
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="DISABLE_TELEMETRY") | .value) = "'${disable_telemetry}'"' - \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="LOG_LEVEL") | .value) = "DEBUG"' - \
 		| yq eval '(.spec.template.spec.containers[] | select(.name=="operator") | .env[] | select(.name=="PGO_FEATURE_GATES") | .value) = "'${PGO_FEATURE_GATES}'"' - \
+		| add_arch_to_podspecs - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -99,6 +243,11 @@ function update_operator() {
 
 	kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch deployment percona-postgresql-operator -p \
 		'{"spec":{"template":{"spec":{"containers":[{"name":"operator","image":"'${IMAGE}'"}]}}}}'
+
+	if arch_scheduling_enabled; then
+		kubectl -n "${OPERATOR_NS:-$NAMESPACE}" patch deployment percona-postgresql-operator -p \
+			'{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/arch":"'${ARCH}'"},"tolerations":[{"key":"kubernetes.io/arch","operator":"Equal","value":"'${ARCH}'","effect":"NoSchedule"}]}}}}'
+	fi
 }
 
 function deploy_operator_gh() {
@@ -119,6 +268,7 @@ function deploy_operator_gh() {
 	local docker_hub_org=$(echo "$IMAGE" | $sed -E 's|(.*/)?([^/]+)/[^/]+(:.*)?|\2|')
 	yq eval '.spec.template.spec.containers[0].image = "'${REGISTRY_NAME_FULL}''$docker_hub_org'/percona-postgresql-operator:'${git_tag#v}'"' \
 		"${TEMP_DIR}/${cw_prefix}operator_${git_tag}.yaml" \
+		| add_arch_to_podspecs - \
 		| kubectl -n "${OPERATOR_NS:-$NAMESPACE}" apply -f -
 }
 
@@ -262,6 +412,9 @@ function deploy_minio() {
 		aws_extra_args="--no-verify-ssl"
 	fi
 
+	helm_arch_args additional_helm_args
+	helm_arch_args additional_helm_args "postJob."
+
 	helm uninstall -n "${NAMESPACE}" "${name}" || :
 	helm repo remove minio || :
 	helm repo add minio https://charts.min.io/
@@ -291,9 +444,52 @@ function deploy_minio() {
 	wait_pod $MINIO_POD
 
 	# create bucket
-	kubectl -n "${NAMESPACE}" run -i --rm aws-cli --image=perconalab/awscli --restart=Never -- \
-		bash -c "AWS_ACCESS_KEY_ID='$access_key' AWS_SECRET_ACCESS_KEY='$secret_key' AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --endpoint-url ${endpoint_url} ${aws_extra_args} s3 mb s3://operator-testing"
+	aws_cli "$access_key" "$secret_key" us-east-1 \
+		--endpoint-url "${endpoint_url}" ${aws_extra_args} s3 mb s3://operator-testing
+}
+
+aws_cli() {
+	local access_key=$1
+	local secret_key=$2
+	local region=$3
+	shift 3
+
+	local -a run_args=(
+		-n "${NAMESPACE}" run -i --rm "aws-cli-${RANDOM}"
+		--image="${IMAGE_AWS_CLI}"
+		--restart=Never
+		--env="AWS_ACCESS_KEY_ID=${access_key}"
+		--env="AWS_SECRET_ACCESS_KEY=${secret_key}"
+		--env="AWS_DEFAULT_REGION=${region}"
+		--env="AWS_EC2_METADATA_DISABLED=true"
+	)
+	if arch_scheduling_enabled; then
+		run_args+=(--overrides="$(arch_run_overrides)")
+	fi
+
+	if [[ ${1:-} == bash || ${1:-} == /bin/bash ]]; then
+		[[ $1 == bash ]] && shift && set -- /bin/bash "$@"
+		kubectl "${run_args[@]}" --command -- "$@"
+	else
+		kubectl "${run_args[@]}" -- "$@"
+	fi
+}
+
+copy_custom_extensions_from_aws() {
+	set +o xtrace
+
+	local minio_key minio_secret
+	minio_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+	minio_secret="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+
+	retry 2 20 aws_cli "$(get_aws_access_key_id aws-s3-secret)" "$(get_aws_access_key aws-s3-secret)" us-east-1 \
+		bash -c "
+			aws s3 cp s3://pg-extensions/ /tmp/pg-ext/ --recursive &&
+			AWS_ACCESS_KEY_ID='${minio_key}' AWS_SECRET_ACCESS_KEY='${minio_secret}' AWS_DEFAULT_REGION=us-east-1 \
+				aws --endpoint-url http://minio-service:9000 s3 cp /tmp/pg-ext/ s3://operator-testing/ --recursive
+		"
+
+	set -o xtrace
 }
 
 function get_repo_auth() {
@@ -368,11 +564,11 @@ function deploy_s3_secrets() {
 }
 
 function deploy_client() {
-	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/client.yaml"
+	add_arch_to_podspecs "${TESTS_CONFIG_DIR}/client.yaml" | kubectl -n "${NAMESPACE}" apply -f -
 }
 
 function deploy_cmctl() {
-	envsubst <"${TESTS_CONFIG_DIR}/cmctl.yml" | kubectl -n "${NAMESPACE}" apply -f -
+	envsubst '${NAMESPACE}' < "${TESTS_CONFIG_DIR}/cmctl.yml" | add_arch_to_podspecs - | kubectl -n "${NAMESPACE}" apply -f -
 	kubectl -n "${NAMESPACE}" wait deployment cmctl --for=condition=available --timeout=60s
 }
 
@@ -425,6 +621,10 @@ function get_cr() {
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
+	fi
+
+	if arch_scheduling_enabled; then
+		add_arch_to_pg "$TEMP_DIR/cr.yaml" >"$TEMP_DIR/cr.yaml.arch" && mv "$TEMP_DIR/cr.yaml.arch" "$TEMP_DIR/cr.yaml"
 	fi
 
 	cat "$TEMP_DIR/cr.yaml"
@@ -562,39 +762,10 @@ function get_aws_access_key_id() {
 	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.AWS_ACCESS_KEY_ID | base64decode }}'
 }
 
-function get_psql_user_host() {
-	local secret_name=${1}
-
-	kubectl -n ${NAMESPACE} get "secret/${secret_name}" --template='{{.data.host | base64decode }}'
-}
-
 function get_instance_set_pods() {
 	local instance=${1:-instance1}
 
 	kubectl get pods -n ${NAMESPACE} --selector postgres-operator.crunchydata.com/instance-set=${instance} -o custom-columns='NAME:.metadata.name' --no-headers
-}
-
-function copy_custom_extensions_form_aws() {
-	set +o xtrace
-
-	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
-	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
-
-	kubectl -n "${NAMESPACE}" run -i --rm aws-cli \
-		--image=perconalab/awscli \
-		--restart=Never -- \
-		bash -c "
-		AWS_ACCESS_KEY_ID=$(get_aws_access_key_id aws-s3-secret) \
-		AWS_SECRET_ACCESS_KEY=$(get_aws_access_key aws-s3-secret) \
-		AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --endpoint-url https://s3.amazonaws.com s3 cp s3://pg-extensions/ /tmp/ --recursive &&
-
-		AWS_ACCESS_KEY_ID='${access_key}' \
-		AWS_SECRET_ACCESS_KEY='${secret_key}' \
-		AWS_DEFAULT_REGION=us-east-1 \
-		/usr/bin/aws --endpoint-url http://minio-service:9000 s3 cp /tmp/ s3://operator-testing/ --recursive
-	  "
-	set -o xtrace
 }
 
 function get_psql_pod_host() {
@@ -889,11 +1060,15 @@ function deploy_pmm_server() {
 		local additional_params="--set platform=openshift --set supresshttp2=false --set serviceAccount.create=false --set serviceAccount.name=pmm-server"
 	fi
 
+	local -a pmm_arch_args
+	helm_arch_args pmm_arch_args
+
 	retry 10 60 helm install monitoring percona/pmm -n "${NAMESPACE}" \
 		--set fullnameOverride=monitoring \
 		--set image.tag=${IMAGE_PMM_SERVER#*:} \
 		--set image.repository=${IMAGE_PMM_SERVER%:*} \
 		--set service.type=LoadBalancer \
+		"${pmm_arch_args[@]}" \
 		$additional_params \
 		--force
 }
@@ -1103,13 +1278,17 @@ function deploy_chaos_mesh() {
 	helm repo add chaos-mesh https://charts.chaos-mesh.org \
 		--force-update
 
-	helm install chaos-mesh chaos-mesh/chaos-mesh \
-		--namespace="${NAMESPACE}" \
-		--create-namespace \
-		--version="${CHAOS_MESH_VER}" \
-		--set chaosDaemon.runtime="${runtime}" \
-		--set chaosDaemon.socketPath="${socket_path}" \
+	local -a chaos_args=(
+		--namespace="${NAMESPACE}"
+		--create-namespace
+		--version="${CHAOS_MESH_VER}"
+		--set chaosDaemon.runtime="${runtime}"
+		--set chaosDaemon.socketPath="${socket_path}"
 		--set dashboard.create=false
+	)
+	helm_arch_args chaos_args "controllerManager."
+	helm_arch_args chaos_args "chaosDaemon."
+	helm install chaos-mesh chaos-mesh/chaos-mesh "${chaos_args[@]}"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		kubectl wait --for=create daemonset/chaos-daemon --namespace="${NAMESPACE}" --timeout=60s
@@ -1558,12 +1737,18 @@ function deploy_cert_manager() {
 	echo 'deploy cert manager'
 	helm repo add jetstack https://charts.jetstack.io --force-update || :
 	helm repo update || :
+	local -a cert_manager_arch_args
+	helm_arch_args cert_manager_arch_args
+	helm_arch_args cert_manager_arch_args "webhook."
+	helm_arch_args cert_manager_arch_args "cainjector."
+	helm_arch_args cert_manager_arch_args "startupapicheck."
 	retry 2 20 helm upgrade --install cert-manager jetstack/cert-manager \
 		--namespace cert-manager \
 		--create-namespace \
 		--version "${CERT_MANAGER_VER}" \
 		--set installCRDs=true \
-		--set "extraArgs={--enable-certificate-owner-ref=true}"
+		--set "extraArgs={--enable-certificate-owner-ref=true}" \
+		"${cert_manager_arch_args[@]}"
 
 	kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true || :
 	kubectl label namespace cert-manager "${CERT_MANAGER_TEST_LABEL}" --overwrite || :
@@ -1894,6 +2079,7 @@ function apply_hugepages_daemonset() {
 
 	HUGEPAGE_COUNT="${hugepage_count}" NODE_SERVICE="${node_service}" \
 		yq "${expression}" "${manifest}" \
+		| add_arch_to_podspecs - \
 		| kubectl apply -f -
 }
 
@@ -2351,16 +2537,21 @@ function create_k8s_cluster() {
 	local platform="$3"
 	local region="$4"
 	local ttl="${5:-"1"}"
+	local gke_machine_type="${K8S_UPGRADE_MACHINE_TYPE:-n1-standard-4}"
+	local doks_node_size="${K8S_UPGRADE_NODE_SIZE:-s-4vcpu-16gb-amd}"
+	if [[ ${ARCH} == arm64 ]]; then
+		gke_machine_type="${K8S_UPGRADE_MACHINE_TYPE:-t2a-standard-4}"
+	fi
 
 	case "$platform" in
 
 		doks)
-			echo "Creating DOKS cluster: $name ($version)"
+			echo "Creating DOKS cluster: $name ($version, size=$doks_node_size)"
 			creation_time=$(date +%s)
 			doctl kubernetes cluster create "$name" \
 				--region "$region" \
 				--version "$version" \
-				--size "s-4vcpu-16gb-amd" \
+				--size "$doks_node_size" \
 				--count "3" \
 				--tag "delete-cluster-after-hours:$ttl" \
 				--tag "creation-time:$creation_time" \
@@ -2377,13 +2568,13 @@ function create_k8s_cluster() {
 			;;
 
 		gke)
-			echo "Creating GKE cluster: $name ($version)"
+			echo "Creating GKE cluster: $name ($version, machine-type=$gke_machine_type)"
 			gcloud container clusters create "$name" \
 				--zone "$region" \
 				--cluster-ipv4-cidr=/21 \
 				--cluster-version "$version" \
 				--num-nodes "3" \
-				--machine-type "n1-standard-4" \
+				--machine-type "$gke_machine_type" \
 				--labels="delete-cluster-after-hours=$ttl,team=cloud,product=pg-operator" \
 				--no-enable-autoupgrade \
 				--monitoring=NONE \
@@ -2739,6 +2930,10 @@ function start_vault() {
 	local values_file="${tmp_dir}/vault.values.yaml"
 	local values_template="${TESTS_CONFIG_DIR}/vault-values-no-tls.yaml"
 
+	local -a vault_arch_args
+	helm_arch_args vault_arch_args "server."
+	helm_arch_args vault_arch_args "injector."
+
 	if [[ ${protocol} == "https" ]]; then
 		vault_tls "${name}" "${tmp_dir}"
 		values_template="${TESTS_CONFIG_DIR}/vault-values-tls.yaml"
@@ -2753,7 +2948,8 @@ function start_vault() {
 		--disable-openapi-validation \
 		--version $VAULT_VER \
 		--namespace "$vault_namespace" \
-		--values "${values_file}"
+		--values "${values_file}" \
+		"${vault_arch_args[@]}"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		oc patch clusterrole $name-agent-injector-clusterrole --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
