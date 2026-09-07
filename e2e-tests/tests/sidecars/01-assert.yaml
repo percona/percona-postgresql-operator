@@ -146,12 +146,12 @@ spec:
         - command:
             - sleep
             - 30d
-          image: busybox
+          image: docker.io/busybox:latest
           name: sidecar1
         - command:
             - sleep
             - 30d
-          image: busybox
+          image: docker.io/busybox:latest
           name: sidecar2
   proxy:
     pgBouncer:
@@ -169,7 +169,7 @@ spec:
         - command:
             - sleep
             - 30d
-          image: busybox
+          image: docker.io/busybox:latest
           name: sidecar1
 status:
   pgbouncer:

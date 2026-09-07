@@ -12,7 +12,7 @@ commands:
 
       # Shut down the Crunchy source cluster (optional step — frees resources
       # and ensures no split-brain once Percona is promoted).
-      kubectl patch postgrescluster crunchy-source \
+      kubectl patch postgrescluster.postgres-operator.crunchydata.com crunchy-source \
         -n "${CRUNCHY_NS}" \
         --type=merge \
         -p '{"spec": {"shutdown": true}}'

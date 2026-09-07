@@ -21,14 +21,10 @@ commands:
       dump_s3_logs() {
         (
           set +o xtrace
-          kubectl -n "${NAMESPACE}" run -i --rm "aws-cli-${RANDOM}" \
-            --image=perconalab/awscli --restart=Never \
-            --env="AWS_ACCESS_KEY_ID=${access_key}" \
-            --env="AWS_SECRET_ACCESS_KEY=${secret_key}" \
-            --env="AWS_DEFAULT_REGION=us-east-1" \
-            --command -- bash -c '
+          aws_cli "${access_key}" "${secret_key}" us-east-1 \
+            bash -c '
               set -e
-              aws_cmd="/usr/bin/aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
+              aws_cmd="aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
               key=$($aws_cmd s3 ls s3://operator-testing/ --recursive 2>/dev/null \
                 | grep postgres | head -1 | awk "{print \$NF}")
               [ -n "$key" ] || exit 1

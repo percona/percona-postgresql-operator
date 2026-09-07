@@ -46,7 +46,7 @@ commands:
       # Convert Crunchy to standby mode: Patroni demotes the leader, archives
       # the final WAL segments to S3, then enters recovery.
       # -----------------------------------------------------------------------
-      kubectl patch postgrescluster crunchy-source \
+      kubectl patch postgrescluster.postgres-operator.crunchydata.com crunchy-source \
         -n "${CRUNCHY_NS}" \
         --type=merge \
         -p '{"spec": {"standby": {"enabled": true, "repoName": "repo1"}}}'
