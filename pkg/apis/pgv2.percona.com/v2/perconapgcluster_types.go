@@ -1237,6 +1237,9 @@ type PMMQuerySource string
 const (
 	PgStatStatements PMMQuerySource = "pgstatstatements"
 	PgStatMonitor    PMMQuerySource = "pgstatmonitor"
+	// QuerySourceNone disables Query Analytics for the cluster. Metrics are
+	// still collected; only the QAN agent is left unregistered.
+	QuerySourceNone PMMQuerySource = "none"
 )
 
 type PMMSpec struct {
@@ -1265,7 +1268,9 @@ type PMMSpec struct {
 	// +kubebuilder:validation:Required
 	Secret string `json:"secret,omitempty"`
 
-	// +kubebuilder:validation:Enum={pgstatmonitor,pgstatstatements}
+	// QuerySource selects the Query Analytics source for the cluster.
+	// Use "none" to disable Query Analytics while keeping metrics collection.
+	// +kubebuilder:validation:Enum={pgstatmonitor,pgstatstatements,none}
 	// +kubebuilder:default=pgstatstatements
 	// +kubebuilder:validation:Required
 	QuerySource PMMQuerySource `json:"querySource,omitempty"`
