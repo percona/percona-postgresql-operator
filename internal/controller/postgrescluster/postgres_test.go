@@ -919,6 +919,77 @@ resources:
 	})
 }
 
+// K8SPG-1086
+func TestReconcilePostgresLogVolume(t *testing.T) {
+	ctx := context.Background()
+	_, tClient := setupKubernetes(t)
+	require.ParallelCapacity(t, 1)
+
+	reconciler := &Reconciler{
+		Client: tClient,
+		Owner:  client.FieldOwner(t.Name()),
+	}
+
+	cluster := testCluster()
+	ns := setupNamespace(t, tClient)
+	cluster.Namespace = ns.Name
+	cluster.SetLabels(map[string]string{naming.LabelVersion: "3.2.0"})
+
+	assert.NilError(t, tClient.Create(ctx, cluster))
+	t.Cleanup(func() { assert.Check(t, tClient.Delete(ctx, cluster)) })
+
+	spec := &v1beta1.PostgresInstanceSetSpec{}
+	assert.NilError(t, yaml.Unmarshal([]byte(`{
+		name: "some-instance",
+		dataVolumeClaimSpec: {
+			accessModes: [ReadWriteOnce],
+			resources: { requests: { storage: 1Gi } },
+		},
+		logVolumeClaimSpec: {
+			accessModes: [ReadWriteOnce],
+			resources: { requests: { storage: 1Gi } },
+			storageClassName: "storage-class-for-logs",
+		},
+	}`), spec))
+	instance := &appsv1.StatefulSet{ObjectMeta: naming.GenerateInstance(cluster, spec)}
+
+	t.Run("Created", func(t *testing.T) {
+		pvc, err := reconciler.reconcilePostgresLogVolume(ctx, cluster, spec, instance, nil)
+		assert.NilError(t, err)
+
+		assert.Equal(t, pvc.Name, instance.Name+"-pglogs")
+		assert.Equal(t, pvc.Labels[naming.LabelCluster], cluster.Name)
+		assert.Equal(t, pvc.Labels[naming.LabelInstance], instance.Name)
+		assert.Equal(t, pvc.Labels[naming.LabelInstanceSet], spec.Name)
+		assert.Equal(t, pvc.Labels[naming.LabelRole], naming.RolePostgresLog)
+
+		assert.Assert(t, cmp.MarshalMatches(pvc.Spec, `
+accessModes:
+- ReadWriteOnce
+resources:
+  requests:
+    storage: 1Gi
+storageClassName: storage-class-for-logs
+volumeMode: Filesystem
+		`))
+	})
+
+	t.Run("RetainedOnRemoval", func(t *testing.T) {
+		// The log volume spec is removed: the instance stops mounting the PVC,
+		// but the PVC itself must be retained for manual cleanup or future reuse.
+		specWithoutLogs := spec.DeepCopy()
+		specWithoutLogs.LogVolumeClaimSpec = nil
+
+		pvc, err := reconciler.reconcilePostgresLogVolume(ctx, cluster, specWithoutLogs, instance, nil)
+		assert.NilError(t, err)
+		assert.Assert(t, pvc == nil)
+
+		retained := &corev1.PersistentVolumeClaim{ObjectMeta: naming.InstancePostgresLogVolume(instance)}
+		assert.NilError(t, tClient.Get(ctx, client.ObjectKeyFromObject(retained), retained))
+		assert.Assert(t, retained.DeletionTimestamp == nil)
+	})
+}
+
 func TestReconcileDatabaseInitSQL(t *testing.T) {
 	ctx := context.Background()
 	var called bool

@@ -7,16 +7,16 @@ commands:
 
       source ../../functions
 
-      primary=$(get_pod_by_role tablespaces primary name)
+      primary=$(get_pod_by_role additional-volumes primary name)
       latest_full_backup=$(kubectl -n ${NAMESPACE} exec ${primary} -- pgbackrest info --output json | jq '[.[] | .backup[] | select(.type == "full")][-1].label')
 
       cat <<EOF | kubectl -n ${NAMESPACE} apply -f -
       apiVersion: pgv2.percona.com/v2
       kind: PerconaPGRestore
       metadata:
-        name: tablespaces-restore
+        name: additional-volumes-restore
       spec:
-        pgCluster: tablespaces
+        pgCluster: additional-volumes
         repoName: repo1
         options:
         - --set=${latest_full_backup}

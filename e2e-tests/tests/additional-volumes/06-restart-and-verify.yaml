@@ -1,0 +1,46 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 420
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # The backup in the previous step ran pgBackRest on the primary, which logs
+      # through the symlink onto the volume. This is the one producer that writes
+      # there with no user configuration: Postgres' own log_directory defaults to
+      # the versioned data directory, so server logs stay on the data volume.
+      primary=$(get_pod_by_role additional-volumes primary name)
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- \
+        bash -c 'ls /pglogs/pgbackrest/log/*.log >/dev/null'
+
+      marker="pglogs-$(date +%s)-${RANDOM}"
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- \
+        bash -c "printf '%s' '${marker}' > /pglogs/marker"
+
+      # Surviving a pod restart is the definitive proof the WAL and the logs live on
+      # their PVCs and not on the pod's ephemeral filesystem.
+      restart_pg_pods additional-volumes instance1
+      wait_cluster_consistency additional-volumes
+
+      for pod in $(get_instance_set_pods instance1); do
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+          grep -q ' /pgwal ' /proc/mounts
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+          grep -q ' /pglogs ' /proc/mounts
+
+        check_additional_volume_symlinks "${pod}" "after restart"
+      done
+
+      primary=$(get_pod_by_role additional-volumes primary name)
+      readback=$(kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- cat /pglogs/marker)
+      if [[ ${readback} != "${marker}" ]]; then
+        echo "log volume did not persist across restart: wrote '${marker}', read '${readback}'"
+        exit 1
+      fi
+
+      data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' \
+        "$(get_psql_uri additional-volumes postgres)")
+      kubectl create configmap -n "${NAMESPACE}" 06-read-after-restart --from-literal=data="${data}"

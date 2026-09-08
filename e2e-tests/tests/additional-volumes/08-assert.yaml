@@ -5,12 +5,11 @@ timeout: 180
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
 metadata:
-  name: tablespaces
-  generation: 4
+  name: additional-volumes
   ownerReferences:
     - apiVersion: pgv2.percona.com/v2
       kind: PerconaPGCluster
-      name: tablespaces
+      name: additional-volumes
       controller: true
       blockOwnerDeletion: true
   finalizers:
@@ -21,7 +20,6 @@ status:
       readyReplicas: 3
       replicas: 3
       updatedReplicas: 3
-  observedGeneration: 4
   pgbackrest:
     repos:
       - name: repo1
@@ -29,7 +27,7 @@ status:
         stanzaCreated: true
     restore:
       finished: true
-      id: tablespaces-restore
+      id: additional-volumes-restore
       succeeded: 1
   proxy:
     pgBouncer:
@@ -39,9 +37,9 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: tablespaces-restore
+  name: additional-volumes-restore
 spec:
-  pgCluster: tablespaces
+  pgCluster: additional-volumes
   repoName: repo1
 status:
   state: Succeeded
