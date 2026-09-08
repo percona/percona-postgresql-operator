@@ -195,6 +195,11 @@ apply_csv_overrides() {
 	yq --in-place --yaml-roundtrip \
 		'
       .metadata.annotations.certified = "true"
+      | (
+          .spec.installModes[]
+          | select(.type == "MultiNamespace")
+          | .supported
+        ) = true
     ' \
 		"${csv_file}"
 
