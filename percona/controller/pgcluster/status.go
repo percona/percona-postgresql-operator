@@ -180,6 +180,8 @@ func updateConditions(cr *v2.PerconaPGCluster, status *v1beta1.PostgresClusterSt
 		}
 	}
 
+	initializePerconaSpecificConditions(cr)
+
 	syncConditionsFromPostgresToPercona(cr, status)
 
 	syncPatroniFromPostgresToPercona(cr, status)
@@ -262,5 +264,19 @@ func syncPatroniFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v
 func syncPgbackrestFromPostgresToPercona(cr *v2.PerconaPGCluster, postgresStatus *v1beta1.PostgresClusterStatus) {
 	if postgresStatus.PGBackRest != nil {
 		cr.Status.PGBackRest = postgresStatus.PGBackRest.DeepCopy()
+	}
+}
+
+func initializePerconaSpecificConditions(cr *v2.PerconaPGCluster) {
+	if !cr.Spec.Backups.IsEnabled() {
+		return
+	}
+	if meta.FindStatusCondition(cr.Status.Conditions, pNaming.ConditionScheduledBackupDegraded) == nil {
+		meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+			Type:    pNaming.ConditionScheduledBackupDegraded,
+			Status:  metav1.ConditionFalse,
+			Reason:  "NoBackupYet",
+			Message: "No scheduled backup has been attempted yet",
+		})
 	}
 }

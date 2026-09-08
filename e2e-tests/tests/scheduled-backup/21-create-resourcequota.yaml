@@ -1,0 +1,82 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 180
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Create a ResourceQuota that prevents new Jobs from being created.
+      # This will cause the scheduled backup to fail to create its job.
+      cat <<EOF | kubectl apply -f -
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: no-jobs-quota
+        namespace: ${NAMESPACE}
+      spec:
+        hard:
+          count/jobs.batch: "0"
+      EOF
+
+      # Disable all schedules so only the one we re-enable below can fire.
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "schedules": {
+                "repo1": null,
+                "repo2": null,
+                "repo3": null
+              }
+            }
+          }
+        }
+      }'
+
+      # Number of backups present before we trigger a new one.
+      BEFORE=$(kubectl get pg-backup -n "${NAMESPACE}" --no-headers 2>/dev/null | wc -l)
+
+      # Re-enable a single schedule with a short interval to fire one backup.
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "schedules": {
+                "repo1": "*/1 * * * *"
+              }
+            }
+          }
+        }
+      }'
+
+      # Wait for the schedule to fire and create exactly one new backup, then
+      # disable the schedule immediately so it does not keep firing every minute.
+      NEW=0
+      for i in $(seq 1 90); do
+        NEW=$(kubectl get pg-backup -n "${NAMESPACE}" --no-headers 2>/dev/null | wc -l)
+        if [ "${NEW}" -gt "${BEFORE}" ]; then
+          break
+        fi
+        sleep 1
+      done
+
+      if [ "${NEW}" -le "${BEFORE}" ]; then
+        echo "ERROR: no new PerconaPGBackup was created within 90s"
+        exit 1
+      fi
+
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "schedules": {
+                "repo1": null
+              }
+            }
+          }
+        }
+      }'

@@ -1022,6 +1022,11 @@ func generateBackupJobSpecIntent(ctx context.Context, postgresCluster *v1beta1.P
 		if postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit != nil {
 			jobSpec.BackoffLimit = postgresCluster.Spec.Backups.PGBackRest.Jobs.BackoffLimit
 		}
+		if postgresCluster.Spec.Backups.PGBackRest.Jobs.ActiveDeadlineSeconds != nil {
+			jobSpec.ActiveDeadlineSeconds = postgresCluster.Spec.Backups.PGBackRest.Jobs.ActiveDeadlineSeconds
+		} else if postgresCluster.CompareVersion("3.1.0") >= 0 {
+			jobSpec.ActiveDeadlineSeconds = new(int64(7200))
+		}
 	}
 
 	// K8SPG-833
