@@ -374,6 +374,11 @@ build_crd_examples() {
               "enabled": false,
               "repoName": "repo1"
             }
+            | .spec.extensions = {
+              "pg_tde": {
+                "vault": null
+              }
+            }
           ' \
 					../../deploy/cr.yaml
 			) \
@@ -506,6 +511,11 @@ render_csv() {
 						| (
 								.spec.template.spec.containers[].env[]?
 								| select(.name == "WATCH_NAMESPACE")
+								| .valueFrom.fieldRef.fieldPath
+							) = $target_namespaces_field_path
+						| (
+								.spec.template.spec.containers[].env[]?
+								| select(.name == "PGO_NAMESPACE")
 								| .valueFrom.fieldRef.fieldPath
 							) = $target_namespaces_field_path
 						| {
