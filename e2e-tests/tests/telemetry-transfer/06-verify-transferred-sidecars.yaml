@@ -8,7 +8,7 @@ commands:
 
       source ../../functions
 
-      kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add","path":"/spec/instances/0/sidecars","value":[{"name":"testcontainer","image":"busybox","command":["sleep","infinity"]}]}]'
+      kubectl -n ${NAMESPACE} patch perconapgcluster/${test_name} --type=json -p '[{"op":"add","path":"/spec/instances/0/sidecars","value":[{"name":"testcontainer","image":"docker.io/busybox:latest","command":["sleep","infinity"]}]}]'
       sleep 7
       CR_ID=$(kubectl -n ${NAMESPACE} get perconapgcluster/${test_name} --template='{{.metadata.uid}}')
       TRANSFERRED_KEYS=$(kubectl -n ${NAMESPACE} logs -l run=version-service| grep ${CR_ID} | tail -n1 | grep -Eo '\{.*\}$' | jq '."grpc.request.content".msg | keys')

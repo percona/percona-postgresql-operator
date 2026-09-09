@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
       uri="postgres:$(get_psql_user_pass ${test_name}-pguser-postgres)@$(get_psql_user_host ${test_name}-pguser-postgres)"
 
       run_psql_local 'SELECT extname||$$=$$||extversion FROM pg_extension ORDER BY 1' "$uri" \

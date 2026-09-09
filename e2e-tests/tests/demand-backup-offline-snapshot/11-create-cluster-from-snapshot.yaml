@@ -24,4 +24,5 @@ commands:
           )
           // .
         ' \
+        | add_arch_to_pg - \
         | kubectl -n "${NAMESPACE}" apply -f -

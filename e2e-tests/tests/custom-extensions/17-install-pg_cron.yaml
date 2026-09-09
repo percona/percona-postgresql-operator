@@ -1,20 +1,31 @@
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  name: custom-extensions
-spec:
-  # pg_cron is installed as a custom extension here so the next steps can move
-  # it to spec.extensions.pg_cron: it is the only extension that is both
-  # available as a custom archive and managed as a builtin one, and it owns
-  # data (the cron.job rows) that a wrong drop would destroy
-  extensions:
-    custom:
-    - name: pg_stat_kcache
-      version: 2.3.2
-    - name: pg_cron
-      version: 1.6.7
-  patroni:
-    dynamicConfiguration:
-      postgresql:
-        parameters:
-          shared_preload_libraries: pg_stat_statements,pg_stat_kcache,pg_cron
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping custom pg_cron on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
+      # pg_cron is installed as a custom extension here so the next steps can move
+      # it to spec.extensions.pg_cron: it is the only extension that is both
+      # available as a custom archive and managed as a builtin one, and it owns
+      # data (the cron.job rows) that a wrong drop would destroy
+      kcache_ver=$(custom_ext_version 2.3.2)
+      cron_ver=$(custom_ext_version 1.6.7)
+      kubectl -n "${NAMESPACE}" patch pg custom-extensions --type merge -p "{
+        \"spec\": {
+          \"extensions\": {\"custom\": [
+            {\"name\": \"pg_stat_kcache\", \"version\": \"${kcache_ver}\"},
+            {\"name\": \"pg_cron\", \"version\": \"${cron_ver}\"}
+          ]},
+          \"patroni\": {\"dynamicConfiguration\": {\"postgresql\": {\"parameters\": {\"shared_preload_libraries\": \"pg_stat_statements,pg_stat_kcache,pg_cron\"}}}}
+        }
+      }"
+
+      wait_cluster_consistency custom-extensions

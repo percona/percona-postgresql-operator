@@ -11,11 +11,14 @@ commands:
       # The Crunchy source cluster and the Percona target cluster never coexist:
       # Crunchy is deleted in step 03, Percona is created in step 04.
       # A single namespace is therefore sufficient for this test.
+      pgo_helm_args=()
+      helm_arch_args pgo_helm_args
       helm install pgo \
         oci://registry.developers.crunchydata.com/crunchydata/pgo \
         --namespace "${NAMESPACE}" \
         --version "${CPGO_VERSION}" \
         --set singleNamespace=true \
+        "${pgo_helm_args[@]}" \
         --wait
 
       # Deploy MinIO using the shared helper so this test follows the same
