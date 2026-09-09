@@ -18,7 +18,7 @@ func TestBackendAuthority(t *testing.T) {
 	projection := &corev1.SecretProjection{
 		LocalObjectReference: corev1.LocalObjectReference{Name: "some-name"},
 	}
-	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection), `
+	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection, nil), `
 secret:
   items:
   - key: ca.crt
@@ -31,12 +31,26 @@ secret:
 		{Key: "some-crt-key", Path: "tls.crt"},
 		{Key: "some-ca-key", Path: "ca.crt"},
 	}
-	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection), `
+	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection, nil), `
 secret:
   items:
   - key: some-ca-key
     path: ~postgres-operator/backend-ca.crt
   name: some-name
+	`))
+
+	// When a caBundle is supplied - because spec.tls.additionalTrustedCAs
+	// merges CAs that postgres' own projection may not carry (e.g. an ACME
+	// issuer that writes no ca.crt) - it is mounted in place of postgres'.
+	caBundle := &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "ca-bundle"},
+	}
+	assert.Assert(t, cmp.MarshalMatches(backendAuthority(projection, caBundle), `
+secret:
+  items:
+  - key: ca.crt
+    path: ~postgres-operator/backend-ca.crt
+  name: ca-bundle
 	`))
 }
 

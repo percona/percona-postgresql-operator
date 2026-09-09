@@ -614,6 +614,17 @@ func PostgresTLSSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	}
 }
 
+// PostgresCABundleSecret returns the ObjectMeta for the Secret holding the
+// merged trust bundle mounted as ca.crt. It exists only when cert-manager owns
+// the certificate Secrets, which the operator must not write into, and extra
+// trust anchors have to be merged in from somewhere it does own.
+func PostgresCABundleSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name + "-ca-bundle",
+	}
+}
+
 // MovePGDataDirJob returns the ObjectMeta for a pgData directory move Job
 func MovePGDataDirJob(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
 	return metav1.ObjectMeta{

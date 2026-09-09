@@ -547,7 +547,7 @@ func TestScaleUpInstancesPreservesTDEVolume(t *testing.T) {
 			&corev1.ServiceAccount{ObjectMeta: object("cluster-instance")},
 			&corev1.Service{ObjectMeta: object("cluster-ha")},
 			clusterCertSecretProjection(&corev1.Secret{ObjectMeta: object("cluster-cert")}),
-			nil, 1, nil, nil, nil, false)
+			nil, nil, 1, nil, nil, nil, false)
 		assert.NilError(t, err)
 	}
 

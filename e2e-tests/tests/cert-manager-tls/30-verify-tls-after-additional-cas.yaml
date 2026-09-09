@@ -1,0 +1,47 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-manager-tls"
+
+      # Widening a trust bundle must not narrow what already verified. These
+      # repeat the checks from steps 25-28 with the additional CA in place.
+      instance=$(kubectl -n "${NAMESPACE}" get pod \
+        -l postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      certificate_data=$(run_comand_on_pod "openssl s_client -connect ${cluster}-primary:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -subject -issuer")
+      if [[ "$certificate_data" != *"issuer=CN=${cluster}-ca"* ]]; then
+          echo "Unexpected PostgreSQL certificate issuer. Expected CN=${cluster}-ca"
+          echo "Got: $certificate_data"
+          exit 1
+      fi
+
+      # mTLS: the _crunchyrepl client certificate is verified against
+      # ssl_ca_file, which now carries two anchors.
+      repl_ssl_count=$(run_psql_local \
+        "SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_replication r ON s.pid = r.pid WHERE s.ssl = true;" \
+        "postgres:$(get_psql_user_pass ${cluster}-pguser-postgres)@${cluster}-primary")
+      repl_ssl_count=$(echo "$repl_ssl_count" | tr -d '[:space:]')
+
+      if [[ "$repl_ssl_count" -lt 1 ]]; then
+          echo "No SSL replication connections found after adding a trusted CA, got: $repl_ssl_count"
+          exit 1
+      fi
+
+      # pgBackRest verifies its client certificate against the same merged file.
+      kubectl -n "${NAMESPACE}" exec "${instance}" -c pgbackrest -- pgbackrest info
+
+      # PgBouncer still serves and reaches the backend.
+      pgbouncer_certificate_data=$(run_comand_on_pod "openssl s_client -connect ${cluster}-pgbouncer:5432 -starttls postgres <<< '' 2>/dev/null | openssl x509 -noout -subject -issuer")
+      if [[ "$pgbouncer_certificate_data" != *"issuer=CN=${cluster}-ca"* ]]; then
+          echo "Unexpected PgBouncer certificate issuer. Expected CN=${cluster}-ca"
+          echo "Got: $pgbouncer_certificate_data"
+          exit 1
+      fi
+    timeout: 120

@@ -1086,7 +1086,7 @@ func TestSecret(t *testing.T) {
 	t.Run("NoRepoHost", func(t *testing.T) {
 		// Nothing happens when there is no repository host.
 		constant := intent.DeepCopy()
-		assert.NilError(t, Secret(ctx, cluster, nil, root, existing, intent))
+		assert.NilError(t, Secret(ctx, cluster, nil, root, nil, existing, intent))
 		assert.DeepEqual(t, constant, intent)
 	})
 
@@ -1097,7 +1097,7 @@ func TestSecret(t *testing.T) {
 
 	// The existing Secret does not change.
 	constant := existing.DeepCopy()
-	assert.NilError(t, Secret(ctx, cluster, host, root, existing, intent))
+	assert.NilError(t, Secret(ctx, cluster, host, root, nil, existing, intent))
 	assert.DeepEqual(t, constant, existing)
 
 	// There is a leaf certificate and private key for the repository host.
@@ -1115,14 +1115,14 @@ func TestSecret(t *testing.T) {
 	// Assuming the intent is written, no change when called again.
 	existing.Data = intent.Data
 	before := intent.DeepCopy()
-	assert.NilError(t, Secret(ctx, cluster, host, root, existing, intent))
+	assert.NilError(t, Secret(ctx, cluster, host, root, nil, existing, intent))
 	assert.DeepEqual(t, before, intent)
 
 	t.Run("Rotation", func(t *testing.T) {
 		// The leaf certificate is regenerated when the root authority changes.
 		root2, err := pki.NewRootCertificateAuthority()
 		assert.NilError(t, err)
-		assert.NilError(t, Secret(ctx, cluster, host, root2, existing, intent))
+		assert.NilError(t, Secret(ctx, cluster, host, root2, nil, existing, intent))
 
 		leaf2 := &pki.LeafCertificate{}
 		assert.NilError(t, leaf2.Certificate.UnmarshalText(intent.Data["pgbackrest-repo-host.crt"]))
