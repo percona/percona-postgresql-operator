@@ -11,6 +11,7 @@ redhat_operator_repository="percona/percona-postgresql-operator"
 redhat_containers_repository="percona/percona-postgresql-operator-containers"
 redhat_operator_tag="${REDHAT_OPERATOR_TAG:-${redhat_release}}"
 redhat_upgrade_tag="${REDHAT_UPGRADE_TAG:-${redhat_release}-upgrade}"
+redhat_logcollector_tag="${REDHAT_LOGCOLLECTOR_TAG:-${redhat_release}-logcollector}"
 redhat_related_images="[]"
 
 required_vars=(
@@ -133,9 +134,13 @@ build_redhat_related_images() {
 	# shellcheck source=/dev/null
 	source "${repo_root}/e2e-tests/release_versions"
 
+	# Official majors only (IMAGE_POSTGRESQL14). Flavor suffixes such as
+	# _UBI8 / _UBI10 / _UBI9_COMMUNITY are e2e matrix variants, not certified
+	# relatedImages.
 	pg_versions="$(
 		compgen -A variable IMAGE_POSTGRESQL \
 			| sed 's/^IMAGE_POSTGRESQL//' \
+			| grep -E '^[0-9]+$' \
 			| sort -rn
 	)"
 
@@ -162,6 +167,7 @@ build_redhat_related_images() {
 		"$(release_component_tag pgbouncer "$(image_version "${IMAGE_PGBOUNCER18}")")"
 
 	add_related_image "pmm" "${redhat_containers_repository}" "${redhat_release}-pmm3"
+	add_related_image "logcollector" "${redhat_containers_repository}" "${redhat_logcollector_tag}"
 	add_related_image "operator" "${redhat_operator_repository}" "${redhat_operator_tag}"
 	add_related_image "pgupgrade" "${redhat_containers_repository}" "${redhat_upgrade_tag}"
 
@@ -171,6 +177,7 @@ build_redhat_related_images() {
 		--arg pgbouncer_image "$(related_image_by_name pgbouncer)" \
 		--arg pgbackrest_image "$(related_image_by_name pgbackrest)" \
 		--arg pmm_image "$(related_image_by_name pmm)" \
+		--arg logcollector_image "$(related_image_by_name logcollector)" \
 		--arg upgrade_image "$(related_image_by_name pgupgrade)" \
 		--argjson related_images "${redhat_related_images}" \
 		'{
@@ -179,6 +186,7 @@ build_redhat_related_images() {
 			pgbouncerImage: $pgbouncer_image,
 			pgbackrestImage: $pgbackrest_image,
 			pmmImage: $pmm_image,
+			logcollectorImage: $logcollector_image,
 			upgradeImage: $upgrade_image,
 			relatedImages: $related_images
 		}'
@@ -192,14 +200,26 @@ apply_csv_overrides() {
 
 	log "Applying Red Hat certified CSV overrides"
 
+	# yq --yaml-roundtrip encodes preserved comments as "__yq_comment*" string
+	# entries inside sequences: guard .type lookups against them, then drop any
+	# that yq fails to turn back into comments (they would otherwise be emitted
+	# as literal list items and break the CSV schema). Sequences of real strings
+	# such as keywords, skips and RBAC verbs are left untouched.
 	yq --in-place --yaml-roundtrip \
 		'
       .metadata.annotations.certified = "true"
       | (
           .spec.installModes[]
-          | select(.type == "MultiNamespace")
+          | select((type == "object") and (.type == "MultiNamespace"))
           | .supported
         ) = true
+      | walk(
+          if type == "array" then
+            map(select((type != "string") or (startswith("__yq_comment") | not)))
+          else
+            .
+          end
+        )
     ' \
 		"${csv_file}"
 
@@ -277,6 +297,7 @@ rewrite_crd_examples_images() {
             | .spec.proxy.pgBouncer.image = $images.pgbouncerImage
             | .spec.backups.pgbackrest.image = $images.pgbackrestImage
             | .spec.pmm.image = $images.pmmImage
+            | .spec.logcollector.image = $images.logcollectorImage
 
           elif .kind == "PerconaPGUpgrade" then
             .spec.image = $images.upgradeImage

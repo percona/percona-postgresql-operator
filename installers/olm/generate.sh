@@ -43,6 +43,40 @@ require_env() {
 	fi
 }
 
+# OPENSHIFT_VERSIONS, if set, is used as-is for com.redhat.openshift.versions.
+# Otherwise derive v<major.minor>-v<major.minor> from OPENSHIFT_MIN/MAX in
+# e2e-tests/release_versions. If that file is missing or unreadable, use a
+# placeholder so bundle generation can still run.
+resolve_openshift_versions() {
+	local file="${repo_root}/e2e-tests/release_versions"
+	local min max
+
+	if [[ -n ${OPENSHIFT_VERSIONS:-} ]]; then
+		log "Using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	if [[ ! -r ${file} ]]; then
+		OPENSHIFT_VERSIONS='@@RHEL_VERSIONS@@'
+		log "${file} is not readable; using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	# shellcheck source=/dev/null
+	source "${file}"
+
+	if [[ -z ${OPENSHIFT_MIN:-} || -z ${OPENSHIFT_MAX:-} ]]; then
+		OPENSHIFT_VERSIONS='@@RHEL_VERSIONS@@'
+		log "OPENSHIFT_MIN/MAX missing in ${file}; using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	min="$(printf '%s' "${OPENSHIFT_MIN}" | awk -F. '{print "v"$1"."$2}')"
+	max="$(printf '%s' "${OPENSHIFT_MAX}" | awk -F. '{print "v"$1"."$2}')"
+	OPENSHIFT_VERSIONS="${min}-${max}"
+	log "Derived OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS} from OPENSHIFT_MIN=${OPENSHIFT_MIN} OPENSHIFT_MAX=${OPENSHIFT_MAX}"
+}
+
 select_manifests() {
 	local kind="$1"
 	shift
@@ -226,7 +260,7 @@ render_scorecard_tests() {
 render_bundle_metadata() {
 	log "Rendering bundle annotations for ${DISTRIBUTION}"
 
-	require_env OPENSHIFT_VERSIONS
+	resolve_openshift_versions
 
 	yq --yaml-roundtrip \
 		--arg distribution "${DISTRIBUTION}" \

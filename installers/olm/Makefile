@@ -19,7 +19,9 @@ IMAGE_TAG_BASE ?= $(IMAGE_TAG_OWNER)/$(NAME)
 CONTAINER ?= docker
 
 # Bundle configuration
-OPENSHIFT_VERSIONS ?= v4.18-v4.21
+# OPENSHIFT_VERSIONS: optional. If unset, generate.sh derives v<min>-v<max>
+# from OPENSHIFT_MIN/MAX in e2e-tests/release_versions (or @@RHEL_VERSIONS@@
+# if that file is unavailable).
 DOCKER_DEFAULT_PLATFORM ?= linux/amd64
 
 # Image configuration
@@ -167,8 +169,8 @@ tools/$(SYSTEM)/venv:
 
 tools: tools/$(SYSTEM)/yq
 tools/$(SYSTEM)/yq: | tools/$(SYSTEM)/venv
-	'tools/$(SYSTEM)/venv/bin/python' -m pip install yq
-	cd '$(dir $@)' && ln -s venv/bin/yq
+       'tools/$(SYSTEM)/venv/bin/python' -m pip install yq
+       cd '$(dir $@)' && ln -s venv/bin/yq
 
 # ==============================================================================
 # Development Targets
