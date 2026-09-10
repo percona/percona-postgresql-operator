@@ -1,0 +1,17 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  # A client connecting through the published hostname with sslmode=verify-full
+  # checks the certificate against that name, so the operator-managed hostnames
+  # have to be in the server certificate's SANs.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      source ./conf/annotations.sh
+
+      wait_san external-dns-cluster-cert 'tls.crt' primary.external-dns.example.com
+      wait_san external-dns-cluster-cert 'tls.crt' replicas.external-dns.example.com
+      wait_san external-dns-pgbouncer 'pgbouncer-frontend.crt' pgbouncer.external-dns.example.com

@@ -1,0 +1,30 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 60
+commands:
+  # Services with no expose section of their own must not get any external-dns
+  # annotation, and the manual per-Service workflow must keep working: an
+  # annotation added by hand carries no ownership marker, so the operator never
+  # removes it. The later steps re-check it after the CR changes.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      source ./conf/annotations.sh
+
+      for svc in external-dns-primary external-dns-pods; do
+        hostname=$(get_annotation ${svc} ${ANNOTATION_HOSTNAME})
+        if [[ -n ${hostname} ]]; then
+          echo "service ${svc} unexpectedly has ${ANNOTATION_HOSTNAME}=${hostname}. Exiting..."
+          exit 1
+        fi
+      done
+
+      kubectl -n "${NAMESPACE}" annotate service/external-dns-primary \
+        "${ANNOTATION_HOSTNAME}=manual.external-dns.example.com" --overwrite
+
+      # An external-dns key the operator never writes, on a Service it does
+      # manage: it must survive every change below.
+      kubectl -n "${NAMESPACE}" annotate service/external-dns-ha \
+        'external-dns.alpha.kubernetes.io/target=1.2.3.4' --overwrite
