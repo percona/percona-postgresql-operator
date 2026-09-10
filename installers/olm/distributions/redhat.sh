@@ -214,8 +214,10 @@ apply_csv_overrides() {
           | .supported
         ) = true
       | walk(
-          if type == "array" then
-            map(select((type != "string") or (startswith("__yq_comment") | not)))
+          if type == "object" then
+            with_entries(select((.key | tostring | startswith("__yq_comment_")) | not))
+          elif type == "array" then
+            map(select((type == "string" and startswith("__yq_comment_")) | not))
           else
             .
           end

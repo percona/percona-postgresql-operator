@@ -81,7 +81,7 @@ select_manifests() {
 	local kind="$1"
 	shift
 
-	yq --slurp --yaml-roundtrip \
+	yq --slurp --yaml-output \
 		--arg kind "${kind}" \
 		'map(select(.kind == $kind))' \
 		"$@"
@@ -103,6 +103,9 @@ check_tools() {
 	require kubectl
 	require operator-sdk
 	require jq
+	# yq 4 --yaml-output strips comments but also literal block scalars
+	# (alm-examples). --yaml-roundtrip keeps both; comment keys are dropped
+	# in jq with strip_yq_comments.
 	require bash -c "yq --help | grep -q -- '--yaml-roundtrip'"
 
 	log "All tools available"
@@ -183,6 +186,30 @@ render_operator_manifests() {
 	log "Extracted manifests: CRDs, Deployments, ServiceAccounts, Roles, ClusterRoles"
 }
 
+# operator-sdk init still runs `go mod tidy` after scaffolding, even with
+# --fetch-deps=false. Bundle generation deletes go.mod immediately and never
+# compiles the scaffold, so skip tidy (it fails when the Go checksum DB is unreachable).
+run_operator_sdk_init() {
+	local real_go wrapper rc
+
+	real_go="$(command -v go)" || abort "go not found in PATH"
+	wrapper="$(mktemp -d)"
+	cat >"${wrapper}/go" <<EOF
+#!/usr/bin/env bash
+if [[ \${1:-} == mod && \${2:-} == tidy ]]; then
+	exit 0
+fi
+exec '${real_go}' "\$@"
+EOF
+	chmod +x "${wrapper}/go"
+
+	PATH="${wrapper}:${PATH}" operator-sdk init \
+		--fetch-deps='false' \
+		--project-name="${bundle_project_name}" && rc=0 || rc=$?
+	rm -rf "${wrapper}"
+	return "${rc}"
+}
+
 create_sdk_workspace() {
 	local crd_gvks
 
@@ -196,9 +223,7 @@ create_sdk_workspace() {
 
 		log "Initializing operator-sdk project"
 
-		operator-sdk init \
-			--fetch-deps='false' \
-			--project-name="${bundle_project_name}" \
+		run_operator_sdk_init \
 			|| abort "Failed to init operator-sdk"
 
 		rm -f ./*.go go.*
@@ -213,7 +238,7 @@ create_sdk_workspace() {
 				<<<"${operator_crds}"
 		)" || abort "Failed to extract CRD GVKs"
 
-		yq --in-place --yaml-roundtrip \
+		yq --in-place --yaml-output \
 			--argjson resources "${crd_gvks}" \
 			'
         .multigroup = true
@@ -262,7 +287,7 @@ render_bundle_metadata() {
 
 	resolve_openshift_versions
 
-	yq --yaml-roundtrip \
+	yq --yaml-output \
 		--arg distribution "${DISTRIBUTION}" \
 		--arg package "${bundle_package_name}" \
 		--arg openshift_supported_versions "${OPENSHIFT_VERSIONS}" \
@@ -321,7 +346,7 @@ write_crd_manifests() {
 	)" || abort "Failed to extract CRD names"
 
 	while IFS=$'\t' read -r index name; do
-		yq --yaml-roundtrip ".[${index}]" \
+		yq --yaml-output ".[${index}]" \
 			<<<"${operator_crds}" \
 			>"${bundle_directory}/manifests/${name}.crd.yaml" \
 			|| abort "Failed to write CRD ${name}"
@@ -558,7 +583,15 @@ render_csv() {
 							}
 					)
 				]
-			| .
+			| walk(
+					if type == "object" then
+						with_entries(select((.key | tostring | startswith("__yq_comment_")) | not))
+					elif type == "array" then
+						map(select((type == "string" and startswith("__yq_comment_")) | not))
+					else
+						.
+					end
+				)
 		' \
 		<bundle.csv.yaml \
 		>"${bundle_directory}/manifests/${bundle_filename}.clusterserviceversion.yaml" \
