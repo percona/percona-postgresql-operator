@@ -7,7 +7,14 @@ commands:
       set -o xtrace
 
       source ../../functions
+
       init_temp_dir # do this only in the first TestStep
+
+      if [[ ${ARCH} == arm64 ]]; then
+        deploy_operator
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
 
       destroy_cert_manager
 
@@ -18,4 +25,4 @@ commands:
       # extension artifacts storage (same flow as the custom-extensions suite)
       deploy_s3_secrets
       deploy_minio
-      copy_custom_extensions_form_aws
+      copy_custom_extensions_from_aws

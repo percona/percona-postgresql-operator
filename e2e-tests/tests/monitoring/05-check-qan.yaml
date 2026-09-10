@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping monitoring test on arm64: PMM server does not support ARM"
+        exit 0
+      fi
+
       token=$(kubectl get -n "${NAMESPACE}" secret monitoring-pmm-secret --template='{{.data.PMM_SERVER_TOKEN | base64decode}}')
       instance=$(kubectl get -n "${NAMESPACE}" pod -l postgres-operator.crunchydata.com/instance-set=instance1 -o 'jsonpath={.items[].metadata.name}')
 

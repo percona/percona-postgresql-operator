@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping pg_cron restart on arm64: custom pg_cron was not installed"
+        exit 0
+      fi
+
       # pg_cron was added to shared_preload_libraries in the previous step and
       # postgres only loads it on start, so the pods have to be restarted before
       # the extension can be created

@@ -1,101 +1,28 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 420
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGCluster
-metadata:
-  labels:
-    e2e: monitoring
-  name: monitoring
-spec:
-  backups:
-    pgbackrest:
-      manual:
-        options:
-          - --type=full
-        repoName: repo1
-      repos:
-        - name: repo1
-          schedules:
-            full: 0 0 * * 6
-          volume:
-            volumeClaimSpec:
-              accessModes:
-                - ReadWriteOnce
-              resources:
-                requests:
-                  storage: 1Gi
-  instances:
-    - dataVolumeClaimSpec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-      name: instance1
-      replicas: 3
-  pmm:
-    enabled: true
-    secret: monitoring-pmm-secret
-    serverHost: monitoring-service
-    customClusterName: monitoring-pmm-custom-name
-    postgresParams: "--environment=dev-postgres"
-  port: 5432
-  proxy:
-    pgBouncer:
-      port: 5432
-      replicas: 3
-status:
-  pgbouncer:
-    ready: 3
-    size: 3
-  postgres:
-    instances:
-      - name: instance1
-        ready: 3
-        size: 3
-    ready: 3
-    size: 3
-  state: ready
----
-kind: Job
-apiVersion: batch/v1
-metadata:
-  labels:
-    postgres-operator.crunchydata.com/cluster: monitoring
-    postgres-operator.crunchydata.com/pgbackrest: ''
-    postgres-operator.crunchydata.com/pgbackrest-backup: replica-create
-    postgres-operator.crunchydata.com/pgbackrest-repo: repo1
-  ownerReferences:
-    - apiVersion: pgv2.percona.com/v2
-      kind: PerconaPGBackup
-      controller: true
-      blockOwnerDeletion: true
-status:
-  succeeded: 1
----
-apiVersion: pgv2.percona.com/v2
-kind: PerconaPGBackup
-metadata:
-  annotations:
-    pgv2.percona.com/pgbackrest-backup-job-type: replica-create
-  generation: 1
-spec:
-  pgCluster: monitoring
-  repoName: repo1
-status:
-  backupType: full
-  repo:
-    name: repo1
-    schedules:
-      full: 0 0 * * 6
-    volume:
-      volumeClaimSpec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-  state: Succeeded
-  storageType: filesystem
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping monitoring test on arm64: PMM server does not support ARM"
+        exit 0
+      fi
+
+      wait_cluster_consistency monitoring 42
+
+      pmm=$(kubectl -n "${NAMESPACE}" get pg monitoring \
+        -o jsonpath='{.spec.pmm.enabled},{.spec.pmm.secret},{.spec.pmm.serverHost},{.spec.pmm.customClusterName},{.spec.pmm.postgresParams}')
+      if [[ ${pmm} != "true,monitoring-pmm-secret,monitoring-service,monitoring-pmm-custom-name,--environment=dev-postgres" ]]; then
+        echo "Unexpected PMM spec: ${pmm}"
+        exit 1
+      fi
+
+      retry 30 10 bash -c '
+        kubectl -n "'"${NAMESPACE}"'" get pg-backup \
+          -o jsonpath="{.items[*].status.state}" | grep -qw Succeeded
+      '

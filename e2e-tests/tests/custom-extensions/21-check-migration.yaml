@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping custom-to-builtin pg_cron check on arm64: custom pg_cron was not installed"
+        exit 0
+      fi
+
       uri="postgres:$(get_psql_user_pass custom-extensions-pguser-postgres)@$(get_psql_user_host custom-extensions-pguser-postgres)"
 
       # moving an extension from spec.extensions.custom to a builtin flag must

@@ -14,11 +14,14 @@ commands:
       kubectl create namespace "${CRUNCHY_NS}" || true
 
       # singleNamespace=true scopes pgo to its own namespace only
+      pgo_helm_args=()
+      helm_arch_args pgo_helm_args
       helm install pgo \
         oci://registry.developers.crunchydata.com/crunchydata/pgo \
         --namespace "${CRUNCHY_NS}" \
         --version "${CPGO_VERSION}" \
         --set singleNamespace=true \
+        "${pgo_helm_args[@]}" \
         --wait
 
       # Deploy minio WITH TLS — pgBackRest requires HTTPS; repo1-s3-verify-tls=n skips validation.
