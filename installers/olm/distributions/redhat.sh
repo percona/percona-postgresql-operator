@@ -6,7 +6,7 @@ set -euo pipefail
 redhat_release="${VERSION}"
 redhat_registry="registry.connect.redhat.com"
 redhat_catalog_api="${REDHAT_CATALOG_API:-https://catalog.redhat.com/api/containers/v1}"
-redhat_catalog_curl_timeout="${REDHAT_CATALOG_CURL_TIMEOUT:-20}"
+redhat_catalog_curl_timeout="${REDHAT_CATALOG_CURL_TIMEOUT:-90}"
 redhat_operator_repository="percona/percona-postgresql-operator"
 redhat_containers_repository="percona/percona-postgresql-operator-containers"
 redhat_operator_tag="${REDHAT_OPERATOR_TAG:-${redhat_release}}"
@@ -243,25 +243,86 @@ apply_csv_overrides() {
 	log "Red Hat CSV overrides applied"
 }
 
+# True if $1 is strictly less than $2 using version sort (2.9.0 < 3.1.0).
+version_lt() {
+	[[ $1 != "$2" ]] || return 1
+	[[ $(printf '%s\n%s\n' "$1" "$2" | sort -V) == "$1"$'\n'"$2" ]]
+}
+
+# Strip a leading "v" or "v." so v3.1.0, v.3.1.0, and 3.1.0 all become 3.1.0.
+normalize_git_tag() {
+	sed -E 's/^v\.?//' <<<"$1"
+}
+
+fetch_remote_tags() {
+	local remote="https://github.com/percona/percona-postgresql-operator"
+
+	log "Fetching tags from ${remote}"
+
+	git -C "${repo_root}" fetch --tags --force "${remote}" \
+		|| abort "Failed to fetch tags from ${remote}"
+}
+
+# Tags strictly after the last seed version and strictly before VERSION.
+# Seed entries such as 2.9.0-cw are kept as-is and never inferred from git.
+discovered_skip_versions() {
+	local last_seed="$1"
+	local current="$2"
+	local tag version
+
+	fetch_remote_tags
+
+	while IFS= read -r tag; do
+		[[ -n ${tag} ]] || continue
+
+		version="$(normalize_git_tag "${tag}")"
+		[[ ${version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+
+		if version_lt "${last_seed}" "${version}" && version_lt "${version}" "${current}"; then
+			printf '%s\n' "${version}"
+		fi
+	done < <(git -C "${repo_root}" tag --list) \
+		| sort -u -V
+}
+
 prepare_redhat_csv_vars() {
 	local file_name="$1"
+	local last_seed extra_versions extra_json
+
+	local seed_versions=(
+		"2.5.0"
+		"2.6.0"
+		"2.6.1"
+		"2.7.0"
+		"2.8.0"
+		"2.8.1"
+		"2.8.2"
+		"2.9.0"
+		"2.9.0-cw"
+		"3.0.0"
+	)
+
+	last_seed="${seed_versions[-1]}"
+	extra_versions="$(discovered_skip_versions "${last_seed}" "${VERSION}")"
+
+	if [[ -n ${extra_versions} ]]; then
+		log "Adding Red Hat skips from git tags after ${last_seed} and before ${VERSION}: ${extra_versions//$'\n'/, }"
+		extra_json="$(printf '%s\n' "${extra_versions}" | jq -R . | jq -s -c .)"
+	else
+		log "No git tags found between ${last_seed} and ${VERSION}; using the seed skip list"
+		extra_json='[]'
+	fi
 
 	redhat_skips="$(
 		jq -nc \
 			--arg file_name "${file_name}" \
+			--argjson extra "${extra_json}" \
+			--args \
 			'
-        [
-          "2.5.0",
-          "2.6.0",
-          "2.6.1",
-          "2.7.0",
-          "2.8.0",
-          "2.8.1",
-          "2.8.2",
-          "2.9.0"
-        ]
+        $ARGS.positional + $extra
         | map("\($file_name).v\(.)")
-      '
+      ' \
+			-- "${seed_versions[@]}"
 	)"
 
 	printf '%s\n' "${redhat_skips}"

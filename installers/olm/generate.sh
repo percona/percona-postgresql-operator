@@ -81,11 +81,26 @@ select_manifests() {
 	local kind="$1"
 	shift
 
-	yq --slurp --yaml-output \
+	yq --slurp --yaml-roundtrip \
 		--arg kind "${kind}" \
 		'map(select(.kind == $kind))' \
 		"$@"
 }
+
+# kislyuk --yaml-roundtrip keeps scalar quote style ("" vs '') by encoding
+# comments as __yq_comment_* keys in jq. Drop those keys so generated files
+# do not copy template comments (bundle.csv.yaml, bundle.annotations.yaml).
+yq_drop_comments='
+walk(
+  if type == "object" then
+    with_entries(select((.key | tostring | startswith("__yq_comment_")) | not))
+  elif type == "array" then
+    map(select((type == "string" and startswith("__yq_comment_")) | not))
+  else
+    .
+  end
+)
+'
 
 require() {
 	if [ $# -eq 1 ]; then
@@ -103,9 +118,9 @@ check_tools() {
 	require kubectl
 	require operator-sdk
 	require jq
-	# yq 4 --yaml-output strips comments but also literal block scalars
-	# (alm-examples). --yaml-roundtrip keeps both; comment keys are dropped
-	# in jq with strip_yq_comments.
+	# --yaml-roundtrip keeps quote style and block scalars; comments are
+	# dropped in jq via yq_drop_comments (not --yaml-output, which rewrites
+	# "" to '' and unquotes scalars).
 	require bash -c "yq --help | grep -q -- '--yaml-roundtrip'"
 
 	log "All tools available"
@@ -238,7 +253,7 @@ create_sdk_workspace() {
 				<<<"${operator_crds}"
 		)" || abort "Failed to extract CRD GVKs"
 
-		yq --in-place --yaml-output \
+		yq --in-place --yaml-roundtrip \
 			--argjson resources "${crd_gvks}" \
 			'
         .multigroup = true
@@ -287,7 +302,7 @@ render_bundle_metadata() {
 
 	resolve_openshift_versions
 
-	yq --yaml-output \
+	yq --yaml-roundtrip \
 		--arg distribution "${DISTRIBUTION}" \
 		--arg package "${bundle_package_name}" \
 		--arg openshift_supported_versions "${OPENSHIFT_VERSIONS}" \
@@ -303,6 +318,7 @@ render_bundle_metadata() {
           else
             .
           end
+        | '"${yq_drop_comments}"'
       ' \
 		<bundle.annotations.yaml \
 		>"${bundle_directory}/metadata/annotations.yaml" \
@@ -346,7 +362,7 @@ write_crd_manifests() {
 	)" || abort "Failed to extract CRD names"
 
 	while IFS=$'\t' read -r index name; do
-		yq --yaml-output ".[${index}]" \
+		yq --yaml-roundtrip ".[${index}] | ${yq_drop_comments}" \
 			<<<"${operator_crds}" \
 			>"${bundle_directory}/manifests/${name}.crd.yaml" \
 			|| abort "Failed to write CRD ${name}"
@@ -462,6 +478,11 @@ rewrite_crd_examples() {
 }
 
 apply_operator_image_to_examples() {
+	if [[ ${DISTRIBUTION} != "redhat" ]]; then
+		log "Skipping initContainer image override for ${DISTRIBUTION}"
+		return
+	fi
+
 	crd_examples="$(
 		jq \
 			--arg operator_image "${operator_image}" \
@@ -515,6 +536,7 @@ render_csv() {
 		--argjson related_images "${related_images}" \
 		"${skips_arg}" skips "${skips}" \
 		--arg target_namespaces_field_path "metadata.annotations['olm.targetNamespaces']" \
+		--arg namespace_field_path "metadata.namespace" \
 		--arg timestamp "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
 		'
 			.metadata.annotations["alm-examples"] = $examples
@@ -576,22 +598,14 @@ render_csv() {
 								.spec.template.spec.containers[].env[]?
 								| select(.name == "PGO_NAMESPACE")
 								| .valueFrom.fieldRef.fieldPath
-							) = $target_namespaces_field_path
+							) = $namespace_field_path
 						| {
 								name: .metadata.name,
 								spec
 							}
 					)
 				]
-			| walk(
-					if type == "object" then
-						with_entries(select((.key | tostring | startswith("__yq_comment_")) | not))
-					elif type == "array" then
-						map(select((type == "string" and startswith("__yq_comment_")) | not))
-					else
-						.
-					end
-				)
+			| '"${yq_drop_comments}"'
 		' \
 		<bundle.csv.yaml \
 		>"${bundle_directory}/manifests/${bundle_filename}.clusterserviceversion.yaml" \

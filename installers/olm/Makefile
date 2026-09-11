@@ -169,8 +169,8 @@ tools/$(SYSTEM)/venv:
 
 tools: tools/$(SYSTEM)/yq
 tools/$(SYSTEM)/yq: | tools/$(SYSTEM)/venv
-       'tools/$(SYSTEM)/venv/bin/python' -m pip install yq
-       cd '$(dir $@)' && ln -s venv/bin/yq
+	'tools/$(SYSTEM)/venv/bin/python' -m pip install yq
+	cd '$(dir $@)' && ln -s venv/bin/yq
 
 # ==============================================================================
 # Development Targets
