@@ -167,7 +167,13 @@ create_sdk_workspace() {
 			--project-name="${bundle_project_name}" \
 			|| abort "Failed to init operator-sdk"
 
+		# operator-sdk init used to put main.go at the project root. Newer
+		# versions scaffold cmd/main.go (imports metrics/filters) and test/.
+		# Those packages join the parent module and break controller-gen
+		# (`paths=./...`) with missing k8s.io/apiserver go.sum entries.
+		# Only kustomize/CSV scaffolding is needed from this workspace.
 		rm -f ./*.go go.*
+		rm -rf cmd test
 
 		crd_gvks="$(
 			yq \
