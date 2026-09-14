@@ -2,7 +2,7 @@
 
 # set root repo relatively to a test dir
 ROOT_REPO=${ROOT_REPO:-$(realpath ../../..)}
-CERT_MANAGER_VER="1.20.2"
+CERT_MANAGER_VER="1.21.1"
 CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-tests"
 CHAOS_MESH_VER="2.5.1"
 test_name=$(basename "$(pwd)")
@@ -825,7 +825,10 @@ function get_version_images() {
 		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
 	fi
 
-	grep -i ${component} $release_versions_file | cut -d'=' -f2
+	# Match the exact key (IMAGE_POSTGRESQL18=, IMAGE_OPERATOR=). A substring
+	# grep also hits IMAGE_POSTGRESQL18_UBI* / *_COMMUNITY, and OPERATOR matches
+	# every value that contains percona-postgresql-operator.
+	grep -E "^IMAGE_${component}=" "$release_versions_file" | cut -d'=' -f2
 }
 
 function get_release_image() {
@@ -833,6 +836,59 @@ function get_release_image() {
 	local release_versions_file="${ROOT_REPO}/e2e-tests/release_versions"
 
 	grep -E "^${key}=" "$release_versions_file" | cut -d'=' -f2
+}
+
+# Suffix after the PG major in release_versions keys, including the leading
+# underscore: "" (official UBI9), _UBI8, _UBI10, _UBI8_COMMUNITY, _UBI9_COMMUNITY.
+#
+# Release jobs export IMAGE_POSTGRESQL as the pillar image (PostgreSQL or
+# PostGIS). Match that value in e2e-tests/release_versions and reuse the same
+# key suffix for every major the test asks for. Fall back to the image tag if
+# the value is not in the file. A test that sets PG_DISTRIBUTION=community
+# remaps an official suffix onto the matching *_COMMUNITY keys.
+function release_image_suffix() {
+	local suffix=""
+	local img="${IMAGE_POSTGRESQL:-}"
+	img="${img#docker.io/}"
+	local file="${ROOT_REPO}/e2e-tests/release_versions"
+	local key=""
+
+	if [[ -n ${img} && -f ${file} ]]; then
+		key=$(awk -F= -v img="${img}" '
+			$1 ~ /^(IMAGE_POSTGRESQL|IMAGE_POSTGIS)[0-9]+/ {
+				val = $2
+				sub(/^docker.io\//, "", val)
+				if (val == img) {
+					print $1
+					exit
+				}
+			}' "${file}")
+	fi
+
+	if [[ -n ${key} ]]; then
+		suffix="${key#IMAGE_POSTGRESQL}"
+		suffix="${suffix#IMAGE_POSTGIS}"
+		suffix="${suffix#[0-9]}"
+		suffix="${suffix#[0-9]}"
+	else
+		case ${img} in
+			*community*ubi8* | *ubi8*community*) suffix="_UBI8_COMMUNITY" ;;
+			*community*ubi9* | *ubi9*community*) suffix="_UBI9_COMMUNITY" ;;
+			*-community*) suffix="_UBI9_COMMUNITY" ;;
+			*-ubi10 | *-ubi10:*) suffix="_UBI10" ;;
+			*-ubi8 | *-ubi8:*) suffix="_UBI8" ;;
+		esac
+	fi
+
+	if [[ ${PG_DISTRIBUTION} == "community" ]]; then
+		case ${suffix} in
+			*_COMMUNITY) ;;
+			_UBI8) suffix="_UBI8_COMMUNITY" ;;
+			*) suffix="_UBI9_COMMUNITY" ;;
+		esac
+	fi
+
+	echo "${suffix}"
 }
 
 function wait_for_delete() {
@@ -1796,15 +1852,35 @@ function get_container_image() {
 	local pgVersion=$2
 
 	if [[ ${IMAGE} == percona/* || ${IMAGE} == docker.io/percona/* ]] || [[ -n ${FORCE_RELEASE_RUN} ]]; then
+		local suffix
+		suffix=$(release_image_suffix)
 		local key
 		case $component in
-			pgbouncer) key="IMAGE_PGBOUNCER${pgVersion}" ;;
-			pgbackrest) key="IMAGE_BACKREST${pgVersion}" ;;
-			postgis) key="IMAGE_POSTGIS${pgVersion}" ;;
-			upgrade) key="IMAGE_UPGRADE${pgVersion}" ;;
-			*) key="IMAGE_POSTGRESQL${pgVersion}" ;;
+			pgbouncer)
+				if [[ ${suffix} == *_COMMUNITY ]]; then
+					key="IMAGE_PGBOUNCER_COMMUNITY"
+				else
+					key="IMAGE_PGBOUNCER${pgVersion}"
+				fi
+				;;
+			pgbackrest)
+				if [[ ${suffix} == *_COMMUNITY ]]; then
+					key="IMAGE_PGBACKREST_COMMUNITY"
+				else
+					key="IMAGE_BACKREST${pgVersion}"
+				fi
+				;;
+			postgis) key="IMAGE_POSTGIS${pgVersion}${suffix}" ;;
+			upgrade) key="IMAGE_UPGRADE${suffix}" ;;
+			*) key="IMAGE_POSTGRESQL${pgVersion}${suffix}" ;;
 		esac
-		get_release_image "$key"
+		local image
+		image=$(get_release_image "$key")
+		if [[ -z ${image} ]]; then
+			echo "release image key ${key} is not defined in e2e-tests/release_versions (variant suffix '${suffix}')" >&2
+			return 1
+		fi
+		echo "${image}"
 		return
 	fi
 
@@ -2839,13 +2915,6 @@ check_logs_for_errors() {
 		kubectl -n "$NAMESPACE" logs "$pod" -c database --since-time="$since" 2>/dev/null \
 			| grep -E 'FATAL|PANIC' | grep -Evf "$allow" >>"${TEMP_DIR}/log_errors_postgres.txt" || true
 	done
-	# event messages can be multi-line (pgBackRest output): fold every event back
-	# into a single line, otherwise the continuation lines pass both the
-	# timestamp filter and the allowlist, which only matches the first line
-	kubectl -n "$NAMESPACE" get events --field-selector type=Warning \
-		-o jsonpath='{range .items[*]}{.lastTimestamp} {.involvedObject.name} {.reason} {.message}{"\n"}{end}' 2>/dev/null \
-		| awk '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T/ {if (rec != "") print rec; rec = $0; next} {rec = rec " " $0} END {if (rec != "") print rec}' \
-		| awk -v s="$since" '$1 >= s' | grep -Evf "$allow" >"${TEMP_DIR}/log_errors_events.txt" || true
 	for f in operator postgres events; do
 		if [[ -s "${TEMP_DIR}/log_errors_${f}.txt" ]]; then
 			echo "=== unexpected ${f} errors since ${since} ==="
