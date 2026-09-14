@@ -825,7 +825,10 @@ function get_version_images() {
 		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
 	fi
 
-	grep -i ${component} $release_versions_file | cut -d'=' -f2
+	# Match the exact key (IMAGE_POSTGRESQL18=, IMAGE_OPERATOR=). A substring
+	# grep also hits IMAGE_POSTGRESQL18_UBI* / *_COMMUNITY, and OPERATOR matches
+	# every value that contains percona-postgresql-operator.
+	grep -E "^IMAGE_${component}=" "$release_versions_file" | cut -d'=' -f2
 }
 
 function get_release_image() {
