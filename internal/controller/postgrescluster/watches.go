@@ -80,6 +80,35 @@ func (r *Reconciler) watchPGBouncerUserSecrets() handler.EventHandler {
 	})
 }
 
+// watchAdditionalTrustedCASecrets returns a handler.EventHandler for Secrets
+// referenced by spec.tls.additionalTrustedCAs. Without this, creating a
+// previously missing CA Secret or rotating an existing one's ca.crt would not
+// enqueue the cluster, leaving the trust bundle absent or stale until an
+// unrelated reconcile happened to occur.
+func (r *Reconciler) watchAdditionalTrustedCASecrets() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters v1beta1.PostgresClusterList
+		if err := r.Client.List(ctx, &clusters, client.MatchingFields{
+			v1beta1.IndexFieldAdditionalTrustedCASecrets: secret.Name,
+		}, client.InNamespace(secret.Namespace)); err != nil {
+			return nil
+		}
+
+		reqs := make([]reconcile.Request, 0, len(clusters.Items))
+		for i := range clusters.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(&clusters.Items[i]),
+			})
+		}
+		return reqs
+	})
+}
+
 // watchPods returns a handler.EventHandler for Pods.
 func (*Reconciler) watchPods() handler.Funcs {
 	return handler.Funcs{

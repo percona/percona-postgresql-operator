@@ -141,6 +141,7 @@ func TestClusterNamesUniqueAndValid(t *testing.T) {
 			{"ClusterPGBouncer", ClusterPGBouncer(cluster)},
 			{"DeprecatedPostgresUserSecret", DeprecatedPostgresUserSecret(cluster)},
 			{"PostgresTLSSecret", PostgresTLSSecret(cluster)},
+			{"PostgresCABundleSecret", PostgresCABundleSecret(cluster)},
 			{"ReplicationClientCertSecret", ReplicationClientCertSecret(cluster)},
 			{"PGBackRestSSHSecret", PGBackRestSSHSecret(cluster)},
 			{"MonitoringUserSecret", MonitoringUserSecret(cluster)},
@@ -358,4 +359,18 @@ func TestClusterCACertSecret(t *testing.T) {
 	meta := ClusterCACertSecret(cluster, "cert-manager")
 	assert.Equal(t, meta.Name, "shared-tls-issuer-ca-cert")
 	assert.Equal(t, meta.Namespace, "cert-manager")
+}
+
+func TestPostgresCABundleSecret(t *testing.T) {
+	cluster := &v1beta1.PostgresCluster{}
+	cluster.Namespace = "postgres-operator"
+	cluster.Name = "hippo"
+
+	meta := PostgresCABundleSecret(cluster)
+	assert.Equal(t, meta.Name, "hippo-ca-bundle")
+	assert.Equal(t, meta.Namespace, "postgres-operator")
+
+	// It must not collide with the Secrets it merges from.
+	assert.Assert(t, meta.Name != PostgresTLSSecret(cluster).Name)
+	assert.Assert(t, meta.Name != ReplicationClientCertSecret(cluster).Name)
 }

@@ -2291,7 +2291,7 @@ func TestInstanceCACert(t *testing.T) {
 		root, err := pki.NewRootCertificateAuthority()
 		assert.NilError(t, err)
 
-		caCert, err := instanceCACert(root, &corev1.Secret{})
+		caCert, err := instanceCACert(root, &corev1.Secret{}, nil)
 		assert.NilError(t, err)
 
 		want, err := root.Certificate.MarshalText()
@@ -2309,7 +2309,7 @@ func TestInstanceCACert(t *testing.T) {
 
 		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: caBytes}}
 
-		caCert, err := instanceCACert(nil, issuedSecret)
+		caCert, err := instanceCACert(nil, issuedSecret, nil)
 		assert.NilError(t, err)
 		got, err := caCert.MarshalText()
 		assert.NilError(t, err)
@@ -2317,13 +2317,66 @@ func TestInstanceCACert(t *testing.T) {
 	})
 
 	t.Run("errors when issued secret has no ca.crt", func(t *testing.T) {
-		_, err := instanceCACert(nil, &corev1.Secret{})
+		_, err := instanceCACert(nil, &corev1.Secret{}, nil)
 		assert.ErrorContains(t, err, "did not return a CA certificate")
 	})
 
 	t.Run("errors when ca.crt is not a valid certificate", func(t *testing.T) {
 		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: []byte("not a cert")}}
-		_, err := instanceCACert(nil, issuedSecret)
+		_, err := instanceCACert(nil, issuedSecret, nil)
 		assert.ErrorContains(t, err, "failed to parse CA certificate")
+	})
+
+	caPEM := func(t *testing.T) []byte {
+		t.Helper()
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		text, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+		return text
+	}
+	marshal := func(t *testing.T, cert pki.Certificate) []byte {
+		t.Helper()
+		text, err := cert.MarshalText()
+		assert.NilError(t, err)
+		return text
+	}
+
+	t.Run("appends additional trusted CAs to the issued ca.crt", func(t *testing.T) {
+		issuedCA, extraCA := caPEM(t), caPEM(t)
+		issuedSecret := &corev1.Secret{Data: map[string][]byte{corev1.ServiceAccountRootCAKey: issuedCA}}
+
+		caCert, err := instanceCACert(nil, issuedSecret, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, marshal(t, caCert), append(append([]byte{}, issuedCA...), extraCA...))
+	})
+
+	t.Run("additional trusted CAs alone are enough", func(t *testing.T) {
+		// An ACME issuer writes no ca.crt at all; the user supplies the anchor.
+		extraCA := caPEM(t)
+
+		caCert, err := instanceCACert(nil, &corev1.Secret{}, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, marshal(t, caCert), extraCA)
+	})
+
+	t.Run("appends additional trusted CAs to the internal root", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		rootPEM := marshal(t, root.Certificate)
+		extraCA := caPEM(t)
+
+		caCert, err := instanceCACert(root, nil, [][]byte{extraCA})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, marshal(t, caCert), append(append([]byte{}, rootPEM...), extraCA...))
+	})
+
+	t.Run("internal root is untouched without additional CAs", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+
+		caCert, err := instanceCACert(root, nil, nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, marshal(t, caCert), marshal(t, root.Certificate))
 	})
 }
