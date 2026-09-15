@@ -37,6 +37,7 @@ pgbouncer
 pg-tde
 pg-tde-wal-encrypt
 pitr
+postgis
 scaling
 scheduled-backup
 self-healing

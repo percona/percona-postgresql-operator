@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 100
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      postgres_image=$(get_container_image "postgis" "${PG_VER}")
+      get_cr | yq eval ".spec.image = \"${postgres_image}\"" - | kubectl -n "${NAMESPACE}" apply -f -
