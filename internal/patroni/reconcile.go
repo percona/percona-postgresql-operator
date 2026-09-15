@@ -28,11 +28,14 @@ func ClusterBootstrapped(postgresCluster *v1beta1.PostgresCluster) bool {
 	return postgresCluster.Status.Patroni.SystemIdentifier != ""
 }
 
-// ClusterConfigMap populates the shared ConfigMap with fields needed to run Patroni.
+// ClusterConfigMap populates the shared ConfigMap with fields needed to run
+// Patroni. dcsYAML is the DCS backend's config additions (see
+// internal/patroni/dcs).
 func ClusterConfigMap(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inHBAs postgres.HBAs,
 	inParameters postgres.Parameters,
+	dcsYAML map[string]any,
 	outClusterConfigMap *corev1.ConfigMap,
 ) error {
 	var err error
@@ -40,15 +43,18 @@ func ClusterConfigMap(ctx context.Context,
 	initialize.Map(&outClusterConfigMap.Data)
 
 	outClusterConfigMap.Data[configMapFileKey], err = clusterYAML(inCluster, inHBAs,
-		inParameters)
+		inParameters, dcsYAML)
 
 	return err
 }
 
-// InstanceConfigMap populates the shared ConfigMap with fields needed to run Patroni.
+// InstanceConfigMap populates the shared ConfigMap with fields needed to run
+// Patroni. dcsYAML is the DCS backend's config additions (see
+// internal/patroni/dcs).
 func InstanceConfigMap(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inInstanceSpec *v1beta1.PostgresInstanceSetSpec,
+	dcsYAML map[string]any,
 	outInstanceConfigMap *corev1.ConfigMap,
 ) error {
 	var err error
@@ -58,7 +64,7 @@ func InstanceConfigMap(ctx context.Context,
 	command := pgbackrest.ReplicaCreateCommand(inCluster, inInstanceSpec)
 
 	outInstanceConfigMap.Data[configMapFileKey], err = instanceYAML(
-		inCluster, inInstanceSpec, command)
+		inCluster, inInstanceSpec, command, dcsYAML)
 
 	return err
 }
@@ -81,12 +87,13 @@ func InstanceCertificates(ctx context.Context,
 }
 
 // InstancePod populates a PodTemplateSpec with the fields needed to run Patroni.
-// The database container must already be in the template.
+// The database container must already be in the template. dcsEnvVars are the
+// DCS backend's additions (see internal/patroni/dcs).
 func InstancePod(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inClusterConfigMap *corev1.ConfigMap,
 	inClusterPodService *corev1.Service,
-	inPatroniLeaderService *corev1.Service,
+	dcsEnvVars []corev1.EnvVar,
 	inInstanceSpec *v1beta1.PostgresInstanceSetSpec,
 	inInstanceCertificates *corev1.Secret,
 	inInstanceConfigMap *corev1.ConfigMap,
@@ -114,8 +121,7 @@ func InstancePod(ctx context.Context,
 	}
 
 	container.Env = append(container.Env,
-		instanceEnvironment(inCluster, inClusterPodService, inPatroniLeaderService,
-			outInstancePod.Spec.Containers)...)
+		instanceEnvironment(inCluster, inClusterPodService, dcsEnvVars)...)
 
 	volume := corev1.Volume{Name: "patroni-config"}
 	volume.Projected = new(corev1.ProjectedVolumeSource)
