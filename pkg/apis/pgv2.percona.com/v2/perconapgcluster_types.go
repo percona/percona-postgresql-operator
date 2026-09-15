@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 
 	gover "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -1649,6 +1650,54 @@ type ServiceExpose struct {
 	// This field will be ignored if the cloud-provider does not support the feature.
 	// +optional
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
+
+	// ExternalDNS generates the external-dns annotations for this service, so that
+	// the external-dns operator publishes a DNS record pointing at it.
+	// +optional
+	ExternalDNS *ExternalDNSConfig `json:"externalDNS,omitempty"`
+}
+
+type ExternalDNSConfig struct {
+	// Hostname is the DNS name external-dns publishes for this service.
+	// The bounds are RFC 1035: at most 253 characters overall, each label at
+	// most 63. Anything longer is rejected by external-dns and by certificate
+	// issuance, so it is rejected at admission instead.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$`
+	Hostname string `json:"hostname"`
+
+	// TTL in seconds of the published record. No ttl annotation is written when
+	// unset or zero, leaving external-dns to use its own default.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	TTL int `json:"ttl,omitempty"`
+}
+
+// ServiceAnnotations returns the user-provided annotations of this service plus
+// the external-dns annotations generated from ExternalDNS. When ExternalDNS is
+// set the result is a copy, so callers never mutate the CR.
+func (s *ServiceExpose) ServiceAnnotations() map[string]string {
+	if s == nil {
+		return nil
+	}
+	if s.ExternalDNS == nil {
+		return s.Annotations
+	}
+
+	annotations := naming.Merge(s.Annotations)
+	annotations[pNaming.AnnotationExternalDNSHostname] = s.ExternalDNS.Hostname
+	// externalDNS owns the ttl key the same way it owns the hostname above, so an
+	// unset ttl falls back to the external-dns default rather than to a ttl left
+	// behind in expose.annotations.
+	delete(annotations, pNaming.AnnotationExternalDNSTTL)
+	if s.ExternalDNS.TTL > 0 {
+		annotations[pNaming.AnnotationExternalDNSTTL] = strconv.Itoa(s.ExternalDNS.TTL)
+	}
+	annotations[pNaming.AnnotationExternalDNSManaged] = "true"
+
+	return annotations
 }
 
 func (s *ServiceExpose) ToCrunchy(version string) *crunchyv1beta1.ServiceSpec {
@@ -1658,7 +1707,7 @@ func (s *ServiceExpose) ToCrunchy(version string) *crunchyv1beta1.ServiceSpec {
 
 	serviceSpec := &crunchyv1beta1.ServiceSpec{
 		Metadata: &crunchyv1beta1.Metadata{
-			Annotations: s.Annotations,
+			Annotations: s.ServiceAnnotations(),
 			Labels:      s.Labels,
 		},
 		NodePort:                 s.NodePort,

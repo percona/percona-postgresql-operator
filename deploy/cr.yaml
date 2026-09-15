@@ -202,6 +202,9 @@ spec:
 #    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
+#    externalDNS:
+#      hostname: pg.example.com
+#      ttl: 60
 #  exposeReplicas:
 #    annotations:
 #      my-annotation: value1
@@ -211,6 +214,9 @@ spec:
 #    loadBalancerClass: "eks.amazonaws.com/nlb"
 #    loadBalancerSourceRanges:
 #      - 10.0.0.0/8
+#    externalDNS:
+#      hostname: pg-replicas.example.com
+#      ttl: 60
 
   instances:
   - name: instance1
@@ -392,6 +398,9 @@ spec:
 #        memory: 4Gi
 #    expose:
 #      type: LoadBalancer
+#      externalDNS:
+#        hostname: replica.example.com
+#        ttl: 60
 
   proxy:
     pgBouncer:
@@ -433,6 +442,9 @@ spec:
 #        loadBalancerClass: "eks.amazonaws.com/nlb"
 #        loadBalancerSourceRanges:
 #          - 10.0.0.0/8
+#        externalDNS:
+#          hostname: pgbouncer.example.com
+#          ttl: 60
 #      additionalTrustedCAs:
 #      - name: some-client-ca
       affinity:
