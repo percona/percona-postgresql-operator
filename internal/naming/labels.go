@@ -122,6 +122,10 @@ const (
 	// RolePostgresWAL is the LabelRole applied to PostgreSQL WAL volumes.
 	RolePostgresWAL = "pgwal"
 
+	// K8SPG-1086
+	// RolePostgresLog is the LabelRole applied to PostgreSQL log volumes.
+	RolePostgresLog = "pglogs"
+
 	// RoleMonitoring is the LabelRole applied to Monitoring resources
 	RoleMonitoring = "monitoring"
 
