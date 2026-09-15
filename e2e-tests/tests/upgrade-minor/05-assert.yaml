@@ -130,6 +130,9 @@ status:
   conditions:
   - type: ReadyForBackup
     status: "True"
+  - type: TLSSecretsReady
+    reason: TLSSecretsFound
+    status: "True"
   - type: PGBackRestRepoHostReady    
     status: "True"
   - type: PGBackRestReplicaRepoReady
@@ -140,9 +143,6 @@ status:
     status: "True"
   - type: APIGroupMigration
     reason: APIGroupMigrationNotNeeded
-    status: "True"
-  - type: TLSSecretsReady
-    reason: TLSSecretsFound
     status: "True"
   - type: PGTDEEnabled
     reason: Disabled
