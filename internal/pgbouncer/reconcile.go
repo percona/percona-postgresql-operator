@@ -156,6 +156,7 @@ func Secret(ctx context.Context,
 					return errors.Wrap(err, "get service dns names")
 				}
 				dnsFQDN = dnsNames[0]
+				dnsNames = append(dnsNames, inCluster.Spec.TLS.GetSANs()...)
 			}
 
 			if err == nil {

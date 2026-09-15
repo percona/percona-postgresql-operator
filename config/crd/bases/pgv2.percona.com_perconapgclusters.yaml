@@ -17092,6 +17092,10 @@ spec:
                 type: object
               tls:
                 properties:
+                  SANs:
+                    items:
+                      type: string
+                    type: array
                   caValidityDuration:
                     type: string
                   certManagementPolicy:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/cert-manager/cert-manager/pkg/apis/certmanager"
@@ -545,6 +546,11 @@ func (c *controller) ApplyClusterCertificate(ctx context.Context, cluster *v1bet
 			needsUpdate = true
 		}
 
+		if !slices.Equal(existing.Spec.DNSNames, dnsNames) {
+			existing.Spec.DNSNames = dnsNames
+			needsUpdate = true
+		}
+
 		if !needsUpdate {
 			return nil
 		}
@@ -763,6 +769,11 @@ func (c *controller) ApplyPGBouncerCertificate(ctx context.Context, cluster *v1b
 
 		if existing.Spec.IssuerRef != wantIssuerRef {
 			existing.Spec.IssuerRef = wantIssuerRef
+			needsUpdate = true
+		}
+
+		if !slices.Equal(existing.Spec.DNSNames, dnsNames) {
+			existing.Spec.DNSNames = dnsNames
 			needsUpdate = true
 		}
 
