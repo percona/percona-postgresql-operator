@@ -106,7 +106,7 @@ jobs:
 
   deploy-cr-release-versions:
     name: deploy/cr.yaml vs e2e-tests/release_versions
-    if: ${{ contains(github.base_ref, 'release-') }}
+    if: ${{ contains(github.base_ref, 'release-') && ! startsWith(github.head_ref, 'after-release-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6

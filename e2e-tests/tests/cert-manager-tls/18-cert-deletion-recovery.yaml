@@ -22,7 +22,7 @@ commands:
           cert_before=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}')
 
           kubectl -n "$NAMESPACE" delete certificate "$cert_name" --wait=true --timeout=120s
-          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=120s
+          kubectl -n "$NAMESPACE" wait --for=delete "secret/${secret_name}" --timeout=120s || true
           retry 6 5 kubectl -n "$NAMESPACE" get certificate "$cert_name"
           kubectl -n "$NAMESPACE" wait --for=condition=Ready "certificate/${cert_name}" --timeout=120s
 

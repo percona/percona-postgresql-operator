@@ -26,7 +26,8 @@ annotations:
   operators.operatorframework.io.bundle.channels.v1: v5
   operators.operatorframework.io.bundle.channel.default.v1: v5
 
-  # This default is overwritten by generate.sh from OPENSHIFT_VERSIONS.
+  # Overwritten by generate.sh: OPENSHIFT_VERSIONS, else OPENSHIFT_MIN/MAX
+  # from e2e-tests/release_versions, else @@RHEL_VERSIONS@@.
   # https://github.com/operator-framework/community-operators/blob/8a36a33/docs/packaging-required-criteria-ocp.md
   # https://redhat-connect.gitbook.io/certified-operator-guide/ocp-deployment/operator-metadata/bundle-directory
   com.redhat.delivery.operator.bundle: true
