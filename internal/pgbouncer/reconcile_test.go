@@ -5,7 +5,9 @@
 package pgbouncer
 
 import (
+	"bytes"
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -328,9 +330,19 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		return cluster
 	}
 
-	ca1 := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
-	// No trailing newline; a separator must be inserted before the next entry.
-	ca2 := []byte("-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----")
+	ca1Root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+	ca1, err := ca1Root.Certificate.MarshalText()
+	assert.NilError(t, err)
+
+	ca2Root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err)
+	ca2PEM, err := ca2Root.Certificate.MarshalText()
+	assert.NilError(t, err)
+	// No trailing newline. Entries are re-encoded into canonical PEM, so this
+	// gains one and the next entry is separated from it either way.
+	ca2 := bytes.TrimRight(ca2PEM, "\n")
+	ca2Normalized := append(append([]byte{}, ca2...), '\n')
 
 	t.Run("AppendedToGeneratedBundle", func(t *testing.T) {
 		cluster := newCluster("3.1.0")
@@ -339,7 +351,20 @@ func TestSecretAdditionalCAs(t *testing.T) {
 		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
 		expected := append(append([]byte{}, rootPEM...), ca1...)
-		expected = append(expected, ca2...)
+		expected = append(expected, ca2Normalized...)
+		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
+	})
+
+	t.Run("DuplicatesDropped", func(t *testing.T) {
+		// The same CA reaching the bundle from two references must not be
+		// written twice, or the bundle grows on every reconcile.
+		cluster := newCluster("3.1.0")
+		intent := new(corev1.Secret)
+
+		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil,
+			[][]byte{ca1, rootPEM, ca1}))
+
+		expected := append(append([]byte{}, rootPEM...), ca1...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
 	})
 
@@ -380,7 +405,7 @@ func TestSecretAdditionalCAs(t *testing.T) {
 
 		require.NoError(t, Secret(ctx, cluster, root, new(corev1.Secret), nil, service, intent, nil, [][]byte{ca1, ca2}))
 
-		expected := append(append([]byte{}, ca1...), ca2...)
+		expected := append(append([]byte{}, ca1...), ca2Normalized...)
 		assert.DeepEqual(t, intent.Data["pgbouncer-frontend.ca-roots"], expected)
 	})
 
@@ -427,7 +452,7 @@ func TestPod(t *testing.T) {
 		naming.LabelVersion: "2.5.0",
 	})
 
-	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "") }
+	call := func() { Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "") }
 
 	t.Run("Disabled", func(t *testing.T) {
 		before := pod.DeepCopy()
@@ -539,6 +564,89 @@ volumes:
 		assert.DeepEqual(t, before, pod)
 	})
 
+	// When a merged caBundle is supplied - because spec.tls.additionalTrustedCAs
+	// applies, or because the issuer wrote no ca.crt of its own - it is mounted
+	// as the backend authority in place of primaryCertificate's.
+	t.Run("BackendAuthorityPrefersCABundle", func(t *testing.T) {
+		caBundle := &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "some-cluster-ca-bundle"},
+		}
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, caBundle, secret, pod, "")
+
+		var backend *corev1.VolumeProjection
+		for _, volume := range pod.Volumes {
+			if volume.Name != "pgbouncer-config" || volume.Projected == nil {
+				continue
+			}
+			for i, source := range volume.Projected.Sources {
+				if source.Secret != nil && source.Secret.Name == "some-cluster-ca-bundle" {
+					backend = &volume.Projected.Sources[i]
+				}
+			}
+		}
+
+		assert.Assert(t, backend != nil, "expected the CA bundle Secret to be projected")
+		assert.Assert(t, cmp.MarshalMatches(backend, `
+secret:
+  items:
+  - key: ca.crt
+    path: ~postgres-operator/backend-ca.crt
+  name: some-cluster-ca-bundle
+		`))
+	})
+
+	// A spec that asks for additional CAs does not always produce a merged
+	// bundle: userProvidedOnly drops the cluster-wide list, and a referenced
+	// Secret that does not exist yet is skipped. When the key was not written,
+	// the custom Secret has to keep supplying ca.crt - projecting a missing key
+	// leaves the Pod stuck with an unmountable volume.
+	t.Run("CustomTLSSecretKeepsItsAuthorityWhenNoBundleWasWritten", func(t *testing.T) {
+		// Self-contained: the subtests above share a mutable fixture, and this
+		// one must hold whether or not they ran.
+		cluster := new(v1beta1.PostgresCluster)
+		cluster.SetLabels(map[string]string{naming.LabelVersion: "2.5.0"})
+		cluster.Spec.Proxy = new(v1beta1.PostgresProxySpec)
+		cluster.Spec.Proxy.PGBouncer = new(v1beta1.PGBouncerPodSpec)
+		assert.NilError(t, cluster.Default(ctx, nil))
+
+		cluster.Spec.Proxy.PGBouncer.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "tls-name"},
+			Items: []corev1.KeyToPath{
+				{Key: "k1", Path: "tls.crt"},
+				{Key: "k2", Path: "tls.key"},
+				{Key: "k3", Path: "ca.crt"},
+			},
+		}
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			CertManagementPolicy: v1beta1.CertManagementUserProvidedOnly,
+			AdditionalTrustedCAs: []corev1.LocalObjectReference{{Name: "external-ca"}},
+		}
+
+		pod := new(corev1.PodSpec)
+		Pod(ctx, cluster, configMap, primaryCertificate, nil, new(corev1.Secret), pod, "")
+
+		var projected []string
+		for _, volume := range pod.Volumes {
+			if volume.Name != "pgbouncer-config" || volume.Projected == nil {
+				continue
+			}
+			for _, source := range volume.Projected.Sources {
+				if source.Secret != nil {
+					for _, item := range source.Secret.Items {
+						projected = append(projected, source.Secret.Name+"/"+item.Key)
+					}
+				}
+			}
+		}
+
+		assert.Assert(t, len(projected) > 0, "no Secret sources were projected")
+		assert.Assert(t, !slices.Contains(projected, "/"+CertFrontendAuthoritySecretKey),
+			"projected a merged bundle that was never written: %v", projected)
+		assert.Assert(t, slices.Contains(projected, "tls-name/k3"),
+			"the custom Secret must keep supplying ca.crt: %v", projected)
+	})
+
 	// K8SPG-952: in manual TLS mode with additional CAs, the frontend
 	// authority is mounted from the operator Secret where the merged CA
 	// bundle is stored; tls.crt/tls.key still come from the custom Secret.
@@ -555,8 +663,16 @@ volumes:
 			{Name: "external-ca"},
 		}
 
+		// The authority is mounted from the operator Secret only because
+		// Secret() wrote the merged bundle there. Projecting a key that was
+		// never written would leave the Pod unable to mount its volume, so the
+		// mount follows the Secret rather than the spec.
+		secret := &corev1.Secret{Data: map[string][]byte{
+			CertFrontendAuthoritySecretKey: []byte("merged-ca-bundle"),
+		}}
+
 		pod := new(corev1.PodSpec)
-		Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+		Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 
 		assert.Assert(t, cmp.MarshalMatches(pod.Volumes, `
 - name: pgbouncer-config
@@ -861,7 +977,7 @@ volumes:
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 				assert.Equal(t, len(pod.Containers), 2)
 
 				var volume *corev1.Volume
@@ -923,7 +1039,7 @@ name: pgbouncer-logs
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "")
 				assert.Equal(t, len(pod.Containers), 2)
 
 				if !tt.expect {
@@ -962,7 +1078,7 @@ timeoutSeconds: 35
 				assert.NilError(t, cluster.Default(context.Background(), nil))
 
 				pod := new(corev1.PodSpec)
-				Pod(ctx, cluster, configMap, primaryCertificate, secret, pod, "some/init:image")
+				Pod(ctx, cluster, configMap, primaryCertificate, nil, secret, pod, "some/init:image")
 
 				var volume *corev1.Volume
 				for i := range pod.Volumes {
@@ -1057,5 +1173,81 @@ func TestPostgreSQL(t *testing.T) {
 			},
 			// postgres.HostBasedAuthentication has unexported fields. Call String() to compare.
 			gocmp.Transformer("", (*postgres.HostBasedAuthentication).String))
+	})
+}
+
+// frontendAuthorityCert is the third of the operator's three CA resolvers, and
+// the only one without direct coverage. spec.tls.additionalTrustedCAs exists
+// because an issuer may return no ca.crt at all, so the anchor arriving from
+// that field alone has to be enough.
+func TestFrontendAuthorityCert(t *testing.T) {
+	t.Parallel()
+
+	caPEM := func(t *testing.T) []byte {
+		t.Helper()
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err, "bug in test")
+		text, err := root.Certificate.MarshalText()
+		assert.NilError(t, err, "bug in test")
+		return text
+	}
+	secretWithCA := func(ca []byte) *corev1.Secret {
+		return &corev1.Secret{Data: map[string][]byte{tlsAuthoritySecretKey: ca}}
+	}
+	certCount := func(b []byte) int {
+		return strings.Count(string(b), "-----BEGIN CERTIFICATE-----")
+	}
+
+	t.Run("PrefersTheInternalRoot", func(t *testing.T) {
+		root, err := pki.NewRootCertificateAuthority()
+		assert.NilError(t, err)
+		want, err := root.Certificate.MarshalText()
+		assert.NilError(t, err)
+
+		got, err := frontendAuthorityCert(root, new(corev1.Secret), nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, want, got)
+	})
+
+	t.Run("UsesTheIssuedCA", func(t *testing.T) {
+		issued := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), nil)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, issued, got)
+	})
+
+	t.Run("AdditionalCAsAloneAreEnough", func(t *testing.T) {
+		// An ACME issuer writes only tls.crt and tls.key. Without this the
+		// frontend bundle would be empty and reconciliation would fail.
+		extra := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, new(corev1.Secret), [][]byte{extra})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, extra, got)
+	})
+
+	t.Run("MergesIssuedAndAdditionalCAs", func(t *testing.T) {
+		issued, extra := caPEM(t), caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), [][]byte{extra})
+		assert.NilError(t, err)
+		assert.Equal(t, certCount(got), 2)
+		assert.DeepEqual(t, got, append(append([]byte{}, issued...), extra...))
+	})
+
+	t.Run("DuplicatesAreNotRepeated", func(t *testing.T) {
+		// Naming the issuer's own CA in additionalTrustedCAs must not grow the
+		// bundle on every reconcile.
+		issued := caPEM(t)
+
+		got, err := frontendAuthorityCert(nil, secretWithCA(issued), [][]byte{issued})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, issued, got)
+	})
+
+	t.Run("ErrorsWhenNothingSuppliesAnAnchor", func(t *testing.T) {
+		_, err := frontendAuthorityCert(nil, new(corev1.Secret), nil)
+		assert.ErrorContains(t, err, "additionalTrustedCAs")
 	})
 }
