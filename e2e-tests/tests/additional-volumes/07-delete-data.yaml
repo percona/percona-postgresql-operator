@@ -7,5 +7,6 @@ commands:
 
       source ../../functions
 
-      # Temporarily skipping this check
-      # check_passwords_leak
+      run_psql_local \
+        '\c myapp \\\ TRUNCATE TABLE myApp' \
+        "$(get_psql_uri additional-volumes postgres)"
