@@ -13,6 +13,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni/dcs"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
@@ -79,7 +80,7 @@ func (r *Reconciler) reconcileInstanceRBAC(
 		Kind: account.Kind,
 		Name: account.Name,
 	}}
-	role.Rules = patroni.Permissions(cluster)
+	role.Rules = append(patroni.Permissions(cluster), dcs.For(cluster).Permissions(cluster)...)
 
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, account))
