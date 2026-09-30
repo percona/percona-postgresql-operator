@@ -46,7 +46,7 @@ commands:
           .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
           .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'"' "${TEMP_DIR}/cr.yaml"
 
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      MINIO_ENDPOINT="$(s3_storage_endpoint)"
       $sed -i "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" "${TEMP_DIR}/cr.yaml"
       # yq may unquote "n" turning it into YAML boolean — restore the quoting
       $sed -i 's|repo2-s3-verify-tls: n$|repo2-s3-verify-tls: "n"|' "${TEMP_DIR}/cr.yaml"

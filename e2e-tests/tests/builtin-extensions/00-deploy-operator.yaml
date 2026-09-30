@@ -12,4 +12,4 @@ commands:
       deploy_operator
       deploy_client
       deploy_s3_secrets
-      deploy_minio
+      deploy_s3_storage

@@ -380,70 +380,107 @@ function retry() {
 	done
 }
 
-function deploy_minio() {
-	local name="${1:-"minio-service"}"
-	local tls_secret="${2:-}"
+# In-cluster S3 is SeaweedFS. Credentials stay in minio-secret: pgBackRest
+# cloud.conf and extension storage reference those AWS_* keys, which is not
+# how the MongoDB operator names its storage.
+s3_storage_host() {
+	echo "s3-storage-all-in-one"
+}
+
+# pgBackRest takes host:port and speaks TLS. SeaweedFS HTTPS listens on 8443.
+s3_storage_endpoint() {
+	echo "$(s3_storage_host).${NAMESPACE}.svc.cluster.local:8443"
+}
+
+# Self-signed cert for the SeaweedFS S3 Service. Keys are tls.crt and tls.key,
+# which seaweedfs-tls-values.yaml mounts.
+create_s3_tls_secret() {
+	local name="${1:-s3-tls}"
+	local host="${2:-$(s3_storage_host)}"
+	local fqdn="${host}.${NAMESPACE}.svc.cluster.local"
+
+	cat >"${TEMP_DIR}/s3-openssl.cnf" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+[req_distinguished_name]
+CN = ${host}
+[v3_req]
+subjectAltName = DNS:${host},DNS:${fqdn}
+EOF
+	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+		-keyout "${TEMP_DIR}/s3.key" \
+		-out "${TEMP_DIR}/s3.crt" \
+		-config "${TEMP_DIR}/s3-openssl.cnf"
+	kubectl -n "${NAMESPACE}" create secret generic "${name}" \
+		--from-file=tls.crt="${TEMP_DIR}/s3.crt" \
+		--from-file=tls.key="${TEMP_DIR}/s3.key"
+}
+
+# deploy_s3_storage installs SeaweedFS and creates the operator-testing bucket.
+# Pass a TLS Secret name (create_s3_tls_secret) to serve S3 on 8443.
+deploy_s3_storage() {
+	local tls_secret="${1:-}"
+	local fullname="${2:-s3-storage}"
 	local access_key
 	local secret_key
-	local endpoint_url="http://${name}:9000"
+	local endpoint_url="http://${fullname}-all-in-one:8333"
 	local aws_extra_args=""
-	local service_account_name="minio-sa"
 	local -a additional_helm_args
 
 	access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
 	secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
-	if [[ ${PLATFORM} == "openshift" ]]; then
-		kubectl create serviceaccount "${service_account_name}" \
-			--namespace "${NAMESPACE}"
-		oc adm policy add-scc-to-user anyuid -z "${service_account_name}" -n "${NAMESPACE}"
+	if arch_scheduling_enabled; then
 		additional_helm_args+=(
-			--set serviceAccount.create=false
-			--set serviceAccount.name="${service_account_name}"
+			--set-string "allInOne.nodeSelector=kubernetes.io/arch: ${ARCH}"
+			--set-string "allInOne.tolerations=- key: kubernetes.io/arch
+  operator: Equal
+  value: ${ARCH}
+  effect: NoSchedule"
 		)
 	fi
 
 	if [[ -n $tls_secret ]]; then
-		additional_helm_args+=(
-			--set tls.enabled=true
-			--set tls.certSecret="${tls_secret}"
-		)
-		endpoint_url="https://${name}:9000"
+		additional_helm_args+=(-f "${TESTS_CONFIG_DIR}/seaweedfs-tls-values.yaml")
+		if [[ $tls_secret != "s3-tls" ]]; then
+			cat >"${TEMP_DIR}/seaweedfs-tls-secret.yaml" <<EOF
+allInOne:
+  extraVolumes: |
+    - name: s3-tls
+      secret:
+        secretName: ${tls_secret}
+EOF
+			additional_helm_args+=(-f "${TEMP_DIR}/seaweedfs-tls-secret.yaml")
+		fi
+		endpoint_url="https://${fullname}-all-in-one:8443"
 		aws_extra_args="--no-verify-ssl"
 	fi
 
-	helm_arch_args additional_helm_args
-	helm_arch_args additional_helm_args "postJob."
-
-	helm uninstall -n "${NAMESPACE}" "${name}" || :
-	helm repo remove minio || :
-	helm repo add minio https://charts.min.io/
-	retry 10 60 helm install "${name}" \
+	helm uninstall -n "${NAMESPACE}" "${fullname}" || :
+	helm repo remove seaweedfs || :
+	helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm
+	retry 10 60 helm install "${fullname}" \
 		-n "${NAMESPACE}" \
-		--version "${MINIO_VER}" \
-		--set replicas=1 \
-		--set mode=standalone \
-		--set resources.requests.memory=256Mi \
-		--set rootUser=rootuser \
-		--set rootPassword=rootpass123 \
-		--set "users[0].accessKey"="$(printf '%q' "$(printf '%q' "$access_key")")" \
-		--set "users[0].secretKey"="$(printf '%q' "$(printf '%q' "$secret_key")")" \
-		--set "users[0].policy"=consoleAdmin \
-		--set service.type=ClusterIP \
-		--set persistence.size=2G \
-		--set securityContext.enabled=false \
+		--version "${SEAWEEDFS_VER}" \
+		-f "${TESTS_CONFIG_DIR}/seaweedfs-values.yaml" \
+		--set allInOne.data.type=persistentVolumeClaim \
+		--set allInOne.data.size=2G \
+		--set fullnameOverride="${fullname}" \
+		--set-string s3.credentials.admin.accessKey="${access_key}" \
+		--set-string s3.credentials.admin.secretKey="${secret_key}" \
+		--set-string global.seaweedfs.serviceAccountName="${fullname}-sa" \
 		"${additional_helm_args[@]}" \
-		minio/minio
+		seaweedfs/seaweedfs
 
-	MINIO_POD=$(
-		kubectl -n "${NAMESPACE}" get pods \
-			--selector=release=${name} \
-			-o 'jsonpath={.items[].metadata.name}'
-	)
+	if [[ ${PLATFORM} == "openshift" ]]; then
+		oc adm policy add-scc-to-user anyuid -z "${fullname}-sa" -n "${NAMESPACE}"
+		kubectl -n "${NAMESPACE}" rollout restart "deployment/${fullname}-all-in-one"
+	fi
 
-	wait_pod $MINIO_POD
+	kubectl -n "${NAMESPACE}" rollout status "deployment/${fullname}-all-in-one" --timeout=300s
 
-	# create bucket
 	aws_cli "$access_key" "$secret_key" us-east-1 \
 		--endpoint-url "${endpoint_url}" ${aws_extra_args} s3 mb s3://operator-testing
 }
@@ -486,7 +523,7 @@ copy_custom_extensions_from_aws() {
 		bash -c "
 			aws s3 cp s3://pg-extensions/ /tmp/pg-ext/ --recursive &&
 			AWS_ACCESS_KEY_ID='${minio_key}' AWS_SECRET_ACCESS_KEY='${minio_secret}' AWS_DEFAULT_REGION=us-east-1 \
-				aws --endpoint-url http://minio-service:9000 s3 cp /tmp/pg-ext/ s3://operator-testing/ --recursive
+				aws --endpoint-url http://s3-storage-all-in-one:8333 s3 cp /tmp/pg-ext/ s3://operator-testing/ --recursive
 		"
 
 	set -o xtrace
@@ -2061,14 +2098,12 @@ function ensure_ebs_gp3_storage_class() {
 }
 
 function setup_longhorn_backup_storage() {
-	local minio_service_name="${1:-minio-service}"
-
 	kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
-	deploy_minio "${minio_service_name}"
+	deploy_s3_storage
 
 	yq '
 			.metadata.name = "minio-secret-longhorn" |
-			.stringData.AWS_ENDPOINTS = "http://'"${minio_service_name}.${NAMESPACE}"'.svc.cluster.local:9000"
+			.stringData.AWS_ENDPOINTS = "http://s3-storage-all-in-one.'"${NAMESPACE}"'.svc.cluster.local:8333"
 		' "${TESTS_CONFIG_DIR}/minio-secret.yml" \
 		| kubectl apply -n longhorn-system -f -
 

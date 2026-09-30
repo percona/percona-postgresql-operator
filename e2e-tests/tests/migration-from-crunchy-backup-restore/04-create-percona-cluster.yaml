@@ -9,7 +9,7 @@ commands:
 
       CRUNCHY_REPO_PATH=$(kubectl get configmap crunchy-backup-restore-config -n "${NAMESPACE}" \
         -o jsonpath='{.data.crunchy-repo-path}')
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      MINIO_ENDPOINT="$(s3_storage_endpoint)"
 
       # Percona cluster's own repo uses a separate S3 path from the Crunchy source:
       #   crunchy source: .../crunchy-repo1  (dataSource only)
