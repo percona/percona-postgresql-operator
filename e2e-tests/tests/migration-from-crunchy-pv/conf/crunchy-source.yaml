@@ -17,7 +17,7 @@ spec:
     pgbackrest:
       configuration:
         - secret:
-            # Shared with the Percona target cluster — same minio credentials,
+            # Shared with the Percona target cluster — same S3 credentials,
             # different S3 path (substituted at apply time).
             name: migration-pv-pgbackrest-secrets
       global:

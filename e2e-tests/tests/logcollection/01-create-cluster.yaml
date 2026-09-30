@@ -19,7 +19,7 @@ commands:
         '    - name: s3' \
         '      match: "*.postgres"' \
         '      bucket: operator-testing' \
-        '      endpoint: https://minio-service:9000' \
+        '      endpoint: https://s3-storage-all-in-one:8443' \
         '      tls: on' \
         '      tls.ca_file: /etc/fluentbit/tls/ca.crt' \
         '      region: us-east-1' \
@@ -59,7 +59,7 @@ commands:
         | yq eval '.spec.logcollector.configuration = strenv(fluentbit_custom)' - \
         | yq eval '.spec.logcollector.envFrom = [{"secretRef": {"name": "minio-secret"}}]' - \
         | yq eval '.spec.logcollector.volumeMounts = [{"name": "s3-ca", "mountPath": "/etc/fluentbit/tls", "readOnly": true}]' - \
-        | yq eval '.spec.logcollector.volumes = [{"name": "s3-ca", "secret": {"secretName": "minio-tls", "items": [{"key": "public.crt", "path": "ca.crt"}]}}]' - \
+        | yq eval '.spec.logcollector.volumes = [{"name": "s3-ca", "secret": {"secretName": "s3-tls", "items": [{"key": "tls.crt", "path": "ca.crt"}]}}]' - \
         | yq eval '.spec.logcollector.logRotate.configuration = strenv(logrotate_custom)' - \
         | yq eval '.spec.logcollector.logRotate.extraConfig.name = "logcollection-extra-logrotate"' - \
         | yq eval '.spec.logcollector.logRotate.schedule = "*/5 * * * *"' - \

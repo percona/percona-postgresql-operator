@@ -24,7 +24,7 @@ commands:
           aws_cli "${access_key}" "${secret_key}" us-east-1 \
             bash -c '
               set -e
-              aws_cmd="aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
+              aws_cmd="aws --endpoint-url https://s3-storage-all-in-one:8443 --no-verify-ssl"
               key=$($aws_cmd s3 ls s3://operator-testing/ --recursive 2>/dev/null \
                 | grep postgres | head -1 | awk "{print \$NF}")
               [ -n "$key" ] || exit 1
@@ -50,4 +50,4 @@ commands:
       }
 
       retry 18 15 check_s3_otel_logs
-      echo "OK: postgres logs shipped to MinIO with OpenTelemetry envelope metadata"
+      echo "OK: postgres logs shipped to SeaweedFS with OpenTelemetry envelope metadata"

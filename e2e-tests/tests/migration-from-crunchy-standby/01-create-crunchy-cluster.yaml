@@ -9,7 +9,7 @@ commands:
       source ../../functions
 
       CRUNCHY_NS="${NAMESPACE}-crunchy"
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      MINIO_ENDPOINT="$(s3_storage_endpoint)"
       REPO_PATH="/migration-from-crunchy/${RANDOM}/repo1"
 
       kubectl create configmap -n "${NAMESPACE}" crunchy-migration-config \

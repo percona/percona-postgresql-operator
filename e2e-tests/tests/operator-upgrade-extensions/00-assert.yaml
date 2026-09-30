@@ -20,8 +20,8 @@ commands:
         exit 0
       fi
 
-      until kubectl assert exist-enhanced deployment minio-service \
+      until kubectl assert exist-enhanced deployment s3-storage-all-in-one \
         -n "${NAMESPACE}" --field-selector status.readyReplicas=1; do
-        echo "Waiting for minio-service deployment"
+        echo "Waiting for s3-storage-all-in-one deployment"
         sleep 5
       done

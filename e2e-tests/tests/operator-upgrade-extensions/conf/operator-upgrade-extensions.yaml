@@ -17,7 +17,7 @@ spec:
       type: s3
       bucket: operator-testing
       region: us-east-1
-      endpoint: http://minio-service:9000
+      endpoint: http://s3-storage-all-in-one:8333
       forcePathStyle: true
       disableSSL: true
       secret:
