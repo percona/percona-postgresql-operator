@@ -1,4 +1,5 @@
 the object has been modified; please apply your changes to the latest version
+StorageError: invalid object, Code: 4
 leader election lost
 failed to sync secret cache
 failed to sync configmap cache
