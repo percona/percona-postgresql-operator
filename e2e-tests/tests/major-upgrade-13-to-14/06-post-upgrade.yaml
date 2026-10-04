@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 420
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      primary=""
+      for i in $(seq 1 60); do
+        primary=$(kubectl -n ${NAMESPACE} get pods \
+          --selector="postgres-operator.crunchydata.com/cluster=major-upgrade-13-to-14,postgres-operator.crunchydata.com/role in (master,primary)" \
+          -o name | head -1 | cut -d/ -f2)
+        [ -n "${primary}" ] && break
+        sleep 5
+      done
+
+      if [ -z "${primary}" ]; then
+        echo "primary pod of major-upgrade-13-to-14 not found"
+        kubectl -n ${NAMESPACE} get pods --show-labels
+        exit 1
+      fi
+
+      kubectl -n ${NAMESPACE} exec ${primary} -c database -- vacuumdb -h /tmp/postgres --all --analyze-in-stages
+      kubectl -n ${NAMESPACE} exec ${primary} -c database -- vacuumdb -h /tmp/postgres --all --analyze-only
+      kubectl -n ${NAMESPACE} exec ${primary} -c database -- /pgdata/delete_old_cluster.sh
