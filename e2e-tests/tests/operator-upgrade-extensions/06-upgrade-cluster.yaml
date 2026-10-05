@@ -26,9 +26,25 @@ commands:
 
       cr_ver=$(yq '.spec.crVersion' $DEPLOY_DIR/cr.yaml)
 
+      # The released CR pins the UBI9 log collector. A UBI10 run has to switch it
+      # with the rest of the images, otherwise the sidecar stays on UBI9.
+      logcollector_patch=""
+      if [[ $(release_image_suffix) == "_UBI10" ]]; then
+          if [[ -n ${IMAGE_LOGCOLLECTOR_UBI10:-} ]]; then
+              target_image_logcollector="${IMAGE_LOGCOLLECTOR_UBI10}"
+          else
+              target_image_logcollector="$(get_release_image IMAGE_LOGCOLLECTOR_UBI10)"
+              if [[ ${target_image_logcollector} != docker.io/* ]]; then
+                  target_image_logcollector="${REGISTRY_NAME_FULL}${target_image_logcollector}"
+              fi
+          fi
+          logcollector_patch='"logcollector": {"image": "'${target_image_logcollector}'"},'
+      fi
+
       kubectl -n "${NAMESPACE}" patch perconapgcluster ${test_name} --type merge -p '{
         "spec": {
           "crVersion": "'${cr_ver}'",
+          '"${logcollector_patch}"'
           "image": "'${target_image_postgresql}'",
           "proxy": {"pgBouncer": {"image": "'${target_image_pgbouncer}'"}},
           "backups": {"pgbackrest": {"image": "'${target_image_backrest}'"}},

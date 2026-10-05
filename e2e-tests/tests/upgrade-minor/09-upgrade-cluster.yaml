@@ -33,6 +33,20 @@ commands:
           .spec.image = "'${target_image_postgresql}'" |
           .spec.proxy.pgBouncer.image = "'${target_image_pgbouncer}'" |
           .spec.backups.pgbackrest.image = "'${target_image_backrest}'"' "${TEMP_DIR}/cr.yaml"
+
+      # The released CR pins the UBI9 log collector. A UBI10 run has to switch it
+      # with the rest of the images, otherwise the sidecar stays on UBI9.
+      if [[ $(release_image_suffix) == "_UBI10" ]]; then
+          if [[ -n ${IMAGE_LOGCOLLECTOR_UBI10:-} ]]; then
+              target_image_logcollector="${IMAGE_LOGCOLLECTOR_UBI10}"
+          else
+              target_image_logcollector="$(get_release_image IMAGE_LOGCOLLECTOR_UBI10)"
+              if [[ ${target_image_logcollector} != docker.io/* ]]; then
+                  target_image_logcollector="${REGISTRY_NAME_FULL}${target_image_logcollector}"
+              fi
+          fi
+          yq -i eval '.spec.logcollector.image = "'${target_image_logcollector}'"' "${TEMP_DIR}/cr.yaml"
+      fi
       kubectl -n "${NAMESPACE}" apply -f "${TEMP_DIR}/cr.yaml"
       sleep 7 # wait for reconcile loop
 
