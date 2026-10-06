@@ -471,7 +471,7 @@ func TestVolumes(t *testing.T) {
 	caVol := corev1.Volume{
 		Name: "s3-ca",
 		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{SecretName: "minio-tls"},
+			Secret: &corev1.SecretVolumeSource{SecretName: "s3-tls"},
 		},
 	}
 
