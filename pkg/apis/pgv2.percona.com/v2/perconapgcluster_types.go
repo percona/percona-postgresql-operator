@@ -673,6 +673,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	postgresCluster.Spec.Paused = cr.Spec.Unmanaged
 	postgresCluster.Spec.Shutdown = cr.Spec.Pause
 
+	postgresCluster.Spec.Standby = nil
 	if cr.Spec.Standby != nil {
 		postgresCluster.Spec.Standby = cr.Spec.Standby.PostgresStandbySpec
 	}
