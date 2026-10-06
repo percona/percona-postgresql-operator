@@ -771,6 +771,47 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.False(t, actual.Spec.Extensions.SetUser)
 			},
 		},
+		"clears standby on existing PostgresCluster when standby is removed": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{},
+						},
+					},
+				},
+			},
+			inputPostgresCluster: &crunchyv1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: crunchyv1beta1.PostgresClusterSpec{
+					Standby: &crunchyv1beta1.PostgresStandbySpec{
+						Enabled:  true,
+						RepoName: "repo1",
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.Nil(t, actual.Spec.Standby)
+			},
+		},
 	}
 
 	for testName, tt := range tests {
