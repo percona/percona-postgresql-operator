@@ -1,0 +1,96 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      cluster="cert-manager-tls"
+
+      # A CA the operator knows nothing about and that no issuer here signs
+      # with. spec.tls.additionalTrustedCAs is what a user sets when the
+      # configured issuer returns no ca.crt of its own, so the anchor has to
+      # reach every trust file on its own merits - not because some issuer
+      # happened to put it there.
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "${TEMP_DIR}/cluster-extra-ca.key" \
+        -out "${TEMP_DIR}/cluster-extra-ca.crt" \
+        -subj "/CN=cluster-extra-trusted-ca"
+
+      kubectl -n "${NAMESPACE}" create secret generic cluster-extra-ca \
+        --from-file=ca.crt="${TEMP_DIR}/cluster-extra-ca.crt"
+
+      kubectl -n "${NAMESPACE}" patch perconapgcluster "${cluster}" --type=merge \
+        -p '{"spec":{"tls":{"additionalTrustedCAs":[{"name":"cluster-extra-ca"}]}}}'
+
+      # The merged bundle lives in a Secret the operator owns; the
+      # cert-manager-issued ones are rebuilt on every issuance and must not be
+      # written to.
+      bundle_has_two_cas() {
+        [[ $(kubectl -n "${NAMESPACE}" get secret "${cluster}-ca-bundle" \
+          -o jsonpath='{.data.ca\.crt}' 2>/dev/null \
+          | base64 -d | grep -c 'BEGIN CERTIFICATE') -eq 2 ]]
+      }
+      retry 30 5 bundle_has_two_cas
+
+      # Adding a source to the certificate volume rolls the instances.
+      wait_cluster_consistency "${cluster}"
+
+      # Inspect the PEM locally so the assertions do not depend on which tools
+      # each container image happens to ship.
+      check_bundle() {
+        local what=$1 file=$2
+
+        if [[ $(grep -c 'BEGIN CERTIFICATE' "${file}") -ne 2 ]]; then
+            echo "${what} should hold the issuer CA and the additional one:"
+            openssl crl2pkcs7 -nocrl -certfile "${file}" | openssl pkcs7 -print_certs -noout
+            exit 1
+        fi
+
+        # Both anchors, specifically: the issuer's, so everything that verified
+        # before still does, and the added one.
+        local subjects
+        subjects=$(openssl crl2pkcs7 -nocrl -certfile "${file}" | openssl pkcs7 -print_certs -noout)
+        if ! grep -q 'cluster-extra-trusted-ca' <<<"${subjects}"; then
+            echo "${what} is missing the additional CA: ${subjects}"
+            exit 1
+        fi
+        if ! grep -q 'cert-manager-tls-ca' <<<"${subjects}"; then
+            echo "${what} lost the issuer CA: ${subjects}"
+            exit 1
+        fi
+      }
+
+      instance=$(kubectl -n "${NAMESPACE}" get pod \
+        -l postgres-operator.crunchydata.com/cluster="${cluster}",postgres-operator.crunchydata.com/role=primary \
+        -o jsonpath='{.items[0].metadata.name}')
+      instance_set=$(kubectl -n "${NAMESPACE}" get pod "${instance}" \
+        -o jsonpath='{.metadata.labels.postgres-operator\.crunchydata\.com/instance}')
+
+      # ssl_ca_file, which verifies the _crunchyrepl client certificate.
+      kubectl -n "${NAMESPACE}" exec "${instance}" -c database -- \
+        cat /pgconf/tls/ca.crt >"${TEMP_DIR}/mounted-ca.crt"
+      check_bundle "/pgconf/tls/ca.crt" "${TEMP_DIR}/mounted-ca.crt"
+
+      # sslrootcert for replication and pg_rewind.
+      kubectl -n "${NAMESPACE}" exec "${instance}" -c database -- \
+        cat /pgconf/tls/replication/ca.crt >"${TEMP_DIR}/mounted-repl-ca.crt"
+      check_bundle "/pgconf/tls/replication/ca.crt" "${TEMP_DIR}/mounted-repl-ca.crt"
+
+      # tls-server-ca-file and pgN-/repoN-host-ca-file are the same file.
+      kubectl -n "${NAMESPACE}" exec "${instance}" -c pgbackrest -- \
+        cat /etc/pgbackrest/conf.d/~postgres-operator/tls-ca.crt >"${TEMP_DIR}/mounted-pgbackrest-ca.crt"
+      check_bundle "pgbackrest.ca-roots" "${TEMP_DIR}/mounted-pgbackrest-ca.crt"
+
+      # Patroni's restapi.cafile and ctl.cacert.
+      kubectl -n "${NAMESPACE}" get secret "${instance_set}-certs" \
+        -o jsonpath='{.data.patroni\.ca-roots}' | base64 -d >"${TEMP_DIR}/mounted-patroni-ca.crt"
+      check_bundle "patroni.ca-roots" "${TEMP_DIR}/mounted-patroni-ca.crt"
+
+      # PgBouncer's client_tls_ca_file.
+      kubectl -n "${NAMESPACE}" get secret "${cluster}-pgbouncer" \
+        -o jsonpath='{.data.pgbouncer-frontend\.ca-roots}' | base64 -d >"${TEMP_DIR}/mounted-pgbouncer-ca.crt"
+      check_bundle "pgbouncer-frontend.ca-roots" "${TEMP_DIR}/mounted-pgbouncer-ca.crt"
+    timeout: 420

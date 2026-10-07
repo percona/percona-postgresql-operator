@@ -477,6 +477,15 @@ func (r *Reconciler) reconcileInternalReplicationSecret(
 		err = errors.WithStack(err)
 	}
 	if err == nil {
+		// Patroni uses this as sslrootcert with sslmode=verify-ca when it
+		// connects for replication and pg_rewind.
+		var additionalCAs [][]byte
+		if additionalCAs, err = r.additionalTrustedCAs(ctx, cluster); err == nil && len(additionalCAs) > 0 {
+			intent.Data[naming.ReplicationCACert] = pki.TrustBundle(
+				append([][]byte{intent.Data[naming.ReplicationCACert]}, additionalCAs...)...)
+		}
+	}
+	if err == nil {
 		err = errors.WithStack(r.apply(ctx, intent))
 	}
 	return intent, err
