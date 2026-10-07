@@ -52,7 +52,7 @@ spec:
           value: "true"
         envFrom:
         - secretRef:
-            name: minio-secret
+            name: s3-secret
         resources: {}
         volumeMounts:
         - mountPath: /pgdata

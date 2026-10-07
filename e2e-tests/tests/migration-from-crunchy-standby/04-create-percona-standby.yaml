@@ -13,7 +13,7 @@ commands:
       # Retrieve the S3 repo path set when the Crunchy cluster was created
       REPO_PATH=$(kubectl get configmap crunchy-migration-config -n "${NAMESPACE}" \
         -o jsonpath='{.data.repo-path}')
-      MINIO_ENDPOINT="minio-service.${NAMESPACE}.svc.cluster.local:9000"
+      S3_ENDPOINT="$(s3_storage_endpoint)"
 
       # -----------------------------------------------------------------------
       # Copy TLS certificates from the Crunchy namespace to the Percona namespace.
@@ -43,7 +43,7 @@ commands:
         yq eval 'del(.spec.users)' | \
         yq eval ".spec.backups.pgbackrest.global.\"repo1-s3-uri-style\" = \"path\"" | \
         yq eval ".spec.backups.pgbackrest.global.\"repo1-s3-verify-tls\" = \"n\"" | \
-        yq eval ".spec.backups.pgbackrest.repos[0].s3.endpoint = \"${MINIO_ENDPOINT}\"" | \
+        yq eval ".spec.backups.pgbackrest.repos[0].s3.endpoint = \"${S3_ENDPOINT}\"" | \
         yq eval ".spec.standby.enabled = true" | \
         yq eval ".spec.standby.repoName = \"repo1\"" | \
         yq eval ".spec.standby.host = \"${CRUNCHY_HOST}\"" | \
