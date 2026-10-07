@@ -1828,3 +1828,182 @@ func TestUpdateLogicalReplicaStatus(t *testing.T) {
 			pNaming.ConditionReadyForLogicalReplication))
 	})
 }
+
+func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
+	ctx := context.Background()
+
+	const (
+		hostnameKey = "external-dns.alpha.kubernetes.io/hostname"
+		ttlKey      = "external-dns.alpha.kubernetes.io/ttl"
+		managedKey  = "percona.com/external-dns-managed"
+	)
+
+	tests := map[string]struct {
+		expose      *v2.ServiceExpose
+		existing    map[string]string
+		expected    map[string]string
+		notExpected []string
+	}{
+		"writes the annotations": {
+			expose: &v2.ServiceExpose{
+				ExternalDNS: &v2.ExternalDNSConfig{Hostname: "replica.example.com", TTL: 60},
+			},
+			expected: map[string]string{
+				hostnameKey: "replica.example.com",
+				ttlKey:      "60",
+				managedKey:  "true",
+			},
+		},
+		"dropping ttl removes only the ttl annotation": {
+			expose: &v2.ServiceExpose{
+				ExternalDNS: &v2.ExternalDNSConfig{Hostname: "replica.example.com"},
+			},
+			existing: map[string]string{
+				hostnameKey: "replica.example.com",
+				ttlKey:      "60",
+				managedKey:  "true",
+			},
+			expected: map[string]string{
+				hostnameKey: "replica.example.com",
+				managedKey:  "true",
+			},
+			notExpected: []string{ttlKey},
+		},
+		"dropping externalDNS removes hostname and marker but keeps other annotations": {
+			expose: &v2.ServiceExpose{},
+			existing: map[string]string{
+				hostnameKey:            "replica.example.com",
+				ttlKey:                 "60",
+				managedKey:             "true",
+				"cloud.google.com/neg": "keep-me",
+			},
+			expected:    map[string]string{"cloud.google.com/neg": "keep-me"},
+			notExpected: []string{hostnameKey, ttlKey, managedKey},
+		},
+		"dropping the whole expose block removes hostname and marker": {
+			expose: nil,
+			existing: map[string]string{
+				hostnameKey:            "replica.example.com",
+				ttlKey:                 "60",
+				managedKey:             "true",
+				"cloud.google.com/neg": "keep-me",
+			},
+			expected:    map[string]string{"cloud.google.com/neg": "keep-me"},
+			notExpected: []string{hostnameKey, ttlKey, managedKey},
+		},
+		"manual annotations without the marker are left alone": {
+			expose: &v2.ServiceExpose{},
+			existing: map[string]string{
+				hostnameKey:                            "manual.example.com",
+				"external-dns.alpha.kubernetes.io/ttl": "300",
+			},
+			expected: map[string]string{
+				hostnameKey: "manual.example.com",
+				ttlKey:      "300",
+			},
+		},
+		"other external-dns keys on a managed service are never touched": {
+			expose: &v2.ServiceExpose{},
+			existing: map[string]string{
+				hostnameKey: "replica.example.com",
+				managedKey:  "true",
+				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
+			},
+			expected:    map[string]string{"external-dns.alpha.kubernetes.io/target": "1.2.3.4"},
+			notExpected: []string{hostnameKey, managedKey},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := testLogicalReplicaCluster()
+			spec := &v2.LogicalReplicaSpec{Name: "lr1", Expose: tt.expose}
+
+			objs := []client.Object{}
+			if tt.existing != nil {
+				objs = append(objs, &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        logicalReplicaObjectName(cr, spec.Name),
+						Namespace:   cr.Namespace,
+						Annotations: tt.existing,
+					},
+				})
+			}
+
+			cl, err := buildFakeClient(ctx, cr, objs...)
+			require.NoError(t, err)
+
+			r := &PGClusterReconciler{Client: cl}
+			require.NoError(t, r.reconcileLogicalReplicaService(ctx, cr, spec))
+
+			svc := new(corev1.Service)
+			require.NoError(t, cl.Get(ctx, client.ObjectKey{
+				Name:      logicalReplicaObjectName(cr, spec.Name),
+				Namespace: cr.Namespace,
+			}, svc))
+
+			for k, v := range tt.expected {
+				assert.Equal(t, v, svc.Annotations[k], "annotation %q", k)
+			}
+			for _, k := range tt.notExpected {
+				assert.NotContains(t, svc.Annotations, k)
+			}
+		})
+	}
+}
+
+func TestRemoveStaleExternalDNSAnnotations(t *testing.T) {
+	const (
+		hostnameKey = "external-dns.alpha.kubernetes.io/hostname"
+		ttlKey      = "external-dns.alpha.kubernetes.io/ttl"
+		managedKey  = "percona.com/external-dns-managed"
+	)
+
+	tests := map[string]struct {
+		annotations map[string]string
+		expected    map[string]string
+	}{
+		"nil map": {
+			annotations: nil,
+			expected:    nil,
+		},
+		"managed keys are dropped, unrelated ones kept": {
+			annotations: map[string]string{
+				hostnameKey:            "pg.example.com",
+				ttlKey:                 "60",
+				managedKey:             "true",
+				"cloud.google.com/neg": "keep-me",
+			},
+			expected: map[string]string{"cloud.google.com/neg": "keep-me"},
+		},
+		"unmarked service is left alone": {
+			annotations: map[string]string{
+				hostnameKey: "manual.example.com",
+				ttlKey:      "300",
+			},
+			expected: map[string]string{
+				hostnameKey: "manual.example.com",
+				ttlKey:      "300",
+			},
+		},
+		"other external-dns keys are never removed": {
+			annotations: map[string]string{
+				hostnameKey: "pg.example.com",
+				managedKey:  "true",
+				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
+				"external-dns.alpha.kubernetes.io/alias":  "true",
+			},
+			expected: map[string]string{
+				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
+				"external-dns.alpha.kubernetes.io/alias":  "true",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			removeStaleExternalDNSAnnotations(tt.annotations)
+			assert.Equal(t, tt.expected, tt.annotations)
+		})
+	}
+}

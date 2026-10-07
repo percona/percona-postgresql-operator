@@ -1,0 +1,29 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  # Removing externalDNS removes the hostname and the ownership marker, so
+  # external-dns deletes the records. Everything the operator does not own is
+  # left exactly as it was.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      source ./conf/annotations.sh
+
+      kubectl -n "${NAMESPACE}" patch pg external-dns --type=json --patch '[
+        {"op": "remove", "path": "/spec/expose/externalDNS"},
+        {"op": "remove", "path": "/spec/exposeReplicas/externalDNS"},
+        {"op": "remove", "path": "/spec/proxy/pgBouncer/expose/externalDNS"}
+      ]'
+
+      for svc in external-dns-ha external-dns-replicas external-dns-pgbouncer; do
+        wait_annotation ${svc} ${ANNOTATION_HOSTNAME} ""
+        wait_annotation ${svc} ${ANNOTATION_MANAGED} ""
+      done
+
+      # Neither the hand-written hostname on an unmanaged Service nor the
+      # /target key on a managed one is ever touched by the operator.
+      check_annotation_stays external-dns-primary ${ANNOTATION_HOSTNAME} "manual.external-dns.example.com"
+      check_annotation_stays external-dns-ha 'external-dns.alpha.kubernetes.io/target' "1.2.3.4"
