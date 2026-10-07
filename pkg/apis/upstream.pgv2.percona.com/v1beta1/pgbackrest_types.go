@@ -198,6 +198,19 @@ type BackupJobs struct {
 
 	// +optional
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"` // K8SPG-619
+
+	// Specifies the duration (in seconds) after a backup Job's start before
+	// Kubernetes terminates it and marks it as failed.
+	// +optional
+	// +kubebuilder:validation:Minimum=60
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+
+	// Specifies the duration (in seconds) after a backup resource is created
+	// before the backup is considered failed if the Job has not started.
+	// Defaults to 600 seconds (10 minutes) if not set.
+	// +optional
+	// +kubebuilder:validation:Minimum=60
+	StartupDeadlineSeconds *int64 `json:"startupDeadlineSeconds,omitempty"`
 }
 
 // PGBackRestManualBackup contains information that is used for creating a

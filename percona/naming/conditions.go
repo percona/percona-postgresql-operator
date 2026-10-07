@@ -12,4 +12,6 @@ const (
 	// everything a logical replica bootstrap needs. A bootstrap started too
 	// early cannot be retried without re-seeding.
 	ConditionReadyForLogicalReplication = "ReadyForLogicalReplication"
+
+	ConditionScheduledBackupDegraded = "ScheduledBackupDegraded"
 )

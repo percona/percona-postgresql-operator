@@ -1,0 +1,21 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Patch the cluster to have a short startup deadline (60 seconds)
+      # This will cause scheduled backups that can't start to fail quickly
+      kubectl patch postgrescluster scheduled-backup -n "${NAMESPACE}" --type=merge -p '
+      {
+        "spec": {
+          "backups": {
+            "pgbackrest": {
+              "jobs": {
+                "startupDeadlineSeconds": 60
+              }
+            }
+          }
+        }
+      }'

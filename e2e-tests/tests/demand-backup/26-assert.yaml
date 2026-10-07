@@ -7,5 +7,5 @@ commands:
       set -o xtrace
 
       # Verify the startup deadline was set
-      kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | \
+      kubectl get postgrescluster demand-backup -n "${NAMESPACE}" -o json | \
         jq -e '.spec.backups.pgbackrest.jobs.startupDeadlineSeconds == 60' >/dev/null
