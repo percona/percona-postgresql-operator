@@ -324,6 +324,17 @@ type TLSSpec struct {
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
+	// SANs are extra Subject Alternative Names appended to the Postgres server
+	// and pgBouncer certificates the operator issues.
+	// +optional
+	SANs []string `json:"SANs,omitempty"`
+}
+
+func (s *TLSSpec) GetSANs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.SANs
 }
 
 func (s *TLSSpec) GetCertManagementPolicy() CertManagementPolicy {

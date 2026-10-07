@@ -19,6 +19,7 @@ commands:
       get_cr "$cluster" \
         | yq '.spec.tls.certManagementPolicy = "operatorProvidedOnly"' \
         | yq '.spec.tls.issuerConf = {"name":"cert-management-policy-ignored-issuer","kind":"ClusterIssuer"}' \
+        | yq '.spec.tls.SANs = ["pg.example.com","*.pg.internal.example.com"]' \
         | yq '.spec.proxy.pgBouncer.replicas = 1' \
         | yq '.spec.instances[].replicas = 1' \
         | kubectl -n "$NAMESPACE" apply -f -

@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 120
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "$NAMESPACE" patch pg cert-manager-tls --type=merge \
+        -p '{"spec":{"tls":{"SANs":["pg.example.com","*.pg.internal.example.com"]}}}'
+
+      wait_cluster_consistency cert-manager-tls
