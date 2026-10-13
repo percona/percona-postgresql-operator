@@ -12,16 +12,9 @@ commands:
           deploy_operator
           deploy_client
 
-          kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/minio-secret.yml"
+          kubectl -n "${NAMESPACE}" apply -f "${TESTS_CONFIG_DIR}/s3-secret.yml"
 
-          # Self-signed cert with CN=minio-service so fluent-bit can verify TLS.
-          openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-            -keyout "${TEMP_DIR}/minio.key" \
-            -out "${TEMP_DIR}/minio.crt" \
-            -subj "/CN=minio-service"
-          kubectl -n "${NAMESPACE}" create secret generic minio-tls \
-            --from-file=public.crt="${TEMP_DIR}/minio.crt" \
-            --from-file=private.key="${TEMP_DIR}/minio.key"
-
-          deploy_minio minio-service minio-tls
+          # Self-signed cert whose SAN matches the SeaweedFS Service fluent-bit dials.
+          create_s3_tls_secret
+          deploy_s3_storage s3-tls
       

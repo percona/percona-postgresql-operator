@@ -9,8 +9,8 @@ commands:
 
       pv_name=$(kubectl get configmap pv-names -n "${NAMESPACE}" \
         -o jsonpath='{.data.pv-name}')
-      MINIO_ENDPOINT=$(kubectl get configmap pv-migration-config -n "${NAMESPACE}" \
-        -o jsonpath='{.data.minio-endpoint}')
+      S3_ENDPOINT=$(kubectl get configmap pv-migration-config -n "${NAMESPACE}" \
+        -o jsonpath='{.data.s3-endpoint}')
 
       # Fresh S3 path for the Percona cluster's own pgBackRest repository.
       PERCONA_REPO_PATH="/migration-pv/${RANDOM}/percona-repo1"
@@ -40,6 +40,6 @@ commands:
       get_cr "percona-migrated" "${PERCONA_REPO_PATH}" | \
         yq eval 'del(.spec.users)' | \
         yq eval '.spec.instances[0].dataVolumeClaimSpec.volumeName = strenv(pv_name)' - | \
-        $sed "s|<minio-endpoint>|${MINIO_ENDPOINT}|g" | \
+        $sed "s|<s3-endpoint>|${S3_ENDPOINT}|g" | \
         kubectl -n "${NAMESPACE}" apply -f -
     timeout: 60
