@@ -98,5 +98,5 @@ spec:
         - name: repo2
           s3:
             bucket: operator-testing
-            endpoint: <minio-endpoint>
+            endpoint: <s3-endpoint>
             region: us-east-1
