@@ -9,8 +9,8 @@ commands:
       source ../../functions
 
       set +o xtrace
-      access_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
-      secret_key="$(kubectl -n "${NAMESPACE}" get secret minio-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
+      access_key="$(kubectl -n "${NAMESPACE}" get secret s3-secret -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
+      secret_key="$(kubectl -n "${NAMESPACE}" get secret s3-secret -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
       set -o xtrace
 
 
@@ -24,7 +24,7 @@ commands:
           aws_cli "${access_key}" "${secret_key}" us-east-1 \
             bash -c '
               set -e
-              aws_cmd="aws --endpoint-url https://minio-service:9000 --no-verify-ssl"
+              aws_cmd="aws --endpoint-url https://s3-storage-all-in-one:8443 --no-verify-ssl"
               key=$($aws_cmd s3 ls s3://operator-testing/ --recursive 2>/dev/null \
                 | grep postgres | head -1 | awk "{print \$NF}")
               [ -n "$key" ] || exit 1
@@ -50,4 +50,4 @@ commands:
       }
 
       retry 18 15 check_s3_otel_logs
-      echo "OK: postgres logs shipped to MinIO with OpenTelemetry envelope metadata"
+      echo "OK: postgres logs shipped to SeaweedFS with OpenTelemetry envelope metadata"
