@@ -164,9 +164,10 @@ func (r *Reconciler) additionalTrustedCAs(
 		return nil, nil
 	}
 
-	// K8SPG-1045: in userProvidedOnly the operator does not own any of the TLS
-	// Secrets, so it has nothing to merge these into.
-	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly {
+	// K8SPG-1045: in userProvidedOnly and custom TLS modes, the operator does
+	// not own the PostgreSQL TLS Secrets, so it cannot merge these consistently.
+	if cluster.Spec.TLS.GetCertManagementPolicy() == v1beta1.CertManagementUserProvidedOnly ||
+		cluster.Spec.CustomTLSSecret != nil {
 		return nil, nil
 	}
 
