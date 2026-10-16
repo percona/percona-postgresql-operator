@@ -1,5 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 180
 commands:
   - script: |-
       set -o errexit
@@ -14,3 +15,48 @@ commands:
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
         "postgres:$(get_psql_user_pass one-pod-pguser-postgres)@$(get_psql_user_host one-pod-pguser-postgres)"
+
+  # Simulate the Kubernetes API server (Patroni's DCS) going unreachable for
+  # longer than Patroni's old 10s retry_timeout, and assert that the
+  # single-instance primary keeps accepting writes throughout instead of
+  # demoting itself.
+  #
+  # Patroni runs inside the database container with its own ServiceAccount
+  # and talks to the API server directly (not through the operator) to read
+  # and renew the leader lock stored in the "<cluster>-instance" Role's
+  # "endpoints" resource. Stripping that Role's rules makes every one of
+  # Patroni's DCS calls fail with 403, exactly like a control-plane outage.
+  #
+  # The operator reconciles that Role back to its desired state on every
+  # pass, so first pause the PostgresCluster (via spec.unmanaged) to freeze
+  # reconciliation for the duration of the test; unsetting it afterwards
+  # lets the operator repair the Role on its own.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      kubectl -n "${NAMESPACE}" patch perconapgcluster "${test_name}" --type=merge -p '{"spec":{"unmanaged":true}}'
+
+      trap 'kubectl -n "${NAMESPACE}" patch perconapgcluster "${test_name}" --type=merge -p "{\"spec\":{\"unmanaged\":false}}"' EXIT
+
+      until [[ "$(kubectl -n "${NAMESPACE}" get postgrescluster "${test_name}" -o jsonpath='{.spec.paused}')" == "true" ]]; do
+        sleep 1
+      done
+
+      kubectl -n "${NAMESPACE}" patch role "${test_name}-instance" --type=json \
+        -p='[{"op":"replace","path":"/rules","value":[]}]'
+
+      end=$((SECONDS + 90))
+      while [ $SECONDS -lt $end ]; do
+        if ! run_psql_local \
+            '\c myapp \\\ INSERT INTO myApp (id) VALUES ('"$SECONDS"')' \
+            "postgres:$(get_psql_user_pass one-pod-pguser-postgres)@$(get_psql_user_host one-pod-pguser-postgres)"; then
+          echo "the single-instance primary refused a write while the Kubernetes API (Patroni's DCS) was unreachable"
+          exit 1
+        fi
+        sleep 5
+      done
+
+

@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/percona/version"
@@ -1027,6 +1028,92 @@ func TestValidateDynamicConfiguration(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestPerconaPGCluster_singleInstancePatroni(t *testing.T) {
+	one := int32(1)
+	two := int32(2)
+
+	tests := map[string]struct {
+		instanceSets PGInstanceSets
+		patroni      *crunchyv1beta1.PatroniSpec
+		assert       func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec)
+	}{
+		"multi-instance cluster is left untouched": {
+			instanceSets: PGInstanceSets{{Replicas: &two}},
+			patroni:      nil,
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				assert.Nil(t, patroni)
+			},
+		},
+		"multiple instance sets totalling more than one replica are left untouched": {
+			instanceSets: PGInstanceSets{{Replicas: &one}, {Replicas: &one}},
+			patroni:      nil,
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				assert.Nil(t, patroni)
+			},
+		},
+		"single-instance cluster relaxes ttl and retry_timeout, and enables failsafe_mode": {
+			instanceSets: PGInstanceSets{{Replicas: &one}},
+			patroni:      nil,
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				require.NotNil(t, patroni)
+				require.NotNil(t, patroni.LeaderLeaseDurationSeconds)
+				assert.EqualValues(t, singleInstanceTTL, *patroni.LeaderLeaseDurationSeconds)
+				assert.EqualValues(t, singleInstanceRetryTimeout, patroni.DynamicConfiguration["retry_timeout"])
+				assert.Equal(t, true, patroni.DynamicConfiguration["failsafe_mode"])
+			},
+		},
+		"single-instance cluster with no replicas set defaults to one replica": {
+			instanceSets: PGInstanceSets{{}},
+			patroni:      nil,
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				require.NotNil(t, patroni)
+				require.NotNil(t, patroni.LeaderLeaseDurationSeconds)
+				assert.EqualValues(t, singleInstanceTTL, *patroni.LeaderLeaseDurationSeconds)
+			},
+		},
+		"single-instance cluster does not override an explicitly customized ttl": {
+			instanceSets: PGInstanceSets{{Replicas: &one}},
+			patroni: &crunchyv1beta1.PatroniSpec{
+				LeaderLeaseDurationSeconds: ptr.To(int32(60)),
+			},
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				require.NotNil(t, patroni.LeaderLeaseDurationSeconds)
+				assert.EqualValues(t, 60, *patroni.LeaderLeaseDurationSeconds)
+			},
+		},
+		"single-instance cluster does not override an explicitly customized retry_timeout": {
+			instanceSets: PGInstanceSets{{Replicas: &one}},
+			patroni: &crunchyv1beta1.PatroniSpec{
+				DynamicConfiguration: crunchyv1beta1.SchemalessObject{
+					"retry_timeout": 5,
+				},
+			},
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				assert.EqualValues(t, 5, patroni.DynamicConfiguration["retry_timeout"])
+				assert.Equal(t, true, patroni.DynamicConfiguration["failsafe_mode"])
+			},
+		},
+		"single-instance cluster does not override an explicitly disabled failsafe_mode": {
+			instanceSets: PGInstanceSets{{Replicas: &one}},
+			patroni: &crunchyv1beta1.PatroniSpec{
+				DynamicConfiguration: crunchyv1beta1.SchemalessObject{
+					"failsafe_mode": false,
+				},
+			},
+			assert: func(t *testing.T, patroni *crunchyv1beta1.PatroniSpec) {
+				assert.Equal(t, false, patroni.DynamicConfiguration["failsafe_mode"])
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &PerconaPGCluster{Spec: PerconaPGClusterSpec{InstanceSets: tt.instanceSets}}
+			tt.assert(t, cr.singleInstancePatroni(tt.patroni))
 		})
 	}
 }

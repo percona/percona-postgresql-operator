@@ -615,6 +615,68 @@ func (cr *PerconaPGCluster) ValidateDynamicConfiguration() error {
 	return nil
 }
 
+const (
+	// patroniDefaultTTL is Patroni's own default for "ttl", tuned for
+	// multi-member clusters where a replica must take over quickly.
+	patroniDefaultTTL = 30
+
+	// singleInstanceTTL and singleInstanceRetryTimeout relax the leader lock
+	// TTL and the DCS/PostgreSQL operation timeout for single-instance
+	// clusters. With no replica to fail over to, a short timeout only turns a
+	// brief Kubernetes API server (Patroni's DCS) outage into a database
+	// write outage: the lone instance demotes itself, waits for the API
+	// server to come back, and is then promoted again.
+	singleInstanceTTL          = 300
+	singleInstanceRetryTimeout = 120
+)
+
+// totalInstanceReplicas returns the number of PostgreSQL pods across all
+// instance sets, i.e. the number of members in the Patroni cluster.
+func (cr *PerconaPGCluster) totalInstanceReplicas() int32 {
+	var total int32
+	for _, set := range cr.Spec.InstanceSets {
+		total += ptr.Deref(set.Replicas, 1)
+	}
+	return total
+}
+
+// singleInstancePatroni returns patroni with Patroni's DCS timeouts relaxed
+// when the cluster has only one PostgreSQL instance and thus no replica to
+// fail over to. Values the user (or a previous defaulting pass) has already
+// moved away from Patroni's stock defaults are left untouched.
+func (cr *PerconaPGCluster) singleInstancePatroni(patroni *crunchyv1beta1.PatroniSpec) *crunchyv1beta1.PatroniSpec {
+	if cr.totalInstanceReplicas() != 1 {
+		return patroni
+	}
+
+	if patroni == nil {
+		patroni = &crunchyv1beta1.PatroniSpec{}
+	}
+
+	if ptr.Deref(patroni.LeaderLeaseDurationSeconds, patroniDefaultTTL) == patroniDefaultTTL {
+		patroni.LeaderLeaseDurationSeconds = ptr.To(int32(singleInstanceTTL))
+	}
+
+	if patroni.DynamicConfiguration == nil {
+		patroni.DynamicConfiguration = crunchyv1beta1.SchemalessObject{}
+	}
+	if _, ok := patroni.DynamicConfiguration["retry_timeout"]; !ok {
+		// Stored as int64, the type runtime.DeepCopyJSON expects for numbers
+		// decoded from JSON; DynamicConfiguration is deep-copied as part of
+		// PostgresCluster, so a plain int here would panic.
+		patroni.DynamicConfiguration["retry_timeout"] = int64(singleInstanceRetryTimeout)
+	}
+	// failsafe_mode lets Patroni keep the lock when it cannot reach the DCS
+	// but can still confirm, by contacting the other members directly, that
+	// no one else holds it. With a single instance that check is trivially
+	// true, so this prevents demotions caused purely by DCS unavailability.
+	if _, ok := patroni.DynamicConfiguration["failsafe_mode"]; !ok {
+		patroni.DynamicConfiguration["failsafe_mode"] = true
+	}
+
+	return patroni
+}
+
 func (cr *PerconaPGCluster) PostgresImage() string {
 	image := cr.Spec.Image
 	postgresVersion := cr.Spec.PostgresVersion
@@ -698,7 +760,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 
 	postgresCluster.Spec.DataSource = cr.Spec.DataSource
 	postgresCluster.Spec.DatabaseInitSQL = cr.Spec.DatabaseInitSQL
-	postgresCluster.Spec.Patroni = cr.Spec.Patroni
+	postgresCluster.Spec.Patroni = cr.singleInstancePatroni(cr.Spec.Patroni.DeepCopy())
 
 	users := make([]crunchyv1beta1.PostgresUserSpec, 0)
 
