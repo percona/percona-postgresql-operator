@@ -769,6 +769,7 @@ spec:
 #        cpu: 300m
 #    customClusterName: "<string>"
 #    postgresParams: "<string>"
+#    # Query Analytics source: pgstatstatements (default), pgstatmonitor, or none to disable QAN.
 #    querySource: pgstatmonitor
   logcollector:
     enabled: true

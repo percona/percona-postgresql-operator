@@ -1,0 +1,35 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # K8SPG-1147: querySource "none" must turn Query Analytics off while
+      # leaving metrics collection in place.
+      kubectl -n ${NAMESPACE} patch perconapgcluster/monitoring --type=merge -p '{
+        "spec":{
+          "pmm":{"querySource":"none"}
+        }
+      }'
+
+      # Wait for PMM to re-register the service without a QAN agent.
+      sleep 80
+
+      primary=$(get_pod_by_role monitoring primary name)
+      kubectl -n ${NAMESPACE} exec ${primary} -c pmm-client -- pmm-admin list
+
+      # No QAN agent of either flavor may be registered.
+      if kubectl -n ${NAMESPACE} exec ${primary} -c pmm-client -- pmm-admin list | grep -E 'postgresql_pgstatements_agent|postgresql_pgstatmonitor_agent'; then
+        echo "a QAN agent is still running with querySource=none"
+        exit 1
+      fi
+
+      # Metrics collection must be unaffected.
+      if ! kubectl -n ${NAMESPACE} exec ${primary} -c pmm-client -- pmm-admin list | grep postgres_exporter; then
+        echo "postgres_exporter is not running"
+        exit 1
+      fi
+    timeout: 360
