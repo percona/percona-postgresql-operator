@@ -170,6 +170,10 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// 	return ctrl.Result{}, nil
 	// }
 
+	// Clear any previous Degraded condition. It will be re-set if an error
+	// occurs during this reconcile cycle.
+	meta.RemoveStatusCondition(&upgrade.Status.Conditions, ConditionPGUpgradeDegraded)
+
 	// Set progressing condition to true if it doesn't exist already
 	setStatusToProgressingIfReasonWas("", upgrade)
 
@@ -218,6 +222,14 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			Type:               ConditionPGUpgradeProgressing,
 			Status:             metav1.ConditionFalse,
 			Reason:             "PGClusterErrorWhenObservingWorld",
+			Message:            err.Error(),
+		})
+
+		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
+			ObservedGeneration: upgrade.GetGeneration(),
+			Type:               ConditionPGUpgradeDegraded,
+			Status:             metav1.ConditionTrue,
+			Reason:             "PGUpgradeError",
 			Message:            err.Error(),
 		})
 
@@ -488,6 +500,20 @@ func (r *PGUpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// - https://github.com/zalando/patroni/blob/v2.1.2/docs/existing_data.rst
 	//
 	// TODO(cbandy): This works only when using Kubernetes Endpoints for DCS.
+
+	// If an unexpected error (e.g. job creation failure) reaches this point with
+	// no terminal condition set, mark the upgrade as Degraded for observability.
+	// The error is still returned so controller-runtime retries with backoff.
+	if err != nil {
+		meta.SetStatusCondition(&upgrade.Status.Conditions, metav1.Condition{
+			ObservedGeneration: upgrade.GetGeneration(),
+			Type:               ConditionPGUpgradeDegraded,
+			Status:             metav1.ConditionTrue,
+			Reason:             "PGUpgradeError",
+			Message:            err.Error(),
+		})
+	}
+
 	if len(world.PatroniEndpoints) > 0 {
 		for _, object := range world.PatroniEndpoints {
 			uid := object.GetUID()
