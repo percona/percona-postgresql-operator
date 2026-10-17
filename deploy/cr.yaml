@@ -67,6 +67,11 @@ spec:
 #      name: some-selfsigned-issuer
 #      kind: ClusterIssuer
 #      group: cert-manager.io
+#    # Extra CA bundles to trust, each a Secret with a PEM bundle in key `ca.crt`.
+#    # Required when the issuer returns no CA certificate of its own, as ACME
+#    # issuers do: without it there is nothing to verify peers against.
+#    additionalTrustedCAs:
+#      - name: my-ca-bundle
 #  standby:
 #    enabled: true
 #    host: "<primary-ip>"
