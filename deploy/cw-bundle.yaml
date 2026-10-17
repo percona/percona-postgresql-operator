@@ -6982,6 +6982,19 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  externalDNS:
+                    properties:
+                      hostname:
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$
+                        type: string
+                      ttl:
+                        minimum: 0
+                        type: integer
+                    required:
+                    - hostname
+                    type: object
                   labels:
                     additionalProperties:
                       type: string
@@ -7008,6 +7021,19 @@ spec:
                   annotations:
                     additionalProperties:
                       type: string
+                    type: object
+                  externalDNS:
+                    properties:
+                      hostname:
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$
+                        type: string
+                      ttl:
+                        minimum: 0
+                        type: integer
+                    required:
+                    - hostname
                     type: object
                   labels:
                     additionalProperties:
@@ -13851,6 +13877,19 @@ spec:
                           additionalProperties:
                             type: string
                           type: object
+                        externalDNS:
+                          properties:
+                            hostname:
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$
+                              type: string
+                            ttl:
+                              minimum: 0
+                              type: integer
+                          required:
+                          - hostname
+                          type: object
                         labels:
                           additionalProperties:
                             type: string
@@ -15247,6 +15286,19 @@ spec:
                           annotations:
                             additionalProperties:
                               type: string
+                            type: object
+                          externalDNS:
+                            properties:
+                              hostname:
+                                maxLength: 253
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$
+                                type: string
+                              ttl:
+                                minimum: 0
+                                type: integer
+                            required:
+                            - hostname
                             type: object
                           labels:
                             additionalProperties:
