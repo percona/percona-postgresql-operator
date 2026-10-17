@@ -5,8 +5,8 @@
 # reconcile, so every check polls instead of reading once.
 
 # Exported because the kuttl steps that source this file use them too.
-export ANNOTATION_HOSTNAME='external-dns.alpha.kubernetes.io/hostname'
-export ANNOTATION_TTL='external-dns.alpha.kubernetes.io/ttl'
+export ANNOTATION_HOSTNAME='external-dns.kubernetes.io/hostname'
+export ANNOTATION_TTL='external-dns.kubernetes.io/ttl'
 export ANNOTATION_MANAGED='percona.com/external-dns-managed'
 
 get_annotation() {

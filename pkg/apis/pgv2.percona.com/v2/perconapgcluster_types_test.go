@@ -1137,8 +1137,8 @@ func TestShouldCheckStandbyLag(t *testing.T) {
 
 func TestServiceExposeServiceAnnotations(t *testing.T) {
 	const (
-		hostnameKey = "external-dns.alpha.kubernetes.io/hostname"
-		ttlKey      = "external-dns.alpha.kubernetes.io/ttl"
+		hostnameKey = "external-dns.kubernetes.io/hostname"
+		ttlKey      = "external-dns.kubernetes.io/ttl"
 		managedKey  = "percona.com/external-dns-managed"
 	)
 

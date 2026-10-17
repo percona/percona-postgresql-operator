@@ -27,4 +27,4 @@ commands:
       # An external-dns key the operator never writes, on a Service it does
       # manage: it must survive every change below.
       kubectl -n "${NAMESPACE}" annotate service/external-dns-ha \
-        'external-dns.alpha.kubernetes.io/target=1.2.3.4' --overwrite
+        'external-dns.kubernetes.io/target=1.2.3.4' --overwrite

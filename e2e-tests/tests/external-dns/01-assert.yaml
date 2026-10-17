@@ -24,8 +24,8 @@ kind: Service
 metadata:
   name: external-dns-ha
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: primary.external-dns.example.com
-    external-dns.alpha.kubernetes.io/ttl: "60"
+    external-dns.kubernetes.io/hostname: primary.external-dns.example.com
+    external-dns.kubernetes.io/ttl: "60"
     percona.com/external-dns-managed: "true"
 ---
 apiVersion: v1
@@ -33,8 +33,8 @@ kind: Service
 metadata:
   name: external-dns-replicas
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: replicas.external-dns.example.com
-    external-dns.alpha.kubernetes.io/ttl: "60"
+    external-dns.kubernetes.io/hostname: replicas.external-dns.example.com
+    external-dns.kubernetes.io/ttl: "60"
     percona.com/external-dns-managed: "true"
 ---
 apiVersion: v1
@@ -42,6 +42,6 @@ kind: Service
 metadata:
   name: external-dns-pgbouncer
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: pgbouncer.external-dns.example.com
-    external-dns.alpha.kubernetes.io/ttl: "60"
+    external-dns.kubernetes.io/hostname: pgbouncer.external-dns.example.com
+    external-dns.kubernetes.io/ttl: "60"
     percona.com/external-dns-managed: "true"

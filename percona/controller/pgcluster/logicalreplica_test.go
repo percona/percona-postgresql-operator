@@ -1833,8 +1833,8 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 	ctx := context.Background()
 
 	const (
-		hostnameKey = "external-dns.alpha.kubernetes.io/hostname"
-		ttlKey      = "external-dns.alpha.kubernetes.io/ttl"
+		hostnameKey = "external-dns.kubernetes.io/hostname"
+		ttlKey      = "external-dns.kubernetes.io/ttl"
 		managedKey  = "percona.com/external-dns-managed"
 	)
 
@@ -1895,7 +1895,7 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 			expose: &v2.ServiceExpose{},
 			existing: map[string]string{
 				hostnameKey:                            "manual.example.com",
-				"external-dns.alpha.kubernetes.io/ttl": "300",
+				"external-dns.kubernetes.io/ttl": "300",
 			},
 			expected: map[string]string{
 				hostnameKey: "manual.example.com",
@@ -1907,9 +1907,9 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 			existing: map[string]string{
 				hostnameKey: "replica.example.com",
 				managedKey:  "true",
-				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
+				"external-dns.kubernetes.io/target": "1.2.3.4",
 			},
-			expected:    map[string]string{"external-dns.alpha.kubernetes.io/target": "1.2.3.4"},
+			expected:    map[string]string{"external-dns.kubernetes.io/target": "1.2.3.4"},
 			notExpected: []string{hostnameKey, managedKey},
 		},
 	}
@@ -1954,8 +1954,8 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 
 func TestRemoveStaleExternalDNSAnnotations(t *testing.T) {
 	const (
-		hostnameKey = "external-dns.alpha.kubernetes.io/hostname"
-		ttlKey      = "external-dns.alpha.kubernetes.io/ttl"
+		hostnameKey = "external-dns.kubernetes.io/hostname"
+		ttlKey      = "external-dns.kubernetes.io/ttl"
 		managedKey  = "percona.com/external-dns-managed"
 	)
 
@@ -1990,12 +1990,12 @@ func TestRemoveStaleExternalDNSAnnotations(t *testing.T) {
 			annotations: map[string]string{
 				hostnameKey: "pg.example.com",
 				managedKey:  "true",
-				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
-				"external-dns.alpha.kubernetes.io/alias":  "true",
+				"external-dns.kubernetes.io/target": "1.2.3.4",
+				"external-dns.kubernetes.io/alias":  "true",
 			},
 			expected: map[string]string{
-				"external-dns.alpha.kubernetes.io/target": "1.2.3.4",
-				"external-dns.alpha.kubernetes.io/alias":  "true",
+				"external-dns.kubernetes.io/target": "1.2.3.4",
+				"external-dns.kubernetes.io/alias":  "true",
 			},
 		},
 	}
