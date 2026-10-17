@@ -1894,7 +1894,7 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 		"manual annotations without the marker are left alone": {
 			expose: &v2.ServiceExpose{},
 			existing: map[string]string{
-				hostnameKey:                            "manual.example.com",
+				hostnameKey:                      "manual.example.com",
 				"external-dns.kubernetes.io/ttl": "300",
 			},
 			expected: map[string]string{
@@ -1905,8 +1905,8 @@ func TestReconcileLogicalReplicaServiceExternalDNS(t *testing.T) {
 		"other external-dns keys on a managed service are never touched": {
 			expose: &v2.ServiceExpose{},
 			existing: map[string]string{
-				hostnameKey: "replica.example.com",
-				managedKey:  "true",
+				hostnameKey:                         "replica.example.com",
+				managedKey:                          "true",
 				"external-dns.kubernetes.io/target": "1.2.3.4",
 			},
 			expected:    map[string]string{"external-dns.kubernetes.io/target": "1.2.3.4"},
@@ -1988,8 +1988,8 @@ func TestRemoveStaleExternalDNSAnnotations(t *testing.T) {
 		},
 		"other external-dns keys are never removed": {
 			annotations: map[string]string{
-				hostnameKey: "pg.example.com",
-				managedKey:  "true",
+				hostnameKey:                         "pg.example.com",
+				managedKey:                          "true",
 				"external-dns.kubernetes.io/target": "1.2.3.4",
 				"external-dns.kubernetes.io/alias":  "true",
 			},
