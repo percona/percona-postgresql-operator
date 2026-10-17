@@ -1,0 +1,55 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 600
+    script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # The Certificate CR already existed before spec.tls.SANs was set, so this
+      # also covers the DNSNames drift path in ApplyClusterCertificate.
+      wait_for_san_in_cert() {
+          local cert_name="$1"
+          local san="$2"
+
+          for i in {1..60}; do
+              if kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{range .spec.dnsNames[*]}{@}{"\n"}{end}' | grep -Fxq -- "$san"; then
+                  return 0
+              fi
+              sleep 5
+          done
+          echo "Certificate $cert_name never got SAN $san"
+          kubectl -n "$NAMESPACE" get certificate "$cert_name" -o jsonpath='{.spec.dnsNames}'
+          return 1
+      }
+
+      wait_for_san_in_cert cert-manager-tls-cluster-cert pg.example.com
+      wait_for_san_in_cert cert-manager-tls-cluster-cert '*.pg.internal.example.com'
+      wait_for_san_in_cert cert-manager-tls-pgbouncer-cert pg.example.com
+
+      wait_for_san_in_secret() {
+          local secret_name="$1"
+          local san="$2"
+
+          for i in {1..60}; do
+              local sans
+              sans=$(kubectl -n "$NAMESPACE" get secret "$secret_name" -o jsonpath='{.data.tls\.crt}' \
+                | base64 -d | openssl x509 -noout -ext subjectAltName)
+              if [[ "$sans" == *"$san"* ]]; then
+                  return 0
+              fi
+              sleep 5
+          done
+          echo "Secret $secret_name certificate never got SAN $san"
+          echo "Got: $sans"
+          return 1
+      }
+
+      wait_for_san_in_secret cert-manager-tls-cluster-cert pg.example.com
+      wait_for_san_in_secret cert-manager-tls-cluster-cert '*.pg.internal.example.com'
+      wait_for_san_in_secret cert-manager-tls-pgbouncer-frontend-tls pg.example.com
+
+      # The generated service names must survive alongside the custom ones.
+      wait_for_san_in_secret cert-manager-tls-cluster-cert cert-manager-tls-primary
