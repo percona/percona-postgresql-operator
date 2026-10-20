@@ -226,3 +226,69 @@ func TestSidecarContainer(t *testing.T) {
 	assert.Equal(t, "/pgconf/tls", container.VolumeMounts[0].MountPath)
 	assert.True(t, container.VolumeMounts[0].ReadOnly)
 }
+
+func TestQuerySource(t *testing.T) {
+	t.Parallel()
+
+	for name, tt := range map[string]struct {
+		crVersion string
+		source    v2.PMMQuerySource
+		expected  string
+	}{
+		"pg_stat_statements is mapped to the pmm-admin spelling": {
+			crVersion: "2.9.0",
+			source:    v2.PgStatStatements,
+			expected:  "pgstatements",
+		},
+		"pg_stat_monitor is passed through": {
+			crVersion: "2.9.0",
+			source:    v2.PgStatMonitor,
+			expected:  "pgstatmonitor",
+		},
+		"none is passed through to disable QAN": {
+			crVersion: "2.9.0",
+			source:    v2.QuerySourceNone,
+			expected:  "none",
+		},
+		"none is passed through on older CR versions too": {
+			crVersion: "2.8.0",
+			source:    v2.QuerySourceNone,
+			expected:  "none",
+		},
+		"pg_stat_statements is not remapped before 2.9.0": {
+			crVersion: "2.8.0",
+			source:    v2.PgStatStatements,
+			expected:  "pgstatstatements",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			pgc := &v2.PerconaPGCluster{
+				Spec: v2.PerconaPGClusterSpec{CRVersion: tt.crVersion},
+			}
+
+			assert.Equal(t, tt.expected, querySource(pgc, tt.source))
+		})
+	}
+}
+
+// TestAgentPrerunScriptQuerySourceNone guards the K8SPG-1147 contract: a cluster
+// with querySource "none" must register the service with --query-source=none so
+// pmm-admin skips the QAN agent instead of silently ignoring an unknown value.
+func TestAgentPrerunScriptQuerySourceNone(t *testing.T) {
+	t.Parallel()
+
+	pgc := &v2.PerconaPGCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+		Spec: v2.PerconaPGClusterSpec{
+			CRVersion: "2.9.0",
+			PMM:       &v2.PMMSpec{Enabled: true, QuerySource: v2.QuerySourceNone},
+		},
+	}
+
+	script := agentPrerunScript(pgc)
+
+	assert.Contains(t, script, "--query-source=none")
+	assert.NotContains(t, script, "--query-source=pgstat")
+}
