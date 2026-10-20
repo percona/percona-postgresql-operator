@@ -1529,3 +1529,40 @@ func TestApplyCertificateIssuerRefDrift(t *testing.T) {
 		assert.Equal(t, "vault-issuer", cert.Spec.IssuerRef.Name)
 	})
 }
+
+func TestApplyCertificateDNSNamesDrift(t *testing.T) {
+	t.Run("cluster certificate picks up added SANs on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-cluster-sans"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"drift-cluster-sans-primary.test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyClusterCertificate(t.Context(), cluster, dnsNames))
+
+		withSANs := append(dnsNames, "pg.example.com", "*.pg.internal.example.com")
+		require.NoError(t, ctrl.ApplyClusterCertificate(t.Context(), cluster, withSANs))
+
+		cert := &v1.Certificate{}
+		secretName := naming.PostgresTLSSecret(cluster)
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: secretName.Name}, cert))
+		assert.Equal(t, withSANs, cert.Spec.DNSNames)
+	})
+
+	t.Run("pgbouncer certificate picks up added SANs on update", func(t *testing.T) {
+		cluster := testCluster()
+		cluster.Name = "drift-pgbouncer-sans"
+		client := setupFakeClient(t, cluster)
+		ctrl := NewController(client, client.Scheme(), false)
+
+		dnsNames := []string{"drift-pgbouncer-sans-pgbouncer.test-namespace.svc"}
+		require.NoError(t, ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, dnsNames))
+
+		withSANs := append(dnsNames, "bouncer.example.com")
+		require.NoError(t, ctrl.ApplyPGBouncerCertificate(t.Context(), cluster, withSANs))
+
+		cert := &v1.Certificate{}
+		require.NoError(t, client.Get(t.Context(), sigs.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-pgbouncer-cert"}, cert))
+		assert.Equal(t, withSANs, cert.Spec.DNSNames)
+	})
+}

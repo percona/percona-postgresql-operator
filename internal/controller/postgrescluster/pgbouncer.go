@@ -220,6 +220,7 @@ func (r *Reconciler) reconcileCertManagerPGBouncerSecret(ctx context.Context, cl
 	if dnsErr != nil {
 		return nil, errors.Wrap(dnsErr, "get pgbouncer service DNS names")
 	}
+	dnsNames = append(dnsNames, cluster.Spec.TLS.GetSANs()...)
 
 	err := c.ApplyPGBouncerCertificate(ctx, cluster, dnsNames)
 	if err != nil {
