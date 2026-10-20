@@ -14,6 +14,15 @@ commands:
         "SELECT pg_stat_statements_reset();" \
         "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres"
 
+      kubectl patch -n "${NAMESPACE}" perconapgcluster/builtin-extensions --type=merge \
+        -p '{"spec":{"patroni":{"dynamicConfiguration":{"postgresql":{"parameters":{"pg_stat_statements.track":"all"}}}}}}'
+
+      check_track() {
+        track=$(run_psql_local "SHOW pg_stat_statements.track;" "postgres:$(get_psql_user_pass builtin-extensions-pguser-postgres)@$(get_psql_user_host builtin-extensions-pguser-postgres)/postgres" | xargs)
+        [[ ${track} == "all" ]]
+      }
+      retry 24 5 check_track
+
       # pg_audit
       run_psql_local \
         "CREATE TEMP TABLE pgaudit_test(x int);DROP TABLE pgaudit_test;" \
