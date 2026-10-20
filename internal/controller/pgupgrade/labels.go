@@ -18,6 +18,10 @@ const (
 	// status of a Postgres major upgrade.
 	ConditionPGUpgradeSucceeded = "Succeeded"
 
+	// ConditionPGUpgradeDegraded is the type used in a condition to indicate that
+	// the upgrade has encountered an error and may not be able to proceed.
+	ConditionPGUpgradeDegraded = "Degraded"
+
 	labelPrefix           = "postgres-operator.crunchydata.com/"
 	LabelPGUpgrade        = labelPrefix + "pgupgrade"
 	LabelCluster          = labelPrefix + "cluster"
