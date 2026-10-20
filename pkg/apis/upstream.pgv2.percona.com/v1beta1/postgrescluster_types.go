@@ -324,8 +324,9 @@ type TLSSpec struct {
 	CertManagementPolicy CertManagementPolicy `json:"certManagementPolicy,omitempty"`
 	// +optional
 	IssuerConf *cmmeta.IssuerReference `json:"issuerConf,omitempty"`
-	// SANs are extra Subject Alternative Names appended to the Postgres server
-	// and pgBouncer certificates the operator issues.
+	// SANs are extra DNS names appended to the dNSName Subject Alternative
+	// Names of the Postgres server and pgBouncer certificates the operator issues.
+	// Only DNS names are supported.
 	// +optional
 	SANs []string `json:"SANs,omitempty"`
 }
