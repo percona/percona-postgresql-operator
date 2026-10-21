@@ -27,31 +27,21 @@ func isUniqueAndSorted(slice []string) bool {
 	return true
 }
 
+// TestPermissions covers the generic RBAC rules Patroni needs regardless of
+// DCS backend. See internal/patroni/dcs for backend-specific rules.
 func TestPermissions(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	err := cluster.Default(context.Background(), nil)
 	assert.NilError(t, err)
 
-	t.Run("Upstream", func(t *testing.T) {
-		permissions := Permissions(cluster)
-		for _, rule := range permissions {
-			assert.Assert(t, isUniqueAndSorted(rule.APIGroups), "got %q", rule.APIGroups)
-			assert.Assert(t, isUniqueAndSorted(rule.Resources), "got %q", rule.Resources)
-			assert.Assert(t, isUniqueAndSorted(rule.Verbs), "got %q", rule.Verbs)
-		}
+	permissions := Permissions(cluster)
+	for _, rule := range permissions {
+		assert.Assert(t, isUniqueAndSorted(rule.APIGroups), "got %q", rule.APIGroups)
+		assert.Assert(t, isUniqueAndSorted(rule.Resources), "got %q", rule.Resources)
+		assert.Assert(t, isUniqueAndSorted(rule.Verbs), "got %q", rule.Verbs)
+	}
 
-		assert.Assert(t, cmp.MarshalMatches(permissions, `
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - create
-  - deletecollection
-  - get
-  - list
-  - patch
-  - watch
+	assert.Assert(t, cmp.MarshalMatches(permissions, `
 - apiGroups:
   - ""
   resources:
@@ -61,59 +51,5 @@ func TestPermissions(t *testing.T) {
   - list
   - patch
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-		`))
-	})
-
-	t.Run("OpenShift", func(t *testing.T) {
-		cluster.Spec.OpenShift = new(bool)
-		*cluster.Spec.OpenShift = true
-
-		permissions := Permissions(cluster)
-		for _, rule := range permissions {
-			assert.Assert(t, isUniqueAndSorted(rule.APIGroups), "got %q", rule.APIGroups)
-			assert.Assert(t, isUniqueAndSorted(rule.Resources), "got %q", rule.Resources)
-			assert.Assert(t, isUniqueAndSorted(rule.Verbs), "got %q", rule.Verbs)
-		}
-
-		assert.Assert(t, cmp.MarshalMatches(permissions, `
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - create
-  - deletecollection
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints/restricted
-  verbs:
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-		`))
-	})
+	`))
 }
