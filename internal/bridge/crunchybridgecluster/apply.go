@@ -6,7 +6,7 @@ package crunchybridgecluster
 
 import (
 	"context"
-	"reflect"
+	"encoding/json"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,9 +34,8 @@ func (r *CrunchyBridgeClusterReconciler) patch(
 //
 // NOTE: This function is duplicated from a version in the postgrescluster package
 func (r *CrunchyBridgeClusterReconciler) apply(ctx context.Context, object client.Object) error {
-	// Generate an apply-patch by comparing the object to its zero value.
-	zero := reflect.New(reflect.TypeOf(object).Elem()).Interface()
-	data, err := client.MergeFrom(zero.(client.Object)).Data(object)
+	// The applied configuration is the object itself.
+	data, err := json.Marshal(object)
 	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// Send the apply-patch with force=true.
