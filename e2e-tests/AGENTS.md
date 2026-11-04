@@ -39,10 +39,10 @@ directory of numbered steps, and the steps call bash helpers.
   in the test namespace. With `OPERATOR_NS` set, it installs the
   cluster-wide variant (`deploy/cw-*.yaml`) into that namespace instead.
 - Images default to `perconalab/percona-postgresql-operator:<branch>` for the
-  operator, `main-*` tags for PostgreSQL and pgBackRest, and a released
-  `percona/percona-pgbouncer` image. Override with `IMAGE`,
-  `IMAGE_POSTGRESQL`, `IMAGE_PGBOUNCER`, `IMAGE_BACKREST`, `PG_VER`, or
-  `PG_DISTRIBUTION=community` (all `main-*-community` tags).
+  operator and `main-*` tags for PostgreSQL, pgBackRest and PgBouncer; see
+  `vars.sh` for the current defaults and any temporary pins. Override with
+  `IMAGE`, `IMAGE_POSTGRESQL`, `IMAGE_PGBOUNCER`, `IMAGE_BACKREST`, `PG_VER`,
+  or `PG_DISTRIBUTION=community` (all `main-*-community` tags).
 - Cloud backup tests need `conf/cloud-secret.yml` (gitignored).
 - In-cluster S3 is SeaweedFS, deployed by `deploy_s3_storage` with
   `conf/seaweedfs-values.yaml` (plus `seaweedfs-tls-values.yaml` when a TLS
