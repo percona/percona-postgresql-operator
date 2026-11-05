@@ -82,6 +82,16 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// GetMetadata gets Metadata from a ServiceSpec pointer, if the ServiceSpec
+// hasn't been set return nil
+// K8SPG-1149
+func (s *ServiceSpec) GetMetadata() *Metadata {
+	if s == nil {
+		return nil
+	}
+	return s.Metadata
+}
+
 // GetLabelsOrNil gets labels from a Metadata pointer, if Metadata
 // hasn't been set return nil
 func (meta *Metadata) GetLabelsOrNil() map[string]string {

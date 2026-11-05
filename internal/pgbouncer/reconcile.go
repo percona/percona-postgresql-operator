@@ -156,6 +156,12 @@ func Secret(ctx context.Context,
 					return errors.Wrap(err, "get service dns names")
 				}
 				dnsFQDN = dnsNames[0]
+
+				// K8SPG-1149: the hostname published by external-dns is appended after
+				// the in-cluster names so the FQDN above stays the common name.
+				dnsNames = append(dnsNames, pNaming.ManagedExternalDNSHostnames(
+					inCluster.Spec.Proxy.PGBouncer.Service.GetMetadata().GetAnnotationsOrNil(),
+				)...)
 			}
 
 			if err == nil {
