@@ -1,0 +1,23 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      # K8SPG-1086: the log volume is gated on crVersion >= 3.2.0 while deploy/cr.yaml
+      # still ships 3.1.0. Drop this line once percona/version/version.txt reaches 3.2.0.
+      get_cr \
+        | yq eval '.spec.crVersion = "3.2.0"' - \
+        | yq eval '
+            .spec.instances[0].walVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[0].walVolumeClaimSpec.resources.requests.storage="1Gi" |
+            .spec.instances[0].logVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[0].logVolumeClaimSpec.resources.requests.storage="1Gi" |
+            .spec.instances[0].tablespaceVolumes[0].name="myts" |
+            .spec.instances[0].tablespaceVolumes[0].dataVolumeClaimSpec.accessModes[0]="ReadWriteOnce" |
+            .spec.instances[0].tablespaceVolumes[0].dataVolumeClaimSpec.resources.requests.storage="1Gi"' - \
+        | kubectl -n "${NAMESPACE}" apply -f -
