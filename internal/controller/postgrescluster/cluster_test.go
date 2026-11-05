@@ -595,7 +595,7 @@ func TestGenerateClusterPrimaryService(t *testing.T) {
 	leader.Spec.ClusterIP = "1.9.8.3"
 
 	_, _, err := reconciler.generateClusterPrimaryService(cluster, nil)
-	assert.ErrorContains(t, err, "not implemented")
+	assert.ErrorContains(t, err, "not available yet")
 
 	alwaysExpect := func(t testing.TB, service *corev1.Service, endpoints *corev1.Endpoints) { //nolint:staticcheck // SA1019
 		assert.Assert(t, cmp.MarshalMatches(service.TypeMeta, `
@@ -700,7 +700,7 @@ func TestReconcileClusterPrimaryService(t *testing.T) {
 	assert.NilError(t, cc.Create(ctx, cluster))
 
 	_, err := reconciler.reconcileClusterPrimaryService(ctx, cluster, nil)
-	assert.ErrorContains(t, err, "not implemented")
+	assert.ErrorContains(t, err, "not available yet")
 
 	leader := &corev1.Service{}
 	leader.Spec.ClusterIP = "192.0.2.10"
