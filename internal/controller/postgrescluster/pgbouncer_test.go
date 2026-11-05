@@ -549,7 +549,7 @@ func TestGeneratePGBouncerDeployment(t *testing.T) {
 			cluster := cluster.DeepCopy()
 			cluster.Spec.Proxy = spec
 
-			deploy, specified, err := reconciler.generatePGBouncerDeployment(ctx, cluster, nil, nil, nil)
+			deploy, specified, err := reconciler.generatePGBouncerDeployment(ctx, cluster, nil, nil, nil, nil)
 			assert.NilError(t, err)
 			assert.Assert(t, !specified)
 
@@ -582,7 +582,7 @@ namespace: ns3
 		}
 
 		deploy, specified, err := reconciler.generatePGBouncerDeployment(
-			ctx, cluster, primary, configmap, secret)
+			ctx, cluster, primary, nil, configmap, secret)
 		assert.NilError(t, err)
 		assert.Assert(t, specified)
 
@@ -623,7 +623,7 @@ namespace: ns3
 
 	t.Run("PodSpec", func(t *testing.T) {
 		deploy, specified, err := reconciler.generatePGBouncerDeployment(
-			ctx, cluster, primary, configmap, secret)
+			ctx, cluster, primary, nil, configmap, secret)
 		assert.NilError(t, err)
 		assert.Assert(t, specified)
 
@@ -669,7 +669,7 @@ topologySpreadConstraints:
 			cluster.Spec.DisableDefaultPodScheduling = new(true)
 
 			deploy, specified, err := reconciler.generatePGBouncerDeployment(
-				ctx, cluster, primary, configmap, secret)
+				ctx, cluster, primary, nil, configmap, secret)
 			assert.NilError(t, err)
 			assert.Assert(t, specified)
 
