@@ -5,6 +5,7 @@ import (
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
+	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
 )
 
 func EnableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
@@ -37,7 +38,13 @@ func DisableInPostgreSQL(ctx context.Context, exec postgres.Executor) error {
 	return err
 }
 
-func PostgreSQLParameters(outParameters *postgres.Parameters) {
+func PostgreSQLParameters(cluster *v1beta1.PostgresCluster, outParameters *postgres.Parameters) {
 	outParameters.Mandatory.AppendToList("shared_preload_libraries", "pg_stat_statements")
+
+	// K8SPG-1198
+	if cluster.CompareVersion("3.2.0") >= 0 {
+		outParameters.Default.Add("pg_stat_statements.track", "top")
+		return
+	}
 	outParameters.Mandatory.Add("pg_stat_statements.track", "all")
 }

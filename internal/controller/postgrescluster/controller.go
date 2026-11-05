@@ -308,7 +308,7 @@ func (r *Reconciler) Reconcile(
 	// K8SPG-577
 	// K8SPG-884: pg_stat_statements must come before pg_stat_monitor
 	if cluster.Spec.Extensions.PGStatStatements {
-		pgstatstatements.PostgreSQLParameters(&pgParameters)
+		pgstatstatements.PostgreSQLParameters(cluster, &pgParameters)
 	}
 	// K8SPG-375
 	if cluster.Spec.Extensions.PGStatMonitor {
