@@ -6,7 +6,7 @@ package pgupgrade
 
 import (
 	"context"
-	"reflect"
+	"encoding/json"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,9 +30,8 @@ func (r *PGUpgradeReconciler) patch(
 // - https://docs.k8s.io/reference/using-api/server-side-apply/#managers
 // - https://docs.k8s.io/reference/using-api/server-side-apply/#conflicts
 func (r *PGUpgradeReconciler) apply(ctx context.Context, object client.Object) error {
-	// Generate an apply-patch by comparing the object to its zero value.
-	zero := reflect.New(reflect.TypeOf(object).Elem()).Interface()
-	data, err := client.MergeFrom(zero.(client.Object)).Data(object)
+	// The applied configuration is the object itself.
+	data, err := json.Marshal(object)
 	apply := client.RawPatch(types.ApplyPatchType, data)
 
 	// Send the apply-patch with force=true.
