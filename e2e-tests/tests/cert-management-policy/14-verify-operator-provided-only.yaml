@@ -42,6 +42,29 @@ commands:
         fi
       done
 
+      # spec.tls.SANs must reach the internal-PKI leaves too, not just cert-manager.
+      verify_san() {
+        local secret="$1"
+        local key="$2"
+        local escaped_key="${key//./\\.}"
+        shift 2
+        local sans
+        sans=$(kubectl -n "$NAMESPACE" get secret "$secret" \
+          -o jsonpath="{.data.${escaped_key}}" | base64 -d | openssl x509 -noout -ext subjectAltName)
+        for san in "$@"; do
+          if [[ "$sans" != *"$san"* ]]; then
+            echo "Certificate $secret/$key is missing SAN $san" >&2
+            echo "Got: $sans" >&2
+            return 1
+          fi
+        done
+      }
+
+      verify_san "${cluster}-cluster-cert" tls.crt \
+        pg.example.com '*.pg.internal.example.com' "${cluster}-primary"
+      verify_san "${cluster}-pgbouncer" pgbouncer-frontend.crt \
+        pg.example.com '*.pg.internal.example.com' "${cluster}-pgbouncer"
+
       instance_sts=$(kubectl -n "$NAMESPACE" get sts \
         -l postgres-operator.crunchydata.com/cluster="$cluster",postgres-operator.crunchydata.com/instance-set=instance1 \
         -o jsonpath='{.items[*].metadata.name}')
