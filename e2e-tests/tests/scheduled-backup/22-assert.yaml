@@ -1,0 +1,26 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 30
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Verify the ResourceQuota was deleted
+      if kubectl get resourcequota no-jobs-quota -n "${NAMESPACE}" 2>/dev/null; then
+        echo "ERROR: ResourceQuota should be deleted"
+        exit 1
+      fi
+      
+      echo "ResourceQuota successfully removed"
+      
+      # The ScheduledBackupDegraded condition should still be True
+      # (it will only clear when a backup succeeds)
+      COND_STATUS=$(kubectl get postgrescluster scheduled-backup -n "${NAMESPACE}" -o json | \
+        jq -r '.status.conditions[] | select(.type == "ScheduledBackupDegraded") | .status')
+      
+      if [ "$COND_STATUS" != "True" ]; then
+        echo "WARNING: ScheduledBackupDegraded condition is not True anymore: $COND_STATUS"
+      else
+        echo "ScheduledBackupDegraded condition is still True (expected until backup succeeds)"
+      fi

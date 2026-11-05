@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      # Wait for the backup to fail due to startup timeout
+      # The job won't start because limits < requests is invalid
+      kubectl wait --for=jsonpath='{.status.state}'=Failed --timeout=90s -n "${NAMESPACE}" pg-backup/demand-backup-invalid-resources
+      
+      # Verify the error message mentions the timeout
+      ERROR_MSG=$(kubectl get pg-backup demand-backup-invalid-resources -n "${NAMESPACE}" -o jsonpath='{.status.error}')
+      echo "Backup error: $ERROR_MSG"
+      
+      if [[ ! "$ERROR_MSG" =~ "timed out waiting for job to start" ]]; then
+        echo "ERROR: Expected timeout error but got: $ERROR_MSG"
+        exit 1
+      fi
+      
+      echo "SUCCESS: Backup failed as expected due to startup timeout"
