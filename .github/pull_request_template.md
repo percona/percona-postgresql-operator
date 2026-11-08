@@ -27,3 +27,4 @@
 - [ ] Did we ensure compatibility with the previous version or cluster upgrade process?
 - [ ] Does the change support oldest and newest supported PG version?
 - [ ] Does the change support oldest and newest supported Kubernetes version?
+- [ ] Does `AGENTS.md` (root and `e2e-tests/`) still describe the layout, commands and conventions after this change?
