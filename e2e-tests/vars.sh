@@ -48,6 +48,8 @@ function detect_k8s_platform() {
 		detected_platform="kind"
 	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'minikube'; then
 		detected_platform="minikube"
+	elif kubectl get nodes -o jsonpath='{.items[*].spec.providerID}' 2>/dev/null | grep -qi 'nutanix://'; then
+		detected_platform="nkp"
 	elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qi 'rke2'; then
 		detected_platform="rancher"
 	else
