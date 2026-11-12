@@ -17,7 +17,9 @@ commands:
 
       assert_no_cluster_secrets() {
         local count
-        count=$(kubectl -n "${NAMESPACE}" get secret -l postgres-operator.crunchydata.com/cluster=finalizers --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        # An external cert-manager (e.g. on NKP or Rancher) without --enable-certificate-owner-ref leaves its Secrets behind; ignore them.
+        count=$(kubectl -n "${NAMESPACE}" get secret -l postgres-operator.crunchydata.com/cluster=finalizers -o json \
+          | jq '[.items[] | select(.metadata.annotations["cert-manager.io/certificate-name"] == null)] | length')
         if [[ "${count}" != "0" ]]; then
           echo "Found recreated secrets for deleted cluster finalizers"
           kubectl -n "${NAMESPACE}" get secret -l postgres-operator.crunchydata.com/cluster=finalizers
