@@ -10,6 +10,11 @@ commands:
 
       wait_cluster_consistency ${test_name}
 
+      if is_cert_manager_installed && ! is_cert_manager_installed_by_test; then
+        echo "cert-manager is installed, but next steps requires it to be uninstalled. As not supported by Rancher, exiting."
+        exit 0
+      fi
+
       # K8SPG-1017: no cert-manager Certificates may appear for a PKI-issued cluster
       certs=$(kubectl -n "${NAMESPACE}" get certificates.cert-manager.io -o name 2>/dev/null || true)
       if [[ -n "$certs" ]]; then

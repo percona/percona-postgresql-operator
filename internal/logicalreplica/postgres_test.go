@@ -190,6 +190,26 @@ func TestDisableOnErrorSQL(t *testing.T) {
 	assert.Assert(t, !strings.Contains(sql, "'"), sql)
 }
 
+func TestSubscriptionsEnabledQuery(t *testing.T) {
+	databases := []string{"cluster1", `we-ird."DB`}
+	sql := SubscriptionsEnabledQuery("analytics", databases)
+
+	// The readiness probe hands this to psql, where a syntax error would take the
+	// replica out of its Service for good. Parse it with PostgreSQL's own grammar
+	// instead of trusting the string.
+	tree, err := pg_query.Parse(sql)
+	assert.NilError(t, err)
+	assert.Equal(t, len(tree.GetStmts()), 1, sql)
+
+	// Every subscription the bootstrap created has to be there and enabled, so a
+	// dropped one fails the probe as surely as a disabled one.
+	assert.Assert(t, strings.Contains(sql, "count(*) = 2"), sql)
+	for _, db := range databases {
+		name := postgres.QuoteLiteral(SubscriptionName("analytics", db))
+		assert.Assert(t, strings.Contains(sql, name), sql)
+	}
+}
+
 func TestIdentifierNames(t *testing.T) {
 	t.Run("distinct kinds do not collide", func(t *testing.T) {
 		slot := SlotName("analytics", "cluster1")

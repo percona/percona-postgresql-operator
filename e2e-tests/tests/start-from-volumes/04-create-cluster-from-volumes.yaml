@@ -18,4 +18,5 @@ commands:
             .spec.instances[].replicas=1 |
             .spec.dataSource.volumes.pgDataVolume.pvcName="'"${PVC}"'" |
             .spec.dataSource.volumes.pgDataVolume.directory="'"${DIR}"'"' - \
+        | add_arch_to_pg - \
         | kubectl -n "${NAMESPACE}" apply -f -

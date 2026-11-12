@@ -129,3 +129,52 @@ func TestPostgresUserOptions(t *testing.T) {
 		assert.NilError(t, cc.Create(ctx, cluster, client.DryRunAll))
 	})
 }
+
+func TestCertManagementPolicyTransition(t *testing.T) {
+	policies := []v1beta1.CertManagementPolicy{
+		v1beta1.CertManagementAuto,
+		v1beta1.CertManagementUserProvidedOnly,
+		v1beta1.CertManagementOperatorProvidedOnly,
+	}
+
+	for _, from := range policies {
+		for _, to := range policies {
+			if from == to {
+				continue
+			}
+
+			t.Run(fmt.Sprintf("%s-to-%s", from, to), func(t *testing.T) {
+				cc := require.Kubernetes(t)
+				t.Parallel()
+
+				cluster := v1beta1.NewPostgresCluster()
+				assert.NilError(t, yaml.Unmarshal([]byte(`{
+			postgresVersion: 16,
+			backups: {
+				pgbackrest: {
+					repos: [{ name: repo1 }],
+				},
+			},
+			instances: [{
+				dataVolumeClaimSpec: {
+					accessModes: [ReadWriteOnce],
+					resources: { requests: { storage: 1Mi } },
+				},
+			}],
+			tls: { certManagementPolicy: auto },
+		}`), &cluster.Spec))
+				cluster.Namespace = require.Namespace(t, cc).Name
+				cluster.Name = "cert-management-policy-transition"
+				cluster.Spec.TLS.CertManagementPolicy = from
+
+				assert.NilError(t, cc.Create(t.Context(), cluster))
+
+				updated := cluster.DeepCopy()
+				updated.Spec.TLS.CertManagementPolicy = to
+				err := cc.Update(t.Context(), updated)
+				assert.Assert(t, apierrors.IsInvalid(err))
+				assert.ErrorContains(t, err, "certManagementPolicy is immutable")
+			})
+		}
+	}
+}

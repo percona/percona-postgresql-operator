@@ -1,0 +1,54 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  # K8SPG-1114: the regression this suite exists for. initdb gives the new data
+  # directory a default postgresql.conf, so without the wal_level and
+  # max_replication_slots carried over in Step 4b the upgrade dies in the Step 5
+  # check with: "wal_level" must be "logical" but is set to "replica".
+  - script: |-
+      set -o errexit
+
+      job=$(kubectl -n "${NAMESPACE}" get job \
+        -l postgres-operator.crunchydata.com/cluster=major-upgrade-logical-replica \
+        -l postgres-operator.crunchydata.com/role=pgupgrade \
+        -o name | head -1)
+
+      if [[ -n ${job} ]]; then
+        echo "--- pg_upgrade job log ---"
+        kubectl -n "${NAMESPACE}" logs "${job}" --tail=100 || true
+
+        if kubectl -n "${NAMESPACE}" logs "${job}" 2>/dev/null | grep -q 'must be "logical"'; then
+          echo 'ERROR: pg_upgrade rejected the new cluster over wal_level'
+          exit 1
+        fi
+      fi
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGUpgrade
+metadata:
+  name: 17-to-18
+status:
+  conditions:
+  - type: Progressing
+    reason: PGUpgradeCompleted
+    status: "False"
+  - type: Succeeded
+    reason: PGUpgradeSucceeded
+    status: "True"
+---
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: major-upgrade-logical-replica
+spec:
+  postgresVersion: 18
+status:
+  postgres:
+    instances:
+    - name: instance1
+      ready: 2
+      size: 2
+    ready: 2
+    size: 2
+  state: ready

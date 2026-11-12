@@ -1,0 +1,46 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 900
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      retry 90 10 bash -c '
+        state=$(kubectl -n "'"${NAMESPACE}"'" get pg major-upgrade-logical-replica \
+          -o jsonpath="{.status.logicalReplicas[?(@.name==\"analytics\")].state}")
+        echo "logical replica analytics state: ${state}"
+        [[ ${state} == "ready" ]]
+      '
+
+      # Seeded from the upgraded cluster, so it is stamped with the new version.
+      seeded=$(kubectl -n "${NAMESPACE}" get pg major-upgrade-logical-replica \
+        -o jsonpath='{.status.logicalReplicas[?(@.name=="analytics")].postgresVersion}')
+      echo "seeded at PostgreSQL: ${seeded}"
+      [[ ${seeded} == "18" ]]
+
+      kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
+        -l "pgv2.percona.com/logical-replica=analytics" --timeout=300s
+
+      PASS=$(get_psql_user_pass major-upgrade-logical-replica-pguser-postgres)
+      HOST=$(get_psql_user_host major-upgrade-logical-replica-pguser-postgres)
+      REPLICA="major-upgrade-logical-replica-lr-analytics.${NAMESPACE}.svc"
+
+      # Replication actually streams again on the upgraded cluster.
+      run_psql \
+        '\c myapp \\\ INSERT INTO myApp (id) VALUES (100501);' \
+        "postgres://postgres:${PASS}@${HOST}"
+
+      row_streamed() {
+        local got
+        got=$(run_psql \
+          '\c myapp \\\ SELECT count(*) FROM myApp WHERE id = 100501;' \
+          "postgres://postgres:${PASS}@${REPLICA}" | xargs)
+
+        echo "streamed rows on the replica: ${got}"
+        [[ ${got} == "1" ]]
+      }
+
+      retry 30 5 row_streamed

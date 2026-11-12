@@ -20,9 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/postgrescluster"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
+	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	pNaming "github.com/percona/percona-postgresql-operator/v3/percona/naming"
 	v2 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/pgv2.percona.com/v2"
 	crunchyv1beta1 "github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -590,7 +592,7 @@ func TestGenerateLogicalReplicaBootstrapJob(t *testing.T) {
 	t.Run("injects the operator init container", func(t *testing.T) {
 		// K8SPG-708: the same container instance pods get, so the bootstrap Job
 		// has the shared scripts available under /opt/crunchy/bin.
-		require.Len(t, podSpec.InitContainers, 1)
+		require.Len(t, podSpec.InitContainers, 2)
 
 		init := podSpec.InitContainers[0]
 		assert.Equal(t, "database-init", init.Name)
@@ -624,6 +626,12 @@ func TestGenerateLogicalReplicaBootstrapJob(t *testing.T) {
 		}
 		require.NotNil(t, volume, "scripts volume is missing from the pod")
 		assert.NotNil(t, volume.EmptyDir)
+	})
+
+	t.Run("resolves an arbitrary user ID to postgres", func(t *testing.T) {
+		require.Len(t, podSpec.Containers, 1)
+
+		assertLogicalReplicaNSSWrapper(t, cr, podSpec.InitContainers, podSpec.Containers[0])
 	})
 
 	t.Run("never retries", func(t *testing.T) {
@@ -667,6 +675,47 @@ func assertLogicalReplicaPassword(t *testing.T, cr *v2.PerconaPGCluster, env []c
 	assert.Empty(t, found.Value)
 }
 
+// assertLogicalReplicaNSSWrapper checks that a Pod both writes the nss_wrapper
+// passwd file and tells its database container to use it. Either half alone is a
+// no-op, and without both an OpenShift arbitrary UID resolves to its own number
+// instead of "postgres", which is the only user the pg_hba.conf that came back
+// with the seed lets in over the local socket.
+func assertLogicalReplicaNSSWrapper(
+	t *testing.T, cr *v2.PerconaPGCluster,
+	initContainers []corev1.Container, container corev1.Container,
+) {
+	t.Helper()
+
+	var init *corev1.Container
+	for i := range initContainers {
+		if initContainers[i].Name == naming.ContainerNSSWrapperInit {
+			init = &initContainers[i]
+		}
+	}
+	require.NotNil(t, init, "nss_wrapper init container is missing")
+
+	assert.Equal(t, cr.PostgresImage(), init.Image)
+	require.Len(t, init.Command, 3)
+	assert.Contains(t, init.Command[2], "NSS_WRAPPER_SUBDIR=postgres")
+
+	// The passwd file it writes has to land where the database container reads
+	// it from, which is the "tmp" volume both mount at /tmp.
+	require.Len(t, init.VolumeMounts, 1)
+	assert.Equal(t, "tmp", init.VolumeMounts[0].Name)
+	assert.Equal(t, "/tmp", init.VolumeMounts[0].MountPath)
+
+	assert.Subset(t, container.Env, postgrescluster.NSSWrapperPostgresEnv())
+
+	var tmp *corev1.VolumeMount
+	for i := range container.VolumeMounts {
+		if container.VolumeMounts[i].Name == "tmp" {
+			tmp = &container.VolumeMounts[i]
+		}
+	}
+	require.NotNil(t, tmp, "database container does not mount the tmp volume")
+	assert.Equal(t, "/tmp", tmp.MountPath)
+}
+
 func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	ctx := context.Background()
 
@@ -681,7 +730,95 @@ func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	r := &PGClusterReconciler{Client: cl}
 
 	spec := &v2.LogicalReplicaSpec{Name: "analytics"}
-	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec))
+	status := &v2.LogicalReplicaStatus{Name: spec.Name, Databases: []string{"cluster1"}}
+	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status))
+
+	sts := &appsv1.StatefulSet{}
+	require.NoError(t, cl.Get(ctx, client.ObjectKey{
+		Name: logicalReplicaObjectName(cr, spec.Name), Namespace: cr.Namespace,
+	}, sts))
+
+	podSpec := sts.Spec.Template.Spec
+	require.Len(t, podSpec.Containers, 1)
+
+	// The load-bearing one. pg_createsubscriber stored a conninfo with no
+	// credential in pg_subscription, and the apply worker runs in this
+	// postmaster and resolves the password out of its environment. Without this
+	// the replica bootstraps and then never replicates.
+	assertLogicalReplicaPassword(t, cr, podSpec.Containers[0].Env)
+
+	t.Run("readiness follows the subscriptions, liveness does not", func(t *testing.T) {
+		container := podSpec.Containers[0]
+		pgIsReady := []string{"pg_isready", "-h", postgres.SocketDirectory}
+
+		// Whether the postmaster is up at all, which is also what
+		// logicalReplicaPod reads.
+		require.NotNil(t, container.StartupProbe)
+		assert.Equal(t, pgIsReady, container.StartupProbe.Exec.Command)
+
+		// A disabled subscription takes the replica out of its Service...
+		require.NotNil(t, container.ReadinessProbe)
+		assert.Contains(t, strings.Join(container.ReadinessProbe.Exec.Command, " "),
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery(spec.Name, status.Databases)))
+
+		// ...and never restarts it: disable_on_error does not undo itself.
+		require.NotNil(t, container.LivenessProbe)
+		assert.Equal(t, pgIsReady, container.LivenessProbe.Exec.Command)
+	})
+
+	t.Run("resolves an arbitrary user ID to postgres", func(t *testing.T) {
+		// The operator queries the replica by running psql inside this Pod, so
+		// the local socket has to accept the connection here too, not only in
+		// the bootstrap Job.
+		assertLogicalReplicaNSSWrapper(t, cr, podSpec.InitContainers, podSpec.Containers[0])
+	})
+
+	t.Run("keeps the socket directory on a volume of its own", func(t *testing.T) {
+		// nss_wrapper needs the rest of /tmp to be writable, and Postgres
+		// creates its socket but not the directory holding it.
+		var mount *corev1.VolumeMount
+		for i := range podSpec.Containers[0].VolumeMounts {
+			if podSpec.Containers[0].VolumeMounts[i].Name == logicalReplicaSocketVolume {
+				mount = &podSpec.Containers[0].VolumeMounts[i]
+			}
+		}
+		require.NotNil(t, mount, "socket volume is not mounted")
+		assert.Equal(t, postgres.SocketDirectory, mount.MountPath)
+
+		for _, name := range []string{"tmp", logicalReplicaSocketVolume} {
+			var volume *corev1.Volume
+			for i := range podSpec.Volumes {
+				if podSpec.Volumes[i].Name == name {
+					volume = &podSpec.Volumes[i]
+				}
+			}
+			require.NotNil(t, volume, "volume %q is missing from the pod", name)
+			require.NotNil(t, volume.EmptyDir, "volume %q is not an emptyDir", name)
+		}
+	})
+}
+
+func TestReconcileLogicalReplicaStatefulSetProbeOverrides(t *testing.T) {
+	ctx := context.Background()
+
+	cr := testLogicalReplicaCluster()
+	crunchyCR := &crunchyv1beta1.PostgresCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace},
+	}
+	crunchyCR.Spec.PostgresVersion = 17
+
+	cl, err := buildFakeClient(ctx, cr)
+	require.NoError(t, err)
+	r := &PGClusterReconciler{Client: cl}
+
+	spec := &v2.LogicalReplicaSpec{
+		Name:           "analytics",
+		StartupProbe:   &corev1.Probe{FailureThreshold: 60},
+		LivenessProbe:  &corev1.Probe{PeriodSeconds: 45},
+		ReadinessProbe: &corev1.Probe{FailureThreshold: 7, TimeoutSeconds: 3},
+	}
+	status := &v2.LogicalReplicaStatus{Name: spec.Name, Databases: []string{"cluster1"}}
+	require.NoError(t, r.reconcileLogicalReplicaStatefulSet(ctx, cr, crunchyCR, spec, status))
 
 	sts := &appsv1.StatefulSet{}
 	require.NoError(t, cl.Get(ctx, client.ObjectKey{
@@ -689,12 +826,21 @@ func TestReconcileLogicalReplicaStatefulSet(t *testing.T) {
 	}, sts))
 
 	require.Len(t, sts.Spec.Template.Spec.Containers, 1)
+	container := sts.Spec.Template.Spec.Containers[0]
 
-	// The load-bearing one. pg_createsubscriber stored a conninfo with no
-	// credential in pg_subscription, and the apply worker runs in this
-	// postmaster and resolves the password out of its environment. Without this
-	// the replica bootstraps and then never replicates.
-	assertLogicalReplicaPassword(t, cr, sts.Spec.Template.Spec.Containers[0].Env)
+	require.NotNil(t, container.StartupProbe)
+	assert.Equal(t, int32(60), container.StartupProbe.FailureThreshold)
+	assert.Equal(t, int32(5), container.StartupProbe.PeriodSeconds)
+
+	require.NotNil(t, container.LivenessProbe)
+	assert.Equal(t, int32(45), container.LivenessProbe.PeriodSeconds)
+	assert.Equal(t, int32(6), container.LivenessProbe.FailureThreshold)
+
+	require.NotNil(t, container.ReadinessProbe)
+	assert.Equal(t, int32(7), container.ReadinessProbe.FailureThreshold)
+	assert.Equal(t, int32(3), container.ReadinessProbe.TimeoutSeconds)
+	assert.Contains(t, strings.Join(container.ReadinessProbe.Exec.Command, " "),
+		shellQuote(logicalreplica.SubscriptionsEnabledQuery(spec.Name, status.Databases)))
 }
 
 func TestGenerateLogicalReplicaBootstrapJobPGBackRestConfig(t *testing.T) {
@@ -1425,12 +1571,148 @@ func TestBootstrapIsNotRepeated(t *testing.T) {
 	})
 }
 
-func TestLogicalReplicaPodRequiresReady(t *testing.T) {
+func TestLogicalReplicaReadinessProbe(t *testing.T) {
+	probe := readinessProbe("analytics", []string{"one", "two"}, nil)
+	command := strings.Join(probe.Exec.Command, " ")
+
+	assert.Contains(t, command, "pg_isready -q -h "+shellQuote(postgres.SocketDirectory))
+	// Quoted as one shell word: the subscription names it carries are themselves
+	// single-quoted SQL literals.
+	assert.Contains(t, command,
+		shellQuote(logicalreplica.SubscriptionsEnabledQuery("analytics", []string{"one", "two"})))
+	assert.Equal(t, int32(5), probe.PeriodSeconds)
+	assert.Equal(t, int32(2), probe.FailureThreshold)
+
+	// A replica whose databases are not resolved yet has no subscriptions to
+	// check, and an empty "IN ()" list would make the probe fail for good.
+	assert.Equal(t, []string{"pg_isready", "-h", postgres.SocketDirectory},
+		readinessProbe("analytics", nil, nil).Exec.Command)
+}
+
+func TestLogicalReplicaProbeDefaults(t *testing.T) {
+	pgIsReady := []string{"pg_isready", "-h", postgres.SocketDirectory}
+
+	for name, tt := range map[string]struct {
+		probe            *corev1.Probe
+		delay            int32
+		period           int32
+		failureThreshold int32
+	}{
+		"startup":   {startupProbe(nil), 5, 5, 30},
+		"liveness":  {livenessProbe(nil), 30, 20, 6},
+		"readiness": {readinessProbe("analytics", nil, nil), 0, 5, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, tt.probe.Exec)
+			assert.Equal(t, pgIsReady, tt.probe.Exec.Command)
+			assert.Equal(t, tt.delay, tt.probe.InitialDelaySeconds)
+			assert.Equal(t, tt.period, tt.probe.PeriodSeconds)
+			assert.Equal(t, tt.failureThreshold, tt.probe.FailureThreshold)
+			assert.Equal(t, int32(1), tt.probe.SuccessThreshold)
+			assert.Equal(t, int32(0), tt.probe.TimeoutSeconds)
+		})
+	}
+}
+
+func TestOverrideProbe(t *testing.T) {
+	base := func() *corev1.Probe { return defaultProbe(1, 2, 3, 4) }
+
+	t.Run("no override keeps the default", func(t *testing.T) {
+		assert.Equal(t, base(), overrideProbe(base(), nil))
+		assert.Equal(t, base(), overrideProbe(base(), new(corev1.Probe)))
+	})
+
+	t.Run("every timing comes from the override", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{
+			InitialDelaySeconds: 11,
+			PeriodSeconds:       12,
+			FailureThreshold:    13,
+			SuccessThreshold:    14,
+			TimeoutSeconds:      15,
+		})
+
+		assert.Equal(t, int32(11), probe.InitialDelaySeconds)
+		assert.Equal(t, int32(12), probe.PeriodSeconds)
+		assert.Equal(t, int32(13), probe.FailureThreshold)
+		assert.Equal(t, int32(14), probe.SuccessThreshold)
+		assert.Equal(t, int32(15), probe.TimeoutSeconds)
+		assert.Equal(t, base().Exec.Command, probe.Exec.Command)
+	})
+
+	t.Run("a field left at zero keeps the default", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{PeriodSeconds: 12})
+
+		assert.Equal(t, int32(12), probe.PeriodSeconds)
+		assert.Equal(t, int32(1), probe.InitialDelaySeconds)
+		assert.Equal(t, int32(3), probe.FailureThreshold)
+		assert.Equal(t, int32(4), probe.SuccessThreshold)
+	})
+
+	t.Run("an exec override replaces the command", func(t *testing.T) {
+		command := []string{"bash", "-c", "true"}
+		probe := overrideProbe(base(), &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: command}},
+		})
+
+		assert.Equal(t, command, probe.Exec.Command)
+	})
+
+	t.Run("other handlers are ignored", func(t *testing.T) {
+		probe := overrideProbe(base(), &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: "/health"}},
+		})
+
+		assert.Nil(t, probe.HTTPGet)
+		assert.Equal(t, base().Exec.Command, probe.Exec.Command)
+	})
+}
+
+func TestLogicalReplicaProbeOverrides(t *testing.T) {
+	databases := []string{"one", "two"}
+	override := &corev1.Probe{
+		InitialDelaySeconds: 11,
+		PeriodSeconds:       12,
+		FailureThreshold:    13,
+		TimeoutSeconds:      15,
+	}
+
+	for name, probe := range map[string]*corev1.Probe{
+		"startup":   startupProbe(override),
+		"liveness":  livenessProbe(override),
+		"readiness": readinessProbe("analytics", databases, override),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, int32(11), probe.InitialDelaySeconds)
+			assert.Equal(t, int32(12), probe.PeriodSeconds)
+			assert.Equal(t, int32(13), probe.FailureThreshold)
+			assert.Equal(t, int32(15), probe.TimeoutSeconds)
+			assert.Equal(t, int32(1), probe.SuccessThreshold)
+		})
+	}
+
+	t.Run("readiness still follows the subscriptions", func(t *testing.T) {
+		probe := readinessProbe("analytics", databases, override)
+
+		assert.Contains(t, strings.Join(probe.Exec.Command, " "),
+			shellQuote(logicalreplica.SubscriptionsEnabledQuery("analytics", databases)))
+	})
+
+	t.Run("an exec override replaces the subscription check", func(t *testing.T) {
+		command := []string{"bash", "-c", "true"}
+		probe := readinessProbe("analytics", databases, &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: command}},
+		})
+
+		assert.Equal(t, command, probe.Exec.Command)
+	})
+}
+
+func TestLogicalReplicaPodRequiresStarted(t *testing.T) {
 	cr, err := readDefaultCR("cluster1", "pg")
 	require.NoError(t, err)
 	cr.Default()
 
-	pod := func(ready corev1.ConditionStatus) *corev1.Pod {
+	pod := func(state corev1.ContainerState, started bool) *corev1.Pod {
 		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster1-lr-analytics-0",
@@ -1441,24 +1723,45 @@ func TestLogicalReplicaPodRequiresReady(t *testing.T) {
 				},
 			},
 			Status: corev1.PodStatus{
-				Phase:      corev1.PodRunning,
-				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: ready}},
+				Phase: corev1.PodRunning,
+				// Readiness also covers the subscriptions, so this is false for a
+				// replica whose replication has broken - the one case where the
+				// callers most need to reach it.
+				Conditions: []corev1.PodCondition{{
+					Type: corev1.PodReady, Status: corev1.ConditionFalse}},
+				ContainerStatuses: []corev1.ContainerStatus{{
+					Name:    naming.ContainerDatabase,
+					State:   state,
+					Started: &started,
+				}},
 			},
 		}
 	}
 
-	// Running but not ready is the state a replica pod is in for the first few
-	// seconds. Returning it made psql fail and the replica look broken.
-	cl, err := buildFakeClient(t.Context(), cr.DeepCopy(), pod(corev1.ConditionFalse))
-	require.NoError(t, err)
-	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
-	require.Error(t, err)
+	running := corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
 
-	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(), pod(corev1.ConditionTrue))
+	// Started but not ready is what a replica out of its Service looks like, and
+	// psql reaches it perfectly well.
+	cl, err := buildFakeClient(t.Context(), cr.DeepCopy(), pod(running, true))
 	require.NoError(t, err)
 	found, err := (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
 	require.NoError(t, err)
 	assert.Equal(t, "cluster1-lr-analytics-0", found.Name)
+
+	// Running is not enough: the postmaster is not accepting connections for the
+	// first few seconds, and returning it made the replica look broken.
+	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(), pod(running, false))
+	require.NoError(t, err)
+	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
+	require.Error(t, err)
+
+	// A container that is not running cannot be reached whatever its startup
+	// probe last reported.
+	cl, err = buildFakeClient(t.Context(), cr.DeepCopy(),
+		pod(corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{}}, true))
+	require.NoError(t, err)
+	_, err = (&PGClusterReconciler{Client: cl}).logicalReplicaPod(t.Context(), cr, "analytics")
+	require.Error(t, err)
 }
 
 func TestUpdateLogicalReplicaStatus(t *testing.T) {

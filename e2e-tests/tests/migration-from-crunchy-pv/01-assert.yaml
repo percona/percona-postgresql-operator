@@ -5,7 +5,7 @@ commands:
   - script: |-
       set -o errexit
 
-      kubectl wait postgrescluster/crunchy-source \
+      kubectl wait postgrescluster.postgres-operator.crunchydata.com/crunchy-source \
         -n "${NAMESPACE}" \
         --for=condition=PGBackRestReplicaRepoReady \
         --timeout=240s

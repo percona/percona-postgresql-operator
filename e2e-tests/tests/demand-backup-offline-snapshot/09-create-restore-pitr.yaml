@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 480
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -44,4 +45,4 @@ commands:
         - --type=time
         - --target="${latest_restorable_time}"
       EOF
-    timeout: 360
+

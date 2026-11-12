@@ -104,6 +104,22 @@ func TestUpgradeCommand(t *testing.T) {
 
 		expectScript(t, script)
 	})
+
+	t.Run("LogicalReplicationSettings", func(t *testing.T) {
+		script := upgradeCommand(17, 18, 0, false)[3]
+
+		for _, parameter := range []string{"wal_level", "max_replication_slots"} {
+			assert.Assert(t, cmp.Contains(script,
+				`echo "`+parameter+` = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \`+"\n"+
+					`/pgdata/pg"""${old_version}""" -C `+parameter+`)'" >> `+
+					`/pgdata/pg"${new_version}"/postgresql.conf`))
+		}
+
+		assert.Assert(t, !strings.Contains(script, `wal_level = 'logical'`),
+			"expected wal_level to be read from the old cluster, got:\n%s", script)
+
+		expectScript(t, script)
+	})
 }
 
 func TestGenerateUpgradeJob(t *testing.T) {
@@ -210,6 +226,11 @@ spec:
           echo -e "Step 4: Copying shared_preload_libraries setting to new postgresql.conf file...\n"
           echo "shared_preload_libraries = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \
           /pgdata/pg"""${old_version}""" -C shared_preload_libraries)'" >> /pgdata/pg"${new_version}"/postgresql.conf
+          echo -e "Step 4b: Copying logical replication settings to new postgresql.conf file...\n"
+          echo "wal_level = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \
+          /pgdata/pg"""${old_version}""" -C wal_level)'" >> /pgdata/pg"${new_version}"/postgresql.conf
+          echo "max_replication_slots = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \
+          /pgdata/pg"""${old_version}""" -C max_replication_slots)'" >> /pgdata/pg"${new_version}"/postgresql.conf
           echo -e "Step 5: Running pg_upgrade check...\n"
           time /usr/pgsql-"${new_version}"/bin/pg_upgrade --old-bindir /usr/pgsql-"${old_version}"/bin \
           --new-bindir /usr/pgsql-"${new_version}"/bin --old-datadir /pgdata/pg"${old_version}"\

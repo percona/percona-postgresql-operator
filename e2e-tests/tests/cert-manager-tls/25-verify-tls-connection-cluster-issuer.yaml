@@ -1,7 +1,8 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: |-
+  - timeout: 60
+    script: |-
       set -o errexit
       set -o xtrace
 
@@ -30,4 +31,3 @@ commands:
           echo "SSL is not enabled on PostgreSQL after switching to the external ClusterIssuer"
           exit 1
       fi
-    timeout: 30

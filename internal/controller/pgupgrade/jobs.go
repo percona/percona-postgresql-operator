@@ -92,6 +92,12 @@ func upgradeCommand(oldVersion, newVersion int, availableCPUs int, pgTDE bool) [
 		`echo "shared_preload_libraries = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \`,
 		`/pgdata/pg"""${old_version}""" -C shared_preload_libraries)'" >> /pgdata/pg"${new_version}"/postgresql.conf`,
 
+		`echo -e "Step 4b: Copying logical replication settings to new postgresql.conf file...\n"`,
+		`echo "wal_level = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \`,
+		`/pgdata/pg"""${old_version}""" -C wal_level)'" >> /pgdata/pg"${new_version}"/postgresql.conf`,
+		`echo "max_replication_slots = '$(/usr/pgsql-"""${old_version}"""/bin/postgres -D \`,
+		`/pgdata/pg"""${old_version}""" -C max_replication_slots)'" >> /pgdata/pg"${new_version}"/postgresql.conf`,
+
 		// Before the actual upgrade is run, we will run the upgrade --check to
 		// verify everything before actually changing any data.
 		`echo -e "Step 5: Running ` + upgradeBinary + ` check...\n"`,

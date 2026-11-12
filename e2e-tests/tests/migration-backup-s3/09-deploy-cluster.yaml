@@ -20,6 +20,7 @@ commands:
         .spec.backups.pgbackrest.repos=[{"name":"repo1","s3":{"bucket":"'$BUCKET'","endpoint":"s3.amazonaws.com","region":"us-east-1"}}] |
         .spec.dataSource.postgresCluster.repoName="repo1"
         ' - |
+      add_arch_to_pg - |
       kubectl -n $NAMESPACE apply -f -
 
       wait_time=20

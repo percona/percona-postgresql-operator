@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      postgres_image=$(get_container_image "postgres" 17)
+      pgbouncer_image=$(get_container_image "pgbouncer" 17)
+      pgbackrest_image=$(get_container_image "pgbackrest" 17)
+
+      get_cr \
+        | yq eval "
+          .spec.postgresVersion = 17 |
+          .spec.image = \"${postgres_image}\" |
+          .spec.proxy.pgBouncer.image = \"${pgbouncer_image}\" |
+          .spec.backups.pgbackrest.image = \"${pgbackrest_image}\" |
+          .spec.patroni.removeDataDirectoryOnDivergedTimelines = true" \
+        | kubectl -n "${NAMESPACE}" apply -f -

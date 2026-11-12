@@ -17,7 +17,7 @@ spec:
     pgbackrest:
       configuration:
         - secret:
-            # Shared with the Percona target cluster — same minio credentials,
+            # Shared with the Percona target cluster — same S3 credentials,
             # different S3 path (substituted at apply time).
             name: migration-pv-pgbackrest-secrets
       global:
@@ -28,7 +28,7 @@ spec:
         - name: repo1
           s3:
             bucket: operator-testing
-            endpoint: <minio-endpoint>
+            endpoint: <s3-endpoint>
             region: us-east-1
   proxy:
     pgBouncer:

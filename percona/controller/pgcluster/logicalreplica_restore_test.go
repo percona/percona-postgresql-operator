@@ -721,9 +721,10 @@ func TestDropLogicalReplicaObjectsSkipsMissingDatabase(t *testing.T) {
 
 func TestLogicalReplicaSettled(t *testing.T) {
 	for _, tt := range []struct {
-		state   v2.LogicalReplicaState
-		reason  string
-		settled bool
+		state     v2.LogicalReplicaState
+		reason    string
+		databases []string
+		settled   bool
 	}{
 		{state: v2.LogicalReplicaStateReady, settled: true},
 		{state: v2.LogicalReplicaStateBootstrapping},
@@ -731,16 +732,256 @@ func TestLogicalReplicaSettled(t *testing.T) {
 		{state: v2.LogicalReplicaStateSuspended, reason: v2.LogicalReplicaReasonSourceRestoring},
 		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonApplyWorkerDown},
 		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonAwaitingCleanup},
-		// All three mean the replica has to be seeded again, which only a person
+		// All four mean the replica has to be seeded again, which only a person
 		// can ask for, and the edit that asks wakes this controller anyway.
 		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonSourceRestored, settled: true},
+		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonSourceUpgraded, settled: true},
+		// The slots the upgrade carried over are still on the primary, pinning WAL,
+		// so this one is not done being reconciled.
+		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonSourceUpgraded,
+			databases: []string{"cluster1"}},
 		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonSourceSlotMissing, settled: true},
 		{state: v2.LogicalReplicaStateBroken, reason: v2.LogicalReplicaReasonBootstrapFailed, settled: true},
 	} {
 		t.Run(string(tt.state)+"/"+tt.reason, func(t *testing.T) {
 			assert.Equal(t, tt.settled, logicalReplicaSettled(&v2.LogicalReplicaStatus{
-				State: tt.state, Reason: tt.reason,
+				State: tt.state, Reason: tt.reason, Databases: tt.databases,
 			}))
 		})
 	}
+}
+
+// TestLogicalReplicaInvalidation covers the two ways a replica's data directory
+// stops matching the cluster. Only the major upgrade case can tell itself apart,
+// so a restore is what everything else reports as.
+func TestLogicalReplicaInvalidation(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		recorded int
+		cluster  int
+		reason   string
+		contains []string
+	}{
+		{
+			// Seeded before the version was recorded, so there is nothing to
+			// compare and a restore stays the only explanation.
+			name: "unknown version", recorded: 0, cluster: 17,
+			reason: v2.LogicalReplicaReasonSourceRestored, contains: []string{"restored in place"},
+		},
+		{
+			name: "same version", recorded: 17, cluster: 17,
+			reason: v2.LogicalReplicaReasonSourceRestored, contains: []string{"restored in place"},
+		},
+		{
+			name: "major upgrade", recorded: 17, cluster: 18,
+			reason:   v2.LogicalReplicaReasonSourceUpgraded,
+			contains: []string{"PostgreSQL 17", "now runs 18", "remove it from spec.logicalReplicas"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := new(v2.PerconaPGCluster)
+			cr.Spec.PostgresVersion = tt.cluster
+
+			reason, message, cause := logicalReplicaInvalidation(cr,
+				&v2.LogicalReplicaStatus{PostgresVersion: tt.recorded})
+
+			assert.Equal(t, tt.reason, reason)
+			for _, want := range tt.contains {
+				assert.Contains(t, message, want)
+			}
+			assert.NotEmpty(t, cause)
+		})
+	}
+}
+
+// TestMajorUpgradeInvalidatesLogicalReplica covers a replica left behind by
+// pg_upgrade. Its data volume still holds the old major version, which nothing
+// rewrites, so it has to be stopped before it is handed the new one.
+func TestMajorUpgradeInvalidatesLogicalReplica(t *testing.T) {
+	spec := v2.LogicalReplicaSpec{Name: "analytics"}
+
+	cr := restoreTestCluster(t, spec)
+	cr.Spec.PostgresVersion = 18
+	cr.Status.LogicalReplicas = []v2.LogicalReplicaStatus{{
+		Name:            spec.Name,
+		State:           v2.LogicalReplicaStateReady,
+		Databases:       []string{"cluster1"},
+		SeededAt:        new(metav1.Now()),
+		PostgresVersion: 17,
+	}}
+
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      logicalReplicaObjectName(cr, spec.Name),
+			Namespace: cr.Namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: new(int32(1)),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{
+					Name:    naming.ContainerDatabase,
+					Command: []string{"postgres", "-D", "/pgdata/pg17"},
+				}}},
+			},
+		},
+	}
+
+	cl, err := buildFakeClient(t.Context(), cr, sts,
+		primaryPodForCluster(cr), logicalReplicaUserSecret(cr))
+	require.NoError(t, err)
+
+	recorder := record.NewFakeRecorder(10)
+	r := &PGClusterReconciler{Client: cl, Recorder: recorder}
+
+	var executed []string
+	r.PodExec = func(_ context.Context, _, _, _ string,
+		stdin io.Reader, out, _ io.Writer, _ ...string,
+	) error {
+		if stdin != nil {
+			sql, err := io.ReadAll(stdin)
+			require.NoError(t, err)
+			executed = append(executed, string(sql))
+		}
+
+		_, err := fmt.Fprintln(out, "")
+		return err
+	}
+
+	requeue, err := r.reconcileLogicalReplicas(t.Context(), cr, new(crunchyv1beta1.PostgresCluster))
+	require.NoError(t, err)
+	assert.False(t, requeue, "this replica is waiting for a person, not for the controller")
+
+	// pg_upgrade carries the logical slots over to the new cluster, where nothing
+	// will ever read from them again. Left alone they pin WAL on the primary until
+	// someone seeds this replica again, so invalidating has to drop them.
+	assert.True(t, slices.ContainsFunc(executed, func(sql string) bool {
+		return strings.Contains(sql, "pg_drop_replication_slot")
+	}), "expected the orphaned replication slot to be dropped, got: %q", executed)
+
+	require.NoError(t, cl.Get(t.Context(), client.ObjectKeyFromObject(sts), sts))
+	assert.Equal(t, int32(0), *sts.Spec.Replicas)
+
+	// The load-bearing assertion: reconcileLogicalReplicaStatefulSet must not have
+	// run, or the pod would be told to open a data directory that does not exist.
+	require.Len(t, sts.Spec.Template.Spec.Containers, 1)
+	assert.Equal(t, []string{"postgres", "-D", "/pgdata/pg17"},
+		sts.Spec.Template.Spec.Containers[0].Command)
+
+	updated := new(v2.PerconaPGCluster)
+	require.NoError(t, cl.Get(t.Context(),
+		client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, updated))
+
+	require.Len(t, updated.Status.LogicalReplicas, 1)
+	status := updated.Status.LogicalReplicas[0]
+	assert.Equal(t, v2.LogicalReplicaStateBroken, status.State)
+	assert.Equal(t, v2.LogicalReplicaReasonSourceUpgraded, status.Reason)
+	assert.NotNil(t, status.InvalidatedAt)
+	assert.Contains(t, status.Message, "PostgreSQL 17")
+	assert.Contains(t, status.Message, "now runs 18")
+	assert.Contains(t, status.Message, "remove it from spec.logicalReplicas")
+	assert.Empty(t, status.Databases,
+		"the database list names the slots still to be dropped, so it is cleared once they are gone")
+
+	select {
+	case event := <-recorder.Events:
+		assert.Contains(t, event, "LogicalReplicaInvalidated")
+	default:
+		t.Error("expected an event on the pass that establishes the replica is invalid")
+	}
+}
+
+func TestLogicalReplicaRecordsPostgresVersion(t *testing.T) {
+	spec := v2.LogicalReplicaSpec{Name: "analytics"}
+
+	reconcile := func(t *testing.T, cr *v2.PerconaPGCluster) v2.LogicalReplicaStatus {
+		t.Helper()
+
+		cl, err := buildFakeClient(t.Context(), cr,
+			primaryPodForCluster(cr), logicalReplicaUserSecret(cr))
+		require.NoError(t, err)
+
+		r := &PGClusterReconciler{Client: cl, Recorder: record.NewFakeRecorder(10)}
+		r.PodExec = func(_ context.Context, _, _, _ string,
+			_ io.Reader, out, _ io.Writer, _ ...string,
+		) error {
+			_, err := fmt.Fprintln(out, "")
+			return err
+		}
+
+		_, err = r.reconcileLogicalReplicas(t.Context(), cr, new(crunchyv1beta1.PostgresCluster))
+		require.NoError(t, err)
+
+		updated := new(v2.PerconaPGCluster)
+		require.NoError(t, cl.Get(t.Context(),
+			client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, updated))
+		require.Len(t, updated.Status.LogicalReplicas, 1)
+
+		return updated.Status.LogicalReplicas[0]
+	}
+
+	// Nothing has been copied yet, so there is no data directory to be stranded.
+	t.Run("leaves an unseeded replica alone", func(t *testing.T) {
+		cr := restoreTestCluster(t, spec)
+		cr.Spec.PostgresVersion = 18
+		cr.Status.LogicalReplicas = []v2.LogicalReplicaStatus{{
+			Name:  spec.Name,
+			State: v2.LogicalReplicaStateBootstrapping,
+		}}
+
+		status := reconcile(t, cr)
+		assert.Equal(t, 0, status.PostgresVersion)
+		assert.Nil(t, status.InvalidatedAt)
+	})
+}
+
+// TestUpgradedReplicaRetriesSlotDrop covers the primary being unreachable on the
+// pass that invalidates a replica. The slots it leaves behind pin WAL, so the
+// controller has to come back for them rather than record the replica as done.
+func TestUpgradedReplicaRetriesSlotDrop(t *testing.T) {
+	spec := v2.LogicalReplicaSpec{Name: "analytics"}
+
+	cr := restoreTestCluster(t, spec)
+	cr.Spec.PostgresVersion = 18
+	cr.Status.LogicalReplicas = []v2.LogicalReplicaStatus{{
+		Name:            spec.Name,
+		State:           v2.LogicalReplicaStateReady,
+		Databases:       []string{"cluster1"},
+		SeededAt:        new(metav1.Now()),
+		PostgresVersion: 17,
+	}}
+
+	cl, err := buildFakeClient(t.Context(), cr,
+		primaryPodForCluster(cr), logicalReplicaUserSecret(cr))
+	require.NoError(t, err)
+
+	r := &PGClusterReconciler{Client: cl, Recorder: record.NewFakeRecorder(10)}
+	r.PodExec = func(_ context.Context, _, _, _ string,
+		stdin io.Reader, out, _ io.Writer, _ ...string,
+	) error {
+		if stdin != nil {
+			sql, err := io.ReadAll(stdin)
+			require.NoError(t, err)
+
+			if strings.Contains(string(sql), "pg_terminate_backend") {
+				return errors.New("connection refused")
+			}
+		}
+
+		_, err := fmt.Fprintln(out, "")
+		return err
+	}
+
+	requeue, err := r.reconcileLogicalReplicas(t.Context(), cr, new(crunchyv1beta1.PostgresCluster))
+	require.NoError(t, err, "a primary that cannot be reached must not fail the whole reconcile")
+	assert.True(t, requeue, "the slots are still on the primary, so this is not settled")
+
+	updated := new(v2.PerconaPGCluster)
+	require.NoError(t, cl.Get(t.Context(),
+		client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, updated))
+
+	require.Len(t, updated.Status.LogicalReplicas, 1)
+	status := updated.Status.LogicalReplicas[0]
+	assert.Equal(t, v2.LogicalReplicaReasonSourceUpgraded, status.Reason)
+	assert.Equal(t, []string{"cluster1"}, status.Databases,
+		"the database list names the slots still to be dropped, so a failed drop keeps it")
 }

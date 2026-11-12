@@ -1962,6 +1962,31 @@ func TestReconcilePGTDEProvidersMultipleInstances(t *testing.T) {
 		assert.Equal(t, patched, 1, "the reason for waiting must be visible")
 	})
 
+	t.Run("WaitingForInstancesKeepsAConfiguredProviderReady", func(t *testing.T) {
+		var calls []execCall
+		cluster := newCluster(standardRevision)
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   v1beta1.PGTDEVaultProviderReady,
+			Status: metav1.ConditionTrue,
+			Reason: "Configured",
+		})
+
+		instances := threeInstances()
+		instances.forCluster[2].Pods[0].Status.ContainerStatuses[0].State =
+			corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}
+
+		r := &Reconciler{
+			Client:   fake.NewClientBuilder().WithObjects(secret).Build(),
+			Recorder: events.NewRecorder(t, runtime.Scheme),
+			PodExec:  execRecorder(&calls, nil),
+		}
+
+		assert.NilError(t, r.reconcilePGTDEProviders(ctx, cluster, instances, failPatch(t)))
+
+		assertTDEProviderCondition(t, cluster, metav1.ConditionTrue, "Configured")
+		assert.Equal(t, len(calls), 0, "the provider is unchanged, so there is nothing to run")
+	})
+
 	t.Run("PhaseTwoCleansEveryInstance", func(t *testing.T) {
 		var calls []execCall
 		cluster := newCluster(tempRevision)

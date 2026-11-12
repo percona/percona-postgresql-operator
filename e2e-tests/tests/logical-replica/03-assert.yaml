@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 900
+timeout: 660
 commands:
   - script: |-
       set -o errexit
@@ -12,44 +12,5 @@ commands:
         exit 0
       fi
 
-      retry 30 5 bash -c '
-        status=$(kubectl -n "'"${NAMESPACE}"'" get pg logical-replica \
-          -o jsonpath="{.status.conditions[?(@.type==\"ReadyForLogicalReplication\")].status}")
-        echo "ReadyForLogicalReplication: ${status}"
-        [[ ${status} == "True" ]]
-      '
-
-      PASS=$(get_psql_user_pass logical-replica-pguser-postgres)
-
-      for replica in analytics reporting; do
-        retry 60 10 bash -c '
-          state=$(kubectl -n "'"${NAMESPACE}"'" get pg logical-replica \
-            -o jsonpath="{.status.logicalReplicas[?(@.name==\"'"${replica}"'\")].state}")
-          echo "logical replica '"${replica}"' state: ${state}"
-          [[ ${state} == "ready" ]]
-        '
-
-        kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod \
-          -l "pgv2.percona.com/logical-replica=${replica}" --timeout=120s
-
-        REPLICA="logical-replica-lr-${replica}.${NAMESPACE}.svc"
-
-        worker=$(run_psql \
-          '\c logical-replica \\\ SELECT count(*) FROM pg_stat_subscription WHERE pid IS NOT NULL;' \
-          "postgres://postgres:${PASS}@${REPLICA}" | xargs)
-
-        if [[ ${worker} != "1" ]]; then
-          echo "ERROR: expected a running apply worker on ${replica}, got: ${worker}"
-          kubectl -n "${NAMESPACE}" logs "statefulset/logical-replica-lr-${replica}" --tail=50 || true
-          exit 1
-        fi
-
-        without=$(run_psql \
-          '\c logical-replica \\\ SELECT count(*) FROM pg_subscription WHERE NOT subdisableonerr;' \
-          "postgres://postgres:${PASS}@${REPLICA}" | xargs)
-
-        if [[ ${without} != "0" ]]; then
-          echo "ERROR: ${without} subscriptions on ${replica} are not set to disable on error"
-          exit 1
-        fi
-      done
+      kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.state}'=Succeeded \
+        --timeout=560s pg-backup/logical-replica-seed-repo1

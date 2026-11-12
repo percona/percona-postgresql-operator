@@ -24,7 +24,7 @@ commands:
       # Wait for pgbackrest stanza to be created.
       # The backup annotation (triggering the full backup) is applied in the
       # next step only after stanza creation, so we don't wait for a job here.
-      kubectl wait postgrescluster/crunchy-source \
+      kubectl wait postgrescluster.postgres-operator.crunchydata.com/crunchy-source \
         -n "${CRUNCHY_NS}" \
         --for=jsonpath='{.status.pgbackrest.repos[0].stanzaCreated}'=true \
         --timeout=300s

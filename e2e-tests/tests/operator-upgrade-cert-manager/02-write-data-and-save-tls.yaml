@@ -13,6 +13,11 @@ commands:
       run_psql_local '\c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY)' "$uri"
       run_psql_local '\c myapp \\\ INSERT INTO myApp VALUES (100500) ON CONFLICT DO NOTHING' "$uri"
 
+      if is_cert_manager_installed && ! is_cert_manager_installed_by_test; then
+        echo "cert-manager is installed, but next steps requires it to be uninstalled. As not supported by Rancher, exiting."
+        exit 0
+      fi
+
       snapshot_tls_fingerprints ${test_name} ${TEMP_DIR}/tls.before
       snapshot_workload_revisions ${test_name} ${TEMP_DIR}/revisions.before
 

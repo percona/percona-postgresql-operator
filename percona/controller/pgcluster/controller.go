@@ -113,6 +113,7 @@ func (r *PGClusterReconciler) SetupWithManager(ctx context.Context, mgr manager.
 		Watches(&corev1.Secret{}, r.watchEnvFromSecrets()).
 		Watches(&corev1.Secret{}, r.watchPGBouncerUserSecrets()).
 		Watches(&corev1.ConfigMap{}, r.watchLogRotateExtraConfig()).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Pod{}, r.watchLogicalReplicaPods())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &corev1.Secret{}, r.watchSecrets())).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchJobs(naming.LabelPGBackRestRepo))).
 		WatchesRawSource(source.Kind(mgr.GetCache(), &batchv1.Job{}, r.watchJobs(pNaming.LabelLogicalReplica))).
@@ -129,6 +130,23 @@ func (r *PGClusterReconciler) watchServices() handler.TypedFuncs[*corev1.Service
 			crName := labels[naming.LabelCluster]
 
 			if e.ObjectNew.GetName() == crName+"-pgbouncer" {
+				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
+					Namespace: e.ObjectNew.GetNamespace(),
+					Name:      crName,
+				}})
+			}
+		},
+	}
+}
+
+func (r *PGClusterReconciler) watchLogicalReplicaPods() handler.TypedFuncs[*corev1.Pod, reconcile.Request] {
+	return handler.TypedFuncs[*corev1.Pod, reconcile.Request]{
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			labels := e.ObjectNew.GetLabels()
+			crName := labels[naming.LabelCluster]
+			isLogical := labels[naming.LabelPerconaComponent] == logicalReplicaComponent
+
+			if crName != "" && isLogical {
 				q.Add(reconcile.Request{NamespacedName: client.ObjectKey{
 					Namespace: e.ObjectNew.GetNamespace(),
 					Name:      crName,

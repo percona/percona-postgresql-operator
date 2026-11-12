@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/percona/percona-postgresql-operator/v3/internal/logicalreplica"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbouncer/startup"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
@@ -98,7 +99,10 @@ func authFileContents(password, adminPassword string, userSecret *corev1.Secret)
 
 	// Names the operator writes itself. A user Secret must not contain them,
 	// otherwise it would replace an operator credential.
-	reserved := map[string]bool{postgresqlUser: true}
+	reserved := map[string]bool{
+		postgresqlUser:                 true,
+		logicalreplica.ReplicationUser: true,
+	}
 	if len(adminPassword) > 0 {
 		reserved[AdminUser] = true
 	}

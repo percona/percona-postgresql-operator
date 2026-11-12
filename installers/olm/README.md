@@ -97,7 +97,10 @@ Common variables:
 
 ```text
 VERSION              Release version. Required.
-OPENSHIFT_VERSIONS   OpenShift range annotation. Default: v4.18-v4.21
+OPENSHIFT_VERSIONS   OpenShift range annotation. If unset, derived from
+                     OPENSHIFT_MIN/MAX in e2e-tests/release_versions
+                     (v<major.minor>-v<major.minor>). If that file is
+                     missing, @@RHEL_VERSIONS@@.
 IMAGE                Community operator image.
 REDHAT_OPERATOR_IMAGE Red Hat operator image.
 BUNDLE_DISTRO        Bundle to build: community or redhat.

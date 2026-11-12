@@ -1,4 +1,3 @@
-
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 timeout: 10
@@ -13,54 +12,56 @@ commands:
       kubectl -n ${NAMESPACE} create configmap versions \
           --from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.pg-operator.dep.json" \
           --from-file "${TESTS_CONFIG_DIR}/operator.9.9.9.pg-operator.json"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    run: version-service
-  name: version-service
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      run: version-service
-  template:
-    metadata:
-      labels:
-        run: version-service
-    spec:
-      containers:
-      - env:
-        - name: SERVE_HTTP
-          value: "true"
-        image: perconalab/version-service:main-latest
-        imagePullPolicy: IfNotPresent
+
+      add_arch_to_podspecs - <<'EOF' | kubectl -n ${NAMESPACE} apply -f -
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        labels:
+          run: version-service
         name: version-service
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            run: version-service
+        template:
+          metadata:
+            labels:
+              run: version-service
+          spec:
+            containers:
+            - env:
+              - name: SERVE_HTTP
+                value: "true"
+              image: docker.io/perconalab/version-service:test-multi
+              imagePullPolicy: IfNotPresent
+              name: version-service
+              ports:
+              - containerPort: 11000
+                protocol: TCP
+              volumeMounts:
+              - name: versions
+                mountPath: /sources/operator.9.9.9.pg-operator.dep.json
+                subPath: operator.9.9.9.pg-operator.dep.json
+              - name: versions
+                mountPath: /sources/operator.9.9.9.pg-operator.json
+                subPath: operator.9.9.9.pg-operator.json
+            volumes:
+            - name: versions
+              configMap:
+                name: versions
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: version-service
+      spec:
         ports:
-        - containerPort: 11000
+        - port: 11000
           protocol: TCP
-        volumeMounts:
-        - name: versions
-          mountPath: /sources/operator.9.9.9.pg-operator.dep.json
-          subPath: operator.9.9.9.pg-operator.dep.json
-        - name: versions
-          mountPath: /sources/operator.9.9.9.pg-operator.json
-          subPath: operator.9.9.9.pg-operator.json
-      volumes:
-      - name: versions
-        configMap:
-          name: versions
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: version-service
-spec:
-  ports:
-  - port: 11000
-    protocol: TCP
-    targetPort: 11000
-  selector:
-    run: version-service
-  type: ClusterIP
+          targetPort: 11000
+        selector:
+          run: version-service
+        type: ClusterIP
+      EOF

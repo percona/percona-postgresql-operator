@@ -7,6 +7,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping monitoring test on arm64: PMM server does not support ARM"
+        exit 0
+      fi
+
       primary=$(get_pod_by_role monitoring primary name)
       kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT * FROM pg_extension;"'
       if ! kubectl -n ${NAMESPACE} exec ${primary} -- bash -c 'psql -c "SELECT extname FROM pg_extension;"' | grep pg_stat_statements; then

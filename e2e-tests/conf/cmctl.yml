@@ -42,13 +42,14 @@ spec:
       serviceAccountName: cmctl
       containers:
         - name: cmctl
-          image: curlimages/curl
+          image: docker.io/alpine/curl:latest
           imagePullPolicy: Always
           command:
           - /bin/sh
           - -c
           - |
-            curl -fsSL -o /tmp/cmctl https://github.com/cert-manager/cmctl/releases/download/v2.4.1/cmctl_linux_amd64 \
+            arch="$(uname -m)"; case "$arch" in aarch64|arm64) arch=arm64 ;; *) arch=amd64 ;; esac
+            curl -fsSL -o /tmp/cmctl "https://github.com/cert-manager/cmctl/releases/download/v2.4.1/cmctl_linux_${arch}" \
             && chmod +x /tmp/cmctl \
             && sleep 100500
       restartPolicy: Always

@@ -8,6 +8,11 @@ commands:
 
       source ../../functions
 
+      if [[ ${ARCH} == arm64 ]]; then
+        echo "Skipping operator-upgrade-extensions on arm64: pg_cron-*-arm64.tar.gz is not in extension storage"
+        exit 0
+      fi
+
       pg_ver_lower="$(cat ${TEMP_DIR}/pg_ver.txt)"
       target_image_postgresql=$IMAGE_POSTGRESQL
       target_image_pgbouncer=$IMAGE_PGBOUNCER

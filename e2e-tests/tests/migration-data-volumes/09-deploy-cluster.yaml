@@ -38,7 +38,7 @@ commands:
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.tolerations[1].tolerationSeconds=420" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.labels.test-label=\"value3\"" - |
         yq eval ".spec.dataSource.volumes.pgBackRestVolume.annotations.test-annotation=\"value4\"" - |
-
-      kubectl -n $NAMESPACE apply -f -
+        add_arch_to_pg - |
+        kubectl -n $NAMESPACE apply -f -
 
     timeout: 300

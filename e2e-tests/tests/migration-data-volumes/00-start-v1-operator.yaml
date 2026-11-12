@@ -23,4 +23,5 @@ commands:
       curl -s https://raw.githubusercontent.com/percona/percona-postgresql-operator/v$PGOV1_TAG/deploy/operator.yaml |
       $sed -r 's/^(    namespace:).*pgo.*$/\1 \"'$NAMESPACE'\"/g' |
       $sed -r 's/^(    pgo_operator_namespace:).*pgo.*$/\1 \"'$OPNS'\"/g' |
+      add_arch_to_podspecs - |
       kubectl -n $NAMESPACE apply -f -

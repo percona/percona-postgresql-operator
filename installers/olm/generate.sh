@@ -43,6 +43,40 @@ require_env() {
 	fi
 }
 
+# OPENSHIFT_VERSIONS, if set, is used as-is for com.redhat.openshift.versions.
+# Otherwise derive v<major.minor>-v<major.minor> from OPENSHIFT_MIN/MAX in
+# e2e-tests/release_versions. If that file is missing or unreadable, use a
+# placeholder so bundle generation can still run.
+resolve_openshift_versions() {
+	local file="${repo_root}/e2e-tests/release_versions"
+	local min max
+
+	if [[ -n ${OPENSHIFT_VERSIONS:-} ]]; then
+		log "Using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	if [[ ! -r ${file} ]]; then
+		OPENSHIFT_VERSIONS='@@RHEL_VERSIONS@@'
+		log "${file} is not readable; using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	# shellcheck source=/dev/null
+	source "${file}"
+
+	if [[ -z ${OPENSHIFT_MIN:-} || -z ${OPENSHIFT_MAX:-} ]]; then
+		OPENSHIFT_VERSIONS='@@RHEL_VERSIONS@@'
+		log "OPENSHIFT_MIN/MAX missing in ${file}; using OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS}"
+		return
+	fi
+
+	min="$(printf '%s' "${OPENSHIFT_MIN}" | awk -F. '{print "v"$1"."$2}')"
+	max="$(printf '%s' "${OPENSHIFT_MAX}" | awk -F. '{print "v"$1"."$2}')"
+	OPENSHIFT_VERSIONS="${min}-${max}"
+	log "Derived OPENSHIFT_VERSIONS=${OPENSHIFT_VERSIONS} from OPENSHIFT_MIN=${OPENSHIFT_MIN} OPENSHIFT_MAX=${OPENSHIFT_MAX}"
+}
+
 select_manifests() {
 	local kind="$1"
 	shift
@@ -52,6 +86,21 @@ select_manifests() {
 		'map(select(.kind == $kind))' \
 		"$@"
 }
+
+# kislyuk --yaml-roundtrip keeps scalar quote style ("" vs '') by encoding
+# comments as __yq_comment_* keys in jq. Drop those keys so generated files
+# do not copy template comments (bundle.csv.yaml, bundle.annotations.yaml).
+yq_drop_comments='
+walk(
+  if type == "object" then
+    with_entries(select((.key | tostring | startswith("__yq_comment_")) | not))
+  elif type == "array" then
+    map(select((type == "string" and startswith("__yq_comment_")) | not))
+  else
+    .
+  end
+)
+'
 
 require() {
 	if [ $# -eq 1 ]; then
@@ -69,6 +118,9 @@ check_tools() {
 	require kubectl
 	require operator-sdk
 	require jq
+	# --yaml-roundtrip keeps quote style and block scalars; comments are
+	# dropped in jq via yq_drop_comments (not --yaml-output, which rewrites
+	# "" to '' and unquotes scalars).
 	require bash -c "yq --help | grep -q -- '--yaml-roundtrip'"
 
 	log "All tools available"
@@ -149,6 +201,30 @@ render_operator_manifests() {
 	log "Extracted manifests: CRDs, Deployments, ServiceAccounts, Roles, ClusterRoles"
 }
 
+# operator-sdk init still runs `go mod tidy` after scaffolding, even with
+# --fetch-deps=false. Bundle generation deletes go.mod immediately and never
+# compiles the scaffold, so skip tidy (it fails when the Go checksum DB is unreachable).
+run_operator_sdk_init() {
+	local real_go wrapper rc
+
+	real_go="$(command -v go)" || abort "go not found in PATH"
+	wrapper="$(mktemp -d)"
+	cat >"${wrapper}/go" <<EOF
+#!/usr/bin/env bash
+if [[ \${1:-} == mod && \${2:-} == tidy ]]; then
+	exit 0
+fi
+exec '${real_go}' "\$@"
+EOF
+	chmod +x "${wrapper}/go"
+
+	PATH="${wrapper}:${PATH}" operator-sdk init \
+		--fetch-deps='false' \
+		--project-name="${bundle_project_name}" && rc=0 || rc=$?
+	rm -rf "${wrapper}"
+	return "${rc}"
+}
+
 create_sdk_workspace() {
 	local crd_gvks
 
@@ -162,12 +238,16 @@ create_sdk_workspace() {
 
 		log "Initializing operator-sdk project"
 
-		operator-sdk init \
-			--fetch-deps='false' \
-			--project-name="${bundle_project_name}" \
+		run_operator_sdk_init \
 			|| abort "Failed to init operator-sdk"
 
+		# operator-sdk init used to put main.go at the project root. Newer
+		# versions scaffold cmd/main.go (imports metrics/filters) and test/.
+		# Those packages join the parent module and break controller-gen
+		# (`paths=./...`) with missing k8s.io/apiserver go.sum entries.
+		# Only kustomize/CSV scaffolding is needed from this workspace.
 		rm -f ./*.go go.*
+		rm -rf cmd test
 
 		crd_gvks="$(
 			yq \
@@ -226,7 +306,7 @@ render_scorecard_tests() {
 render_bundle_metadata() {
 	log "Rendering bundle annotations for ${DISTRIBUTION}"
 
-	require_env OPENSHIFT_VERSIONS
+	resolve_openshift_versions
 
 	yq --yaml-roundtrip \
 		--arg distribution "${DISTRIBUTION}" \
@@ -244,6 +324,7 @@ render_bundle_metadata() {
           else
             .
           end
+        | '"${yq_drop_comments}"'
       ' \
 		<bundle.annotations.yaml \
 		>"${bundle_directory}/metadata/annotations.yaml" \
@@ -287,7 +368,7 @@ write_crd_manifests() {
 	)" || abort "Failed to extract CRD names"
 
 	while IFS=$'\t' read -r index name; do
-		yq --yaml-roundtrip ".[${index}]" \
+		yq --yaml-roundtrip ".[${index}] | ${yq_drop_comments}" \
 			<<<"${operator_crds}" \
 			>"${bundle_directory}/manifests/${name}.crd.yaml" \
 			|| abort "Failed to write CRD ${name}"
@@ -374,6 +455,11 @@ build_crd_examples() {
               "enabled": false,
               "repoName": "repo1"
             }
+            | .spec.extensions = {
+              "pg_tde": {
+                "vault": null
+              }
+            }
           ' \
 					../../deploy/cr.yaml
 			) \
@@ -398,6 +484,11 @@ rewrite_crd_examples() {
 }
 
 apply_operator_image_to_examples() {
+	if [[ ${DISTRIBUTION} != "redhat" ]]; then
+		log "Skipping initContainer image override for ${DISTRIBUTION}"
+		return
+	fi
+
 	crd_examples="$(
 		jq \
 			--arg operator_image "${operator_image}" \
@@ -451,6 +542,7 @@ render_csv() {
 		--argjson related_images "${related_images}" \
 		"${skips_arg}" skips "${skips}" \
 		--arg target_namespaces_field_path "metadata.annotations['olm.targetNamespaces']" \
+		--arg namespace_field_path "metadata.namespace" \
 		--arg timestamp "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
 		'
 			.metadata.annotations["alm-examples"] = $examples
@@ -508,13 +600,18 @@ render_csv() {
 								| select(.name == "WATCH_NAMESPACE")
 								| .valueFrom.fieldRef.fieldPath
 							) = $target_namespaces_field_path
+						| (
+								.spec.template.spec.containers[].env[]?
+								| select(.name == "PGO_NAMESPACE")
+								| .valueFrom.fieldRef.fieldPath
+							) = $namespace_field_path
 						| {
 								name: .metadata.name,
 								spec
 							}
 					)
 				]
-			| .
+			| '"${yq_drop_comments}"'
 		' \
 		<bundle.csv.yaml \
 		>"${bundle_directory}/manifests/${bundle_filename}.clusterserviceversion.yaml" \

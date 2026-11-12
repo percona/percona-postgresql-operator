@@ -8,6 +8,14 @@ commands:
 
       source ../../functions
 
+      case "${K8S_UPGRADE_PLATFORM}:${PLATFORM}" in
+        gke:gke|doks:doks) ;;
+        *)
+          echo "Unsupported platform combination: K8S_UPGRADE_PLATFORM=${K8S_UPGRADE_PLATFORM}, PLATFORM=${PLATFORM}"
+          exit 0
+          ;;
+      esac
+
       primary=$(get_pod_by_role k8s-upgrade primary name)
       latest_full_repo1_backup=$(
         kubectl -n "${NAMESPACE}" exec "${primary}" -- \

@@ -9,4 +9,5 @@ commands:
 
       get_cr \
         | yq 'del(.spec.extensions.pg_tde)' \
+        | add_arch_to_pg - \
         | kubectl -n "${NAMESPACE}" apply -f -
