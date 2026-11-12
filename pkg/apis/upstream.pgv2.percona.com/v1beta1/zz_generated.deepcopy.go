@@ -2105,6 +2105,11 @@ func (in *PostgresClusterSpec) DeepCopyInto(out *PostgresClusterSpec) {
 		*out = make([]LogicalReplicaSpec, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExternalDNSHostnames != nil {
+		in, out := &in.ExternalDNSHostnames, &out.ExternalDNSHostnames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.SupplementalGroups != nil {
 		in, out := &in.SupplementalGroups, &out.SupplementalGroups
 		*out = make([]int64, len(*in))

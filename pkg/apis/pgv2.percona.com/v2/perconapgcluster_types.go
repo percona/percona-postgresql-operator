@@ -333,6 +333,37 @@ func (cr *PerconaPGCluster) LogicalReplicasEnabled() bool {
 	return cr.CompareVersion("3.1.0") >= 0 && len(cr.Spec.LogicalReplicas) > 0
 }
 
+// ClusterCertificateExposes returns the expose spec of every service served by
+// the cluster certificate. A new instance type with its own service only has
+// to be added here for its external hostname to become a certificate SAN.
+// PgBouncer is not listed: it has a certificate of its own.
+// Entries can be nil.
+func (cr *PerconaPGCluster) ClusterCertificateExposes() []*ServiceExpose {
+	exposes := []*ServiceExpose{cr.Spec.Expose, cr.Spec.ExposeReplicas}
+	if cr.LogicalReplicasEnabled() {
+		for i := range cr.Spec.LogicalReplicas {
+			exposes = append(exposes, cr.Spec.LogicalReplicas[i].Expose)
+		}
+	}
+	return exposes
+}
+
+// ExternalDNSHostnames returns the hostnames external-dns publishes for the
+// services served by the cluster certificate, in spec order and without
+// duplicates or empty entries.
+func (cr *PerconaPGCluster) ExternalDNSHostnames() []string {
+	var hostnames []string
+	for _, e := range cr.ClusterCertificateExposes() {
+		if e == nil || e.ExternalDNS == nil {
+			continue
+		}
+		if h := e.ExternalDNS.Hostname; h != "" && !slices.Contains(hostnames, h) {
+			hostnames = append(hostnames, h)
+		}
+	}
+	return hostnames
+}
+
 // rePostgresIdentifier is the pattern the CRD enforces on spec.users[].name.
 var rePostgresIdentifier = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
@@ -751,6 +782,7 @@ func (cr *PerconaPGCluster) ToCrunchy(ctx context.Context, postgresCluster *crun
 	// crunchy layer renders pg_hba rules, server parameters and
 	// Patroni's ignore_slots from this.
 	postgresCluster.Spec.LogicalReplicas = cr.Spec.LogicalReplicas.ToCrunchy()
+	postgresCluster.Spec.ExternalDNSHostnames = cr.ExternalDNSHostnames()
 
 	postgresCluster.Spec.InstanceSets = cr.Spec.InstanceSets.ToCrunchy()
 	postgresCluster.Spec.Proxy = cr.Spec.Proxy.ToCrunchy(cr.Spec.CRVersion)

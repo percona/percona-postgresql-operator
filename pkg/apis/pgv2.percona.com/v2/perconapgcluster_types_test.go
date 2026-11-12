@@ -771,6 +771,83 @@ func TestPerconaPGCluster_ToCrunchy(t *testing.T) {
 				assert.False(t, actual.Spec.Extensions.SetUser)
 			},
 		},
+		"projects external-dns hostnames of every cluster-certificate service": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					Expose:          &ServiceExpose{ExternalDNS: &ExternalDNSConfig{Hostname: "pg.example.com"}},
+					// Same name as the primary: listed once.
+					ExposeReplicas: &ServiceExpose{ExternalDNS: &ExternalDNSConfig{Hostname: "pg.example.com"}},
+					LogicalReplicas: LogicalReplicas{
+						{Name: "lr1", Expose: &ServiceExpose{ExternalDNS: &ExternalDNSConfig{Hostname: "lr1.example.com"}}},
+					},
+					// PgBouncer has its own certificate.
+					Proxy: &PGProxySpec{PGBouncer: &PGBouncerSpec{
+						ServiceExpose: &ServiceExpose{ExternalDNS: &ExternalDNSConfig{Hostname: "bouncer.example.com"}},
+					}},
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{{Name: "repo1"}},
+						},
+					},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.Equal(t, []string{"pg.example.com", "lr1.example.com"}, actual.Spec.ExternalDNSHostnames)
+			},
+		},
+		"clears stale external-dns hostnames on existing PostgresCluster": {
+			expectedPerconaPGCluster: &PerconaPGCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: PerconaPGClusterSpec{
+					CRVersion:       version.Version(),
+					PostgresVersion: 18,
+					InstanceSets: PGInstanceSets{
+						{
+							Name:     "instance1",
+							Replicas: &[]int32{1}[0],
+							DataVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					Backups: Backups{
+						PGBackRest: PGBackRestArchive{
+							Repos: []crunchyv1beta1.PGBackRestRepo{{Name: "repo1"}},
+						},
+					},
+				},
+			},
+			inputPostgresCluster: &crunchyv1beta1.PostgresCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: crunchyv1beta1.PostgresClusterSpec{
+					ExternalDNSHostnames: []string{"old.example.com"},
+				},
+			},
+			assertClusterFunc: func(t *testing.T, actual *crunchyv1beta1.PostgresCluster, _ *PerconaPGCluster) {
+				assert.Empty(t, actual.Spec.ExternalDNSHostnames)
+			},
+		},
 		"clears standby on existing PostgresCluster when standby is removed": {
 			expectedPerconaPGCluster: &PerconaPGCluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1254,4 +1331,65 @@ func TestServiceExposeServiceAnnotations(t *testing.T) {
 		assert.Equal(t, "60", spec.Metadata.Annotations[ttlKey])
 		assert.Equal(t, "true", spec.Metadata.Annotations[managedKey])
 	})
+}
+
+func TestPerconaPGClusterExternalDNSHostnames(t *testing.T) {
+	withHostname := func(hostname string) *ServiceExpose {
+		return &ServiceExpose{ExternalDNS: &ExternalDNSConfig{Hostname: hostname}}
+	}
+	// A hostname written by hand into expose.annotations is not operator-managed,
+	// so it must not reissue the certificate.
+	manual := &ServiceExpose{Metadata: crunchyv1beta1.Metadata{
+		Annotations: map[string]string{"external-dns.kubernetes.io/hostname": "manual.example.com"},
+	}}
+
+	tests := map[string]struct {
+		crVersion string
+		spec      PerconaPGClusterSpec
+		expected  []string
+	}{
+		"no exposes": {
+			crVersion: version.Version(),
+			expected:  nil,
+		},
+		"primary, replicas and logical replicas": {
+			crVersion: version.Version(),
+			spec: PerconaPGClusterSpec{
+				Expose:         withHostname("pg.example.com"),
+				ExposeReplicas: withHostname("pg-replicas.example.com"),
+				LogicalReplicas: LogicalReplicas{
+					{Name: "a", Expose: withHostname("a.example.com")},
+					{Name: "b"},
+					{Name: "c", Expose: manual},
+				},
+			},
+			expected: []string{"pg.example.com", "pg-replicas.example.com", "a.example.com"},
+		},
+		"empty and duplicate hostnames dropped": {
+			crVersion: version.Version(),
+			spec: PerconaPGClusterSpec{
+				Expose:         withHostname(""),
+				ExposeReplicas: withHostname("pg.example.com"),
+				LogicalReplicas: LogicalReplicas{
+					{Name: "a", Expose: withHostname("pg.example.com")},
+				},
+			},
+			expected: []string{"pg.example.com"},
+		},
+		"logical replicas ignored before 3.1.0": {
+			crVersion: "3.0.0",
+			spec: PerconaPGClusterSpec{
+				LogicalReplicas: LogicalReplicas{{Name: "a", Expose: withHostname("a.example.com")}},
+			},
+			expected: nil,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &PerconaPGCluster{Spec: tt.spec}
+			cr.Spec.CRVersion = tt.crVersion
+			assert.Equal(t, tt.expected, cr.ExternalDNSHostnames())
+		})
+	}
 }
