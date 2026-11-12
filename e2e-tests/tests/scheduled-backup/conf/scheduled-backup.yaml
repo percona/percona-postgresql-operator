@@ -19,12 +19,12 @@ spec:
       repos:
         - name: repo1
           s3:
-            bucket: <bucket>
+            bucket: pg-operator-testing
             endpoint: s3.amazonaws.com
             region: us-east-1
         - name: repo2
           gcs:
-            bucket: <bucket>
+            bucket: pg-operator-testing
         - name: repo3
           azure:
-            container: <bucket>
+            container: pg-operator-testing

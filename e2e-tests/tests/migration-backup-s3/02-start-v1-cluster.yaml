@@ -31,7 +31,7 @@ commands:
         .spec.backup.storages.my-s3.endpointUrl="s3.amazonaws.com" |
         .spec.backup.storages.my-s3.region="us-east-1" |
         .spec.backup.storages.my-s3.uriStyle="path" |
-        .spec.backup.storages.my-s3.bucket="'$BUCKET'"
+        .spec.backup.storages.my-s3.bucket="pg-operator-testing"
         ' - |
       $sed -r 's/cluster1/'$V1_CLUSTER_NAME'/g' |
       kubectl -n $NAMESPACE apply -f -

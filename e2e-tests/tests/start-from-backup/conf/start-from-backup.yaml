@@ -17,7 +17,7 @@ spec:
       repos:
         - name: repo1
           s3:
-            bucket: <bucket>
+            bucket: pg-operator-testing
             endpoint: s3.amazonaws.com
             region: us-east-1
   dataSource:
@@ -31,6 +31,6 @@ spec:
       repo:
         name: repo1
         s3:
-          bucket: <bucket>
+          bucket: pg-operator-testing
           endpoint: s3.amazonaws.com
           region: us-east-1

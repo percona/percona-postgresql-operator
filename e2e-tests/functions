@@ -544,6 +544,16 @@ function get_repo_auth() {
 	echo "\n$auth"
 }
 
+function get_nos_value() {
+	yq eval "select(.metadata.name==\"nutanix-nos-secret-$1\").data.$2" "$TESTS_CONFIG_DIR/cloud-secret.yml" | base64 -d
+}
+
+# NOS has 3 secrets instead of 1, separated by repo number (repo1 -> nutanix-nos-secret-1, etc.)
+function get_nos_repo_auth() {
+	local n=$1
+	get_repo_auth "repo${n}" s3 "$(get_nos_value "$n" ACCESS_KEY_ID)" "$(get_nos_value "$n" SECRET_ACCESS_KEY)"
+}
+
 function deploy_s3_secrets() {
 	set +o xtrace
 
@@ -563,6 +573,19 @@ function deploy_s3_secrets() {
 			"scheduled-backup")
 				repo_auth+=$(get_repo_auth repo2 s3 $key $secret)
 				repo_auth+=$(get_repo_auth repo3 s3 $key $secret)
+				;;
+		esac
+	elif [[ $platform == "nkp" ]]; then
+		# Nutanix Objects: repoN uses the bucket and keys from nutanix-nos-secret-N
+		repo_auth+=$(get_nos_repo_auth 1)
+
+		case $test_name in
+			"demand-backup")
+				repo_auth+=$(get_nos_repo_auth 3)
+				;;
+			"scheduled-backup")
+				repo_auth+=$(get_nos_repo_auth 2)
+				repo_auth+=$(get_nos_repo_auth 3)
 				;;
 		esac
 	else
@@ -620,11 +643,14 @@ function get_cr() {
 	local cr_file="$TEST_CONFIG_DIR/${cr_name}.yaml"
 	local platform_cr_file="$TEST_CONFIG_DIR/${cr_name}-${platform}.yaml"
 	local spaces_cr_file="$TEST_CONFIG_DIR/${cr_name}-spaces.yaml"
+	local nos_cr_file="$TEST_CONFIG_DIR/${cr_name}-nos.yaml"
 
 	if [[ -f $platform_cr_file ]]; then
 		cr_file=$platform_cr_file
 	elif [[ ($platform == "doks") && -f $spaces_cr_file ]]; then
 		cr_file=$spaces_cr_file
+	elif [[ ($platform == "nkp") && -f $nos_cr_file ]]; then
+		cr_file=$nos_cr_file
 	fi
 
 	local crs=("$DEPLOY_DIR/cr.yaml")
@@ -652,7 +678,6 @@ function get_cr() {
 
 	$sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
-	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
 	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then

@@ -19,16 +19,16 @@ spec:
       repos:
         - name: repo1
           s3:
-            bucket: <bucket>
+            bucket: pg-operator-testing
             endpoint: ams3.digitaloceanspaces.com
             region: ams3
         - name: repo2
           s3:
-            bucket: <bucket>
+            bucket: pg-operator-testing
             endpoint: ams3.digitaloceanspaces.com
             region: ams3
         - name: repo3
           s3:
-            bucket: <bucket>
+            bucket: pg-operator-testing
             endpoint: ams3.digitaloceanspaces.com
             region: ams3

@@ -1,0 +1,32 @@
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: some-name
+spec:
+  backups:
+    pgbackrest:
+      configuration:
+        - secret:
+            name: demand-backup-pgbackrest-secrets
+      manual:
+        repoName: repo1
+        options:
+          - --type=full
+      global:
+        repo1-path: /backrestrepo/postgres-operator/<repo-path>/repo1
+        repo3-path: /backrestrepo/postgres-operator/<repo-path>/repo3
+        repo1-s3-uri-style: path
+        repo1-s3-verify-tls: "n"
+        repo3-s3-uri-style: path
+        repo3-s3-verify-tls: "n"
+      repos:
+        - name: repo1
+          s3:
+            bucket: percona1
+            endpoint: 10.8.61.152
+            region: us-east-1
+        - name: repo3
+          s3:
+            bucket: percona3
+            endpoint: 10.8.61.152
+            region: us-east-1
