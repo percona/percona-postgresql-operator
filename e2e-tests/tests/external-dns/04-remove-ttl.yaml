@@ -1,0 +1,25 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  # Dropping ttl removes only the ttl annotation; hostname and marker stay.
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+      source ./conf/annotations.sh
+
+      kubectl -n "${NAMESPACE}" patch pg external-dns --type=json --patch '[
+        {"op": "remove", "path": "/spec/expose/externalDNS/ttl"},
+        {"op": "remove", "path": "/spec/exposeReplicas/externalDNS/ttl"},
+        {"op": "remove", "path": "/spec/proxy/pgBouncer/expose/externalDNS/ttl"}
+      ]'
+
+      wait_annotation external-dns-ha ${ANNOTATION_TTL} ""
+      wait_annotation external-dns-replicas ${ANNOTATION_TTL} ""
+      wait_annotation external-dns-pgbouncer ${ANNOTATION_TTL} ""
+
+      wait_annotation external-dns-ha ${ANNOTATION_HOSTNAME} "primary.external-dns.example.com"
+      wait_annotation external-dns-replicas ${ANNOTATION_HOSTNAME} "replicas.external-dns.example.com"
+      wait_annotation external-dns-pgbouncer ${ANNOTATION_HOSTNAME} "pgbouncer.external-dns.example.com"

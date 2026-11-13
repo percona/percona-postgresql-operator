@@ -9,6 +9,7 @@ database-init-sql
 demand-backup
 demand-backup-offline-snapshot
 dynamic-configuration
+external-dns
 extra-volumes
 finalizers
 init-deploy
