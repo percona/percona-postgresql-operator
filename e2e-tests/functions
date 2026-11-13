@@ -2277,19 +2277,32 @@ function enable_hugepages_doks() {
 }
 
 function enable_hugepages_rancher() {
-	local hugepage_count=$1
+	enable_hugepages_on_worker RKE2 "$1" rke2-agent
+}
 
-	ensure_rancher_hugepages_node
+function enable_hugepages_nkp() {
+	enable_hugepages_on_worker NKP "$1" kubelet
+}
+
+# Labels one worker with hugepages=enabled and configures it through the DaemonSet,
+# which restarts node_service so kubelet publishes the capacity.
+function enable_hugepages_on_worker() {
+	local platform=$1
+	local hugepage_count=$2
+	local node_service=$3
+
+	ensure_hugepages_worker_node "${platform}"
 
 	if verify_hugepages_on_labeled_nodes; then
-		echo "Hugepages are already configured on the selected RKE2 worker"
+		echo "Hugepages are already configured on the selected ${platform} worker"
 		return 0
 	fi
 
-	configure_hugepages_on_labeled_nodes RKE2 "${hugepage_count}" rke2-agent 15m
+	configure_hugepages_on_labeled_nodes "${platform}" "${hugepage_count}" "${node_service}" 15m
 }
 
-function ensure_rancher_hugepages_node() {
+function ensure_hugepages_worker_node() {
+	local platform=$1
 	local node
 	node=$(kubectl get nodes -l node-role.kubernetes.io/worker \
 		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -2301,7 +2314,7 @@ function ensure_rancher_hugepages_node() {
 	fi
 
 	if [ -z "${node}" ]; then
-		echo "RKE2: No worker nodes found"
+		echo "${platform}: No worker nodes found"
 		return 1
 	fi
 
@@ -2506,6 +2519,9 @@ function enable_hugepages() {
 			;;
 		rancher)
 			enable_hugepages_rancher "${hugepage_count}"
+			;;
+		nkp)
+			enable_hugepages_nkp "${hugepage_count}"
 			;;
 		doks)
 			enable_hugepages_doks "${hugepage_count}"

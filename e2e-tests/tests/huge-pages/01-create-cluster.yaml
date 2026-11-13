@@ -12,7 +12,7 @@ commands:
       enable_hugepages $PLATFORM
 
       hugepages_affinity='.'
-      if [[ ${PLATFORM} == "aks" || ${PLATFORM} == "doks" || ${PLATFORM} == "rancher" ]]; then
+      if [[ ${PLATFORM} == "aks" || ${PLATFORM} == "doks" || ${PLATFORM} == "rancher" || ${PLATFORM} == "nkp" ]]; then
         hugepages_affinity='.spec.instances[0].affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [{"matchExpressions": [{"key": "hugepages", "operator": "In", "values": ["enabled"]}]}]'
       fi
 
