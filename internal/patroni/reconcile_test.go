@@ -28,18 +28,21 @@ func TestClusterConfigMap(t *testing.T) {
 	pgHBAs := postgres.HBAs{}
 	pgParameters := postgres.Parameters{}
 
+	dcsYAML := map[string]any{"kubernetes": map[string]any{"example": true}}
+
 	err := cluster.Default(context.Background(), nil)
 	assert.NilError(t, err)
 	config := new(corev1.ConfigMap)
-	assert.NilError(t, ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters, config))
+	assert.NilError(t, ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters, dcsYAML, config))
 
 	// The output of clusterYAML should go into config.
-	data, _ := clusterYAML(cluster, pgHBAs, pgParameters)
+	data, _ := clusterYAML(cluster, pgHBAs, pgParameters, dcsYAML)
 	assert.DeepEqual(t, config.Data["patroni.yaml"], data)
+	assert.Assert(t, cmp.Contains(config.Data["patroni.yaml"], "example: true"))
 
 	// No change when called again.
 	before := config.DeepCopy()
-	assert.NilError(t, ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters, config))
+	assert.NilError(t, ClusterConfigMap(ctx, cluster, pgHBAs, pgParameters, dcsYAML, config))
 	assert.DeepEqual(t, config, before)
 }
 
@@ -138,15 +141,16 @@ func TestInstanceConfigMap(t *testing.T) {
 	cluster := new(v1beta1.PostgresCluster)
 	instance := new(v1beta1.PostgresInstanceSetSpec)
 	config := new(corev1.ConfigMap)
-	data, _ := instanceYAML(cluster, instance, nil)
+	dcsYAML := map[string]any{"kubernetes": map[string]any{}}
+	data, _ := instanceYAML(cluster, instance, nil, dcsYAML)
 
-	assert.NilError(t, InstanceConfigMap(ctx, cluster, instance, config))
+	assert.NilError(t, InstanceConfigMap(ctx, cluster, instance, dcsYAML, config))
 
 	assert.DeepEqual(t, config.Data["patroni.yaml"], data)
 
 	// No change when called again.
 	before := config.DeepCopy()
-	assert.NilError(t, InstanceConfigMap(ctx, cluster, instance, config))
+	assert.NilError(t, InstanceConfigMap(ctx, cluster, instance, dcsYAML, config))
 	assert.DeepEqual(t, config, before)
 }
 
@@ -369,14 +373,26 @@ volumes:
 			instanceCertificates := new(corev1.Secret)
 			instanceConfigMap := new(corev1.ConfigMap)
 			instanceSpec := new(v1beta1.PostgresInstanceSetSpec)
-			patroniLeaderService := new(corev1.Service)
 			template := new(corev1.PodTemplateSpec)
 			template.Spec.Containers = []corev1.Container{{Name: "database"}}
 			cluster.Labels = tt.labels
 
+			// Fixture standing in for a DCS backend's env vars (see
+			// internal/patroni/dcs), e.g. Kubernetes' PATRONI_KUBERNETES_*.
+			dcsEnvVars := []corev1.EnvVar{
+				{
+					Name: "PATRONI_KUBERNETES_POD_IP",
+					ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					}},
+				},
+				{Name: "PATRONI_KUBERNETES_PORTS", Value: "[]\n"},
+			}
+
 			call := func() error {
 				return InstancePod(context.Background(),
-					cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
+					cluster, clusterConfigMap, clusterPodService, dcsEnvVars,
 					instanceSpec, instanceCertificates, instanceConfigMap, template, initImage)
 			}
 			assert.NilError(t, call())

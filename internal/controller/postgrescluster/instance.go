@@ -36,6 +36,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni/dcs"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgbackrest"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgtde"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
@@ -1296,13 +1297,15 @@ func (r *Reconciler) reconcileInstance(
 		}
 
 		// K8SPG-708
-		initImage, err := k8s.InitImage(ctx, r.Client, cluster, spec)
+		var initImage string
+		initImage, err = k8s.InitImage(ctx, r.Client, cluster, spec)
 		if err != nil {
 			return errors.Wrap(err, "failed to determine initial init image")
 		}
 
+		dcsEnvVars := dcs.For(cluster).InstanceEnvVars(cluster, patroniLeaderService, instance.Spec.Template.Spec.Containers)
 		err = patroni.InstancePod(
-			ctx, cluster, clusterConfigMap, clusterPodService, patroniLeaderService,
+			ctx, cluster, clusterConfigMap, clusterPodService, dcsEnvVars,
 			spec, instanceCertificates, instanceConfigMap, &instance.Spec.Template, initImage) // K8SPG-708
 		if err != nil {
 			return errors.Wrap(err, "failed to populate pod")
@@ -1576,7 +1579,7 @@ func (r *Reconciler) reconcileInstanceConfigMap(
 		}, cluster.Name, "pg", cluster.Labels[naming.LabelVersion]))
 
 	if err == nil {
-		err = patroni.InstanceConfigMap(ctx, cluster, spec, instanceConfigMap)
+		err = patroni.InstanceConfigMap(ctx, cluster, spec, dcs.For(cluster).InstanceYAML(cluster), instanceConfigMap)
 	}
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, instanceConfigMap))
