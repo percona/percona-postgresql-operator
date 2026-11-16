@@ -1486,6 +1486,25 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaStatefulSet(
 	return errors.Wrap(err, "create or update statefulset")
 }
 
+// removeStaleExternalDNSAnnotations drops the external-dns annotations the
+// operator wrote itself, so that the ones the CR no longer asks for are gone
+// after they are rewritten from the spec. It is only needed here: every other
+// service is written with server-side apply, which prunes what the operator
+// stops emitting on its own.
+//
+// A service without the ownership marker was annotated by hand and is left
+// alone, and external-dns keys the operator never writes (/target, /alias, ...)
+// are never removed from any service.
+func removeStaleExternalDNSAnnotations(annotations map[string]string) {
+	if annotations[pNaming.AnnotationExternalDNSManaged] != "true" {
+		return
+	}
+
+	delete(annotations, pNaming.AnnotationExternalDNSHostname)
+	delete(annotations, pNaming.AnnotationExternalDNSTTL)
+	delete(annotations, pNaming.AnnotationExternalDNSManaged)
+}
+
 func (r *PGClusterReconciler) reconcileLogicalReplicaService(
 	ctx context.Context, cr *v2.PerconaPGCluster, spec *v2.LogicalReplicaSpec,
 ) error {
@@ -1506,12 +1525,17 @@ func (r *PGClusterReconciler) reconcileLogicalReplicaService(
 			Protocol:   corev1.ProtocolTCP,
 		}}
 
+		// Outside the guard below: dropping the whole expose block has to clear
+		// the annotations too, not just dropping externalDNS from within it.
+		removeStaleExternalDNSAnnotations(svc.Annotations)
+
 		if spec.Expose != nil {
 			svc.Spec.Type = corev1.ServiceType(spec.Expose.Type)
 			svc.Spec.LoadBalancerSourceRanges = spec.Expose.LoadBalancerSourceRanges
-			if len(spec.Expose.Annotations) > 0 {
+
+			if annotations := spec.Expose.ServiceAnnotations(); len(annotations) > 0 {
 				initialize.Annotations(svc)
-				maps.Copy(svc.Annotations, spec.Expose.Annotations)
+				maps.Copy(svc.Annotations, annotations)
 			}
 			maps.Copy(svc.Labels, spec.Expose.Labels)
 		}

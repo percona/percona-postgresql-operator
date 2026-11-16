@@ -182,6 +182,15 @@ type PostgresClusterSpec struct {
 	// +optional
 	LogicalReplicas []LogicalReplicaSpec `json:"logicalReplicas,omitempty"`
 
+	// K8SPG-1149: hostnames external-dns publishes for the services served by
+	// the cluster certificate, set by the Percona layer. They are added to the
+	// certificate SANs after the in-cluster names.
+	// +listType=set
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=253
+	// +optional
+	ExternalDNSHostnames []string `json:"externalDNSHostnames,omitempty"`
+
 	// A list of group IDs applied to the process of a container. These can be
 	// useful when accessing shared file systems with constrained permissions.
 	// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
