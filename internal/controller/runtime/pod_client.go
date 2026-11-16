@@ -25,6 +25,31 @@ type PodExecutor func(
 	stdin io.Reader, stdout, stderr io.Writer, command ...string,
 ) error
 
+// PodExecTarget identifies the container in which a PodExecutor ran a command.
+type PodExecTarget struct {
+	Namespace string
+	Pod       string
+	Container string
+}
+
+type podExecTargetKey struct{}
+
+// WithPodExecTarget returns a copy of ctx in which a PodExecutor created by
+// [NewPodExecutor] records the container it executes in. Callers that only
+// see an executor function (e.g. postgres.Executor) use this to report where
+// their commands ran. The returned target stays empty when no such
+// PodExecutor is called with ctx.
+func WithPodExecTarget(ctx context.Context) (context.Context, *PodExecTarget) {
+	target := new(PodExecTarget)
+	return context.WithValue(ctx, podExecTargetKey{}, target), target
+}
+
+func recordPodExecTarget(ctx context.Context, namespace, pod, container string) {
+	if target, ok := ctx.Value(podExecTargetKey{}).(*PodExecTarget); ok && target != nil {
+		*target = PodExecTarget{Namespace: namespace, Pod: pod, Container: container}
+	}
+}
+
 func newPodClient(config *rest.Config) (rest.Interface, error) {
 	codecs := serializer.NewCodecFactory(scheme.Scheme)
 	gvk, _ := apiutil.GVKForObject(&corev1.Pod{}, scheme.Scheme)
@@ -50,6 +75,8 @@ func NewPodExecutor(config *rest.Config) (PodExecutor, error) {
 		ctx context.Context, namespace, pod, container string,
 		stdin io.Reader, stdout, stderr io.Writer, command ...string,
 	) error {
+		recordPodExecTarget(ctx, namespace, pod, container)
+
 		request := client.Post().
 			Resource("pods").SubResource("exec").
 			Namespace(namespace).Name(pod).

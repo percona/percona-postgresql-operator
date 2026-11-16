@@ -1720,7 +1720,10 @@ func (r *Reconciler) reconcileDatabaseInitSQL(ctx context.Context,
 	// A writable pod executor has been found and we have the sql provided by
 	// the user. Setup a write function to execute the sql using the podExecutor
 	write := func(ctx context.Context, exec postgres.Executor) error {
-		stdout, stderr, err := exec.Exec(ctx, strings.NewReader(data), map[string]string{}, nil)
+		// The SQL comes from the user and may contain plaintext passwords;
+		// keep it out of the logs. The ConfigMap name and key identify it.
+		stdout, stderr, err := exec.Exec(postgres.WithSQLOmittedFromLogs(ctx),
+			strings.NewReader(data), map[string]string{}, nil)
 		log.V(1).Info("applied init SQL", "stdout", stdout, "stderr", stderr)
 		return err
 	}
