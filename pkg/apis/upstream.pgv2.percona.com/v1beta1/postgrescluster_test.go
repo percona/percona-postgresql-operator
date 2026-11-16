@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
 )
@@ -323,4 +324,31 @@ func TestIsStandby(t *testing.T) {
 
 	cluster.Spec.Standby.Enabled = true
 	assert.Assert(t, cluster.IsStandby())
+}
+
+func TestAdditionalTrustedCASecrets(t *testing.T) {
+	t.Run("NilWhenTLSUnset", func(t *testing.T) {
+		cluster := &PostgresCluster{}
+		assert.Assert(t, cluster.AdditionalTrustedCASecrets() == nil)
+	})
+
+	t.Run("NilWhenEmpty", func(t *testing.T) {
+		cluster := &PostgresCluster{}
+		cluster.Spec.TLS = &TLSSpec{}
+		assert.Assert(t, cluster.AdditionalTrustedCASecrets() == nil)
+	})
+
+	t.Run("ReturnsReferencedNames", func(t *testing.T) {
+		cluster := &PostgresCluster{}
+		cluster.Spec.TLS = &TLSSpec{
+			AdditionalTrustedCAs: []corev1.LocalObjectReference{
+				{Name: "ca-one"}, {Name: "ca-two"},
+			},
+		}
+		assert.DeepEqual(t, cluster.AdditionalTrustedCASecrets(), []string{"ca-one", "ca-two"})
+	})
+
+	t.Run("IndexerFuncIgnoresOtherTypes", func(t *testing.T) {
+		assert.Assert(t, AdditionalTrustedCASecretsIndexerFunc(&corev1.Secret{}) == nil)
+	})
 }

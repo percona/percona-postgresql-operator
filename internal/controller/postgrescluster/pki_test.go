@@ -18,6 +18,7 @@ import (
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1313,4 +1314,318 @@ func TestIssuerModeAwareness(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Equal(t, recovery.applyIssuerCalls, 0)
 	})
+}
+
+// caPEMFixture returns a fresh self-signed CA in PEM form.
+func caPEMFixture(t *testing.T) []byte {
+	t.Helper()
+	root, err := pki.NewRootCertificateAuthority()
+	assert.NilError(t, err, "bug in test")
+	text, err := root.Certificate.MarshalText()
+	assert.NilError(t, err, "bug in test")
+	return text
+}
+
+func TestAdditionalTrustedCAs(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	caOne, caTwo := caPEMFixture(t), caPEMFixture(t)
+
+	newCluster := func(refs ...string) *v1beta1.PostgresCluster {
+		cluster := &v1beta1.PostgresCluster{ObjectMeta: metav1.ObjectMeta{
+			Name: "some-cluster", Namespace: "ns1",
+		}}
+		cluster.Spec.TLS = &v1beta1.TLSSpec{}
+		for _, name := range refs {
+			cluster.Spec.TLS.AdditionalTrustedCAs = append(
+				cluster.Spec.TLS.AdditionalTrustedCAs,
+				corev1.LocalObjectReference{Name: name})
+		}
+		return cluster
+	}
+	caSecret := func(name string, data map[string][]byte) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns1"},
+			Data:       data,
+		}
+	}
+
+	t.Run("NilWhenUnset", func(t *testing.T) {
+		r := &Reconciler{Client: fake.NewClientBuilder().Build()}
+
+		cas, err := r.additionalTrustedCAs(ctx, newCluster())
+		assert.NilError(t, err)
+		assert.Assert(t, cas == nil)
+
+		// spec.tls itself is optional.
+		cluster := newCluster()
+		cluster.Spec.TLS = nil
+		cas, err = r.additionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, cas == nil)
+	})
+
+	t.Run("ReadsInOrder", func(t *testing.T) {
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"ca.crt": caOne}),
+			caSecret("ca-two", map[string][]byte{"ca.crt": caTwo}),
+		).Build()}
+
+		cas, err := r.additionalTrustedCAs(ctx, newCluster("ca-two", "ca-one"))
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{caTwo, caOne})
+	})
+
+	t.Run("MissingSecretIsSkipped", func(t *testing.T) {
+		// The Secret may simply not exist yet; the next reconcile picks it up.
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"ca.crt": caOne}),
+		).Build()}
+
+		cas, err := r.additionalTrustedCAs(ctx, newCluster("nope", "ca-one"))
+		assert.NilError(t, err)
+		assert.DeepEqual(t, cas, [][]byte{caOne})
+	})
+
+	t.Run("MissingKeyIsAnError", func(t *testing.T) {
+		// A Secret that exists but holds nothing usable is a mistake worth
+		// reporting rather than silently ignoring.
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"tls.crt": caOne}),
+		).Build()}
+
+		_, err := r.additionalTrustedCAs(ctx, newCluster("ca-one"))
+		assert.ErrorContains(t, err, "does not contain key 'ca.crt'")
+	})
+
+	t.Run("MalformedCertificateIsAnError", func(t *testing.T) {
+		// A "ca.crt" whose CERTIFICATE-labeled PEM block does not actually
+		// decode as an X.509 certificate is as unusable as an empty one, and
+		// must be reported rather than silently written into a trust file.
+		malformed := []byte("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"ca.crt": malformed}),
+		).Build()}
+
+		_, err := r.additionalTrustedCAs(ctx, newCluster("ca-one"))
+		assert.ErrorContains(t, err, "does not contain a PEM-encoded certificate")
+	})
+
+	t.Run("IgnoredForUserProvidedOnly", func(t *testing.T) {
+		// The operator owns none of the TLS Secrets in that mode, so it has
+		// nowhere to merge these into.
+		r := &Reconciler{Client: fake.NewClientBuilder().WithObjects(
+			caSecret("ca-one", map[string][]byte{"ca.crt": caOne}),
+		).Build()}
+
+		cluster := newCluster("ca-one")
+		cluster.Spec.TLS.CertManagementPolicy = v1beta1.CertManagementUserProvidedOnly
+
+		cas, err := r.additionalTrustedCAs(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, cas == nil)
+	})
+}
+
+func TestReconcileCABundleSecret(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	clusterCA, replicationCA, extraCA := caPEMFixture(t), caPEMFixture(t), caPEMFixture(t)
+
+	scheme := runtime.NewScheme()
+	assert.NilError(t, corev1.AddToScheme(scheme))
+	assert.NilError(t, v1beta1.AddToScheme(scheme))
+
+	secret := func(meta metav1.ObjectMeta, ca []byte) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: meta, Data: map[string][]byte{"ca.crt": ca}}
+	}
+
+	// An external issuer kind resolves to IssuerModeExternal without touching
+	// the API, which is what makes isRootCACertManagerManaged report true.
+	newCluster := func(refs ...string) *v1beta1.PostgresCluster {
+		cluster := testCluster()
+		cluster.Namespace = "ns1"
+		cluster.Spec.TLS = &v1beta1.TLSSpec{
+			IssuerConf: &cmmeta.IssuerReference{Name: "vault", Kind: "VaultClusterIssuer"},
+		}
+		for _, name := range refs {
+			cluster.Spec.TLS.AdditionalTrustedCAs = append(
+				cluster.Spec.TLS.AdditionalTrustedCAs,
+				corev1.LocalObjectReference{Name: name})
+		}
+		return cluster
+	}
+
+	newReconciler := func(objects ...client.Object) *Reconciler {
+		return &Reconciler{
+			Client:              fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build(),
+			Owner:               ControllerName,
+			Scheme:              scheme,
+			CertManagerCtrlFunc: mockCertManagerCtrlFunc,
+			RestConfig:          &rest.Config{},
+		}
+	}
+
+	t.Run("NilWhenNoAdditionalCAs", func(t *testing.T) {
+		// The whole feature has to be inert, or every existing cluster gets a
+		// new Secret and a changed certificate volume.
+		cluster := newCluster()
+		r := newReconciler()
+
+		projection, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, projection == nil)
+
+		err = r.Client.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace, Name: cluster.Name + "-ca-bundle",
+		}, new(corev1.Secret))
+		assert.Assert(t, k8serrors.IsNotFound(err), "expected no Secret, got %v", err)
+	})
+
+	t.Run("NilForCustomTLSSecret", func(t *testing.T) {
+		cluster := newCluster("extra")
+		cluster.Spec.CustomTLSSecret = &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "mine"},
+		}
+		r := newReconciler(secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, extraCA))
+
+		projection, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, projection == nil)
+	})
+
+	t.Run("NilForInternalPKI", func(t *testing.T) {
+		// Without cert-manager the operator writes ca.crt into the certificate
+		// Secrets itself, so it has no need to project a second Secret.
+		cluster := newCluster("extra")
+		cluster.Spec.TLS.IssuerConf = nil
+		r := newReconciler(secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, extraCA))
+		r.RestConfig = nil // cert-manager is not available
+
+		projection, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, projection == nil)
+	})
+
+	t.Run("MergesIssuedAndAdditionalCAs", func(t *testing.T) {
+		cluster := newCluster("extra")
+		r := newReconciler(
+			secret(naming.PostgresTLSSecret(cluster), clusterCA),
+			secret(naming.ReplicationClientCertSecret(cluster), replicationCA),
+			secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, extraCA),
+		)
+
+		projection, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+		assert.Assert(t, projection != nil)
+		assert.Equal(t, projection.Name, cluster.Name+"-ca-bundle")
+
+		// One key mounted at both paths, replacing the ca.crt the two
+		// certificate Secrets no longer supply.
+		assert.DeepEqual(t, projection.Items, []corev1.KeyToPath{
+			{Key: "ca.crt", Path: "ca.crt"},
+			{Key: "ca.crt", Path: "replication/ca.crt"},
+		})
+
+		bundle := new(corev1.Secret)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace, Name: cluster.Name + "-ca-bundle",
+		}, bundle))
+
+		want := append(append(append([]byte{}, clusterCA...), replicationCA...), extraCA...)
+		assert.DeepEqual(t, bundle.Data["ca.crt"], want)
+	})
+
+	t.Run("AdditionalCAsAloneAreEnough", func(t *testing.T) {
+		// An ACME issuer writes no ca.crt into either certificate Secret.
+		cluster := newCluster("extra")
+		r := newReconciler(
+			&corev1.Secret{ObjectMeta: naming.PostgresTLSSecret(cluster)},
+			&corev1.Secret{ObjectMeta: naming.ReplicationClientCertSecret(cluster)},
+			secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, extraCA),
+		)
+
+		_, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+
+		bundle := new(corev1.Secret)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace, Name: cluster.Name + "-ca-bundle",
+		}, bundle))
+		assert.DeepEqual(t, bundle.Data["ca.crt"], extraCA)
+	})
+
+	t.Run("StableAcrossReconciles", func(t *testing.T) {
+		// Churn here rewrites the Secret and makes every instance SIGHUP.
+		cluster := newCluster("extra")
+		r := newReconciler(
+			secret(naming.PostgresTLSSecret(cluster), clusterCA),
+			secret(naming.ReplicationClientCertSecret(cluster), replicationCA),
+			secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, extraCA),
+		)
+
+		_, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+
+		before := new(corev1.Secret)
+		key := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-ca-bundle"}
+		assert.NilError(t, r.Client.Get(ctx, key, before))
+
+		_, err = r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+
+		after := new(corev1.Secret)
+		assert.NilError(t, r.Client.Get(ctx, key, after))
+
+		// Identical bytes are what server-side apply needs to see to leave the
+		// Secret alone; whether it actually does is the API server's job, not
+		// something the fake client models faithfully.
+		assert.DeepEqual(t, before.Data, after.Data)
+	})
+
+	t.Run("DuplicateCAsAreNotRepeated", func(t *testing.T) {
+		// The cluster and replication Secrets normally share one issuer.
+		cluster := newCluster("extra")
+		r := newReconciler(
+			secret(naming.PostgresTLSSecret(cluster), clusterCA),
+			secret(naming.ReplicationClientCertSecret(cluster), clusterCA),
+			secret(metav1.ObjectMeta{Name: "extra", Namespace: "ns1"}, clusterCA),
+		)
+
+		_, err := r.reconcileCABundleSecret(ctx, cluster)
+		assert.NilError(t, err)
+
+		bundle := new(corev1.Secret)
+		assert.NilError(t, r.Client.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace, Name: cluster.Name + "-ca-bundle",
+		}, bundle))
+		assert.DeepEqual(t, bundle.Data["ca.crt"], clusterCA)
+	})
+}
+
+func TestWithoutCA(t *testing.T) {
+	t.Parallel()
+
+	// A projected volume rejects two sources writing the same path, so the
+	// certificate Secrets must stop supplying ca.crt once the bundle does.
+	cluster := clusterCertSecretProjection(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-cert"},
+	})
+	assert.DeepEqual(t, withoutCA(cluster).Items, []corev1.KeyToPath{
+		{Key: "tls.crt", Path: "tls.crt"},
+		{Key: "tls.key", Path: "tls.key"},
+	})
+
+	replication := replicationCertSecretProjection(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "replication-cert"},
+	})
+	assert.DeepEqual(t, withoutCA(replication).Items, []corev1.KeyToPath{
+		{Key: "tls.crt", Path: "replication/tls.crt"},
+		{Key: "tls.key", Path: "replication/tls.key"},
+	})
+
+	// The input is left alone; the caller still projects it elsewhere.
+	assert.Equal(t, len(cluster.Items), 3)
 }
