@@ -288,6 +288,15 @@ function remove_all_finalizers() {
 	done
 }
 
+function remove_all_resources() {
+	local resources=("certificate" "secret" "pvc")
+
+	for resource in "${resources[@]}"; do
+		echo "removing all $resource resources in namespace $NAMESPACE"
+		kubectl -n "${NAMESPACE}" delete "$resource" --all --ignore-not-found=true 2>/dev/null || true
+	done
+}
+
 function wait_for_ready_containers() {
 	local pod_prefix="$1"
 	local target_count="$2"
