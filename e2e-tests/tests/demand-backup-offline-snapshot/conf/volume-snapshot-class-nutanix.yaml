@@ -1,0 +1,6 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: nutanix-snapshot-class
+driver: csi.nutanix.com
+deletionPolicy: Delete

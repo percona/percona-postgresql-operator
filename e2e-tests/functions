@@ -2152,6 +2152,9 @@ function deploy_volume_snapshot_class() {
 		gke)
 			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-gke.yaml"
 			;;
+		nkp)
+			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-nutanix.yaml"
+			;;
 		openshift)
 			snapshot_class_file="${TEST_CONFIG_DIR}/volume-snapshot-class-openshift.yaml"
 			;;
@@ -2183,6 +2186,9 @@ function get_volume_snapshot_class() {
 			;;
 		gke)
 			echo "gke-snapshot-class"
+			;;
+		nkp)
+			echo "nutanix-snapshot-class"
 			;;
 		openshift)
 			echo "openshift-snapshot-class"
