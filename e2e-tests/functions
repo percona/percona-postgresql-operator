@@ -202,10 +202,34 @@ function check_operator_panic() {
 	fi
 }
 
+# Crunchy CRDs are left behind by the migration-from-crunchy tests (helm uninstall keeps chart CRDs).
+# Their short names (postgrescluster, pgadmin, pgupgrade...) clash with ours, so a bare
+# `kubectl get postgrescluster` may resolve to the Crunchy group instead of upstream.pgv2.percona.com.
+# Kept while Crunchy is in use (a migration test running on the same cluster).
+function remove_crunchy_crds() {
+	local crds crd
+	crds=$(kubectl get crd -o name | grep '\.postgres-operator\.crunchydata\.com$' || :)
+	[[ -n $crds ]] || return 0
+
+	if kubectl get pods -A -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\n' | grep -q 'crunchydata/postgres-operator'; then
+		echo "Crunchy operator is running, keeping Crunchy CRDs"
+		return 0
+	fi
+	for crd in $crds; do
+		if [[ -n $(kubectl get "${crd#*/}" -A --no-headers 2>/dev/null) ]]; then
+			echo "Crunchy resources found (${crd#*/}), keeping Crunchy CRDs"
+			return 0
+		fi
+	done
+
+	echo "$crds" | xargs timeout 120 kubectl delete || :
+}
+
 function deploy_operator() {
 	local cw_prefix=""
 
 	destroy_operator
+	remove_crunchy_crds
 
 	if [[ $OPERATOR_NS ]]; then
 		create_namespace $OPERATOR_NS
@@ -255,6 +279,7 @@ function deploy_operator_gh() {
 	local cw_prefix=""
 
 	destroy_operator
+	remove_crunchy_crds
 
 	if [[ $OPERATOR_NS ]]; then
 		create_namespace $OPERATOR_NS

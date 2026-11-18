@@ -8,6 +8,9 @@ commands:
       source ../../functions
       init_temp_dir
 
+      # Before installing Crunchy: deploy_operator removes leftover Crunchy CRDs.
+      deploy_operator
+
       # The Crunchy source cluster and the Percona target cluster never coexist:
       # Crunchy is deleted in step 03, Percona is created in step 04.
       # A single namespace is therefore sufficient for this test.
@@ -43,6 +46,5 @@ commands:
       kubectl -n "${NAMESPACE}" create secret generic "migration-pv-pgbackrest-secrets" \
         --from-file=cloud.conf="${TEMP_DIR}/pgbackrest-s3.ini"
 
-      deploy_operator
       deploy_client
     timeout: 300
