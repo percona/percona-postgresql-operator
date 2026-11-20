@@ -1945,7 +1945,7 @@ function get_container_image() {
 
 	if [[ $component == 'pgbouncer' ]]; then
 		echo "${IMAGE_PGBOUNCER}"
-	elif [[  $component == 'pgbackrest' ]]; then
+	elif [[ $component == 'pgbackrest' ]]; then
 		echo "${IMAGE_BACKREST}"
 	elif [[ $component == 'upgrade' ]]; then
 		# a single upgrade image carries every supported version
