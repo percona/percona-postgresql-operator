@@ -1943,7 +1943,7 @@ function get_container_image() {
 		return
 	fi
 
-	if [[ $component == 'pgbouncer' ]]; then  
+	if [[ $component == 'pgbouncer' ]]; then
 		echo "${IMAGE_PGBOUNCER}"
 	elif [[  $component == 'pgbackrest' ]]; then
 		echo "${IMAGE_BACKREST}"
