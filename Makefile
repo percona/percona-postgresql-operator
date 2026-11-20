@@ -368,19 +368,19 @@ PREV2_VERSION   := $(MAJOR_VER).$(shell expr $(MINOR_VER) - 2).0
 after-release: update-version generate after-release-versions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(NEXT_VER)/}" \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql:$(PG_VER)#}" \
 		-e "/initContainer:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-pgbouncer:latest#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-pgbackrest:latest#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main#}" \
 		-e "/^  logcollector:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/fluentbit:main-logcollector#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-upgrade#}" \
-		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-ppg$(PG_VER)-postgres#}" \
-		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbouncer$(PG_VER)#}" \
-		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)perconalab/percona-postgresql-operator:main-pgbackrest$(PG_VER)#}" deploy/upgrade.yaml
+		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql-upgrade:18-17-16-15-14#}" \
+		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql:$(PG_VER)#}" \
+		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)percona/percona-pgbouncer:latest#}" \
+		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)percona/percona-pgbackrest:latest#}" deploy/upgrade.yaml
 
 # Update sidecars
 	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(NEXT_VER)#" e2e-tests/tests/sidecars/01-assert.yaml
@@ -393,43 +393,65 @@ after-release: update-version generate after-release-versions
 after-release-versions:
 	$(SED) -i \
 		-e "s#^IMAGE_OPERATOR=.*#IMAGE_OPERATOR=$(IMAGE_TAG_BASE):main#" \
-		-e "s#^IMAGE_POSTGRESQL14=.*#IMAGE_POSTGRESQL14=$(IMAGE_TAG_BASE):main-ppg14-postgres#" \
+		-e "s#^IMAGE_POSTGRESQL14=.*#IMAGE_POSTGRESQL14=percona/percona-distribution-postgresql:14#" \
+		-e "s#^IMAGE_POSTGRESQL14_UBI8=.*#IMAGE_POSTGRESQL14_UBI8=percona/percona-distribution-postgresql:14-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL14_UBI10=.*#IMAGE_POSTGRESQL14_UBI10=percona/percona-distribution-postgresql:14-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL14_UBI8_COMMUNITY=.*#IMAGE_POSTGRESQL14_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-postgres14-community#" \
 		-e "s#^IMAGE_POSTGRESQL14_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL14_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres14-community#" \
-		-e "s#^IMAGE_PGBOUNCER14=.*#IMAGE_PGBOUNCER14=$(IMAGE_TAG_BASE):main-pgbouncer14#" \
-		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=$(IMAGE_TAG_BASE):main-ppg14-postgres-gis#" \
-		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=$(IMAGE_TAG_BASE):main-pgbackrest14#" \
-		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=$(IMAGE_TAG_BASE):main-ppg15-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER14=.*#IMAGE_PGBOUNCER14=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=percona/percona-distribution-postgresql-with-postgis:14#" \
+		-e "s#^IMAGE_POSTGIS14_UBI8=.*#IMAGE_POSTGIS14_UBI8=percona/percona-distribution-postgresql-with-postgis:14-ubi8#" \
+		-e "s#^IMAGE_POSTGIS14_UBI10=.*#IMAGE_POSTGIS14_UBI10=percona/percona-distribution-postgresql-with-postgis:14-ubi10#" \
+		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=percona/percona-pgbackrest:latest#" \
+		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=percona/percona-distribution-postgresql:15#" \
+		-e "s#^IMAGE_POSTGRESQL15_UBI8=.*#IMAGE_POSTGRESQL15_UBI8=percona/percona-distribution-postgresql:15-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL15_UBI10=.*#IMAGE_POSTGRESQL15_UBI10=percona/percona-distribution-postgresql:15-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL15_UBI8_COMMUNITY=.*#IMAGE_POSTGRESQL15_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-postgres15-community#" \
 		-e "s#^IMAGE_POSTGRESQL15_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL15_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres15-community#" \
-		-e "s#^IMAGE_PGBOUNCER15=.*#IMAGE_PGBOUNCER15=$(IMAGE_TAG_BASE):main-pgbouncer15#" \
-		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=$(IMAGE_TAG_BASE):main-ppg15-postgres-gis#" \
-		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=$(IMAGE_TAG_BASE):main-pgbackrest15#" \
-		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=$(IMAGE_TAG_BASE):main-ppg16-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER15=.*#IMAGE_PGBOUNCER15=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=percona/percona-distribution-postgresql-with-postgis:15#" \
+		-e "s#^IMAGE_POSTGIS15_UBI8=.*#IMAGE_POSTGIS15_UBI8=percona/percona-distribution-postgresql-with-postgis:15-ubi8#" \
+		-e "s#^IMAGE_POSTGIS15_UBI10=.*#IMAGE_POSTGIS15_UBI10=percona/percona-distribution-postgresql-with-postgis:15-ubi10#" \
+		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=percona/percona-pgbackrest:latest#" \
+		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16#" \
+		-e "s#^IMAGE_POSTGRESQL16_UBI8=.*#IMAGE_POSTGRESQL16_UBI8=percona/percona-distribution-postgresql:16-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL16_UBI10=.*#IMAGE_POSTGRESQL16_UBI10=percona/percona-distribution-postgresql:16-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL16_UBI8_COMMUNITY=.*#IMAGE_POSTGRESQL16_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-postgres16-community#" \
 		-e "s#^IMAGE_POSTGRESQL16_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL16_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres16-community#" \
-		-e "s#^IMAGE_PGBOUNCER16=.*#IMAGE_PGBOUNCER16=$(IMAGE_TAG_BASE):main-pgbouncer16#" \
-		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=$(IMAGE_TAG_BASE):main-ppg16-postgres-gis#" \
-		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=$(IMAGE_TAG_BASE):main-pgbackrest16#" \
-		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=$(IMAGE_TAG_BASE):main-ppg17-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER16=.*#IMAGE_PGBOUNCER16=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=percona/percona-distribution-postgresql-with-postgis:16#" \
+		-e "s#^IMAGE_POSTGIS16_UBI8=.*#IMAGE_POSTGIS16_UBI8=percona/percona-distribution-postgresql-with-postgis:16-ubi8#" \
+		-e "s#^IMAGE_POSTGIS16_UBI10=.*#IMAGE_POSTGIS16_UBI10=percona/percona-distribution-postgresql-with-postgis:16-ubi10#" \
+		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=percona/percona-pgbackrest:latest#" \
+		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17#" \
+		-e "s#^IMAGE_POSTGRESQL17_UBI8=.*#IMAGE_POSTGRESQL17_UBI8=percona/percona-distribution-postgresql:17-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL17_UBI10=.*#IMAGE_POSTGRESQL17_UBI10=percona/percona-distribution-postgresql:17-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL17_UBI8_COMMUNITY=.*#IMAGE_POSTGRESQL17_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-postgres17-community#" \
 		-e "s#^IMAGE_POSTGRESQL17_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL17_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres17-community#" \
-		-e "s#^IMAGE_PGBOUNCER17=.*#IMAGE_PGBOUNCER17=$(IMAGE_TAG_BASE):main-pgbouncer17#" \
-		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=$(IMAGE_TAG_BASE):main-ppg17-postgres-gis#" \
-		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=$(IMAGE_TAG_BASE):main-pgbackrest17#" \
-		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=$(IMAGE_TAG_BASE):main-ppg18-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER17=.*#IMAGE_PGBOUNCER17=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=percona/percona-distribution-postgresql-with-postgis:17#" \
+		-e "s#^IMAGE_POSTGIS17_UBI8=.*#IMAGE_POSTGIS17_UBI8=percona/percona-distribution-postgresql-with-postgis:17-ubi8#" \
+		-e "s#^IMAGE_POSTGIS17_UBI10=.*#IMAGE_POSTGIS17_UBI10=percona/percona-distribution-postgresql-with-postgis:17-ubi10#" \
+		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=percona/percona-pgbackrest:latest#" \
+		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18#" \
+		-e "s#^IMAGE_POSTGRESQL18_UBI8=.*#IMAGE_POSTGRESQL18_UBI8=percona/percona-distribution-postgresql:18-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL18_UBI10=.*#IMAGE_POSTGRESQL18_UBI10=percona/percona-distribution-postgresql:18-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL18_UBI8_COMMUNITY=.*#IMAGE_POSTGRESQL18_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-postgres18-community#" \
 		-e "s#^IMAGE_POSTGRESQL18_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL18_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres18-community#" \
-		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=$(IMAGE_TAG_BASE):main-pgbouncer18#" \
-		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=$(IMAGE_TAG_BASE):main-ppg18-postgres-gis#" \
-		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=$(IMAGE_TAG_BASE):main-pgbackrest18#" \
-		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=$(IMAGE_TAG_BASE):main-ppg19-postgres#" \
+		-e "s#^IMAGE_PGBOUNCER18=.*#IMAGE_PGBOUNCER18=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18#" \
+		-e "s#^IMAGE_POSTGIS18_UBI8=.*#IMAGE_POSTGIS18_UBI8=percona/percona-distribution-postgresql-with-postgis:18-ubi8#" \
+		-e "s#^IMAGE_POSTGIS18_UBI10=.*#IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18-ubi10#" \
+		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=percona/percona-pgbackrest:latest#" \
+		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=percona/percona-distribution-postgresql:19#" \
 		-e "s#^IMAGE_POSTGRESQL19_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL19_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres19-community#" \
-		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=$(IMAGE_TAG_BASE):main-pgbouncer19#" \
-		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=$(IMAGE_TAG_BASE):main-pgbackrest19#" \
+		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_PGBOUNCER_COMMUNITY=.*#IMAGE_PGBOUNCER_COMMUNITY=$(IMAGE_TAG_BASE):main-pgbouncer-community#" \
 		-e "s#^IMAGE_PGBACKREST_COMMUNITY=.*#IMAGE_PGBACKREST_COMMUNITY=$(IMAGE_TAG_BASE):main-pgbackrest-community#" \
-		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=$(IMAGE_TAG_BASE):main-upgrade#" \
+		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14#" \
+		-e "s#^IMAGE_UPGRADE_UBI8=.*#IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi8#" \
+		-e "s#^IMAGE_UPGRADE_UBI10=.*#IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi10#" \
 		-e "s#^IMAGE_UPGRADE_UBI8_COMMUNITY=.*#IMAGE_UPGRADE_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-upgrade-community#" \
 		-e "s#^IMAGE_UPGRADE_UBI9_COMMUNITY=.*#IMAGE_UPGRADE_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-upgrade-community#" \
 		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
