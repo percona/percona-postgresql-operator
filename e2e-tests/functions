@@ -1943,16 +1943,18 @@ function get_container_image() {
 		return
 	fi
 
-	if [[ $component == 'pgbouncer' || $component == 'pgbackrest' ]]; then
-		echo "${IMAGE_BASE}:${operatorVersion}-${component}${pgVersion}"
+	if [[ $component == 'pgbouncer' ]]; then
+		echo "${IMAGE_PGBOUNCER}"
+	elif [[ $component == 'pgbackrest' ]]; then
+		echo "${IMAGE_BACKREST}"
 	elif [[ $component == 'upgrade' ]]; then
 		# a single upgrade image carries every supported version
-		echo "${IMAGE_BASE}:${operatorVersion}-upgrade"
+		echo "${IMAGE_UPGRADE}"
 	elif [[ $component == 'postgis' ]]; then
 		# the docker build job publishes postgis images as ...-ppg<V>-postgres-gis
-		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-postgres-gis"
+		echo "docker.io/percona/percona-distribution-postgresql-with-postgis:${pgVersion}"
 	else
-		echo "${IMAGE_BASE}:${operatorVersion}-ppg${pgVersion}-${component}"
+		echo "docker.io/percona/percona-distribution-postgresql:${pgVersion}"
 	fi
 }
 
