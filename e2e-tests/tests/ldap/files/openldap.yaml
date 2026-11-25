@@ -1,12 +1,4 @@
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: openldap
-type: Opaque
-stringData:
-  adminpassword: adminpassword
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,48 +17,38 @@ spec:
     spec:
       serviceAccountName: openldap
       containers:
+        # osixia/openldap v2 runs as non-root and listens on 3890. The Service
+        # still exposes port 389, which is what PostgreSQL is configured to use.
         - name: openldap
           image: docker.io/osixia/openldap:latest
           imagePullPolicy: Always
-          args: ["--copy-service"]
           env:
-            - name: LDAP_DOMAIN
+            - name: OPENLDAP_BOOTSTRAP_ORGANIZATION
               value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
-            - name: LDAP_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap
-            - name: LDAP_CONFIG_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap
-            - name: LDAP_READONLY_USER
-              value: "true"
-            - name: LDAP_READONLY_USER_USERNAME
-              value: "readonly"
-            - name: LDAP_READONLY_USER_PASSWORD
-              value: "readonlypass"
-            - name: CONTAINER_LOG_LEVEL
-              value: "info"
+            - name: OPENLDAP_BOOTSTRAP_SUFFIX
+              value: "dc=ldap,dc=local"
+            # {SSHA} hash of "adminpassword".
+            - name: OPENLDAP_BOOTSTRAP_DATA_ROOT_PASSWORD_HASHED
+              value: "{SSHA}XyAanpFfmRWI+E9FQRdgfkrrdfVsZGFw"
+            - name: OPENLDAP_BOOTSTRAP_CONFIG_ROOT_PASSWORD_HASHED
+              value: "{SSHA}XyAanpFfmRWI+E9FQRdgfkrrdfVsZGFw"
+            - name: OPENLDAP_URLS
+              value: "ldap://:3890 ldapi:///"
           ports:
             - name: tcp-ldap
-              containerPort: 389
+              containerPort: 3890
           readinessProbe:
             tcpSocket:
-              port: 389
-            initialDelaySeconds: 60
-            periodSeconds: 10
+              port: tcp-ldap
+            initialDelaySeconds: 5
+            periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 12
           livenessProbe:
             tcpSocket:
-              port: 389
-            initialDelaySeconds: 60
-            periodSeconds: 30
+              port: tcp-ldap
+            initialDelaySeconds: 30
+            periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
         - name: ldap-setup
@@ -76,17 +58,27 @@ spec:
           args:
             - -c
             - |
+              set -eu
+
               echo "Waiting for LDAP server to be ready..."
+              ready=0
               for i in $(seq 30); do
-                ldapsearch -x -H ldap://localhost:389 \
+                if ldapsearch -x -H ldap://localhost:3890 \
                   -D "cn=admin,dc=ldap,dc=local" -w adminpassword \
-                  -b "dc=ldap,dc=local" 2>&1 | grep -q "numEntries" && break
+                  -b "dc=ldap,dc=local" 2>&1 | grep -q "numEntries"; then
+                  ready=1
+                  break
+                fi
                 echo "Attempt ${i}: LDAP server not ready yet, waiting..."
-                sleep 10
+                sleep 5
               done
+              if [[ "${ready}" -ne 1 ]]; then
+                echo "LDAP server did not become ready" >&2
+                exit 1
+              fi
 
               echo "Adding LDAP structure..."
-              ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=ldap,dc=local" -w adminpassword <<EOF
+              ldapadd -x -H ldap://localhost:3890 -D "cn=admin,dc=ldap,dc=local" -w adminpassword <<'EOF'
               dn: ou=perconadba,dc=ldap,dc=local
               objectClass: organizationalUnit
               ou: perconadba
@@ -106,16 +98,6 @@ spec:
 
               echo "LDAP structure added successfully"
               sleep infinity
-          env:
-            - name: LDAP_DOMAIN
-              value: "ldap.local"
-            - name: LDAP_ORGANISATION
-              value: "ldap.local"
-            - name: LDAP_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: adminpassword
-                  name: openldap
 ---
 apiVersion: v1
 kind: Service

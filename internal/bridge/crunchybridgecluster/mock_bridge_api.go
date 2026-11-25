@@ -7,6 +7,7 @@ package crunchybridgecluster
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -229,9 +230,9 @@ func (tbc *TestBridgeClient) DeleteCluster(ctx context.Context, apiKey, clusterI
 	var cluster *bridge.ClusterApiResource
 
 	if apiKey == tbc.ApiKey {
-		for i := len(tbc.Clusters) - 1; i >= 0; i-- {
-			if tbc.Clusters[i].ID == clusterId {
-				cluster = tbc.Clusters[i]
+		for i, v := range slices.Backward(tbc.Clusters) {
+			if v.ID == clusterId {
+				cluster = v
 				alreadyDeleted = false
 				tbc.Clusters = append(tbc.Clusters[:i], tbc.Clusters[i+1:]...)
 				return cluster, alreadyDeleted, nil
