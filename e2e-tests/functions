@@ -648,12 +648,13 @@ function get_cr() {
 		.spec.pmm.secret = "'${cr_name}'-pmm-secret" |
 		.spec.pmm.customClusterName = "'${cr_name}'-pmm-custom-name" |
 		.spec.pmm.postgresParams = "--environment=dev-postgres"
-	' "${crs[@]}" >"$TEMP_DIR/cr.yaml"
-
-	$sed -i "s|<repo-path>|$repo_path|g" "$TEMP_DIR/cr.yaml"
-	$sed -i "s|<source-path>|$source_path|g" "$TEMP_DIR/cr.yaml"
-	$sed -i "s|<bucket>|$BUCKET|g" "$TEMP_DIR/cr.yaml"
-	$sed -i "s|<image>|$IMAGE|g" "$TEMP_DIR/cr.yaml"
+	' "${crs[@]}" \
+		| $sed \
+			-e "s|<repo-path>|$repo_path|g" \
+			-e "s|<source-path>|$source_path|g" \
+			-e "s|<bucket>|$BUCKET|g" \
+			-e "s|<image>|$IMAGE|g" \
+			>"$TEMP_DIR/cr.yaml"
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		yq eval -i '.spec.openshift = true' "$TEMP_DIR/cr.yaml"
@@ -2952,11 +2953,53 @@ check_logs_for_errors() {
 	return $fail
 }
 
+# kms_namespace prints the namespace of a KMS provider: vault or openbao.
+function kms_namespace() {
+	local provider=${1:-vault}
+
+	case ${provider} in
+		vault | openbao)
+			echo "${provider}"
+			;;
+		*)
+			echo "unknown KMS provider: ${provider}" >&2
+			return 1
+			;;
+	esac
+}
+
+# kms_cli runs the vault or bao CLI in the server pod with the given token.
+function kms_cli() {
+	local provider=$1
+	local name=$2
+	local token=$3
+	shift 3
+
+	local namespace
+	namespace=$(kms_namespace "${provider}")
+	local cli=vault
+	if [[ ${provider} == "openbao" ]]; then
+		cli=bao
+	fi
+
+	kubectl -n "${namespace}" exec -i "${name}-0" -- \
+		env VAULT_TOKEN="${token}" BAO_TOKEN="${token}" \
+		VAULT_SKIP_VERIFY=true BAO_SKIP_VERIFY=true \
+		"${cli}" "$@"
+}
+
+# kms_token prints the root token from the secret start_vault created.
+function kms_token() {
+	local secret_name=${1:-vault-secret}
+
+	kubectl -n "${NAMESPACE}" get secret "${secret_name}" -o jsonpath='{.data.token}' | base64 -d
+}
+
 function vault_tls() {
 	local name=${1:-vault-service}
 	local tmp_dir=$2
+	local vault_namespace=${3:-vault}
 
-	local vault_namespace="vault"
 	local service=$name
 	local secret_name=$name
 	local csr_name=vault-csr-${name}
@@ -3006,48 +3049,69 @@ function vault_tls() {
 		--from-file=vault.ca=${tmp_dir}/vault.ca
 }
 
+# start_vault installs Vault (provider "vault", the default) or OpenBao
+# ("openbao"), enables KV v2 at "tde" and stores the root token and CA in
+# vault-secret.
 function start_vault() {
 	local name=${1:-vault-service}
 	local protocol=${2:-http}
+	local provider=${3:-vault}
 	local platform=kubernetes
-	local tmp_dir=$(mktemp -d)
-	local vault_namespace="vault"
+	local openshift=false
+	local tmp_dir
+	tmp_dir=$(mktemp -d)
+	local vault_namespace
+	vault_namespace=$(kms_namespace "${provider}")
 
 	if [[ ${PLATFORM} == "openshift" ]]; then
 		platform=openshift
+		openshift=true
 		oc patch clusterrole system:auth-delegator --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 	fi
 
-	stop_vault "$name" || :
+	stop_vault "$name" "$provider" || :
 	create_namespace "$vault_namespace" || :
-	helm repo add hashicorp https://helm.releases.hashicorp.com
 
-	echo "install Vault $name"
-	local values_file="${tmp_dir}/vault.values.yaml"
-	local values_template="${TESTS_CONFIG_DIR}/vault-values-no-tls.yaml"
-
+	local chart chart_version
 	local -a vault_arch_args
 	helm_arch_args vault_arch_args "server."
-	helm_arch_args vault_arch_args "injector."
+	case ${provider} in
+		vault)
+			helm repo add hashicorp https://helm.releases.hashicorp.com
+			chart=hashicorp/vault
+			chart_version=${VAULT_VER}
+			helm_arch_args vault_arch_args "injector."
+			;;
+		openbao)
+			helm repo add openbao https://openbao.github.io/openbao-helm
+			chart=openbao/openbao
+			chart_version=${OPENBAO_VER}
+			;;
+	esac
+
+	echo "install ${provider} $name"
+	local values_file="${tmp_dir}/vault.values.yaml"
+	local values_template="${TESTS_CONFIG_DIR}/${provider}-values-no-tls.yaml"
 
 	if [[ ${protocol} == "https" ]]; then
-		vault_tls "${name}" "${tmp_dir}"
-		values_template="${TESTS_CONFIG_DIR}/vault-values-tls.yaml"
+		vault_tls "${name}" "${tmp_dir}" "${vault_namespace}"
+		values_template="${TESTS_CONFIG_DIR}/${provider}-values-tls.yaml"
 	fi
 
 	sed \
 		-e "s/<name>/${name}/g" \
 		-e "s/<platform>/${platform}/g" \
+		-e "s/<openshift>/${openshift}/g" \
 		"${values_template}" >"${values_file}"
 
-	helm install $name hashicorp/vault \
+	helm install "$name" "$chart" \
 		--disable-openapi-validation \
-		--version $VAULT_VER \
+		--version "$chart_version" \
 		--namespace "$vault_namespace" \
 		--values "${values_file}" \
 		"${vault_arch_args[@]}"
 
-	if [[ ${PLATFORM} == "openshift" ]]; then
+	if [[ ${PLATFORM} == "openshift" && ${provider} == "vault" ]]; then
 		oc patch clusterrole $name-agent-injector-clusterrole --type='json' -p '[{"op":"add","path":"/rules/-", "value":{"apiGroups":["security.openshift.io"], "attributeRestrictions":null, "resourceNames": ["privileged"], "resources":["securitycontextconstraints"],"verbs":["use"]}}]'
 		oc adm policy add-scc-to-user privileged $name-agent-injector
 	fi
@@ -3067,26 +3131,35 @@ function start_vault() {
 		fi
 	done
 
-	kubectl -n ${vault_namespace} exec -it $name-0 -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json >"$tmp_dir/$name"
-	local unsealKey=$(jq -r ".unseal_keys_b64[]" <"$tmp_dir/$name")
-	local token=$(jq -r ".root_token" <"$tmp_dir/$name")
-	sleep 10
+	kms_cli "$provider" "$name" "" operator init -key-shares=1 -key-threshold=1 -format=json >"$tmp_dir/$name"
+	local unsealKey token
+	unsealKey=$(jq -r ".unseal_keys_b64[]" <"$tmp_dir/$name")
+	token=$(jq -r ".root_token" <"$tmp_dir/$name")
 
-	kubectl -n ${vault_namespace} exec -it $name-0 -- vault operator unseal -tls-skip-verify "$unsealKey"
-	kubectl -n ${vault_namespace} exec -it $name-0 -- \
-		sh -c "export VAULT_TOKEN=$token && export VAULT_LOG_LEVEL=trace \
-                && vault secrets enable --version=2 -path=tde kv \
-                && vault audit enable file file_path=/vault/vault-audit.log"
-	sleep 10
+	kms_cli "$provider" "$name" "" operator unseal "$unsealKey"
+	retry 30 2 kms_cli "$provider" "$name" "" status >/dev/null
 
+	kms_cli "$provider" "$name" "$token" secrets enable -version=2 -path=tde kv
+	retry 30 2 kms_cli "$provider" "$name" "$token" read tde/config >/dev/null
+	if [[ ${provider} == "vault" ]]; then
+		# OpenBao only accepts audit devices from its configuration file
+		kms_cli "$provider" "$name" "$token" audit enable file file_path=/vault/vault-audit.log
+	fi
+
+	local -a ca_args
+	if [[ ${protocol} == "https" ]]; then
+		ca_args=(--from-file=ca.crt="${tmp_dir}/vault.ca")
+	fi
 	kubectl -n "$NAMESPACE" create secret generic vault-secret \
-		--from-literal=token=${token} \
-		--from-file=ca.crt=${tmp_dir}/vault.ca
+		--from-literal=token="${token}" \
+		"${ca_args[@]}"
 }
 
 function stop_vault() {
 	local name=${1:-vault-service}
-	local vault_namespace="vault"
+	local provider=${2:-vault}
+	local vault_namespace
+	vault_namespace=$(kms_namespace "${provider}")
 
 	helm uninstall "$name" --namespace "$vault_namespace" || :
 	kubectl delete csr "vault-csr-${name}" --ignore-not-found || :

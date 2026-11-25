@@ -8,12 +8,8 @@ commands:
 
       source ../../functions
 
-      vault_namespace=vault
-      vault_name=vault-service
-
-      old_token=$(kubectl -n "${NAMESPACE}" get secret vault-secret -o jsonpath='{.data.token}' | base64 -d)
-      new_token=$(kubectl -n ${vault_namespace} exec ${vault_name}-0 -- \
-        sh -c "VAULT_TOKEN=${old_token} vault token create -tls-skip-verify -format=json" | jq -r '.auth.client_token')
+      new_token=$(kms_cli vault vault-service "$(kms_token vault-secret)" token create -format=json \
+        | jq -r '.auth.client_token')
 
       kubectl -n "${NAMESPACE}" get secret vault-secret -o jsonpath='{.data.ca\.crt}' \
         | base64 -d > ${TEMP_DIR}/ca.crt

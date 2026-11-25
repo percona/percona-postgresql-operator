@@ -107,6 +107,7 @@ export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
 export SEAWEEDFS_VER="${SEAWEEDFS_VER:-"4.47.0"}"
 export VAULT_VER="0.32.0"
+export OPENBAO_VER="0.30.8"
 export IMAGE_AWS_CLI=${IMAGE_AWS_CLI:-"docker.io/amazon/aws-cli:2.34.60"}
 
 # Add 'docker.io' for images that are provided without registry

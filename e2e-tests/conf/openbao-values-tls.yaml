@@ -1,0 +1,35 @@
+global:
+  tlsDisable: false
+  openshift: <openshift>
+
+injector:
+  enabled: false
+
+server:
+  image:
+    registry: quay.io
+    repository: openbao/openbao
+  dataStorage:
+    enabled: true
+    size: 1Gi
+  standalone:
+    enabled: true
+    config: |
+      listener "tcp" {
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+        tls_cert_file = "/openbao/userconfig/<name>/vault.crt"
+        tls_key_file = "/openbao/userconfig/<name>/vault.key"
+        tls_client_ca_file = "/openbao/userconfig/<name>/vault.ca"
+      }
+
+      storage "pebbledb" {
+        path = "/openbao/data/pebbledb"
+      }
+  ha:
+    enabled: false
+  extraVolumes:
+    - type: secret
+      name: <name>
+  extraEnvironmentVars:
+    BAO_CACERT: /openbao/userconfig/<name>/vault.ca
