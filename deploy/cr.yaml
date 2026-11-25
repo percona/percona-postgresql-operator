@@ -12,7 +12,7 @@ spec:
   crVersion: 3.1.1
 #  clusterServiceDNSSuffix: cluster.local
 #  initContainer:
-#    image: docker.io/percona/percona-postgresql-operator:3.1.0
+#    image: docker.io/percona/percona-postgresql-operator:3.1.1
 #    resources:
 #      limits:
 #        cpu: 2.0
@@ -222,7 +222,7 @@ spec:
 #    - secretRef:
 #        name: instance-env-secret
 #    initContainer:
-#      image: docker.io/percona/percona-postgresql-operator:3.1.0
+#      image: docker.io/percona/percona-postgresql-operator:3.1.1
 #      resources:
 #        limits:
 #          cpu: 2.0
@@ -535,7 +535,7 @@ spec:
 #      - secretRef:
 #          name: repo-host-env-secret
 #      initContainer:
-#        image: docker.io/percona/percona-postgresql-operator:3.1.0
+#        image: docker.io/percona/percona-postgresql-operator:3.1.1
 #        resources:
 #          limits:
 #            cpu: 2.0
