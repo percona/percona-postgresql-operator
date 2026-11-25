@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-# OpenLDAP readiness probe has initialDelaySeconds: 60, so allow extra time.
+# Readiness probe initialDelaySeconds is 5; allow time for image pull and slapd.
 timeout: 180
 ---
 apiVersion: apps/v1

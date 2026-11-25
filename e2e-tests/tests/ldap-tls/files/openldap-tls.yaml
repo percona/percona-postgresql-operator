@@ -1,12 +1,4 @@
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: openldap-tls-admin
-type: Opaque
-stringData:
-  adminpassword: adminpassword
----
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:

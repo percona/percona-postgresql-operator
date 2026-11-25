@@ -24,7 +24,7 @@ commands:
       ## verify ldap directories
       for i in $(seq 12); do
         if kubectl exec --namespace "${NAMESPACE}" deployment/openldap-tls -c ldap-setup \
-          -- ldapsearch -x -H ldap://localhost:389 \
+          -- ldapsearch -x -H ldap://localhost:3890 \
              -D "cn=admin,dc=ldap,dc=local" -w adminpassword \
              -b "uid=percona,ou=perconadba,dc=ldap,dc=local" 2>&1 \
           | grep -q "uid: percona"; then
