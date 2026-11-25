@@ -60,9 +60,9 @@ IMAGE_POSTGRESQL19_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql
 IMAGE_PGBOUNCER_COMMUNITY=percona/percona-postgresql-operator:pgbouncer1.25.2-43-community
 IMAGE_PGBACKREST_COMMUNITY=percona/percona-postgresql-operator:pgbackrest2.59.1-1-community
 
-IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:19.0-18.7-17.12-16.16-15.20
-IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:19.0-18.7-17.12-16.16-15.20-ubi8
-IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:19.0-18.7-17.12-16.16-15.20-ubi10
+IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25
+IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-ubi8
+IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-ubi10
 IMAGE_UPGRADE_UBI8_COMMUNITY=percona/percona-postgresql-operator:upgrade18.6-17.11-16.15-15.19-14.24-1-community-ubi8
 IMAGE_UPGRADE_UBI9_COMMUNITY=percona/percona-postgresql-operator:upgrade18.6-17.11-16.15-15.19-14.24-1-community-ubi9
 

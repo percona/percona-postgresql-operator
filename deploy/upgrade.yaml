@@ -4,7 +4,7 @@ metadata:
   name: cluster1-17-to-18
 spec:
   postgresClusterName: cluster1
-  image: docker.io/percona/percona-distribution-postgresql-upgrade:19.0-18.7-17.12-16.16-15.20
+  image: docker.io/percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25
   fromPostgresVersion: 17
   toPostgresVersion: 18
   toPostgresImage: docker.io/percona/percona-distribution-postgresql:18.7.1-1
