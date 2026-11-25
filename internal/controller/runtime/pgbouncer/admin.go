@@ -60,11 +60,16 @@ type adminClient struct {
 	db *sql.DB
 }
 
+func errIsAlreadyPaused(err error) bool {
+	return strings.Contains(err.Error(), "already suspended/paused") ||
+		strings.Contains(err.Error(), "already paused")
+}
+
 // Pause pgbouncer connections.
 func (c *adminClient) Pause(ctx context.Context) error {
 	_, err := c.db.ExecContext(ctx, "PAUSE")
 	if err != nil {
-		if strings.Contains(err.Error(), "already suspended/paused") {
+		if errIsAlreadyPaused(err) {
 			return nil
 		}
 		return errors.Wrap(err, "pause pgbouncer")
