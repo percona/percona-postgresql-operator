@@ -396,7 +396,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: docker.io/percona/percona-pgbouncer:1.26.1
+      image: docker.io/percona/percona-pgbouncer:1.26.1-1
 #      paused: true
 #      env:
 #      - name: MY_ENV
@@ -527,7 +527,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/percona/percona-pgbackrest:2.60.0
+      image: docker.io/percona/percona-pgbackrest:2.60.0-1
 #      env:
 #      - name: MY_ENV
 #        value: "1000"

@@ -5,64 +5,64 @@ IMAGE_POSTGRESQL14_UBI8=percona/percona-distribution-postgresql:14.25-1-ubi8
 IMAGE_POSTGRESQL14_UBI10=percona/percona-distribution-postgresql:14.25-1-ubi10
 IMAGE_POSTGRESQL14_UBI8_COMMUNITY=percona/percona-postgresql-operator:postgresql14.24-1-community-ubi8
 IMAGE_POSTGRESQL14_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql14.24-1-community-ubi9
-IMAGE_PGBOUNCER14=percona/percona-pgbouncer:1.26.1
+IMAGE_PGBOUNCER14=percona/percona-pgbouncer:1.26.1-1
 IMAGE_POSTGIS14=percona/percona-distribution-postgresql-with-postgis:14.25-1
 IMAGE_POSTGIS14_UBI8=percona/percona-distribution-postgresql-with-postgis:14.25-1-ubi8
 IMAGE_POSTGIS14_UBI10=percona/percona-distribution-postgresql-with-postgis:14.25-1-ubi10
-IMAGE_BACKREST14=percona/percona-pgbackrest:2.60.0
+IMAGE_BACKREST14=percona/percona-pgbackrest:2.60.0-1
 
 IMAGE_POSTGRESQL15=percona/percona-distribution-postgresql:15.20-1
 IMAGE_POSTGRESQL15_UBI8=percona/percona-distribution-postgresql:15.20-1-ubi8
 IMAGE_POSTGRESQL15_UBI10=percona/percona-distribution-postgresql:15.20-1-ubi10
 IMAGE_POSTGRESQL15_UBI8_COMMUNITY=percona/percona-postgresql-operator:postgresql15.19-1-community-ubi8
 IMAGE_POSTGRESQL15_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql15.19-1-community-ubi9
-IMAGE_PGBOUNCER15=percona/percona-pgbouncer:1.26.1
+IMAGE_PGBOUNCER15=percona/percona-pgbouncer:1.26.1-1
 IMAGE_POSTGIS15=percona/percona-distribution-postgresql-with-postgis:15.20-1
 IMAGE_POSTGIS15_UBI8=percona/percona-distribution-postgresql-with-postgis:15.20-1-ubi8
 IMAGE_POSTGIS15_UBI10=percona/percona-distribution-postgresql-with-postgis:15.20-1-ubi10
-IMAGE_BACKREST15=percona/percona-pgbackrest:2.60.0
+IMAGE_BACKREST15=percona/percona-pgbackrest:2.60.0-1
 
 IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16.16-1
 IMAGE_POSTGRESQL16_UBI8=percona/percona-distribution-postgresql:16.16-1-ubi8
 IMAGE_POSTGRESQL16_UBI10=percona/percona-distribution-postgresql:16.16-1-ubi10
 IMAGE_POSTGRESQL16_UBI8_COMMUNITY=percona/percona-postgresql-operator:postgresql16.15-1-community-ubi8
 IMAGE_POSTGRESQL16_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql16.15-1-community-ubi9
-IMAGE_PGBOUNCER16=percona/percona-pgbouncer:1.26.1
+IMAGE_PGBOUNCER16=percona/percona-pgbouncer:1.26.1-1
 IMAGE_POSTGIS16=percona/percona-distribution-postgresql-with-postgis:16.16-1
 IMAGE_POSTGIS16_UBI8=percona/percona-distribution-postgresql-with-postgis:16.16-1-ubi8
 IMAGE_POSTGIS16_UBI10=percona/percona-distribution-postgresql-with-postgis:16.16-1-ubi10
-IMAGE_BACKREST16=percona/percona-pgbackrest:2.60.0
+IMAGE_BACKREST16=percona/percona-pgbackrest:2.60.0-1
 
 IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17.12.1-1
 IMAGE_POSTGRESQL17_UBI8=percona/percona-distribution-postgresql:17.12.1-1-ubi8
 IMAGE_POSTGRESQL17_UBI10=percona/percona-distribution-postgresql:17.12.1-1-ubi10
 IMAGE_POSTGRESQL17_UBI8_COMMUNITY=percona/percona-postgresql-operator:postgresql17.11-1-community-ubi8
 IMAGE_POSTGRESQL17_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql17.11-1-community-ubi9
-IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.26.1
+IMAGE_PGBOUNCER17=percona/percona-pgbouncer:1.26.1-1
 IMAGE_POSTGIS17=percona/percona-distribution-postgresql-with-postgis:17.12.1-1
 IMAGE_POSTGIS17_UBI8=percona/percona-distribution-postgresql-with-postgis:17.12.1-1-ubi8
 IMAGE_POSTGIS17_UBI10=percona/percona-distribution-postgresql-with-postgis:17.12.1-1-ubi10
-IMAGE_BACKREST17=percona/percona-pgbackrest:2.60.0
+IMAGE_BACKREST17=percona/percona-pgbackrest:2.60.0-1
 
 IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18.7.1-1
 IMAGE_POSTGRESQL18_UBI8=percona/percona-distribution-postgresql:18.7.1-1-ubi8
 IMAGE_POSTGRESQL18_UBI10=percona/percona-distribution-postgresql:18.7.1-1-ubi10
 IMAGE_POSTGRESQL18_UBI8_COMMUNITY=percona/percona-postgresql-operator:postgresql18.6-1-community-ubi8
 IMAGE_POSTGRESQL18_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql18.6-1-community-ubi9
-IMAGE_PGBOUNCER18=percona/percona-pgbouncer:1.26.1
+IMAGE_PGBOUNCER18=percona/percona-pgbouncer:1.26.1-1
 IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18.7.1-1
 IMAGE_POSTGIS18_UBI8=percona/percona-distribution-postgresql-with-postgis:18.7.1-1-ubi8
 IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18.7.1-1-ubi10
-IMAGE_BACKREST18=percona/percona-pgbackrest:2.60.0
+IMAGE_BACKREST18=percona/percona-pgbackrest:2.60.0-1
 
 IMAGE_POSTGRESQL19_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql19-1-community-ubi9
 
 IMAGE_PGBOUNCER_COMMUNITY=percona/percona-postgresql-operator:pgbouncer1.25.2-43-community
 IMAGE_PGBACKREST_COMMUNITY=percona/percona-postgresql-operator:pgbackrest2.59.1-1-community
 
-IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25
-IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-ubi8
-IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-ubi10
+IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-1
+IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-1-ubi8
+IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18.7-17.12-16.16-15.20-14.25-1-ubi10
 IMAGE_UPGRADE_UBI8_COMMUNITY=percona/percona-postgresql-operator:upgrade18.6-17.11-16.15-15.19-14.24-1-community-ubi8
 IMAGE_UPGRADE_UBI9_COMMUNITY=percona/percona-postgresql-operator:upgrade18.6-17.11-16.15-15.19-14.24-1-community-ubi9
 
