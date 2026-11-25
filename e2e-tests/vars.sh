@@ -74,7 +74,7 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -nE 's/.*(-ppg|-postgres|:)([0-9]+)([.-]|$).*/\2/p')
 	export PG_VER="${pg_version_value}"
 else
-	export PG_VER="${PG_VER:-18}"
+	export PG_VER="${PG_VER:-19}"
 fi
 
 export ARCH="${ARCH:-}"
@@ -94,8 +94,8 @@ if [[ $PG_DISTRIBUTION == "community" ]]; then
 else
 	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"percona/percona-pgbouncer:1.25.2-8"}
 	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"percona/percona-distribution-postgresql:$PG_VER"}
-	export IMAGE_BACKREST=${IMAGE_BACKREST:-"percona/percona-pgbackrest:latest"}
-	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"percona/percona-distribution-postgresql-upgrade:18-17-16-15-14"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"perconalab/percona-postgresql-operator:2.60.1-pgbackrest-community"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"percona/percona-distribution-postgresql-upgrade:19-18-17-16-15"}
 fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}

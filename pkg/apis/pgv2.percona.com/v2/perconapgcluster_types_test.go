@@ -112,6 +112,65 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 		err := cluster.Validate()
 		require.EqualError(t, err, "pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	})
+
+	tests := map[string]struct {
+		crVersion       string
+		postgresVersion int
+		pgCron          *bool
+		setUser         *bool
+		expectedErr     string
+	}{
+		"PG19 beta crVersion rejects pg_cron": {
+			crVersion:       "3.1.0",
+			postgresVersion: 19,
+			pgCron:          new(true),
+			expectedErr:     "spec.extensions.pg_cron.enabled cannot be set for PostgreSQL 19",
+		},
+		"PG19 beta crVersion rejects set_user": {
+			crVersion:       "3.1.1",
+			postgresVersion: 19,
+			setUser:         new(true),
+			expectedErr:     "spec.extensions.set_user.enabled cannot be set for PostgreSQL 19",
+		},
+		"PG19 beta crVersion allows disabled extensions": {
+			crVersion:       "3.1.0",
+			postgresVersion: 19,
+			pgCron:          new(false),
+		},
+		"PG18 with old crVersion allows pg_cron": {
+			crVersion:       "3.1.0",
+			postgresVersion: 18,
+			pgCron:          new(true),
+		},
+		"PG19 GA crVersion allows pg_cron and set_user": {
+			crVersion:       "3.2.0",
+			postgresVersion: 19,
+			pgCron:          new(true),
+			setUser:         new(true),
+		},
+		"PG19 with current crVersion allows pg_cron and set_user": {
+			crVersion:       version.Version(),
+			postgresVersion: 19,
+			pgCron:          new(true),
+			setUser:         new(true),
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cluster := new(PerconaPGCluster)
+			cluster.Spec.CRVersion = tt.crVersion
+			cluster.Spec.PostgresVersion = tt.postgresVersion
+			cluster.Spec.Extensions.PGCron.Enabled = tt.pgCron
+			cluster.Spec.Extensions.SetUser.Enabled = tt.setUser
+
+			err := cluster.Validate()
+			if tt.expectedErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.expectedErr)
+		})
+	}
 }
 
 func TestPerconaPGCluster_Version(t *testing.T) {

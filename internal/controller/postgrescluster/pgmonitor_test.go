@@ -7,6 +7,7 @@ package postgrescluster
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
+	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 	"github.com/percona/percona-postgresql-operator/v3/pkg/apis/upstream.pgv2.percona.com/v1beta1"
@@ -336,6 +338,46 @@ name: exporter-config
 
 		testExporterCollectorsAnnotation(t, ctx, cluster, exporterQueriesConfig, testConfigMap)
 	})
+}
+
+func TestAddPGMonitorExporterToInstancePodSpecStatBGWriter(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		postgresVersion int
+		deactivated     bool
+	}{
+		{postgresVersion: 16, deactivated: false},
+		{postgresVersion: 17, deactivated: true},
+		{postgresVersion: 18, deactivated: true},
+		{postgresVersion: 19, deactivated: true},
+	} {
+		t.Run(fmt.Sprint(tt.postgresVersion), func(t *testing.T) {
+			cluster := &v1beta1.PostgresCluster{}
+			cluster.Name = "pg1"
+			cluster.Spec.Port = new(int32(5432))
+			cluster.Spec.PostgresVersion = tt.postgresVersion
+			cluster.SetLabels(map[string]string{naming.LabelVersion: "2.5.0"})
+			cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
+				PGMonitor: &v1beta1.PGMonitorSpec{
+					Exporter: &v1beta1.ExporterSpec{Image: "test/image:tag"},
+				},
+			}
+			template := &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: naming.ContainerDatabase}},
+				},
+			}
+			queries := new(corev1.ConfigMap)
+			queries.Name = "query-conf"
+
+			assert.NilError(t, addPGMonitorExporterToInstancePodSpec(context.Background(), cluster, template, queries, nil))
+			assert.Equal(t, len(template.Spec.Containers), 2)
+
+			command := strings.Join(template.Spec.Containers[1].Command, "\n")
+			assert.Equal(t, strings.Contains(command, pgmonitor.ExporterDeactivateStatBGWriterFlag), tt.deactivated)
+		})
+	}
 }
 
 // TestReconcilePGMonitorExporterSetupErrors tests how reconcilePGMonitorExporter
