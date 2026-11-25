@@ -61,6 +61,9 @@ type adminClient struct {
 }
 
 func errIsAlreadyPaused(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), "already suspended/paused") ||
 		strings.Contains(err.Error(), "already paused")
 }
@@ -77,11 +80,19 @@ func (c *adminClient) Pause(ctx context.Context) error {
 	return nil
 }
 
+func errIsNotPaused(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "pooler is not paused/suspended") ||
+		strings.Contains(err.Error(), "pooler is not paused")
+}
+
 // Resume pgbouncer connections.
 func (c *adminClient) Resume(ctx context.Context) error {
 	_, err := c.db.ExecContext(ctx, "RESUME")
 	if err != nil {
-		if strings.Contains(err.Error(), "pooler is not paused/suspended") {
+		if errIsNotPaused(err) {
 			return nil
 		}
 		return errors.Wrap(err, "resume pgbouncer")
