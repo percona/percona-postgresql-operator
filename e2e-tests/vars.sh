@@ -94,9 +94,9 @@ if [[ $PG_DISTRIBUTION == "community" ]]; then
 else
     # pgbouncer test fails bc of unsupported latest version. Pinned the version to latest supported (issue is submitted in K8SPG-1188)
 	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"percona/percona-pgbouncer:1.25.2-8"}
-	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
-	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
-	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
+	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"percona/percona-distribution-postgresql:$PG_VER"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"percona/percona-pgbackrest:latest"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"percona/percona-distribution-postgresql-upgrade:18-17-16-15-14"}
 fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
