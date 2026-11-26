@@ -7,7 +7,6 @@ CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-
 CHAOS_MESH_VER="2.5.1"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
-source "${ROOT_REPO}/e2e-tests/skip-pg-tde.sh"
 
 function init_temp_dir() {
 	rm -rf "$TEMP_DIR"

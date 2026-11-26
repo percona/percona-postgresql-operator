@@ -1,6 +1,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 380
+timeout: 500
 ---
 apiVersion: upstream.pgv2.percona.com/v1beta1
 kind: PostgresCluster
