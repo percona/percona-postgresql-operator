@@ -21,8 +21,7 @@ commands:
         | openssl x509 -noout -fingerprint -sha256 \
         | sed 's/.*=//' \
         | tr -d ':[:space:]')
-      postgres_served_fingerprint=$(kubectl -n "$NAMESPACE" exec "$primary" -c database -- \
-        bash -c "timeout 20 openssl s_client -connect ${cluster}-primary:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
+      postgres_served_fingerprint=$(run_comand_on_pod "timeout 20 openssl s_client -connect ${cluster}-primary:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
         | tr -d ':[:space:]')
 
       if [[ "$postgres_served_fingerprint" != "$postgres_secret_fingerprint" ]]; then
@@ -38,8 +37,7 @@ commands:
         | openssl x509 -noout -fingerprint -sha256 \
         | sed 's/.*=//' \
         | tr -d ':[:space:]')
-      pgbouncer_served_fingerprint=$(kubectl -n "$NAMESPACE" exec "$primary" -c database -- \
-        bash -c "timeout 20 openssl s_client -connect ${cluster}-pgbouncer:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
+      pgbouncer_served_fingerprint=$(run_comand_on_pod "timeout 20 openssl s_client -connect ${cluster}-pgbouncer:5432 -starttls postgres </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//'" \
         | tr -d ':[:space:]')
 
       if [[ "$pgbouncer_served_fingerprint" != "$pgbouncer_secret_fingerprint" ]]; then
