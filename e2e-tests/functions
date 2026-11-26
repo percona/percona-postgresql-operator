@@ -7,6 +7,7 @@ CERT_MANAGER_TEST_LABEL="e2e.percona.com/managed-by=percona-postgresql-operator-
 CHAOS_MESH_VER="2.5.1"
 test_name=$(basename "$(pwd)")
 source "${ROOT_REPO}/e2e-tests/vars.sh"
+source "${ROOT_REPO}/e2e-tests/skip-pg-tde.sh"
 
 function init_temp_dir() {
 	rm -rf "$TEMP_DIR"
@@ -856,13 +857,14 @@ function get_service_ip() {
 function get_version_images() {
 	local cr_version="$1"
 	local component="$2"
+	local image_suffix="$3"
 	local release_versions_file="${TEMP_DIR}/release_version_${cr_version}"
 
 	if [[ ! -f $release_versions_file ]]; then
 		curl -s "https://raw.githubusercontent.com/percona/percona-postgresql-operator/refs/tags/v${cr_version}/e2e-tests/release_versions" >$release_versions_file
 	fi
 
-	grep -E "^IMAGE_${component}=" "$release_versions_file" | cut -d'=' -f2
+	grep -E "^IMAGE_${component}${image_suffix}=" "$release_versions_file" | cut -d'=' -f2
 }
 
 function get_release_image() {

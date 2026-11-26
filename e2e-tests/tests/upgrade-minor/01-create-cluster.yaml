@@ -30,7 +30,13 @@ commands:
 
       backrest_image=$(get_version_images $lower_ver BACKREST${pg_ver})
       pgbouncer_image=$(get_version_images $lower_ver PGBOUNCER${pg_ver})
-      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+      postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver} $(release_image_suffix))
+      if [[ -z "$postgres_image" ]]; then
+        postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
+      fi
+      if [[ $(release_image_suffix) == "_UBI10" ]]; then
+        logcollector_image=$(get_version_images $lower_ver LOGCOLLECTOR_UBI10)
+      fi
       operator_image=$(get_version_images $lower_ver OPERATOR)
 
       yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
@@ -44,6 +50,7 @@ commands:
           .spec.initContainer.image = "'${REGISTRY_NAME_FULL}''${operator_image}'" |
           .spec.image = "'${REGISTRY_NAME_FULL}''${postgres_image}'" |
           .spec.proxy.pgBouncer.image = "'${REGISTRY_NAME_FULL}''${pgbouncer_image}'" |
+          .spec.logcollector.image = "'${REGISTRY_NAME_FULL}''${logcollector_image}'" |
           .spec.backups.pgbackrest.image = "'${REGISTRY_NAME_FULL}''${backrest_image}'"' "${TEMP_DIR}/cr.yaml"
 
       MINIO_ENDPOINT="$(s3_storage_endpoint)"
