@@ -127,7 +127,7 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 			expectedErr:     "spec.extensions.pg_cron.enabled cannot be set for PostgreSQL 19",
 		},
 		"PG19 beta crVersion rejects set_user": {
-			crVersion:       "3.1.1",
+			crVersion:       "3.1.0",
 			postgresVersion: 19,
 			setUser:         new(true),
 			expectedErr:     "spec.extensions.set_user.enabled cannot be set for PostgreSQL 19",
@@ -143,7 +143,7 @@ func TestPerconaPGCluster_Validate(t *testing.T) {
 			pgCron:          new(true),
 		},
 		"PG19 GA crVersion allows pg_cron and set_user": {
-			crVersion:       "3.2.0",
+			crVersion:       "3.1.1",
 			postgresVersion: 19,
 			pgCron:          new(true),
 			setUser:         new(true),

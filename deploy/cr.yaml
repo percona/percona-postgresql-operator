@@ -527,7 +527,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/perconalab/percona-postgresql-operator:2.60.1-pgbackrest-community
+      image: docker.io/percona/percona-pgbackrest:latest
 #      env:
 #      - name: MY_ENV
 #        value: "1000"

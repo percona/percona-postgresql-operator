@@ -1946,7 +1946,15 @@ function get_container_image() {
 	if [[ $component == 'pgbouncer' ]]; then
 		echo "${IMAGE_PGBOUNCER}"
 	elif [[ $component == 'pgbackrest' ]]; then
-		echo "${IMAGE_BACKREST}"
+		# IMAGE_BACKREST matches PG_VER; major upgrade tests also ask for the
+		# other side of the upgrade, which may need a different pgBackRest build.
+		if [[ ${pgVersion} -ge 19 && ${PG_VER} -lt 19 ]]; then
+			echo "${IMAGE_BACKREST_PG19}"
+		elif [[ ${pgVersion} -lt 19 && ${PG_VER} -ge 19 ]]; then
+			echo "${IMAGE_BACKREST_PRE19}"
+		else
+			echo "${IMAGE_BACKREST}"
+		fi
 	elif [[ $component == 'upgrade' ]]; then
 		# a single upgrade image carries every supported version
 		echo "${IMAGE_UPGRADE}"

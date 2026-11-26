@@ -9,4 +9,4 @@ spec:
   toPostgresVersion: 19
   toPostgresImage: docker.io/percona/percona-distribution-postgresql:19
   toPgBouncerImage: docker.io/percona/percona-pgbouncer:latest
-  toPgBackRestImage: docker.io/perconalab/percona-postgresql-operator:2.60.1-pgbackrest-community
+  toPgBackRestImage: docker.io/percona/percona-pgbackrest:latest
