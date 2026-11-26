@@ -94,15 +94,7 @@ if [[ $PG_DISTRIBUTION == "community" ]]; then
 else
 	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"percona/percona-pgbouncer:1.25.2-8"}
 	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"percona/percona-distribution-postgresql:$PG_VER"}
-	# PostgreSQL 14-18 images ship pgBackRest 2.60.0, and PostgreSQL 19 images match
-	# latest; the pgBackRest image must match the version in the database image.
-	export IMAGE_BACKREST_PRE19=${IMAGE_BACKREST_PRE19:-"percona/percona-pgbackrest:2.60.0"}
-	export IMAGE_BACKREST_PG19=${IMAGE_BACKREST_PG19:-"percona/percona-pgbackrest:latest"}
-	if [[ ${PG_VER} -ge 19 ]]; then
-		export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BACKREST_PG19}"}
-	else
-		export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BACKREST_PRE19}"}
-	fi
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"percona/percona-pgbackrest:latest"}
 	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"percona/percona-distribution-postgresql-upgrade:19-18-17-16-15"}
 fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}

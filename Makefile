@@ -402,7 +402,7 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS14=.*#IMAGE_POSTGIS14=percona/percona-distribution-postgresql-with-postgis:14#" \
 		-e "s#^IMAGE_POSTGIS14_UBI8=.*#IMAGE_POSTGIS14_UBI8=percona/percona-distribution-postgresql-with-postgis:14-ubi8#" \
 		-e "s#^IMAGE_POSTGIS14_UBI10=.*#IMAGE_POSTGIS14_UBI10=percona/percona-distribution-postgresql-with-postgis:14-ubi10#" \
-		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=percona/percona-pgbackrest:2.60.0#" \
+		-e "s#^IMAGE_BACKREST14=.*#IMAGE_BACKREST14=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL15=.*#IMAGE_POSTGRESQL15=percona/percona-distribution-postgresql:15#" \
 		-e "s#^IMAGE_POSTGRESQL15_UBI8=.*#IMAGE_POSTGRESQL15_UBI8=percona/percona-distribution-postgresql:15-ubi8#" \
 		-e "s#^IMAGE_POSTGRESQL15_UBI10=.*#IMAGE_POSTGRESQL15_UBI10=percona/percona-distribution-postgresql:15-ubi10#" \
@@ -412,7 +412,7 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS15=.*#IMAGE_POSTGIS15=percona/percona-distribution-postgresql-with-postgis:15#" \
 		-e "s#^IMAGE_POSTGIS15_UBI8=.*#IMAGE_POSTGIS15_UBI8=percona/percona-distribution-postgresql-with-postgis:15-ubi8#" \
 		-e "s#^IMAGE_POSTGIS15_UBI10=.*#IMAGE_POSTGIS15_UBI10=percona/percona-distribution-postgresql-with-postgis:15-ubi10#" \
-		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=percona/percona-pgbackrest:2.60.0#" \
+		-e "s#^IMAGE_BACKREST15=.*#IMAGE_BACKREST15=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL16=.*#IMAGE_POSTGRESQL16=percona/percona-distribution-postgresql:16#" \
 		-e "s#^IMAGE_POSTGRESQL16_UBI8=.*#IMAGE_POSTGRESQL16_UBI8=percona/percona-distribution-postgresql:16-ubi8#" \
 		-e "s#^IMAGE_POSTGRESQL16_UBI10=.*#IMAGE_POSTGRESQL16_UBI10=percona/percona-distribution-postgresql:16-ubi10#" \
@@ -422,7 +422,7 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS16=.*#IMAGE_POSTGIS16=percona/percona-distribution-postgresql-with-postgis:16#" \
 		-e "s#^IMAGE_POSTGIS16_UBI8=.*#IMAGE_POSTGIS16_UBI8=percona/percona-distribution-postgresql-with-postgis:16-ubi8#" \
 		-e "s#^IMAGE_POSTGIS16_UBI10=.*#IMAGE_POSTGIS16_UBI10=percona/percona-distribution-postgresql-with-postgis:16-ubi10#" \
-		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=percona/percona-pgbackrest:2.60.0#" \
+		-e "s#^IMAGE_BACKREST16=.*#IMAGE_BACKREST16=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL17=.*#IMAGE_POSTGRESQL17=percona/percona-distribution-postgresql:17#" \
 		-e "s#^IMAGE_POSTGRESQL17_UBI8=.*#IMAGE_POSTGRESQL17_UBI8=percona/percona-distribution-postgresql:17-ubi8#" \
 		-e "s#^IMAGE_POSTGRESQL17_UBI10=.*#IMAGE_POSTGRESQL17_UBI10=percona/percona-distribution-postgresql:17-ubi10#" \
@@ -432,7 +432,7 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS17=.*#IMAGE_POSTGIS17=percona/percona-distribution-postgresql-with-postgis:17#" \
 		-e "s#^IMAGE_POSTGIS17_UBI8=.*#IMAGE_POSTGIS17_UBI8=percona/percona-distribution-postgresql-with-postgis:17-ubi8#" \
 		-e "s#^IMAGE_POSTGIS17_UBI10=.*#IMAGE_POSTGIS17_UBI10=percona/percona-distribution-postgresql-with-postgis:17-ubi10#" \
-		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=percona/percona-pgbackrest:2.60.0#" \
+		-e "s#^IMAGE_BACKREST17=.*#IMAGE_BACKREST17=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL18=.*#IMAGE_POSTGRESQL18=percona/percona-distribution-postgresql:18#" \
 		-e "s#^IMAGE_POSTGRESQL18_UBI8=.*#IMAGE_POSTGRESQL18_UBI8=percona/percona-distribution-postgresql:18-ubi8#" \
 		-e "s#^IMAGE_POSTGRESQL18_UBI10=.*#IMAGE_POSTGRESQL18_UBI10=percona/percona-distribution-postgresql:18-ubi10#" \
@@ -442,7 +442,7 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS18=.*#IMAGE_POSTGIS18=percona/percona-distribution-postgresql-with-postgis:18#" \
 		-e "s#^IMAGE_POSTGIS18_UBI8=.*#IMAGE_POSTGIS18_UBI8=percona/percona-distribution-postgresql-with-postgis:18-ubi8#" \
 		-e "s#^IMAGE_POSTGIS18_UBI10=.*#IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18-ubi10#" \
-		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=percona/percona-pgbackrest:2.60.0#" \
+		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=percona/percona-distribution-postgresql:19#" \
 		-e "s#^IMAGE_POSTGRESQL19_UBI8=.*#IMAGE_POSTGRESQL19_UBI8=percona/percona-distribution-postgresql:19-ubi8#" \
 		-e "s#^IMAGE_POSTGRESQL19_UBI10=.*#IMAGE_POSTGRESQL19_UBI10=percona/percona-distribution-postgresql:19-ubi10#" \
