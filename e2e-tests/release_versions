@@ -55,6 +55,15 @@ IMAGE_POSTGIS18_UBI8=percona/percona-distribution-postgresql-with-postgis:18.7.1
 IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18.7.1-2-ubi10
 IMAGE_BACKREST18=percona/percona-pgbackrest:2.60.1-2
 
+IMAGE_POSTGRESQL19=percona/percona-distribution-postgresql:19.0.1-2
+IMAGE_POSTGRESQL19_UBI8=percona/percona-distribution-postgresql:19.0.1-2-ubi8
+IMAGE_POSTGRESQL19_UBI10=percona/percona-distribution-postgresql:19.0.1-2-ubi10
+IMAGE_PGBOUNCER19=percona/percona-pgbouncer:1.26.1-2
+IMAGE_POSTGIS19=percona/percona-distribution-postgresql-with-postgis:19.0.1-2
+IMAGE_POSTGIS19_UBI8=percona/percona-distribution-postgresql-with-postgis:19.0.1-2-ubi8
+IMAGE_POSTGIS19_UBI10=percona/percona-distribution-postgresql-with-postgis:19.0.1-2-ubi10
+IMAGE_BACKREST19=percona/percona-pgbackrest:2.60.1-2
+
 IMAGE_POSTGRESQL19_UBI9_COMMUNITY=percona/percona-postgresql-operator:postgresql19-1-community-ubi9
 
 IMAGE_PGBOUNCER_COMMUNITY=percona/percona-postgresql-operator:pgbouncer1.25.2-43-community

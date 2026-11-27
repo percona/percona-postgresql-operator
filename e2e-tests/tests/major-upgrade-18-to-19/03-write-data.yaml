@@ -7,10 +7,16 @@ commands:
 
       source ../../functions
 
+      # K8SPG-911: tde_heap keeps the table encrypted with the key pg_tde fetches from
+      # Vault, so the upgrade has to carry both the data and the keyring to pg19.
       run_psql_local \
-        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY);' \
+        'CREATE DATABASE myapp; \c myapp \\\ CREATE TABLE IF NOT EXISTS myApp (id int PRIMARY KEY) USING tde_heap;' \
         "postgres:$(get_psql_user_pass major-upgrade-18-to-19-pguser-postgres)@$(get_psql_user_host major-upgrade-18-to-19-pguser-postgres)"
 
       run_psql_local \
         '\c myapp \\\ INSERT INTO myApp (id) VALUES (100500)' \
+        "postgres:$(get_psql_user_pass major-upgrade-18-to-19-pguser-postgres)@$(get_psql_user_host major-upgrade-18-to-19-pguser-postgres)"
+
+      run_psql_local \
+        '\c postgres \\\ CREATE EXTENSION pg_stat_kcache' \
         "postgres:$(get_psql_user_pass major-upgrade-18-to-19-pguser-postgres)@$(get_psql_user_host major-upgrade-18-to-19-pguser-postgres)"

@@ -16,6 +16,7 @@ commands:
 
       source ../../functions
 
+      stop_vault "vault-major-upgrade"
       remove_all_finalizers
       check_operator_panic
       destroy_operator
