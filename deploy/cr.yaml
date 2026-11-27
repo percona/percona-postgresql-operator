@@ -350,6 +350,14 @@ spec:
 #         requests:
 #           storage: 1Gi
 #
+#    logVolumeClaimSpec:
+#       storageClassName: standard
+#       accessModes:
+#       - ReadWriteOnce
+#       resources:
+#         requests:
+#           storage: 1Gi
+#
     dataVolumeClaimSpec:
 #      storageClassName: standard
       accessModes:

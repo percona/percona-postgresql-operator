@@ -1,0 +1,65 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 120
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      for role in pgwal pglogs; do
+        pvcs=$(kubectl -n "${NAMESPACE}" get pvc \
+          --selector postgres-operator.crunchydata.com/role=${role} \
+          -o custom-columns='NAME:.metadata.name' --no-headers)
+        if [[ -z ${pvcs} ]]; then
+          echo "no ${role} PVC was created"
+          exit 1
+        fi
+        for pvc in ${pvcs}; do
+          kubectl -n "${NAMESPACE}" wait --for=jsonpath='{.status.phase}'=Bound \
+            "pvc/${pvc}" --timeout=120s
+        done
+      done
+
+      sts=$(kubectl -n "${NAMESPACE}" get sts \
+        --selector postgres-operator.crunchydata.com/instance-set=instance1 -o json)
+
+      check_sts_volume() {
+        local volume=$1
+        local path=$2
+
+        printf '%s\n' "${sts}" | jq -e --arg v "${volume}" '.items[0].spec.template.spec.volumes[]
+          | select(.name == $v) | select(.persistentVolumeClaim != null)' >/dev/null
+        printf '%s\n' "${sts}" | jq -e --arg p "${path}" '.items[0].spec.template.spec.containers[]
+          | select(.name == "database") | .volumeMounts[]
+          | select(.mountPath == $p)' >/dev/null
+        printf '%s\n' "${sts}" | jq -e --arg p "${path}" '.items[0].spec.template.spec.initContainers[]
+          | select(.name == "postgres-startup") | .volumeMounts[]
+          | select(.mountPath == $p)' >/dev/null
+      }
+
+      check_sts_volume postgres-wal /pgwal
+      check_sts_volume postgres-logs /pglogs
+
+      # The startup command relocates the WAL directory, the pgBackRest spool path and
+      # the log directories onto their volumes; all of them are symlinks from the data
+      # volume, so nothing else has to be reconfigured to use them.
+      i=1
+      for pod in $(get_instance_set_pods instance1); do
+        # /proc/mounts guards against a false positive where the mount silently
+        # failed and reads/writes land on the container's own filesystem instead.
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+          grep -q ' /pgwal ' /proc/mounts
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+          grep -q ' /pglogs ' /proc/mounts
+
+        check_additional_volume_symlinks "${pod}" "on start"
+
+        kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- \
+          test -d /pglogs/postgres -a -d /pglogs/pgbackrest/log
+
+        path=$(kubectl -n "${NAMESPACE}" exec "${pod}" -c database -- ls /tablespaces)
+        kubectl create configmap -n "${NAMESPACE}" 02-ts-path-${i} --from-literal=path="/tablespaces/${path}"
+        i=$((i + 1))
+      done

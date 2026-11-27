@@ -1,22 +1,29 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-timeout: 30
+timeout: 60
 commands:
   - script: |-
       set -o errexit
       set -o xtrace
 
       source ../../functions
-        
+
+      uri=$(get_psql_uri additional-volumes postgres)
+
       data=$(run_psql_local \
         "select pg_tablespace_location(oid) from pg_tablespace where spcname = '\''myts'\'';" \
-        "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)")
+        "${uri}")
       kubectl create configmap -n "${NAMESPACE}" 04-check-tablespace --from-literal=data="${data}"
-        
+
       data=$(run_psql_local \
         "\c myapp \\\\\ SELECT ts.spcname AS tablespace_name FROM pg_class t JOIN pg_tablespace ts ON t.reltablespace = ts.oid WHERE t.relname = '\''myapp'\'';" \
-        "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)")
+        "${uri}")
       kubectl create configmap -n "${NAMESPACE}" 04-check-table-in-tablespace --from-literal=data="${data}"
-        
-      data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "postgres:$(get_psql_user_pass tablespaces-pguser-postgres)@$(get_psql_user_host tablespaces-pguser-postgres)")
+
+      data=$(run_psql_local '\c myapp \\\ SELECT * from myApp;' "${uri}")
       kubectl create configmap -n "${NAMESPACE}" 04-read-from-primary --from-literal=data="${data}"
+
+      # Postgres must be writing its WAL segments onto the volume, not the data volume.
+      primary=$(get_pod_by_role additional-volumes primary name)
+      kubectl -n "${NAMESPACE}" exec "${primary}" -c database -- \
+        bash -c "ls /pgwal/pg${PG_VER}_wal | grep -qE '^[0-9A-F]{24}$'"

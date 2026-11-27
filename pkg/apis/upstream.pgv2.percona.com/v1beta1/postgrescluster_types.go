@@ -709,6 +709,11 @@ type PostgresInstanceSetSpec struct {
 	// +optional
 	WALVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"walVolumeClaimSpec,omitempty"`
 
+	// K8SPG-1086
+	// Defines a separate PersistentVolumeClaim for PostgreSQL and pgBackRest logs.
+	// +optional
+	LogVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"logVolumeClaimSpec,omitempty"`
+
 	// The list of tablespaces volumes to mount for this postgrescluster
 	// This field requires enabling TablespaceVolumes feature gate
 	// +listType=map

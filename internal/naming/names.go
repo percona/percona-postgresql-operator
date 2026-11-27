@@ -369,6 +369,16 @@ func InstancePostgresWALVolume(instance *appsv1.StatefulSet) metav1.ObjectMeta {
 	}
 }
 
+// K8SPG-1086
+// InstancePostgresLogVolume returns the ObjectMeta for the PostgreSQL log
+// volume for instance.
+func InstancePostgresLogVolume(instance *appsv1.StatefulSet) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: instance.GetNamespace(),
+		Name:      instance.GetName() + "-pglogs",
+	}
+}
+
 // MonitoringUserSecret returns ObjectMeta necessary to lookup the Secret
 // containing authentication credentials for monitoring tools.
 func MonitoringUserSecret(cluster *v1beta1.PostgresCluster) metav1.ObjectMeta {
