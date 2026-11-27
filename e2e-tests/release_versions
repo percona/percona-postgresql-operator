@@ -1,4 +1,4 @@
- IMAGE_OPERATOR=perconalab/percona-postgresql-operator:main
+IMAGE_OPERATOR=perconalab/percona-postgresql-operator:main
 
 IMAGE_POSTGRESQL14=percona/percona-distribution-postgresql:14
 IMAGE_POSTGRESQL14_UBI8=percona/percona-distribution-postgresql:14-ubi8

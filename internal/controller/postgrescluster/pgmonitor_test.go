@@ -7,7 +7,6 @@ package postgrescluster
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/percona/percona-postgresql-operator/v3/internal/feature"
-
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pgmonitor"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/cmp"
@@ -343,24 +341,45 @@ name: exporter-config
 func TestAddPGMonitorExporterToInstancePodSpecStatBGWriter(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
+	tlsSecret := &corev1.SecretProjection{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "custom-exporter-certs"},
+	}
+
+	tests := map[string]struct {
 		postgresVersion int
-		deactivated     bool
+		tlsSecret       *corev1.SecretProjection
+		collectors      string
+		wantBGWriterOff bool
+		wantWebConfig   bool
 	}{
-		{postgresVersion: 16, deactivated: false},
-		{postgresVersion: 17, deactivated: true},
-		{postgresVersion: 18, deactivated: true},
-		{postgresVersion: 19, deactivated: true},
-	} {
-		t.Run(fmt.Sprint(tt.postgresVersion), func(t *testing.T) {
+		"PG16 keeps stat_bgwriter":             {postgresVersion: 16},
+		"PG16 with TLS keeps stat_bgwriter":    {postgresVersion: 16, tlsSecret: tlsSecret, wantWebConfig: true},
+		"PG17 disables stat_bgwriter":          {postgresVersion: 17, wantBGWriterOff: true},
+		"PG18 disables stat_bgwriter":          {postgresVersion: 18, wantBGWriterOff: true},
+		"PG19 disables stat_bgwriter":          {postgresVersion: 19, wantBGWriterOff: true},
+		"PG19 with TLS disables stat_bgwriter": {postgresVersion: 19, tlsSecret: tlsSecret, wantBGWriterOff: true, wantWebConfig: true},
+		"PG19 with collectors None":            {postgresVersion: 19, collectors: "None"},
+		"PG19 with TLS and collectors None":    {postgresVersion: 19, tlsSecret: tlsSecret, collectors: "None", wantWebConfig: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			cluster := &v1beta1.PostgresCluster{}
 			cluster.Name = "pg1"
 			cluster.Spec.Port = new(int32(5432))
 			cluster.Spec.PostgresVersion = tt.postgresVersion
 			cluster.SetLabels(map[string]string{naming.LabelVersion: "2.5.0"})
+			if tt.collectors != "" {
+				cluster.SetAnnotations(map[string]string{naming.PostgresExporterCollectorsAnnotation: tt.collectors})
+			}
 			cluster.Spec.Monitoring = &v1beta1.MonitoringSpec{
 				PGMonitor: &v1beta1.PGMonitorSpec{
-					Exporter: &v1beta1.ExporterSpec{Image: "test/image:tag"},
+					Exporter: &v1beta1.ExporterSpec{
+						Image:           "test/image:tag",
+						CustomTLSSecret: tt.tlsSecret,
+					},
 				},
 			}
 			template := &corev1.PodTemplateSpec{
@@ -370,12 +389,15 @@ func TestAddPGMonitorExporterToInstancePodSpecStatBGWriter(t *testing.T) {
 			}
 			queries := new(corev1.ConfigMap)
 			queries.Name = "query-conf"
+			webConfig := new(corev1.ConfigMap)
+			webConfig.Name = "web-conf"
 
-			assert.NilError(t, addPGMonitorExporterToInstancePodSpec(context.Background(), cluster, template, queries, nil))
+			assert.NilError(t, addPGMonitorExporterToInstancePodSpec(t.Context(), cluster, template, queries, webConfig))
 			assert.Equal(t, len(template.Spec.Containers), 2)
 
 			command := strings.Join(template.Spec.Containers[1].Command, "\n")
-			assert.Equal(t, strings.Contains(command, pgmonitor.ExporterDeactivateStatBGWriterFlag), tt.deactivated)
+			assert.Equal(t, strings.Contains(command, pgmonitor.ExporterDeactivateStatBGWriterFlag), tt.wantBGWriterOff)
+			assert.Equal(t, strings.Contains(command, pgmonitor.ExporterWebConfigFileFlag), tt.wantWebConfig)
 		})
 	}
 }
