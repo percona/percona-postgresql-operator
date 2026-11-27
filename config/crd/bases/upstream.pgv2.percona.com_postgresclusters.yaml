@@ -6390,6 +6390,13 @@ spec:
                     vault and wait for pod restarts
                   rule: '!has(oldSelf.pg_tde) || !has(oldSelf.pg_tde.vault) || !has(oldSelf.pg_tde.enabled)
                     || !oldSelf.pg_tde.enabled || has(self.pg_tde.vault)'
+              externalDNSHostnames:
+                items:
+                  maxLength: 253
+                  minLength: 1
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
               image:
                 type: string
               imagePullPolicy:
