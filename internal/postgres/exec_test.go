@@ -6,16 +6,22 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 
+	"github.com/go-logr/logr/funcr"
 	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
+	"k8s.io/client-go/rest"
 
+	"github.com/percona/percona-postgresql-operator/v3/internal/controller/runtime"
+	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/testing/require"
 )
 
@@ -190,5 +196,204 @@ done <<< "${databases}"
 
 			return nil
 		}).ExecInDatabasesFromQuery(context.Background(), "", "", nil)
+	})
+}
+
+func TestExecutorLogging(t *testing.T) {
+	const verifier = "SCRAM-SHA-256$4096:c2FsdA==$c3RvcmVk:c2VydmVy"
+
+	capture := func(t *testing.T, verbosity int) (context.Context, *[]map[string]any) {
+		var entries []map[string]any
+		logger := funcr.NewJSON(func(object string) {
+			var entry map[string]any
+			assert.NilError(t, json.Unmarshal([]byte(object), &entry))
+			entries = append(entries, entry)
+		}, funcr.Options{Verbosity: verbosity})
+		return logging.NewContext(context.Background(), logger), &entries
+	}
+
+	failing := Executor(func(
+		_ context.Context, stdin io.Reader, stdout, stderr io.Writer, _ ...string,
+	) error {
+		_, _ = io.Copy(io.Discard, stdin)
+		_, _ = io.WriteString(stdout, "out "+verifier)
+		_, _ = io.WriteString(stderr, "ERROR: boom md5"+strings.Repeat("a", 32))
+		return errors.New("command terminated with exit code 1")
+	})
+
+	t.Run("ExecFailure", func(t *testing.T) {
+		ctx, entries := capture(t, 0)
+
+		_, _, err := failing.Exec(ctx,
+			strings.NewReader(`ALTER ROLE x PASSWORD '`+verifier+`';`),
+			map[string]string{"verifier": "plain", "username": "x", "token_path": "/pgdata/token"},
+			[]string{"--no-align"})
+		assert.ErrorContains(t, err, "exit code 1")
+
+		assert.Equal(t, len(*entries), 1)
+		entry := (*entries)[0]
+		assert.Equal(t, entry["msg"], "failed to execute SQL")
+		assert.Equal(t, entry["error"], "command terminated with exit code 1")
+		assert.Equal(t, entry["sql"], `ALTER ROLE x PASSWORD '<redacted>';`)
+		assert.DeepEqual(t, entry["variables"], map[string]any{
+			"verifier": "<redacted>", "username": "x", "token_path": "/pgdata/token",
+		})
+		assert.DeepEqual(t, entry["psqlArgs"], []any{"--no-align"})
+		assert.Equal(t, entry["stdout"], "out <redacted>")
+		assert.Equal(t, entry["stderr"], "ERROR: boom <redacted>")
+		for _, key := range []string{"namespace", "pod", "container"} {
+			assert.Assert(t, entry[key] != nil, "missing %q", key)
+		}
+	})
+
+	t.Run("ExecInDatabasesFromQueryFailure", func(t *testing.T) {
+		ctx, entries := capture(t, 0)
+
+		_, _, err := failing.ExecInDatabasesFromQuery(ctx, `db query`, `SELECT 1;`, nil)
+		assert.ErrorContains(t, err, "exit code 1")
+
+		assert.Equal(t, len(*entries), 1)
+		entry := (*entries)[0]
+		assert.Equal(t, entry["msg"], "failed to execute SQL")
+		assert.Equal(t, entry["sql"], `SELECT 1;`)
+		assert.Equal(t, entry["databasesQuery"], `db query`)
+	})
+
+	t.Run("SuccessOnlyAtDebug", func(t *testing.T) {
+		succeeding := Executor(func(
+			context.Context, io.Reader, io.Writer, io.Writer, ...string,
+		) error {
+			return nil
+		})
+
+		ctx, entries := capture(t, 0)
+		_, _, err := succeeding.Exec(ctx, strings.NewReader(`SELECT 1;`), nil, nil)
+		assert.NilError(t, err)
+		assert.Equal(t, len(*entries), 0)
+
+		ctx, entries = capture(t, 1)
+		_, _, err = succeeding.Exec(ctx, strings.NewReader(`SELECT 1;`), nil, nil)
+		assert.NilError(t, err)
+		assert.Equal(t, len(*entries), 1)
+		assert.Equal(t, (*entries)[0]["msg"], "executed SQL")
+		assert.Equal(t, (*entries)[0]["sql"], `SELECT 1;`)
+	})
+
+	t.Run("SQLOmitted", func(t *testing.T) {
+		ctx, entries := capture(t, 0)
+
+		_, _, err := failing.Exec(WithSQLOmittedFromLogs(ctx),
+			strings.NewReader(`CREATE ROLE app LOGIN PASSWORD 'plaintext';`), nil, nil)
+		assert.ErrorContains(t, err, "exit code 1")
+
+		assert.Equal(t, len(*entries), 1)
+		entry := (*entries)[0]
+		assert.Equal(t, entry["msg"], "failed to execute SQL")
+		assert.Equal(t, entry["sql"], "<omitted>")
+		assert.Equal(t, entry["stdout"], "out <redacted>")
+		assert.Equal(t, entry["stderr"], "ERROR: boom <redacted>")
+
+		_, _, err = failing.ExecInDatabasesFromQuery(WithSQLOmittedFromLogs(ctx),
+			`db query`, `CREATE ROLE app LOGIN PASSWORD 'plaintext';`, nil)
+		assert.ErrorContains(t, err, "exit code 1")
+		assert.Equal(t, len(*entries), 2)
+		assert.Equal(t, (*entries)[1]["sql"], "<omitted>")
+	})
+
+	t.Run("Truncation", func(t *testing.T) {
+		long := strings.Repeat("x", maxLoggedLength+10)
+		assert.Equal(t, redactForLog(long),
+			strings.Repeat("x", maxLoggedLength)+"... (truncated)")
+	})
+
+	t.Run("LargeSQLIsStreamed", func(t *testing.T) {
+		const size = 4 << 20
+
+		// A verifier straddles the end of the logged part of the SQL.
+		sql := strings.Repeat("x", maxLoggedLength-20) + "'" + verifier + "'" + strings.Repeat("y", size)
+
+		var received int64
+		streaming := Executor(func(
+			_ context.Context, stdin io.Reader, _, _ io.Writer, _ ...string,
+		) error {
+			// The executor gets every byte, unchanged.
+			n, err := io.Copy(io.Discard, stdin)
+			received = n
+			assert.NilError(t, err)
+			return errors.New("command terminated with exit code 3")
+		})
+
+		ctx, entries := capture(t, 0)
+		_, _, err := streaming.Exec(ctx, strings.NewReader(sql), nil, nil)
+		assert.ErrorContains(t, err, "exit code 3")
+		assert.Equal(t, received, int64(len(sql)))
+
+		assert.Equal(t, len(*entries), 1)
+		logged := (*entries)[0]["sql"].(string)
+		assert.Assert(t, !strings.Contains(logged, "c2FsdA"), "verifier leaked: %q", logged[len(logged)-100:])
+		assert.Equal(t, logged, strings.Repeat("x", maxLoggedLength-20)+"'<redacted>'"+
+			strings.Repeat("y", 8)+"... (truncated)")
+	})
+
+	t.Run("TruncatedAfterRedaction", func(t *testing.T) {
+		// Redacting many verifiers makes the logged part shorter than
+		// maxLoggedLength, yet the SQL continues past it.
+		sql := strings.Repeat("'"+verifier+"',", sqlPrefixLength) + "SELECT 1;"
+
+		ctx, entries := capture(t, 0)
+		_, _, err := failing.Exec(ctx, strings.NewReader(sql), nil, nil)
+		assert.ErrorContains(t, err, "exit code 1")
+
+		logged := (*entries)[0]["sql"].(string)
+		assert.Assert(t, len(logged) < maxLoggedLength)
+		assert.Assert(t, strings.HasSuffix(logged, "... (truncated)"), "%q", logged[len(logged)-40:])
+		assert.Assert(t, !strings.Contains(logged, "c2FsdA"))
+	})
+
+	t.Run("PrefixReadBeforeExecuting", func(t *testing.T) {
+		// The executor never reads stdin, as when psql fails before reading
+		// or a PodExecutor is still copying stdin after it returns.
+		var calls int
+		unread := Executor(func(
+			context.Context, io.Reader, io.Writer, io.Writer, ...string,
+		) error {
+			calls++
+			return errors.New("command terminated with exit code 2")
+		})
+
+		sql := strings.Repeat("z", 1<<20)
+		ctx, entries := capture(t, 0)
+		_, _, err := unread.Exec(ctx, strings.NewReader(sql), nil, nil)
+		assert.ErrorContains(t, err, "exit code 2")
+		assert.Equal(t, (*entries)[0]["sql"], strings.Repeat("z", maxLoggedLength)+"... (truncated)")
+
+		// A reader that fails is not executed.
+		broken := errors.New("broken reader")
+		_, _, err = unread.Exec(ctx, iotest.ErrReader(broken), nil, nil)
+		assert.Error(t, err, "read SQL to log before executing: broken reader")
+		assert.Assert(t, errors.Is(err, broken), "the cause is kept")
+		assert.Equal(t, calls, 1)
+	})
+
+	t.Run("PodExecutorTarget", func(t *testing.T) {
+		// Nothing listens on this address, so the exec fails without a network.
+		podExec, err := runtime.NewPodExecutor(&rest.Config{Host: "http://127.0.0.1:1"})
+		assert.NilError(t, err)
+
+		ctx, entries := capture(t, 0)
+		_, _, err = Executor(func(
+			ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, command ...string,
+		) error {
+			return podExec(ctx, "some-ns", "some-pod", "database", stdin, stdout, stderr, command...)
+		}).Exec(ctx, strings.NewReader(`SELECT 1;`), nil, nil)
+		assert.Assert(t, err != nil)
+
+		assert.Assert(t, len(*entries) >= 1)
+		entry := (*entries)[len(*entries)-1]
+		assert.Equal(t, entry["msg"], "failed to execute SQL")
+		assert.Equal(t, entry["namespace"], "some-ns")
+		assert.Equal(t, entry["pod"], "some-pod")
+		assert.Equal(t, entry["container"], "database")
+		assert.Equal(t, entry["sql"], `SELECT 1;`)
 	})
 }
