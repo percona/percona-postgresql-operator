@@ -8,4 +8,4 @@ commands:
 
       source ../../functions
 
-      start_vault vault-service https
+      start_vault openbao-service https openbao

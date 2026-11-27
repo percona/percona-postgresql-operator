@@ -16,7 +16,7 @@ commands:
 
       source ../../functions
 
-      stop_vault "vault-service"
+      stop_vault "openbao-service" openbao
       remove_all_finalizers
       check_operator_panic
       destroy_operator
