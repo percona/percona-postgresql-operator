@@ -188,7 +188,7 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:18.7.1-1
+  image: docker.io/percona/percona-distribution-postgresql:18.7.1-2
   imagePullPolicy: Always
   postgresVersion: 18
 #  port: 5432
@@ -396,7 +396,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: docker.io/percona/percona-pgbouncer:1.26.1-1
+      image: docker.io/percona/percona-pgbouncer:1.26.1-2
 #      paused: true
 #      env:
 #      - name: MY_ENV
@@ -527,7 +527,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/percona/percona-pgbackrest:2.60.0-1
+      image: docker.io/percona/percona-pgbackrest:2.60.1-2
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
@@ -756,7 +756,7 @@ spec:
 
   pmm:
     enabled: false
-    image: docker.io/percona/pmm-client:3.10.0
+    image: docker.io/percona/pmm-client:3.11.0
 #    imagePullPolicy: IfNotPresent
     secret: cluster1-pmm-secret
     serverHost: monitoring-service
