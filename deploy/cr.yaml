@@ -63,6 +63,9 @@ spec:
 #    certValidityDuration: 2160h
 #    caValidityDuration: 26280h
 #    pgBackRestCertValidityDuration: 2160h
+#    SANs:
+#      - pg.example.com
+#      - "*.pg.internal.example.com"
 #    issuerConf:
 #      name: some-selfsigned-issuer
 #      kind: ClusterIssuer
