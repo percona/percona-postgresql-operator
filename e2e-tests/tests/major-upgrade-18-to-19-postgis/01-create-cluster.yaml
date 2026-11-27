@@ -1,0 +1,31 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 10
+commands:
+  - script: |-
+      set -o errexit
+      set -o xtrace
+
+      source ../../functions
+
+      postgres_image=$(get_container_image "postgis" 18)
+      pgbouncer_image=$(get_container_image "pgbouncer" 18)
+      pgbackrest_image=$(get_container_image "pgbackrest" 18)
+      kcache_ver=$(custom_ext_version 2.3.1)
+
+      get_cr \
+        | yq eval "
+          .spec.postgresVersion = 18 |
+          .spec.image = \"${postgres_image}\" |
+          .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = \"3Gi\" |
+          .spec.proxy.pgBouncer.image = \"${pgbouncer_image}\" |
+          .spec.backups.pgbackrest.image = \"${pgbackrest_image}\" |
+          .spec.patroni.removeDataDirectoryOnDivergedTimelines = true |
+          .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = \"pg_stat_statements,pg_stat_kcache\" |
+          .spec.extensions.builtin.pg_stat_monitor = false |
+          .spec.extensions.builtin.pg_stat_statements = true |
+          .spec.extensions.builtin.pg_audit = true |
+          .spec.extensions.builtin.pgvector = true |
+          .spec.extensions.builtin.pg_repack = true |
+          .spec.extensions.custom += [{\"name\": \"pg_stat_kcache\", \"version\": \"${kcache_ver}\"}]" \
+        | kubectl -n "${NAMESPACE}" apply -f -
