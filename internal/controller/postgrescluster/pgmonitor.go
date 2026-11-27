@@ -260,14 +260,14 @@ func addPGMonitorExporterToInstancePodSpec(
 		!strings.EqualFold(cluster.Annotations[naming.PostgresExporterCollectorsAnnotation], "None")
 
 	var cmd []string
-	// PG 17 does not include some of the columns found in stat_bgwriter with older PGs.
-	// Selectively turn off the collector for stat_bgwriter in PG 17, unless the user
+	// PG 17+ does not include some of the columns found in stat_bgwriter with older PGs.
+	// Selectively turn off the collector for stat_bgwriter in PG 17+, unless the user
 	// requests all collectors to be turned off.
 	switch {
-	case cluster.Spec.PostgresVersion == 17 && withBuiltInCollectors && certSecret == nil:
+	case cluster.Spec.PostgresVersion >= 17 && withBuiltInCollectors && certSecret == nil:
 		cmd = pgmonitor.ExporterStartCommand(withBuiltInCollectors,
 			pgmonitor.ExporterDeactivateStatBGWriterFlag)
-	case cluster.Spec.PostgresVersion == 17 && withBuiltInCollectors && certSecret != nil:
+	case cluster.Spec.PostgresVersion >= 17 && withBuiltInCollectors && certSecret != nil:
 		cmd = pgmonitor.ExporterStartCommand(withBuiltInCollectors,
 			pgmonitor.ExporterWebConfigFileFlag,
 			pgmonitor.ExporterDeactivateStatBGWriterFlag)

@@ -339,19 +339,19 @@ release: generate license
 	$(SED) -i "/CERT_MANAGER_VER/s/CERT_MANAGER_VER=\".*/CERT_MANAGER_VER=\"$(CERT_MANAGER_VER)\"/" e2e-tests/functions
 	$(SED) -i \
 		-e "/^spec:/,/^  crVersion:/{s/crVersion: .*/crVersion: $(VERSION)/}" \
-		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
+		-e "/^spec:/,/^  image:/{/^#/! s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL$(PG_VER))#}" \
 		-e "s|    image: docker.io/perconalab/percona-postgresql-operator:main|    image: $(IMAGE)|" \
-		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
-		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" \
+		-e "/^    pgBouncer:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER$(PG_VER))#}" \
+		-e "/^    pgbackrest:/,/^      image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST$(PG_VER))#}" \
 		-e "/extensions:/,/image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_OPERATOR)#}" \
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_PMM_CLIENT)#}" \
 		-e "/^  logcollector:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_LOGCOLLECTOR)#}" deploy/cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(VERSION)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
        -e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)$(IMAGE_UPGRADE)#}" \
-       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL18)#}" \
-       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER18)#}" \
-       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST18)#}" deploy/upgrade.yaml
+       -e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)$(IMAGE_POSTGRESQL$(PG_VER))#}" \
+       -e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)$(IMAGE_PGBOUNCER$(PG_VER))#}" \
+       -e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)$(IMAGE_BACKREST$(PG_VER))#}" deploy/upgrade.yaml
 
 # Update sidecars
 	$(SED) -i -r "s#pgv2.percona.com/version: [0-9]+\.[0-9]+\.[0-9]+#pgv2.percona.com/version: $(VERSION)#" e2e-tests/tests/sidecars/01-assert.yaml
@@ -377,7 +377,7 @@ after-release: update-version generate after-release-versions
 		-e "/^  pmm:/,/^    image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)perconalab/pmm-client:3-dev-latest#}" deploy/cr.yaml percona/controller/testdata/sidecar-resources-cr.yaml
 	$(SED) -i -r "/Version *= \"[0-9]+\.[0-9]+\.[0-9]+\"$$/ s/[0-9]+\.[0-9]+\.[0-9]+/$(NEXT_VER)/" pkg/apis/pgv2.percona.com/v2/perconapgcluster_types.go
 	$(SED) -i \
-		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql-upgrade:18-17-16-15-14#}" \
+		-e "/^spec:/,/^  image:/{s#image: .*#image: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql-upgrade:19-18-17-16-15#}" \
 		-e "/^spec:/,/^  toPostgresImage:/{s#toPostgresImage: .*#toPostgresImage: $(REGISTRY_NAME_FULL)percona/percona-distribution-postgresql:$(PG_VER)#}" \
 		-e "/^spec:/,/^  toPgBouncerImage:/{s#toPgBouncerImage: .*#toPgBouncerImage: $(REGISTRY_NAME_FULL)percona/percona-pgbouncer:latest#}" \
 		-e "/^spec:/,/^  toPgBackRestImage:/{s#toPgBackRestImage: .*#toPgBackRestImage: $(REGISTRY_NAME_FULL)percona/percona-pgbackrest:latest#}" deploy/upgrade.yaml
@@ -444,14 +444,19 @@ after-release-versions:
 		-e "s#^IMAGE_POSTGIS18_UBI10=.*#IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18-ubi10#" \
 		-e "s#^IMAGE_BACKREST18=.*#IMAGE_BACKREST18=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_POSTGRESQL19=.*#IMAGE_POSTGRESQL19=percona/percona-distribution-postgresql:19#" \
+		-e "s#^IMAGE_POSTGRESQL19_UBI8=.*#IMAGE_POSTGRESQL19_UBI8=percona/percona-distribution-postgresql:19-ubi8#" \
+		-e "s#^IMAGE_POSTGRESQL19_UBI10=.*#IMAGE_POSTGRESQL19_UBI10=percona/percona-distribution-postgresql:19-ubi10#" \
 		-e "s#^IMAGE_POSTGRESQL19_UBI9_COMMUNITY=.*#IMAGE_POSTGRESQL19_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-postgres19-community#" \
 		-e "s#^IMAGE_PGBOUNCER19=.*#IMAGE_PGBOUNCER19=percona/percona-pgbouncer:latest#" \
+		-e "s#^IMAGE_POSTGIS19=.*#IMAGE_POSTGIS19=percona/percona-distribution-postgresql-with-postgis:19#" \
+		-e "s#^IMAGE_POSTGIS19_UBI8=.*#IMAGE_POSTGIS19_UBI8=percona/percona-distribution-postgresql-with-postgis:19-ubi8#" \
+		-e "s#^IMAGE_POSTGIS19_UBI10=.*#IMAGE_POSTGIS19_UBI10=percona/percona-distribution-postgresql-with-postgis:19-ubi10#" \
 		-e "s#^IMAGE_BACKREST19=.*#IMAGE_BACKREST19=percona/percona-pgbackrest:latest#" \
 		-e "s#^IMAGE_PGBOUNCER_COMMUNITY=.*#IMAGE_PGBOUNCER_COMMUNITY=$(IMAGE_TAG_BASE):main-pgbouncer-community#" \
 		-e "s#^IMAGE_PGBACKREST_COMMUNITY=.*#IMAGE_PGBACKREST_COMMUNITY=$(IMAGE_TAG_BASE):main-pgbackrest-community#" \
-		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14#" \
-		-e "s#^IMAGE_UPGRADE_UBI8=.*#IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi8#" \
-		-e "s#^IMAGE_UPGRADE_UBI10=.*#IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi10#" \
+		-e "s#^IMAGE_UPGRADE=.*#IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15#" \
+		-e "s#^IMAGE_UPGRADE_UBI8=.*#IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15-ubi8#" \
+		-e "s#^IMAGE_UPGRADE_UBI10=.*#IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15-ubi10#" \
 		-e "s#^IMAGE_UPGRADE_UBI8_COMMUNITY=.*#IMAGE_UPGRADE_UBI8_COMMUNITY=$(IMAGE_TAG_BASE):main-ubi8-upgrade-community#" \
 		-e "s#^IMAGE_UPGRADE_UBI9_COMMUNITY=.*#IMAGE_UPGRADE_UBI9_COMMUNITY=$(IMAGE_TAG_BASE):main-upgrade-community#" \
 		-e "s#^IMAGE_PMM_CLIENT=.*#IMAGE_PMM_CLIENT=perconalab/pmm-client:3-dev-latest#" \
