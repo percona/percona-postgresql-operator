@@ -529,11 +529,12 @@ func (cr *PerconaPGCluster) Validate() error {
 		ptr.Deref(cr.Spec.Extensions.BuiltIn.PGStatStatements, false) {
 		return errors.New("pg_stat_monitor and pg_stat_statements cannot both be enabled")
 	}
-	// Extension packages are not built for PostgreSQL 19 (beta) yet; loading them
-	// via shared_preload_libraries would make postgres fail to start.
-	// pgAudit is the exception: the PG 19 community image compiles it from source.
-	// Remove this check once PostgreSQL 19 goes GA and the extensions are available.
-	if cr.Spec.PostgresVersion >= 19 {
+	// Operator 3.1.0 supported PostgreSQL 19 only as a beta, and its images had no
+	// pg_cron or set_user packages; loading them via shared_preload_libraries
+	// would make postgres fail to start. pgAudit is the exception: the PG 19
+	// community image compiles it from source. Clusters that keep an older crVersion
+	// may still run those beta images, so keep rejecting these extensions for them.
+	if cr.Spec.PostgresVersion >= 19 && cr.CompareVersion("3.1.1") < 0 {
 		for _, ext := range []struct {
 			name    string
 			enabled *bool
@@ -542,7 +543,7 @@ func (cr *PerconaPGCluster) Validate() error {
 			{"set_user", cr.Spec.Extensions.SetUser.Enabled},
 		} {
 			if ptr.Deref(ext.enabled, false) {
-				return errors.Errorf("spec.extensions.%s.enabled cannot be set for PostgreSQL %d: extension packages are not built for beta releases", ext.name, cr.Spec.PostgresVersion)
+				return errors.Errorf("spec.extensions.%s.enabled cannot be set for PostgreSQL %d: extension packages are not built for beta releases; set crVersion to 3.1.1 or later and use a GA image", ext.name, cr.Spec.PostgresVersion)
 			}
 		}
 	}

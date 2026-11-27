@@ -74,7 +74,7 @@ if [[ ! $PG_VER && $IMAGE_POSTGRESQL ]]; then
 	pg_version_value=$(echo "$IMAGE_POSTGRESQL" | sed -nE 's/.*(-ppg|-postgres|:)([0-9]+)([.-]|$).*/\2/p')
 	export PG_VER="${pg_version_value}"
 else
-	export PG_VER="${PG_VER:-18}"
+	export PG_VER="${PG_VER:-19}"
 fi
 
 export ARCH="${ARCH:-}"
@@ -93,9 +93,9 @@ if [[ $PG_DISTRIBUTION == "community" ]]; then
 	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade-community"}
 else
 	export IMAGE_PGBOUNCER=${IMAGE_PGBOUNCER:-"percona/percona-pgbouncer:1.25.2-8"}
-	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"${IMAGE_BASE}:main-ppg$PG_VER-postgres"}
-	export IMAGE_BACKREST=${IMAGE_BACKREST:-"${IMAGE_BASE}:main-pgbackrest$PG_VER"}
-	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"${IMAGE_BASE}:main-upgrade"}
+	export IMAGE_POSTGRESQL=${IMAGE_POSTGRESQL:-"percona/percona-distribution-postgresql:$PG_VER"}
+	export IMAGE_BACKREST=${IMAGE_BACKREST:-"percona/percona-pgbackrest:latest"}
+	export IMAGE_UPGRADE=${IMAGE_UPGRADE:-"percona/percona-distribution-postgresql-upgrade:19-18-17-16-15"}
 fi
 export BUCKET=${BUCKET:-"pg-operator-testing"}
 export PMM_SERVER_VERSION=${PMM_SERVER_VERSION:-"9.9.9"}
@@ -105,6 +105,8 @@ export IMAGE_LOGCOLLECTOR=${IMAGE_LOGCOLLECTOR:-"perconalab/fluentbit:main-logco
 export PGOV1_TAG=${PGOV1_TAG:-"1.4.0"}
 export PGOV1_VER=${PGOV1_VER:-"14"}
 export CPGO_VERSION=${CPGO_VERSION:-"5.8.7"}
+# Newest PostgreSQL major version Crunchy PGO ${CPGO_VERSION} supports.
+export CPGO_MAX_PG_VER=${CPGO_MAX_PG_VER:-"18"}
 export SEAWEEDFS_VER="${SEAWEEDFS_VER:-"4.47.0"}"
 export VAULT_VER="0.32.0"
 export IMAGE_AWS_CLI=${IMAGE_AWS_CLI:-"docker.io/amazon/aws-cli:2.34.60"}

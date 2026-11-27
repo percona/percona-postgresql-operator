@@ -188,9 +188,9 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/perconalab/percona-postgresql-operator:main-ppg18-postgres
+  image: docker.io/percona/percona-distribution-postgresql:19
   imagePullPolicy: Always
-  postgresVersion: 18
+  postgresVersion: 19
 #  port: 5432
 
 #  expose:
@@ -396,7 +396,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: 3
-      image: docker.io/perconalab/percona-postgresql-operator:main-pgbouncer18
+      image: docker.io/percona/percona-pgbouncer:latest
 #      paused: true
 #      env:
 #      - name: MY_ENV
@@ -527,7 +527,7 @@ spec:
     pgbackrest:
 #      metadata:
 #        labels:
-      image: docker.io/perconalab/percona-postgresql-operator:main-pgbackrest18
+      image: docker.io/percona/percona-pgbackrest:latest
 #      env:
 #      - name: MY_ENV
 #        value: "1000"
