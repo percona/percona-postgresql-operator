@@ -12,13 +12,12 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/percona/percona-postgresql-operator/v3/internal/initialize"
 	"github.com/percona/percona-postgresql-operator/v3/internal/logging"
 	"github.com/percona/percona-postgresql-operator/v3/internal/naming"
 	"github.com/percona/percona-postgresql-operator/v3/internal/patroni"
+	"github.com/percona/percona-postgresql-operator/v3/internal/patroni/dcs"
 	"github.com/percona/percona-postgresql-operator/v3/internal/pki"
 	"github.com/percona/percona-postgresql-operator/v3/internal/postgres"
 	"github.com/percona/percona-postgresql-operator/v3/percona/certmanager"
@@ -30,22 +29,7 @@ import (
 func (r *Reconciler) deletePatroniArtifacts(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
-	// TODO(cbandy): This could also be accomplished by adopting the Endpoints
-	// as Patroni creates them. Would their events cause too many reconciles?
-	// Foreground deletion may force us to adopt and set finalizers anyway.
-
-	selector, err := naming.AsSelector(naming.ClusterPatronis(cluster))
-	if err == nil {
-		err = errors.WithStack(
-			r.Client.DeleteAllOf(
-				ctx, &corev1.Endpoints{}, //nolint:staticcheck // SA1019
-				client.InNamespace(cluster.Namespace),
-				client.MatchingLabelsSelector{Selector: selector},
-			),
-		)
-	}
-
-	return err
+	return dcs.For(cluster).Delete(ctx, r.Client, cluster)
 }
 
 func (r *Reconciler) handlePatroniRestarts(
@@ -147,15 +131,12 @@ func (r *Reconciler) handlePatroniRestarts(
 func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) error {
-	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
-	// Endpoints object is not removed by Kubernetes at startup. Patroni will
-	// create this object if it has permission to do so, but it won't set any
-	// ownership.
-	// - https://releases.k8s.io/v1.16.0/pkg/controller/endpoint/endpoints_controller.go#L547
-	// - https://releases.k8s.io/v1.20.0/pkg/controller/endpoint/endpoints_controller.go#L580
-	// - https://github.com/zalando/patroni/blob/v2.0.1/patroni/dcs/kubernetes.py#L865-L881
-	dcsService := &corev1.Service{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)}
-	dcsService.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
+	// The DCS backend may not own any Kubernetes object for its distributed
+	// configuration (e.g. an external DCS).
+	dcsService := dcs.For(cluster).DistributedConfigurationService(cluster)
+	if dcsService == nil {
+		return nil
+	}
 
 	err := errors.WithStack(r.setControllerReference(cluster, dcsService))
 
@@ -169,11 +150,6 @@ func (r *Reconciler) reconcilePatroniDistributedConfiguration(
 			naming.LabelPatroni: naming.PatroniScope(cluster),
 		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]),
 	)
-
-	// Allocate no IP address (headless) and create no Endpoints.
-	// - https://docs.k8s.io/concepts/services-networking/service/#headless-services
-	dcsService.Spec.ClusterIP = corev1.ClusterIPNone
-	dcsService.Spec.Selector = nil
 
 	if err == nil {
 		err = errors.WithStack(r.apply(ctx, dcsService))
@@ -233,80 +209,6 @@ func (r *Reconciler) reconcilePatroniDynamicConfiguration(
 	)
 }
 
-// generatePatroniLeaderLeaseService returns a v1.Service that exposes the
-// Patroni leader when Patroni is using Endpoints for its leader elections.
-func (r *Reconciler) generatePatroniLeaderLeaseService(
-	cluster *v1beta1.PostgresCluster) (*corev1.Service, error,
-) {
-	service := &corev1.Service{ObjectMeta: naming.PatroniLeaderEndpoints(cluster)}
-	service.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
-
-	service.Annotations = naming.Merge(
-		cluster.Spec.Metadata.GetAnnotationsOrNil(),
-	)
-	service.Labels = naming.Merge(
-		cluster.Spec.Metadata.GetLabelsOrNil(),
-	)
-
-	if spec := cluster.Spec.Service; spec != nil {
-		service.Annotations = naming.Merge(service.Annotations,
-			spec.Metadata.GetAnnotationsOrNil())
-		service.Labels = naming.Merge(service.Labels,
-			spec.Metadata.GetLabelsOrNil())
-	}
-
-	// add our labels last so they aren't overwritten
-	service.Labels = naming.Merge(service.Labels,
-		naming.WithPerconaLabels(map[string]string{ // K8SPG-430
-			naming.LabelCluster: cluster.Name,
-			naming.LabelPatroni: naming.PatroniScope(cluster),
-		}, cluster.Name, "", cluster.Labels[naming.LabelVersion]))
-
-	// Allocate an IP address and/or node port and let Patroni manage the Endpoints.
-	// Patroni will ensure that they always route to the elected leader.
-	// - https://docs.k8s.io/concepts/services-networking/service/#services-without-selectors
-	service.Spec.Selector = nil
-
-	// The TargetPort must be the name (not the number) of the PostgreSQL
-	// ContainerPort. This name allows the port number to differ between
-	// instances, which can happen during a rolling update.
-	servicePort := corev1.ServicePort{
-		Name:       naming.PortPostgreSQL,
-		Port:       *cluster.Spec.Port,
-		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.FromString(naming.PortPostgreSQL),
-	}
-
-	if spec := cluster.Spec.Service; spec == nil {
-		service.Spec.Type = corev1.ServiceTypeClusterIP
-	} else {
-		service.Spec.Type = corev1.ServiceType(spec.Type)
-		// K8SPG-389
-		service.Spec.LoadBalancerSourceRanges = spec.LoadBalancerSourceRanges
-
-		if spec.NodePort != nil {
-			if service.Spec.Type == corev1.ServiceTypeClusterIP {
-				// The NodePort can only be set when the Service type is NodePort or
-				// LoadBalancer. However, due to a known issue prior to Kubernetes
-				// 1.20, we clear these errors during our apply. To preserve the
-				// appropriate behavior, we log an Event and return an error.
-				// TODO(tjmoore4): Once Validation Rules are available, this check
-				// and event could potentially be removed in favor of that validation
-				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "MisconfiguredClusterIP",
-					"NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-				return nil, errors.Errorf("NodePort cannot be set with type ClusterIP on Service %q", service.Name)
-			}
-			servicePort.NodePort = *spec.NodePort
-		}
-		service.Spec.ExternalTrafficPolicy = initialize.FromPointer(spec.ExternalTrafficPolicy)
-		service.Spec.InternalTrafficPolicy = spec.InternalTrafficPolicy
-	}
-	service.Spec.Ports = []corev1.ServicePort{servicePort}
-
-	err := errors.WithStack(r.setControllerReference(cluster, service))
-	return service, err
-}
-
 // +kubebuilder:rbac:groups="",resources="services",verbs={create,patch}
 
 // reconcilePatroniLeaderLease sets labels and ownership on the objects Patroni
@@ -315,12 +217,11 @@ func (r *Reconciler) generatePatroniLeaderLeaseService(
 func (r *Reconciler) reconcilePatroniLeaderLease(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 ) (*corev1.Service, error) {
-	// When using Endpoints for DCS, Patroni needs a Service to ensure that the
-	// Endpoints object is not removed by Kubernetes at startup.
-	// - https://releases.k8s.io/v1.16.0/pkg/controller/endpoint/endpoints_controller.go#L547
-	// - https://releases.k8s.io/v1.20.0/pkg/controller/endpoint/endpoints_controller.go#L580
-	service, err := r.generatePatroniLeaderLeaseService(cluster)
-	if err == nil {
+	service, err := dcs.For(cluster).LeaderLeaseService(cluster, r.Recorder)
+	if err == nil && service != nil {
+		err = errors.WithStack(r.setControllerReference(cluster, service))
+	}
+	if err == nil && service != nil {
 		err = errors.WithStack(r.apply(ctx, service))
 	}
 	return service, err
@@ -333,9 +234,6 @@ func (r *Reconciler) reconcilePatroniStatus(
 	ctx context.Context, cluster *v1beta1.PostgresCluster,
 	observedInstances *observedInstances,
 ) (time.Duration, error) {
-	var requeue time.Duration
-	log := logging.FromContext(ctx)
-
 	var readyInstance bool
 	for _, instance := range observedInstances.forCluster {
 		if r, _ := instance.IsReady(); r {
@@ -343,29 +241,13 @@ func (r *Reconciler) reconcilePatroniStatus(
 		}
 	}
 
-	dcs := &corev1.Endpoints{ObjectMeta: naming.PatroniDistributedConfiguration(cluster)} //nolint:staticcheck // SA1019
-	err := errors.WithStack(client.IgnoreNotFound(
-		r.Client.Get(ctx, client.ObjectKeyFromObject(dcs), dcs),
-	))
-
-	if err == nil {
-		if dcs.Annotations["initialize"] != "" {
-			// After bootstrap, Patroni writes the cluster system identifier to DCS.
-			cluster.Status.Patroni.SystemIdentifier = dcs.Annotations["initialize"]
-		} else if readyInstance {
-			// While we typically expect a value for the initialize key to be present in the
-			// Endpoints above by the time the StatefulSet for any instance indicates "ready"
-			// (since Patroni writes this value after successful cluster bootstrap, at which time
-			// the initial primary should transition to "ready"), sometimes this is not the case
-			// and the "initialize" key is not yet present.  Therefore, if a "ready" instance
-			// is detected in the cluster we assume this is the case, and simply log a message and
-			// requeue in order to try again until the expected value is found.
-			log.Info("detected ready instance but no initialize value")
-			requeue = time.Second
-		}
+	observation, err := dcs.For(cluster).Observe(ctx, r.Client, cluster, readyInstance)
+	if err == nil && observation.SystemIdentifier != "" {
+		// After bootstrap, the DCS backend reports the cluster system identifier.
+		cluster.Status.Patroni.SystemIdentifier = observation.SystemIdentifier
 	}
 
-	return requeue, err
+	return observation.RequeueAfter, err
 }
 
 // reconcileReplicationSecret creates a secret containing the TLS
