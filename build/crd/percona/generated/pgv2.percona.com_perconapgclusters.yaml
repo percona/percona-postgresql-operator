@@ -577,6 +577,10 @@ spec:
                         type: object
                       jobs:
                         properties:
+                          activeDeadlineSeconds:
+                            format: int64
+                            minimum: 60
+                            type: integer
                           affinity:
                             properties:
                               nodeAffinity:
@@ -1135,6 +1139,10 @@ spec:
                                     type: string
                                 type: object
                             type: object
+                          startupDeadlineSeconds:
+                            format: int64
+                            minimum: 60
+                            type: integer
                           tolerations:
                             items:
                               properties:
