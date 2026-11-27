@@ -481,7 +481,8 @@ EOF
 
 	kubectl -n "${NAMESPACE}" rollout status "deployment/${fullname}-all-in-one" --timeout=300s
 
-	aws_cli "$access_key" "$secret_key" us-east-1 \
+	# the pod is Ready before the S3 gateway listens, so the first request can be refused
+	retry 12 5 aws_cli "$access_key" "$secret_key" us-east-1 \
 		--endpoint-url "${endpoint_url}" ${aws_extra_args} s3 mb s3://operator-testing
 }
 
@@ -1880,6 +1881,20 @@ function destroy_cert_manager() {
 	kubectl get validatingwebhookconfiguration -o name | grep 'cert-manager' | xargs kubectl delete >/dev/null 2>&1 || :
 	kubectl get clusterrole,clusterrolebinding -o name | grep 'cert-manager' | xargs -r kubectl delete 2>&1 || :
 	kubectl delete namespace cert-manager --grace-period=0 --force=true --ignore-not-found >/dev/null 2>&1 || :
+}
+
+# Caps PG_VER and the matching images at the newest PostgreSQL version Crunchy
+# PGO supports, so migration-from-crunchy-* tests run on both operators.
+function use_crunchy_pg_version() {
+	if [[ ${PG_VER} -le ${CPGO_MAX_PG_VER} ]]; then
+		return
+	fi
+
+	PG_VER=${CPGO_MAX_PG_VER}
+	IMAGE_POSTGRESQL=$(get_container_image postgresql "${PG_VER}")
+	IMAGE_BACKREST=$(get_container_image pgbackrest "${PG_VER}")
+	IMAGE_PGBOUNCER=$(get_container_image pgbouncer "${PG_VER}")
+	export PG_VER IMAGE_POSTGRESQL IMAGE_BACKREST IMAGE_PGBOUNCER
 }
 
 function get_container_image() {

@@ -30,9 +30,9 @@ collectors:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGRestore
 metadata:
-  name: restore-after-18-to-19
+  name: restore-after-18-to-19-postgis
 spec:
-  pgCluster: major-upgrade-18-to-19
+  pgCluster: major-upgrade-18-to-19-postgis
   repoName: repo1
 status:
   state: Succeeded
@@ -40,7 +40,7 @@ status:
 apiVersion: pgv2.percona.com/v2
 kind: PerconaPGCluster
 metadata:
-  name: major-upgrade-18-to-19
+  name: major-upgrade-18-to-19-postgis
 status:
   pgbouncer:
     ready: 3

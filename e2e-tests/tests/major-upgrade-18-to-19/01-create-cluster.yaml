@@ -6,18 +6,12 @@ commands:
       set -o errexit
       set -o xtrace
 
-      # PostgreSQL 19 is a beta tech preview: it exists only as a community
-      # image built from PGDG packages, there are no ppg-19 packages. Both
-      # sides of the upgrade must come from the same build, so this test pins
-      # the community distribution instead of following the run flavor.
-      # Drop this once PostgreSQL 19 goes GA and ppg-19 images are published.
-      export PG_DISTRIBUTION=community
-
       source ../../functions
 
       postgres_image=$(get_container_image "postgres" 18)
       pgbouncer_image=$(get_container_image "pgbouncer" 18)
       pgbackrest_image=$(get_container_image "pgbackrest" 18)
+      kcache_ver=$(custom_ext_version 2.3.1)
 
       get_cr \
         | yq eval "
@@ -26,5 +20,16 @@ commands:
           .spec.instances[0].dataVolumeClaimSpec.resources.requests.storage = \"3Gi\" |
           .spec.proxy.pgBouncer.image = \"${pgbouncer_image}\" |
           .spec.backups.pgbackrest.image = \"${pgbackrest_image}\" |
-          .spec.patroni.removeDataDirectoryOnDivergedTimelines = true" \
+          .spec.patroni.removeDataDirectoryOnDivergedTimelines = true |
+          .spec.patroni.dynamicConfiguration.postgresql.parameters.shared_preload_libraries = \"pg_stat_statements,pg_stat_kcache\" |
+          .spec.extensions.builtin.pg_stat_monitor = false |
+          .spec.extensions.builtin.pg_stat_statements = true |
+          .spec.extensions.custom += [{\"name\": \"pg_stat_kcache\", \"version\": \"${kcache_ver}\"}] |
+          .spec.extensions.pg_tde.enabled = true |
+          .spec.extensions.pg_tde.vault.host = \"https://vault-major-upgrade.vault.svc:8200\" |
+          .spec.extensions.pg_tde.vault.mountPath = \"tde\" |
+          .spec.extensions.pg_tde.vault.tokenSecret.name = \"vault-secret\" |
+          .spec.extensions.pg_tde.vault.tokenSecret.key = \"token\" |
+          .spec.extensions.pg_tde.vault.caSecret.name = \"vault-secret\" |
+          .spec.extensions.pg_tde.vault.caSecret.key = \"ca.crt\"" \
         | kubectl -n "${NAMESPACE}" apply -f -

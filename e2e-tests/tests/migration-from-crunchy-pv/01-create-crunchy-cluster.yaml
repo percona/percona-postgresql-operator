@@ -6,6 +6,7 @@ commands:
       set -o xtrace
 
       source ../../functions
+      use_crunchy_pg_version
 
       MINIO_ENDPOINT="$(s3_storage_endpoint)"
       # Unique S3 path so parallel test runs do not collide.

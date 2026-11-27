@@ -6,6 +6,7 @@ commands:
       set -o xtrace
 
       source ../../functions
+      use_crunchy_pg_version
 
       CRUNCHY_NS="${NAMESPACE}-crunchy"
       MINIO_ENDPOINT="$(s3_storage_endpoint)"
