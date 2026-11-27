@@ -55,14 +55,22 @@ IMAGE_POSTGIS18_UBI8=percona/percona-distribution-postgresql-with-postgis:18-ubi
 IMAGE_POSTGIS18_UBI10=percona/percona-distribution-postgresql-with-postgis:18-ubi10
 IMAGE_BACKREST18=percona/percona-pgbackrest:latest
 
+IMAGE_POSTGRESQL19=percona/percona-distribution-postgresql:19
+IMAGE_POSTGRESQL19_UBI8=percona/percona-distribution-postgresql:19-ubi8
+IMAGE_POSTGRESQL19_UBI10=percona/percona-distribution-postgresql:19-ubi10
 IMAGE_POSTGRESQL19_UBI9_COMMUNITY=perconalab/percona-postgresql-operator:main-postgres19-community
+IMAGE_PGBOUNCER19=percona/percona-pgbouncer:latest
+IMAGE_POSTGIS19=percona/percona-distribution-postgresql-with-postgis:19
+IMAGE_POSTGIS19_UBI8=percona/percona-distribution-postgresql-with-postgis:19-ubi8
+IMAGE_POSTGIS19_UBI10=percona/percona-distribution-postgresql-with-postgis:19-ubi10
+IMAGE_BACKREST19=percona/percona-pgbackrest:latest
 
 IMAGE_PGBOUNCER_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbouncer-community
 IMAGE_PGBACKREST_COMMUNITY=perconalab/percona-postgresql-operator:main-pgbackrest-community
 
-IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14
-IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi8
-IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:18-17-16-15-14-ubi10
+IMAGE_UPGRADE=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15
+IMAGE_UPGRADE_UBI8=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15-ubi8
+IMAGE_UPGRADE_UBI10=percona/percona-distribution-postgresql-upgrade:19-18-17-16-15-ubi10
 IMAGE_UPGRADE_UBI8_COMMUNITY=perconalab/percona-postgresql-operator:main-ubi8-upgrade-community
 IMAGE_UPGRADE_UBI9_COMMUNITY=perconalab/percona-postgresql-operator:main-upgrade-community
 

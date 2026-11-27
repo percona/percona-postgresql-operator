@@ -188,9 +188,9 @@ spec:
 #          test-label: value
 
 
-  image: docker.io/percona/percona-distribution-postgresql:18
+  image: docker.io/percona/percona-distribution-postgresql:19
   imagePullPolicy: Always
-  postgresVersion: 18
+  postgresVersion: 19
 #  port: 5432
 
 #  expose:
