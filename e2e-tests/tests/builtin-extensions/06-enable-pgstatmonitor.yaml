@@ -20,7 +20,8 @@ commands:
                 \"parameters\": {
                   \"pgaudit.log\": \"ddl,write,role\",
                   \"pgaudit.log_level\": \"warning\",
-                  \"logging_collector\": \"off\"
+                  \"logging_collector\": \"off\",
+                  \"pg_stat_statements.track\": null
                 }
               }
             }
