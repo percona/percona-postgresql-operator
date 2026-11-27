@@ -34,8 +34,9 @@ commands:
       if [[ -z "$postgres_image" ]]; then
         postgres_image=$(get_version_images $lower_ver POSTGRESQL${pg_ver})
       fi
-      if [[ $(release_image_suffix) == "_UBI10" ]]; then
-        logcollector_image=$(get_version_images $lower_ver LOGCOLLECTOR_UBI10)
+      logcollector_image=$(get_version_images $lower_ver LOGCOLLECTOR $(release_image_suffix))
+      if [[ -z "$logcollector_image" ]]; then
+          logcollector_image=$(get_version_images $lower_ver LOGCOLLECTOR)
       fi
       operator_image=$(get_version_images $lower_ver OPERATOR)
 

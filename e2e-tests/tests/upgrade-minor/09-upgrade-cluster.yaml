@@ -19,6 +19,7 @@ commands:
       target_image_postgresql=$IMAGE_POSTGRESQL
       target_image_pgbouncer=$IMAGE_PGBOUNCER
       target_image_backrest=$IMAGE_BACKREST
+      target_image_logcollector=$IMAGE_LOGCOLLECTOR
 
       if [ "$pg_ver_lower" != "$PG_VER" ]; then
           target_image_postgresql="${REGISTRY_NAME_FULL}percona/percona-distribution-postgresql:$PG_VER"
