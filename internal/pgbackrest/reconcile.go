@@ -528,6 +528,7 @@ func Secret(ctx context.Context,
 	inCluster *v1beta1.PostgresCluster,
 	inRepoHost *appsv1.StatefulSet,
 	inRoot *pki.RootCertificateAuthority,
+	inAdditionalCAs [][]byte,
 	inSecret *corev1.Secret,
 	outSecret *corev1.Secret,
 ) error {
@@ -558,7 +559,13 @@ func Secret(ctx context.Context,
 		}
 
 		if err == nil {
-			outSecret.Data[certAuthoritySecretKey], err = certFile(inRoot.Certificate)
+			// The additional CAs go in the same file: pgBackRest verifies both
+			// its clients and its servers against "pgbackrest.ca-roots".
+			var root []byte
+			if root, err = certFile(inRoot.Certificate); err == nil {
+				outSecret.Data[certAuthoritySecretKey] = pki.TrustBundle(
+					append([][]byte{root}, inAdditionalCAs...)...)
+			}
 		}
 		if err == nil {
 			outSecret.Data[certClientPrivateKeySecretKey], err = certFile(leaf.PrivateKey)
